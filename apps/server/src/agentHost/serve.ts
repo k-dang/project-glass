@@ -17,10 +17,11 @@ import { Changes } from "../Changes"
 import { FolderFiles } from "./FolderFiles"
 import { forgottenByGlass } from "./forgotten"
 import { HostConversations, type Harnesses } from "./HostConversations"
+import { HostGlassTools } from "./HostGlassTools"
 import { Journal } from "./Journal"
 import { Git } from "../git"
 import { HostReady } from "./protocol"
-import { hostServer } from "./server"
+import { hostServer, portOf } from "./server"
 
 const unattended = (journal: Journal["Service"], conversations: HostConversations["Service"]) => {
   const readAttendanceAndTurnsAtOnce = Effect.sync(
@@ -45,11 +46,9 @@ const unattended = (journal: Journal["Service"], conversations: HostConversation
   )
 }
 
-const reportReady = (address: Parameters<typeof HttpServer.formatAddress>[0]) =>
+const reportReady = (address: HttpServer.HttpServer["Service"]["address"]) =>
   Effect.sync(() => {
-    const listening = new URL(HttpServer.formatAddress(address))
-
-    writeSync(3, Schema.encodeSync(HostReady)({ port: Number(listening.port) }))
+    writeSync(3, Schema.encodeSync(HostReady)({ port: portOf(address) }))
     closeSync(3)
   })
 
@@ -79,6 +78,7 @@ export const serveAgentHost = <E, R>(harnesses: Effect.Effect<Harnesses, E, R>) 
           }),
         ),
         Layer.provideMerge(HostConversations.make(adapters)),
+        Layer.provideMerge(HostGlassTools.layer),
         Layer.provideMerge(Journal.layer),
         Layer.provide(Changes.layer),
         Layer.provide(FolderFiles.layer),

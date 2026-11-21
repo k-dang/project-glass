@@ -35,6 +35,8 @@ export const conversationsPanelOpenAtom = Atom.make(true)
 
 export const conversationDetailsPinnedAtom = Atom.make(true).pipe(Atom.keepAlive)
 
+export const settledOpenAtom = Atom.make(true).pipe(Atom.keepAlive)
+
 export const ConversationSearch = Schema.Struct({
   view: Schema.optional(Schema.Literal("changes")),
 })
@@ -66,6 +68,18 @@ export const workingConversationsAtom = backendRuntime
     ),
   )
   .pipe(Atom.keepAlive)
+
+export const settledConversationsAtom = backendRuntime
+  .atom(
+    Stream.unwrap(Backend.useSync((backend) => backend.WatchSettledConversations())).pipe(
+      Stream.map((ids): ReadonlySet<string> => new Set(ids)),
+    ),
+  )
+  .pipe(Atom.keepAlive)
+
+export const bringBackConversationAtom = backendRuntime.fn((conversationId: string) =>
+  Backend.use((backend) => backend.BringBackConversation({ conversationId })),
+)
 
 export const conversationPullRequestsAtom = backendRuntime
   .atom(
@@ -437,6 +451,33 @@ export const removeConversation = async (
       type: "error",
       title: `Couldn't remove ${conversation.name}`,
       description: problemOf(exit.cause).detail,
+    })
+}
+
+export const removeSettledConversations = async (
+  registry: AtomRegistry.AtomRegistry,
+  settled: ReadonlyArray<Conversation>,
+  beforeRemoving: (conversation: Conversation) => void,
+) => {
+  let kept = 0
+
+  for (const conversation of settled) {
+    const warnings = await backendRuntimeOf(registry).runPromiseExit(
+      Backend.use((backend) => backend.GetRemovalWarnings({ conversationId: conversation.id })),
+    )
+
+    if (Exit.isSuccess(warnings) && warnings.value.uncommittedChanges === "none") {
+      beforeRemoving(conversation)
+      await removeConversation(registry, conversation)
+    } else kept++
+  }
+
+  if (kept > 0)
+    toast.add({
+      type: "info",
+      title: kept === 1 ? "Kept 1 Settled Conversation" : `Kept ${kept} Settled Conversations`,
+      description:
+        "They have uncommitted changes, or Glass couldn't check. Remove each one to see what it discards.",
     })
 }
 

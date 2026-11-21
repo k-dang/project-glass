@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { GlobalConversationCaller } from "./McpCredentials"
+import { GlobalChatCaller } from "./McpCredentials"
 import {
   AskUserAnswered,
   AskUserCancelled,
@@ -331,8 +331,8 @@ describe("ask_user", () => {
       const { baseUrl, client, mcpCredentials } = yield* startBackend({})
 
       const bearer = yield* mcpCredentials.issue(
-        GlobalConversationCaller.make({
-          globalConversationId: "conversation-1",
+        GlobalChatCaller.make({
+          globalChatId: "global-chat",
           sessionId: "session-1",
         }),
       )

@@ -1,25 +1,12 @@
-import {
-  Context,
-  Deferred,
-  Effect,
-  Exit,
-  Layer,
-  Option,
-  Predicate,
-  Redacted,
-  Schema,
-  Scope,
-} from "effect"
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto"
+import { Context, Deferred, Effect, Exit, Layer, Option, Redacted, Schema, Scope } from "effect"
+import { randomBytes, timingSafeEqual } from "node:crypto"
 import type { GlassToolsAccess, StartOutcome } from "../agentHost/protocol"
+import { digest } from "./mcpHttp"
 
-export class GlobalConversationCaller extends Schema.TaggedClass<GlobalConversationCaller>()(
-  "GlobalConversation",
-  {
-    globalConversationId: Schema.String,
-    sessionId: Schema.String,
-  },
-) {}
+export class GlobalChatCaller extends Schema.TaggedClass<GlobalChatCaller>()("GlobalChat", {
+  globalChatId: Schema.String,
+  sessionId: Schema.String,
+}) {}
 
 export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()("OutsideAgent", {
   agentId: Schema.String,
@@ -31,14 +18,7 @@ export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()
   conversationId: Schema.String,
 }) {}
 
-export type McpCallerIdentity = GlobalConversationCaller | ConversationCaller | OutsideAgentCaller
-
-export type IssuedCaller = GlobalConversationCaller | ConversationCaller
-
-const runningKey = (caller: IssuedCaller) =>
-  Predicate.isTagged(caller, "GlobalConversation")
-    ? `GlobalConversation:${caller.globalConversationId}`
-    : `Conversation:${caller.conversationId}`
+export type McpCallerIdentity = GlobalChatCaller | ConversationCaller | OutsideAgentCaller
 
 export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   "@glass/server/McpCaller",
@@ -52,8 +32,6 @@ export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
     ),
   )
 }
-
-export const digest = (bearer: string) => createHash("sha256").update(bearer).digest("hex")
 
 export const mintBearer = () => randomBytes(32).toString("base64url")
 
@@ -73,16 +51,18 @@ export interface McpCredential {
 export class McpCredentials extends Context.Service<
   McpCredentials,
   {
-    readonly issue: (caller: IssuedCaller) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
+    readonly issue: (
+      caller: GlobalChatCaller,
+    ) => Effect.Effect<Redacted.Redacted, never, Scope.Scope>
     readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<McpCredential>
     readonly endpoint: Effect.Effect<string>
     readonly listening: (url: string) => Effect.Effect<void>
     readonly startWith: <E>(
       lifetime: Scope.Scope,
-      caller: IssuedCaller,
+      caller: GlobalChatCaller,
       start: (access: GlassToolsAccess) => Effect.Effect<StartOutcome, E>,
     ) => Effect.Effect<StartOutcome, E>
-    readonly revoke: (caller: IssuedCaller) => Effect.Effect<void>
+    readonly revoke: (caller: GlobalChatCaller) => Effect.Effect<void>
   }
 >()("@glass/server/McpCredentials") {
   static readonly layer = Layer.effect(
@@ -102,7 +82,7 @@ export class McpCredentials extends Context.Service<
           return ending === undefined ? Effect.void : Scope.close(ending, Exit.void)
         })
 
-      const issue = (caller: IssuedCaller) =>
+      const issue = (caller: GlobalChatCaller) =>
         Effect.acquireRelease(
           Effect.gen(function* () {
             const bearer = mintBearer()
@@ -141,11 +121,11 @@ export class McpCredentials extends Context.Service<
 
             const started = yield* start(access).pipe(Effect.onError(() => revoke))
 
-            yield* started === "started" ? replaceRunning(runningKey(caller), credential) : revoke
+            yield* started === "started" ? replaceRunning(caller.globalChatId, credential) : revoke
 
             return started
           }),
-        revoke: (caller) => replaceRunning(runningKey(caller), null),
+        revoke: (caller) => replaceRunning(caller.globalChatId, null),
       })
     }),
   )

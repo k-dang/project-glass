@@ -434,12 +434,12 @@ export const states: ReadonlyArray<State> = [
   },
   {
     area: "Overlays",
-    name: "Global conversation",
-    focus: dialog(/Global conversation/),
+    name: "Global chat",
+    focus: dialog(/Global chat/),
     reach: async (window) => {
       await area(window, "Dashboard")
-      await window.getByRole("button", { name: "Global conversation" }).click()
-      await visible(window, "dialog", /Global conversation/)
+      await window.getByRole("button", { name: "Global chat" }).click()
+      await visible(window, "dialog", /Global chat/)
     },
   },
 ]

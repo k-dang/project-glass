@@ -21,9 +21,9 @@ import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from
 import { basename, dirname, join } from "node:path"
 import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
 import type { DeliveredTurn } from "../src/agentHost/deliveredMessage"
-import { GlassToolsAccess, glassToolsOf, notRunning } from "../src/agentHost/protocol"
+import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
 import type { WrittenSkills } from "../src/agentHost/sentSkills"
-import { MCP_PATH } from "../src/mcp/server"
+import { MCP_PATH } from "../src/mcp/mcpHttp"
 import { filesIn } from "./filesIn"
 import { connectMcp, initialize, mcpPost } from "./mcpClient"
 import { settleWith } from "../src/agentHost/requests"
@@ -73,7 +73,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
   const earlierStart = Effect.suspend(() =>
     existsSync(previousStart)
       ? Effect.succeed(decodeAccess(readFileSync(previousStart, "utf8")))
-      : Effect.die("The Global conversation has no earlier start"),
+      : Effect.die("The Global chat has no earlier start"),
   )
 
   return {
@@ -84,10 +84,10 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
       }),
     ),
     commands: (_folder, skills) => Effect.succeed(skillCommands(skills)),
-    start: ({ folder, conversation, role, skills, report }) =>
+    start: ({ folder, conversation, role, glassTools, skills, report }) =>
       Effect.gen(function* () {
         const review = Predicate.isTagged(role, "Review") ? role.brief : null
-        const glass = glassToolsOf(role) ?? null
+        const glass = glassTools ?? null
         const scope = yield* Scope.Scope
 
         if (Predicate.isTagged(role, "Global")) {

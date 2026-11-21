@@ -72,17 +72,8 @@ import {
   type Placement,
 } from "./Placement"
 import { Sandboxes } from "./Sandboxes"
-import { LocalAgentHost } from "./LocalAgentHost"
 import { LocalPlacement } from "./LocalPlacement"
-import {
-  type GlassToolsAccess,
-  type RepositoryRole,
-  type StartOutcome,
-  ReviewBrief,
-  ReviewRole,
-  WorkRole,
-} from "./agentHost/protocol"
-import { ConversationCaller, McpCredentials } from "./mcp/McpCredentials"
+import { type RepositoryRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { forgetStartedWork } from "./startedWorkRows"
@@ -101,8 +92,25 @@ const encodeBrief = Schema.encodeSync(BriefJson)
 
 const decodeBrief = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ brief: BriefJson })))
 
+const decodeKeptGoing = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ id: Schema.String, keptGoingAt: Schema.DateTimeUtcFromString })),
+)
+
 const annotateConversation = ({ id, harness, model, place }: Conversation) =>
   annotateUnit({ conversation_id: id, harness, model, sandbox_provider: sandboxProviderOf(place) })
+
+const inSandbox = (place: ConversationPlace) => Predicate.isTagged(place, "sandbox")
+
+const refuseReach = (
+  from: Conversation,
+  to: Pick<Conversation, "place" | "permissionMode">,
+  refusals: { readonly leavesSandbox: string; readonly asksLess: string },
+) =>
+  inSandbox(from.place) && !inSandbox(to.place)
+    ? Effect.fail(new ConversationError({ message: refusals.leavesSandbox }))
+    : asksLessThan(to.permissionMode, from.permissionMode)
+      ? Effect.fail(new ConversationError({ message: refusals.asksLess }))
+      : Effect.void
 
 const storageFailure = () =>
   new ConversationError({ message: "Couldn't read or save your Conversations. Try again." })
@@ -147,6 +155,10 @@ export class Conversations extends Context.Service<
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<WaitingConversation>>
     readonly watchFinished: () => Stream.Stream<ReadonlyArray<FinishedConversation>>
     readonly watchWorking: () => Stream.Stream<ReadonlyArray<string>>
+    readonly keptGoing: Stream.Stream<ReadonlyMap<string, DateTime.Utc>>
+    readonly bringBack: (
+      conversationId: string,
+    ) => Effect.Effect<void, ConversationNotFound | ConversationError>
     readonly markTurnSeen: (
       conversationId: string,
       endedAt: DateTime.Utc,
@@ -307,25 +319,8 @@ export class Conversations extends Context.Service<
       const notes = yield* FeedbackNotes
       const skillPacks = yield* SkillPacks
       const localSkills = yield* LocalSkills
-      const localHost = yield* LocalAgentHost
-      const credentials = yield* McpCredentials
       const fs = yield* FileSystem.FileSystem
       const lock = yield* Semaphore.make(1)
-
-      const startWithTools = <E>(
-        conversationId: string,
-        client: ConversationHost,
-        start: (tools: GlassToolsAccess | undefined) => Effect.Effect<StartOutcome, E>,
-      ) =>
-        localHost.lifetimeOf(client).pipe(
-          Effect.flatMap(
-            Option.match({
-              onNone: () => start(undefined),
-              onSome: (lifetime) =>
-                credentials.startWith(lifetime, ConversationCaller.make({ conversationId }), start),
-            }),
-          ),
-        )
 
       const stored = yield* sql`
         SELECT id, name, sandbox_provider AS sandboxProvider, owner, repo, base_branch AS baseBranch,
@@ -342,6 +337,28 @@ export class Conversations extends Context.Service<
           toRow(conversation, packsOfConversations.get(conversation.id) ?? []),
         ),
       )
+
+      const keptGoing = yield* SubscriptionRef.make<ReadonlyMap<string, DateTime.Utc>>(
+        new Map(
+          (yield* sql`
+            SELECT id, kept_going_at AS keptGoingAt FROM conversation WHERE kept_going_at IS NOT NULL
+          `.pipe(Effect.flatMap(decodeKeptGoing), Effect.orDie)).map(
+            ({ id, keptGoingAt }) => [id, keptGoingAt] as const,
+          ),
+        ),
+      )
+
+      const setKeptGoing = (conversationId: string, at: DateTime.Utc) =>
+        SubscriptionRef.update(keptGoing, (current) => new Map(current).set(conversationId, at))
+
+      const keepGoing = Effect.fnUntraced(function* (conversationId: string) {
+        const now = yield* DateTime.now
+
+        yield* sql`
+          UPDATE conversation SET kept_going_at = ${DateTime.formatIso(now)} WHERE id = ${conversationId}
+        `.pipe(Effect.catchTag("SqlError", couldNotSave))
+        yield* setKeptGoing(conversationId, now)
+      })
 
       const find = Effect.fnUntraced(function* (conversationId: string) {
         const found = (yield* SubscriptionRef.get(rows)).find(
@@ -450,7 +467,7 @@ export class Conversations extends Context.Service<
               ? reviewBrief(row).pipe(
                   Effect.flatMap((brief) => startAs(client, ReviewRole.make({ brief }))),
                 )
-              : startWithTools(id, client, (tools) => startAs(client, WorkRole.make({ tools })))
+              : startAs(client, WorkRole.make({}))
             ).pipe(Effect.asVoid),
           settings: { model, effort, permissionMode },
           prepareHost: hosting.prepareHost(row),
@@ -547,6 +564,7 @@ export class Conversations extends Context.Service<
                 local_skills: conversation.localSkills ? 1 : 0,
                 folder: placed.folder,
                 created_at: DateTime.formatIso(conversation.createdAt),
+                kept_going_at: DateTime.formatIso(conversation.createdAt),
                 review_brief: Purpose.$match(purpose, {
                   Work: () => null,
                   Review: ({ brief }) => encodeBrief(brief),
@@ -557,6 +575,7 @@ export class Conversations extends Context.Service<
                 ...current,
                 { ...placed, conversation },
               ])
+              yield* setKeptGoing(id, conversation.createdAt)
               yield* transcripts.startOrQueue(id, { ...first, context: null })
 
               return conversation
@@ -671,11 +690,16 @@ export class Conversations extends Context.Service<
           parent.permissionMode,
         )
 
-        if (asksLessThan(permissionMode, parent.permissionMode))
-          return yield* new ConversationError({
-            message:
+        yield* refuseReach(
+          parent,
+          { place: input.place, permissionMode },
+          {
+            leavesSandbox:
+              "A Conversation in a Sandbox can only create Conversations in a Sandbox. Ask the user to start one on this device.",
+            asksLess:
               "That Conversation would ask the user less than you do, so you can't create it. Create one on this device with Claude Code instead, or ask the user to.",
-          })
+          },
+        )
 
         return yield* createWith(input, permissionMode)
       })
@@ -690,11 +714,15 @@ export class Conversations extends Context.Service<
       ) {
         yield* findWritable(conversationId)
 
-        return yield* turns.send(
+        const delivery = yield* turns.send(
           conversationId,
           { message, images, context: null },
           notes.take(conversationNotes(conversationId), feedback),
         )
+
+        yield* keepGoing(conversationId)
+
+        return delivery
       })
 
       const sendFrom = Effect.fn("Conversations.sendFrom")(function* (
@@ -710,11 +738,12 @@ export class Conversations extends Context.Service<
         const sender = (yield* find(senderId)).conversation
         const target = (yield* find(conversationId)).conversation
 
-        if (asksLessThan(target.permissionMode, sender.permissionMode))
-          return yield* new ConversationError({
-            message:
-              "That Conversation asks the user less than you do, so you can't send it a message. Ask the user to.",
-          })
+        yield* refuseReach(sender, target, {
+          leavesSandbox:
+            "A Conversation in a Sandbox can only message Conversations in a Sandbox. Ask the user to message one on this device.",
+          asksLess:
+            "That Conversation asks the user less than you do, so you can't send it a message. Ask the user to.",
+        })
 
         return yield* send(conversationId, input)
       })
@@ -725,6 +754,12 @@ export class Conversations extends Context.Service<
       ) {
         const row = yield* findWritable(conversationId)
         yield* turns.steer(conversationOf(row), { ...input, context: null })
+        yield* keepGoing(conversationId)
+      })
+
+      const bringBack = Effect.fn("Conversations.bringBack")(function* (conversationId: string) {
+        yield* find(conversationId)
+        yield* keepGoing(conversationId)
       })
 
       const sendQueued = Effect.fn("Conversations.sendQueued")(function* (
@@ -910,8 +945,6 @@ export class Conversations extends Context.Service<
               Effect.ignore,
             )
 
-          yield* credentials.revoke(ConversationCaller.make({ conversationId }))
-
           yield* hosting.remove(row)
 
           yield* Effect.gen(function* () {
@@ -945,6 +978,8 @@ export class Conversations extends Context.Service<
       )
 
       return Conversations.of({
+        keptGoing: SubscriptionRef.changes(keptGoing),
+        bringBack,
         watch: () =>
           placed.pipe(Stream.map((current) => current.map(({ conversation }) => conversation))),
         transcript: (conversationId) =>

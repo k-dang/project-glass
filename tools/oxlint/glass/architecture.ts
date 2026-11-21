@@ -24,8 +24,11 @@ const transportOwners = new Set([
   "rpcSocket.ts",
   "LocalAgentHost.ts",
   "sandboxCalls.ts",
+  "agentHost/HostGlassTools.ts",
   "mcp/server.ts",
+  "mcp/mcpHttp.ts",
   "mcp/oauthHttp.ts",
+  "mcp/GlassToolRelay.ts",
 ])
 
 const entryPoints = new Set([

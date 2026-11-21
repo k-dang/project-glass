@@ -1,5 +1,5 @@
 import { getSessionInfo, query } from "@anthropic-ai/claude-agent-sdk"
-import { GlobalConversationCaller } from "../src/mcp/McpCredentials"
+import { GlobalChatCaller } from "../src/mcp/McpCredentials"
 import {
   type AgentEvent,
   type AgentHarness,
@@ -142,33 +142,42 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
   )
 
   const open = (conversation: string, role: Role | Work = WorkRole.make({})) =>
-    adapter.start({ folder, conversation, role, skills: [], report }).pipe(
-      Effect.map((session: HarnessSession) => ({
-        session,
-        configure: (settings: Partial<TurnSettings>) =>
-          session.configure({
-            model: null,
-            effort: null,
-            permissionMode: null,
-            ...defaults,
-            ...settings,
-          }),
-        send: (message: string, images: ReadonlyArray<Image> = []) =>
-          Effect.gen(function* () {
-            const turnId = `turn-${++nextTurn}`
-            const sentAt = yield* DateTime.now
-            yield* report(
-              TurnStarted.make({ turnId, message, images, context: null, feedback: [], sentAt }),
-            )
-            yield* session.startTurn(turnId, { message, images, context: null, prompt: message })
+    adapter
+      .start({
+        folder,
+        conversation,
+        role,
+        glassTools: Predicate.isTagged(role, "Global") ? role.tools : undefined,
+        skills: [],
+        report,
+      })
+      .pipe(
+        Effect.map((session: HarnessSession) => ({
+          session,
+          configure: (settings: Partial<TurnSettings>) =>
+            session.configure({
+              model: null,
+              effort: null,
+              permissionMode: null,
+              ...defaults,
+              ...settings,
+            }),
+          send: (message: string, images: ReadonlyArray<Image> = []) =>
+            Effect.gen(function* () {
+              const turnId = `turn-${++nextTurn}`
+              const sentAt = yield* DateTime.now
+              yield* report(
+                TurnStarted.make({ turnId, message, images, context: null, feedback: [], sentAt }),
+              )
+              yield* session.startTurn(turnId, { message, images, context: null, prompt: message })
 
-            return turnId
-          }),
-        steer: (message: string, images: ReadonlyArray<Image> = []) =>
-          session.steer({ message, images, context: null, prompt: message }),
-        answer: (requestId: string, answer: RequestAnswer) => session.answer(requestId, answer),
-      })),
-    )
+              return turnId
+            }),
+          steer: (message: string, images: ReadonlyArray<Image> = []) =>
+            session.steer({ message, images, context: null, prompt: message }),
+          answer: (requestId: string, answer: RequestAnswer) => session.answer(requestId, answer),
+        })),
+      )
 
   return {
     adapter,
@@ -315,7 +324,7 @@ export const glassToolsBackend = Effect.fnUntraced(function* (sessionId: string)
   const url = yield* mcpCredentials.endpoint
 
   const bearer = yield* mcpCredentials.issue(
-    GlobalConversationCaller.make({ globalConversationId: "global-conversation", sessionId }),
+    GlobalChatCaller.make({ globalChatId: "global-chat", sessionId }),
   )
 
   return {

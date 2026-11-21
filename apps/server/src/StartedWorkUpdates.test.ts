@@ -190,7 +190,7 @@ it.live(
       const [conversation] = yield* f.conversations
       assert.isDefined(conversation)
 
-      yield* f.client.StartGlobalConversationFresh()
+      yield* f.client.StartGlobalChatFresh()
       yield* f.release("first")
 
       const [startedWorkUpdate] = yield* globalTurns(f.client, settled(1))

@@ -50,7 +50,7 @@ export const needsYouKey = (item: NeedsYouItem): string =>
     OutsideQuestion: ({ id }) => `ask:${id}`,
     CheckIn: ({ id }) => `check-in:${id}`,
     PullRequest: ({ pullRequest }) => `pr:${referenceKey(pullRequest.ref)}`,
-    GlobalConversation: () => "global",
+    GlobalChat: () => "global",
   })
 
 export const finishedAgentReviewOf = (item: PullRequestNeedsYou) =>

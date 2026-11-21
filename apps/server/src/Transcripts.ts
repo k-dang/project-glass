@@ -309,7 +309,7 @@ export class Transcripts extends Context.Service<
     ) => Effect.Effect<void, ConversationBusy | ConversationError>
     readonly subscribeStarted: Effect.Effect<Stream.Stream<StartedTurn>, never, Scope.Scope>
     readonly subscribeEnded: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>
-    readonly subscribeSettled: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>
+    readonly subscribeMaybeIdle: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>
     readonly lastEnds: (
       conversationIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyMap<string, TurnEnd>, ConversationError>
@@ -416,7 +416,7 @@ export class Transcripts extends Context.Service<
           SELECT a.id AS conversationId, t.ended AS ended
           FROM (
             SELECT id, turn_seen_at FROM conversation
-            UNION ALL SELECT session_id, turn_seen_at FROM global_conversation
+            UNION ALL SELECT id, turn_seen_at FROM global_chat_session WHERE ended_at IS NULL
           ) a
           JOIN conversation_turn t ON t.rowid = (SELECT MAX(rowid) FROM conversation_turn WHERE conversation_id = a.id)
           WHERE ${sql.and(["t.ended IS NOT NULL", ...conditions])}
@@ -1174,7 +1174,7 @@ export class Transcripts extends Context.Service<
             ),
           ),
         ),
-        subscribeSettled: PubSub.subscribe(published).pipe(
+        subscribeMaybeIdle: PubSub.subscribe(published).pipe(
           Effect.map((live) =>
             Stream.fromSubscription(live).pipe(
               Stream.filter(
@@ -1217,8 +1217,8 @@ export class Transcripts extends Context.Service<
                     WHERE id = ${conversationId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
                   `,
                   sql`
-                    UPDATE global_conversation SET turn_seen_at = ${at}
-                    WHERE session_id = ${conversationId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
+                    UPDATE global_chat_session SET turn_seen_at = ${at}
+                    WHERE id = ${conversationId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
                   `,
                 ],
                 { discard: true },

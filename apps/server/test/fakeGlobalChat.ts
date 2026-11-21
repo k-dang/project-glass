@@ -16,10 +16,9 @@ const toolNames = ({ tools = [] }: FakeModelRequest) =>
       : [],
   )
 
-export const isGlobalConversation = (input: FakeModelRequest) =>
-  toolNames(input).includes("ask_user")
+export const isGlobalChat = (input: FakeModelRequest) => toolNames(input).includes("ask_user")
 
-export const globalConversationReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
+export const globalChatReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   const last = input.messages.at(-1)
 
   if (last?.role === "tool") return [{ text: `The fake model saw: ${textOf(last).slice(0, 200)}` }]

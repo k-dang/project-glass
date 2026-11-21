@@ -6,7 +6,7 @@ import { Asks } from "./Asks"
 import { ConversationPullRequests } from "./ConversationPullRequests"
 import { Conversations } from "./Conversations"
 import { GitHubClient } from "./github/GitHubClient"
-import { GlobalConversation } from "./GlobalConversation"
+import { GlobalChat } from "./GlobalChat"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
@@ -21,6 +21,7 @@ import { Queue } from "./Queue"
 import { engineSettingsOf, SettingsStore, withEngineSettings } from "./SettingsStore"
 import { Sandboxes } from "./Sandboxes"
 import { SavedPlaces } from "./SavedPlaces"
+import { SettledConversations } from "./SettledConversations"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { Storage } from "./Storage"
@@ -42,7 +43,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const settings = yield* SettingsStore
     const savedPlaces = yield* SavedPlaces
     const conversations = yield* Conversations
-    const globalConversation = yield* GlobalConversation
+    const globalChat = yield* GlobalChat
     const sandboxes = yield* Sandboxes
     const checkouts = yield* LocalCheckouts
     const storage = yield* Storage
@@ -50,6 +51,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const localSkills = yield* LocalSkills
     const needsYou = yield* NeedsYou
     const conversationPullRequests = yield* ConversationPullRequests
+    const settledConversations = yield* SettledConversations
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const outsideAgents = yield* OutsideAgents
@@ -175,6 +177,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       CreateConversation: (input) => conversations.create(input),
       WatchWorkingConversations: () => conversations.watchWorking(),
       WatchConversationPullRequests: () => conversationPullRequests.watch(),
+      WatchSettledConversations: () => settledConversations.watch(),
+      BringBackConversation: ({ conversationId }) => conversations.bringBack(conversationId),
       WatchNeedsYou: () => needsYou.watch(),
       MarkTurnSeen: ({ conversationId, endedAt }) =>
         conversations.markTurnSeen(conversationId, endedAt),
@@ -215,27 +219,25 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         conversations.removeFeedbackNote(conversationId, noteId),
       GetRemovalWarnings: ({ conversationId }) => conversations.removalWarnings(conversationId),
       RemoveConversation: ({ conversationId }) => conversations.remove(conversationId),
-      GetGlobalConversationModel: () => globalConversation.model,
-      ChangeGlobalConversationModel: (choice) => globalConversation.changeModel(choice),
-      WatchGlobalTranscript: () => globalConversation.transcript,
-      LoadEarlierGlobalTurns: ({ before }) => globalConversation.loadEarlier(before),
-      SendGlobalMessage: (input) => globalConversation.send(input),
-      SteerGlobal: (input) => globalConversation.steer(input),
-      CancelGlobalQueuedMessage: ({ queuedMessageId }) =>
-        globalConversation.cancelQueued(queuedMessageId),
-      SendGlobalQueuedMessage: ({ queuedMessageId }) =>
-        globalConversation.sendQueued(queuedMessageId),
-      StopGlobalTurn: () => globalConversation.stop,
-      AnswerGlobalRequest: ({ requestId, answer }) => globalConversation.answer(requestId, answer),
-      GetGlobalUnsentMessage: () => globalConversation.unsent,
-      SaveGlobalUnsentMessage: (unsent) => globalConversation.saveUnsent(unsent),
-      WatchGlobalUnseen: () => globalConversation.unseen,
-      MarkGlobalTurnSeen: ({ endedAt }) => globalConversation.markSeen(endedAt),
-      StartGlobalConversationFresh: () => globalConversation.startFresh,
-      ListPastGlobalConversations: () => globalConversation.past,
-      WatchPastGlobalConversation: ({ id }) => globalConversation.watchPast(id),
-      LoadEarlierPastGlobalTurns: ({ id, before }) =>
-        globalConversation.loadEarlierPast(id, before),
+      GetGlobalChatModel: () => globalChat.model,
+      ChangeGlobalChatModel: (choice) => globalChat.changeModel(choice),
+      WatchGlobalTranscript: () => globalChat.transcript,
+      LoadEarlierGlobalTurns: ({ before }) => globalChat.loadEarlier(before),
+      SendGlobalMessage: (input) => globalChat.send(input),
+      SteerGlobal: (input) => globalChat.steer(input),
+      CancelGlobalQueuedMessage: ({ queuedMessageId }) => globalChat.cancelQueued(queuedMessageId),
+      SendGlobalQueuedMessage: ({ queuedMessageId }) => globalChat.sendQueued(queuedMessageId),
+      StopGlobalTurn: () => globalChat.stop,
+      AnswerGlobalRequest: ({ requestId, answer }) => globalChat.answer(requestId, answer),
+      GetGlobalUnsentMessage: () => globalChat.unsent,
+      SaveGlobalUnsentMessage: (unsent) => globalChat.saveUnsent(unsent),
+      WatchGlobalUnseen: () => globalChat.unseen,
+      MarkGlobalTurnSeen: ({ endedAt }) => globalChat.markSeen(endedAt),
+      StartGlobalChatFresh: () => globalChat.startFresh,
+      ListEndedGlobalChatSessions: () => globalChat.endedSessions,
+      WatchGlobalChatSession: ({ id }) => globalChat.watchSession(id),
+      LoadEarlierGlobalChatSessionTurns: ({ id, before }) =>
+        globalChat.loadEarlierInSession(id, before),
     })
   }),
 )

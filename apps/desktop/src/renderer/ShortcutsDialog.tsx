@@ -50,7 +50,7 @@ const groups: ReadonlyArray<ShortcutGroup> = [
       { label: "Settings", keys: ["Mod", "7"] },
       { label: "Back", keys: ["Mod", "←"] },
       { label: "Forward", keys: ["Mod", "→"] },
-      { label: "Open or close the Global conversation", keys: ["Mod", "J"] },
+      { label: "Open or close the Global chat", keys: ["Mod", "J"] },
       { label: "Open the Command menu", keys: ["Mod", "K"] },
       { label: "Open a PR from the Command menu", keys: ["Mod", "L"] },
       { label: "Record a Dogfood report", keys: ["Mod", "Shift", "."] },

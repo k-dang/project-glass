@@ -25,7 +25,9 @@ export class PullRequestSummary extends Schema.Class<PullRequestSummary>("PullRe
 
 export const PullRequestOpen = Schema.TaggedStruct("Open", { checks: Checks })
 
-export const PullRequestMerged = Schema.TaggedStruct("Merged", {})
+export const PullRequestMerged = Schema.TaggedStruct("Merged", {
+  mergedAt: Schema.DateTimeUtcFromString,
+})
 
 export const PullRequestClosed = Schema.TaggedStruct("Closed", {})
 

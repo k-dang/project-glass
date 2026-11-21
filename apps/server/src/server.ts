@@ -22,13 +22,14 @@ import { Git } from "./git"
 import { GitHubAuth } from "./github/GitHubAuth"
 import { GitHubClient } from "./github/GitHubClient"
 import { GlassRpcHandlers } from "./handlers"
-import { GlobalConversation } from "./GlobalConversation"
+import { GlobalChat } from "./GlobalChat"
 import { LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
 import { Plugins } from "./Plugins"
 import { Sandboxes } from "./Sandboxes"
 import { ServerConfig } from "./ServerConfig"
 import { LocalPlacement } from "./LocalPlacement"
+import { GlassToolRelay } from "./mcp/GlassToolRelay"
 import { McpCredentials } from "./mcp/McpCredentials"
 import { McpOAuth } from "./mcp/McpOAuth"
 import { OAuthRoutes } from "./mcp/oauthHttp"
@@ -43,6 +44,7 @@ import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
 import { AgentCommands, SettingsStore } from "./SettingsStore"
 import { SavedPlaces } from "./SavedPlaces"
+import { SettledConversations } from "./SettledConversations"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { StartedWork } from "./StartedWork"
@@ -75,13 +77,13 @@ type AgentRunnersLayer = Layer.Layer<
 const followReattachedHost = Layer.effectDiscard(
   Effect.gen(function* () {
     yield* Conversations
-    yield* GlobalConversation
+    yield* GlobalChat
     yield* (yield* LocalAgentHost).followReattached
   }),
 )
 
 const ConversationsLive = followReattachedHost.pipe(
-  Layer.provideMerge(Layer.merge(Conversations.layer, GlobalConversation.layer)),
+  Layer.provideMerge(Layer.merge(Conversations.layer, GlobalChat.layer)),
   Layer.provide(LocalPlacement.layer),
   Layer.provideMerge(Sandboxes.layer),
   Layer.provide(ConversationTurns.layer),
@@ -104,7 +106,9 @@ const services = (
   Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates)
     .pipe(
       Layer.provide(NeedsYou.layer),
-      Layer.provide(ConversationPullRequests.layer),
+      Layer.provide(
+        SettledConversations.layer.pipe(Layer.provideMerge(ConversationPullRequests.layer)),
+      ),
       Layer.provide(StartedWork.layer),
       Layer.provide(PullRequestLists.layer),
       Layer.provide(PullRequestMirror.layer),
@@ -132,6 +136,7 @@ const services = (
       Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
       Layer.provideMerge(OutsideAgents.layer),
       Layer.provideMerge(McpOAuth.layer),
+      Layer.provide(GlassToolRelay.layer),
       Layer.provide(DatabaseLive),
       Layer.provide(FollowedRepositories.layer),
       Layer.provide(SettingsStore.layer),

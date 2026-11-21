@@ -2,6 +2,7 @@ import { ConversationError, RPC_PATH } from "@glass/contracts"
 import {
   Context,
   Data,
+  Deferred,
   Effect,
   Exit,
   FileSystem,
@@ -32,7 +33,8 @@ import {
 } from "./agentHost/hostAddress"
 import { AgentHostRpcs, hostPort, type HostReplaced, newHostToken } from "./agentHost/protocol"
 import { writeDataFile } from "./dataFiles"
-import { followJournal, greet } from "./hostJournal"
+import { followHost, greet } from "./hostJournal"
+import { GlassToolRelay, ToolCallOrigin } from "./mcp/GlassToolRelay"
 import type { ConversationHost } from "./ConversationTurns"
 import type { HostClient } from "./Placement"
 import { nodeEntry } from "./processes"
@@ -118,6 +120,7 @@ export class LocalAgentHost extends Context.Service<
       const fs = yield* FileSystem.FileSystem
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
+      const relay = yield* GlassToolRelay
       const webSocketConstructor = yield* Socket.WebSocketConstructor
       const backendScope = yield* Scope.Scope
       const lock = yield* Semaphore.make(1)
@@ -184,12 +187,17 @@ export class LocalAgentHost extends Context.Service<
             const fromOldestKept = { host, saved: 0 }
             const alreadySaved = new Map(savedRows.map(({ id, saved }) => [id, saved]))
 
-            const follow = followJournal(
-              transcripts.save,
-              client,
-              fromOldestKept,
-              (conversationId) => alreadySaved.get(conversationId) ?? 0,
-            ).pipe(
+            const offered = yield* Deferred.make<void>()
+
+            const follow = followHost(client, fromOldestKept, {
+              save: transcripts.save,
+              alreadySaved: (conversationId) => alreadySaved.get(conversationId) ?? 0,
+              relay,
+              origin: ToolCallOrigin.ThisDevice(),
+              calls: backendScope,
+            }).pipe(
+              Effect.tap(() => Deferred.succeed(offered, undefined)),
+              Effect.flatten,
               Effect.catchIf(lostConnection, (error) =>
                 gone(recorded.port).pipe(
                   Effect.flatMap((isGone) => Effect.fail(isGone ? new HostGone() : error)),
@@ -197,6 +205,8 @@ export class LocalAgentHost extends Context.Service<
               ),
               Effect.tapCause((cause) => Effect.logWarning("Lost the agent host's journal", cause)),
               Effect.retry({ while: lostConnection, schedule: Schedule.spaced("1 second") }),
+              // WARNING: A fresh launch waits on the offer while holding the lock that stop takes.
+              Effect.ensuring(Deferred.succeed(offered, undefined)),
               Effect.catch(() =>
                 Scope.close(connectionScope, Exit.void).pipe(
                   Effect.andThen(shutDownHost(recorded)),
@@ -208,7 +218,11 @@ export class LocalAgentHost extends Context.Service<
               Effect.asVoid,
             )
 
-            return { attached: { client, scope } satisfies Attached, follow }
+            return {
+              attached: { client, scope } satisfies Attached,
+              follow,
+              offered: Deferred.await(offered),
+            }
           }).pipe(
             Scope.provide(scope),
             Effect.onError(() => Scope.close(scope, Exit.void)),
@@ -322,8 +336,9 @@ export class LocalAgentHost extends Context.Service<
           }),
         ).pipe(Effect.scoped)
 
-        const { attached, follow } = yield* attach(yield* startRecordedHost)
+        const { attached, follow, offered } = yield* attach(yield* startRecordedHost)
         yield* follow
+        yield* offered
 
         return attached
       })
