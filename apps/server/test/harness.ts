@@ -1,4 +1,4 @@
-import { NodeFileSystem, NodeSocket } from "@effect/platform-node"
+import { NodeSocket } from "@effect/platform-node"
 import {
   ActivityPullRequest,
   GlassRpcs,
@@ -7,17 +7,15 @@ import {
   RPC_PATH,
   TOKEN_PARAM,
 } from "@glass/contracts"
-import { Clock, ConfigProvider, Context, Effect, FileSystem, Layer, Option } from "effect"
+import { Clock, ConfigProvider, Context, Effect, Layer, Option } from "effect"
 import { HttpServer } from "effect/http"
 import { Socket } from "effect/socket"
-import { mkdtemp, realpath, rm } from "node:fs/promises"
+import { mkdtemp, realpath } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { afterEach, vi } from "vite-plus/test"
 import { connectRpcClient } from "../src/rpcSocket"
 import { AgentRunners } from "../src/agentRunners"
-import { hostRecordPath, readHostRecord } from "../src/agentHost/hostAddress"
-import { shutDownHost } from "../src/LocalAgentHost"
 import { McpCredentials } from "../src/mcp/McpCredentials"
 import { OutsideAgents } from "../src/OutsideAgents"
 import { GlassMcpTools } from "../src/mcp/server"
@@ -25,6 +23,7 @@ import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
 import { AgentCommands } from "../src/SettingsStore"
 import { startFakeGitHub } from "./fakeGitHub"
+import { removeGlassHome } from "./glassHome"
 import { VIEWER } from "./fakePullRequest"
 
 const withRealTimeHeartbeat = Effect.provideService(Clock.Clock, Clock.Clock.defaultValue())
@@ -42,22 +41,8 @@ export const stubHome = (home: string) => {
 export const isolatedHome = Effect.acquireRelease(
   // WARNING: On macOS the temporary folder sits behind /private, so use the real path programs print.
   Effect.promise(() => mkdtemp(join(tmpdir(), "glass-test-")).then((made) => realpath(made))),
-  (directory) =>
-    shutDownLeftRunningHost(directory).pipe(
-      // WARNING: Windows keeps the folder locked until the shut-down host and its agents have exited.
-      Effect.andThen(
-        Effect.promise(() => rm(directory, { recursive: true, force: true, maxRetries: 20 })),
-      ),
-    ),
+  (directory) => Effect.promise(() => removeGlassHome(directory)),
 )
-
-const shutDownLeftRunningHost = (home: string) =>
-  FileSystem.FileSystem.pipe(
-    Effect.flatMap((fs) => readHostRecord(fs, hostRecordPath(join(home, ".project-glass")))),
-    Effect.flatMap(shutDownHost),
-    Effect.ignore,
-    Effect.provide(NodeFileSystem.layer),
-  )
 
 afterEach(() => vi.unstubAllEnvs())
 
