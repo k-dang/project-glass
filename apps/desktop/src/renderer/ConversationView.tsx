@@ -696,7 +696,7 @@ const TurnView = memo(function TurnView(props: {
                   <TraceTitle>{props.status === null ? "Working…" : `${props.status}…`}</TraceTitle>
                 </TraceLine>
               ) : (
-                <TurnEnding sentAt={turn.sentAt} ended={turn.ended} />
+                <TurnEnding sentAt={turn.sentAt} ended={turn.ended} parts={turn.parts} />
               )}
             </Trace>
           </MessageContent>
@@ -714,19 +714,39 @@ const elapsed = (sentAt: DateTime.Utc, ended: TurnEnd) => {
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`
 }
 
-function TurnEnding(props: { sentAt: DateTime.Utc; ended: TurnEnd }) {
+function TurnEnding(props: {
+  sentAt: DateTime.Utc
+  ended: TurnEnd
+  parts: ReadonlyArray<TurnPart>
+}) {
+  const inBackground = useContext(BackgroundToolCalls)
   const duration = elapsed(props.sentAt, props.ended)
+
+  const stillRunning = props.parts.some(
+    (part) =>
+      Predicate.isTagged(part, "ToolCall") &&
+      part.status === "done" &&
+      inBackground.has(part.toolCallId),
+  )
 
   return Match.value(props.ended.ending).pipe(
     Match.tagsExhaustive({
-      Done: () => (
-        <TraceLine>
-          <TraceIcon>
-            <CircleCheck />
-          </TraceIcon>
-          <TraceTitle>Done in {duration}</TraceTitle>
-        </TraceLine>
-      ),
+      Done: () =>
+        stillRunning ? (
+          <TraceLine status="running">
+            <TraceIcon>
+              <LoaderCircle className="animate-spin" />
+            </TraceIcon>
+            <TraceTitle>Replied in {duration}, still running in the background…</TraceTitle>
+          </TraceLine>
+        ) : (
+          <TraceLine>
+            <TraceIcon>
+              <CircleCheck />
+            </TraceIcon>
+            <TraceTitle>Done in {duration}</TraceTitle>
+          </TraceLine>
+        ),
       Failed: ({ reason }) => (
         <TraceLine status="error" role="alert" className="items-start">
           <TraceIcon className="mt-0.5">
