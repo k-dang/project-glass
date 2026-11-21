@@ -450,6 +450,33 @@ export const removeConversation = async (
     })
 }
 
+export const removeSettledConversations = async (
+  registry: AtomRegistry.AtomRegistry,
+  settled: ReadonlyArray<Conversation>,
+  beforeRemoving: (conversation: Conversation) => void,
+) => {
+  let kept = 0
+
+  for (const conversation of settled) {
+    const warnings = await backendRuntimeOf(registry).runPromiseExit(
+      Backend.use((backend) => backend.GetRemovalWarnings({ conversationId: conversation.id })),
+    )
+
+    if (Exit.isSuccess(warnings) && warnings.value.uncommittedChanges === "none") {
+      beforeRemoving(conversation)
+      await removeConversation(registry, conversation)
+    } else kept++
+  }
+
+  if (kept > 0)
+    toast.add({
+      type: "info",
+      title: kept === 1 ? "Kept 1 Settled Conversation" : `Kept ${kept} Settled Conversations`,
+      description:
+        "They have uncommitted changes, or Glass couldn't check. Remove each one to see what it discards.",
+    })
+}
+
 const groupOrder: ReadonlyArray<PlaceTag> = ["local", "sandbox"]
 
 export const groupConversations = (conversations: ReadonlyArray<Conversation>) =>

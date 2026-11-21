@@ -237,6 +237,37 @@ it("lists Settled Conversations apart from the ones still going, in a section th
   await waitFor(() => expect(broughtBack).toEqual([conversation.id]))
 })
 
+it("removes every Settled Conversation without uncommitted changes at once", async () => {
+  const clean = new Conversation({ ...conversationFields, id: "agent-2", name: "agent/calm-heron" })
+  const removed: Array<string> = []
+
+  const user = mount(
+    {
+      WatchConversations: () => Stream.make([conversation, clean]),
+      WatchSettledConversations: () => Stream.make([conversation.id, clean.id]),
+      GetRemovalWarnings: ({ conversationId }) =>
+        Effect.succeed(
+          new RemovalWarnings({
+            uncommittedChanges: conversationId === clean.id ? "none" : "some",
+          }),
+        ),
+      RemoveConversation: ({ conversationId }) =>
+        Effect.sync(() => void removed.push(conversationId)),
+    },
+    "/conversations",
+  )
+
+  await user.click(await screen.findByRole("button", { name: "Remove Settled Conversations" }))
+
+  const dialog = await screen.findByRole("alertdialog", {
+    name: "Remove 2 Settled Conversations?",
+  })
+
+  await user.click(within(dialog).getByRole("button", { name: "Remove Conversations" }))
+
+  await waitFor(() => expect(removed).toEqual([clean.id]))
+})
+
 it("says in the Conversations panel how a Turn that finished unseen ended", async () => {
   const ended = {
     at: DateTime.add(sentAt, { seconds: 3 }),
