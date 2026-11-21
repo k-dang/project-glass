@@ -21,6 +21,7 @@ Fake GitHub only (`node $V launch`); never merge on real GitHub. Open each PR wi
 - **`merge-when-ready`:** #99. `click --role button --name "Merge when ready"`, `wait --text "Auto-merge on"`: the chip shows and the button is gone.
 - **`merge-queue`:** #100. `click --role button --name "Add to merge queue"`, `wait --text "In merge queue"`.
 - **`merge-queue-when-ready`:** #98. `click --role button --name "Merge when ready"`, `wait --text "Auto-merge on"`.
+- **Settle a Thread:** `launch --backend fake`. In Threads, open the Thread whose row shows `#2`, `click --role link --name "Open PR #2, checks passing"`, then Merge. Back in Threads it sits under Settled (`button "SETTLED 1"`; the CSS uppercases it). That fake lives in the backend, so `relaunch` reopens PR #2.
 - **Proof.** A snapshot and screenshot of each header before and after.
 
 ## Gotchas
