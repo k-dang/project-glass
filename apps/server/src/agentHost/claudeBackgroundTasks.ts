@@ -41,9 +41,14 @@ const taskOf = (frame: TaskFrame, toolCallId: string | null): BackgroundTask | n
   }
 }
 
+interface Ended {
+  readonly work: BackgroundWork
+  readonly toolCallId: string | null
+}
+
 export interface Tracked {
   readonly tasks: BackgroundTasks
-  readonly ended: BackgroundWork | null
+  readonly ended: Ended | null
 }
 
 const unchanged = (tasks: BackgroundTasks): Tracked => ({ tasks, ended: null })
@@ -92,7 +97,10 @@ export const trackBackgroundTasks = (tasks: BackgroundTasks, message: SDKMessage
           unendedById,
           runningIds: tasks.runningIds.filter((id) => id !== message.task_id),
         },
-        ended: { kind: task.kind, description: task.description, outcome: message.status },
+        ended: {
+          work: { kind: task.kind, description: task.description, outcome: message.status },
+          toolCallId: message.tool_use_id ?? task.toolCallId,
+        },
       }
     }
 

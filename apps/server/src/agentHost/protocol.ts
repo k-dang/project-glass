@@ -13,6 +13,7 @@ import {
   PartSet,
   RequestAnswer,
   RequestNotWaiting,
+  ToolCallStatusSet,
   TurnEnded,
   TurnStarted,
 } from "@glass/contracts"
@@ -39,6 +40,7 @@ export const HostEvent = Schema.Union([
   TurnStarted,
   PartSet,
   PartAppended,
+  ToolCallStatusSet,
   HostTurnEnded,
   AgentStatusesChanged,
 ])
