@@ -127,7 +127,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ReplyToReviewThread: ({ reviewThreadId, body }) =>
         github.replyToReviewThread(reviewThreadId, body),
       MergePullRequest: ({ pullRequestId, revision, action }) =>
-        github.mergePullRequest(pullRequestId, revision, action),
+        github
+          .mergePullRequest(pullRequestId, revision, action)
+          .pipe(Effect.andThen(lists.refreshSoon)),
       SetReviewThreadResolved: ({ reviewThreadId, resolved }) =>
         github.setReviewThreadResolved(reviewThreadId, resolved),
       SetReaction: ({ commentId, reaction, reacted }) =>

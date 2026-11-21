@@ -2,7 +2,9 @@ import { assert, it } from "@effect/vitest"
 import {
   ThreadStarted,
   LineNote,
+  Merge,
   PageNote,
+  PullRequestRef,
   PageText,
   SandboxPlace,
   TextPatch,
@@ -589,6 +591,51 @@ ${toDoMention({ id: 1, title: "Fix spacing" })}`)
         { title: "Tidy later", done: false },
         { title: "Fix spacing", done: true },
       ],
+    )
+  }),
+)
+
+it.live("settles a Thread right after its PR is merged from Glass", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+
+    const pr = f.github.seedPullRequest({
+      owner: "glass-demo",
+      repo: "greeter",
+      number: 7,
+      headBranch: "feature/merge-here",
+      base: { sha: "b0", files: {} },
+      head: { sha: "h1", files: {} },
+    })
+
+    const thread = yield* f.start("hold:first")
+    yield* f.transcript(thread.id, holding)
+    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/merge-here")
+    yield* f.release("first")
+
+    yield* f.client.WatchThreadPullRequests().pipe(
+      Stream.filter((listed) =>
+        listed.some(
+          ({ threadId, state }) => threadId === thread.id && Predicate.isTagged(state, "Open"),
+        ),
+      ),
+      Stream.runHead,
+    )
+
+    const { pullRequest, revision } = yield* f.client.LoadPullRequest({
+      pullRequest: new PullRequestRef(pr),
+    })
+
+    yield* f.client.MergePullRequest({
+      pullRequestId: pullRequest.id,
+      revision,
+      action: Merge.make({ method: "merge" }),
+    })
+
+    yield* f.client.WatchSettledThreads().pipe(
+      Stream.filter((ids) => ids.includes(thread.id)),
+      Stream.runHead,
     )
   }),
 )
