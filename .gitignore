@@ -12,3 +12,4 @@ release/
 .gallery/
 test-results/
 playwright-report/
+.env
