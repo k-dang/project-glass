@@ -15,8 +15,12 @@ jobs:
   # does not know runs every job, and so does every push to main, which checks what landed after
   # other pull requests merged.
   server:
-    name: test (server)
+    name: test (server ${{ matrix.shard }}/${{ strategy.job-total }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@v7
         with:
@@ -28,7 +32,7 @@ jobs:
       - if: steps.check.outputs.affected == 'true'
         uses: ./.github/actions/setup
       - if: steps.check.outputs.affected == 'true'
-        run: pnpm --filter @glass/server test
+        run: pnpm --filter @glass/server test --shard=${{ matrix.shard }}/${{ strategy.job-total }}
 
   desktop:
     name: test (desktop)
