@@ -92,6 +92,10 @@ const encodeBrief = Schema.encodeSync(BriefJson)
 
 const decodeBrief = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ brief: BriefJson })))
 
+const decodeKeptGoing = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ id: Schema.String, keptGoingAt: Schema.DateTimeUtcFromString })),
+)
+
 const annotateConversation = ({ id, harness, model, place }: Conversation) =>
   annotateUnit({ conversation_id: id, harness, model, sandbox_provider: sandboxProviderOf(place) })
 
@@ -151,6 +155,10 @@ export class Conversations extends Context.Service<
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<WaitingConversation>>
     readonly watchFinished: () => Stream.Stream<ReadonlyArray<FinishedConversation>>
     readonly watchWorking: () => Stream.Stream<ReadonlyArray<string>>
+    readonly keptGoing: Stream.Stream<ReadonlyMap<string, DateTime.Utc>>
+    readonly bringBack: (
+      conversationId: string,
+    ) => Effect.Effect<void, ConversationNotFound | ConversationError>
     readonly markTurnSeen: (
       conversationId: string,
       endedAt: DateTime.Utc,
@@ -329,6 +337,28 @@ export class Conversations extends Context.Service<
           toRow(conversation, packsOfConversations.get(conversation.id) ?? []),
         ),
       )
+
+      const keptGoing = yield* SubscriptionRef.make<ReadonlyMap<string, DateTime.Utc>>(
+        new Map(
+          (yield* sql`
+            SELECT id, kept_going_at AS keptGoingAt FROM conversation WHERE kept_going_at IS NOT NULL
+          `.pipe(Effect.flatMap(decodeKeptGoing), Effect.orDie)).map(
+            ({ id, keptGoingAt }) => [id, keptGoingAt] as const,
+          ),
+        ),
+      )
+
+      const setKeptGoing = (conversationId: string, at: DateTime.Utc) =>
+        SubscriptionRef.update(keptGoing, (current) => new Map(current).set(conversationId, at))
+
+      const keepGoing = Effect.fnUntraced(function* (conversationId: string) {
+        const now = yield* DateTime.now
+
+        yield* sql`
+          UPDATE conversation SET kept_going_at = ${DateTime.formatIso(now)} WHERE id = ${conversationId}
+        `.pipe(Effect.catchTag("SqlError", couldNotSave))
+        yield* setKeptGoing(conversationId, now)
+      })
 
       const find = Effect.fnUntraced(function* (conversationId: string) {
         const found = (yield* SubscriptionRef.get(rows)).find(
@@ -534,6 +564,7 @@ export class Conversations extends Context.Service<
                 local_skills: conversation.localSkills ? 1 : 0,
                 folder: placed.folder,
                 created_at: DateTime.formatIso(conversation.createdAt),
+                kept_going_at: DateTime.formatIso(conversation.createdAt),
                 review_brief: Purpose.$match(purpose, {
                   Work: () => null,
                   Review: ({ brief }) => encodeBrief(brief),
@@ -544,6 +575,7 @@ export class Conversations extends Context.Service<
                 ...current,
                 { ...placed, conversation },
               ])
+              yield* setKeptGoing(id, conversation.createdAt)
               yield* transcripts.startOrQueue(id, { ...first, context: null })
 
               return conversation
@@ -682,11 +714,15 @@ export class Conversations extends Context.Service<
       ) {
         yield* findWritable(conversationId)
 
-        return yield* turns.send(
+        const delivery = yield* turns.send(
           conversationId,
           { message, images, context: null },
           notes.take(conversationNotes(conversationId), feedback),
         )
+
+        yield* keepGoing(conversationId)
+
+        return delivery
       })
 
       const sendFrom = Effect.fn("Conversations.sendFrom")(function* (
@@ -718,6 +754,12 @@ export class Conversations extends Context.Service<
       ) {
         const row = yield* findWritable(conversationId)
         yield* turns.steer(conversationOf(row), { ...input, context: null })
+        yield* keepGoing(conversationId)
+      })
+
+      const bringBack = Effect.fn("Conversations.bringBack")(function* (conversationId: string) {
+        yield* find(conversationId)
+        yield* keepGoing(conversationId)
       })
 
       const sendQueued = Effect.fn("Conversations.sendQueued")(function* (
@@ -936,6 +978,8 @@ export class Conversations extends Context.Service<
       )
 
       return Conversations.of({
+        keptGoing: SubscriptionRef.changes(keptGoing),
+        bringBack,
         watch: () =>
           placed.pipe(Stream.map((current) => current.map(({ conversation }) => conversation))),
         transcript: (conversationId) =>

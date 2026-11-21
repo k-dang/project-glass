@@ -19,6 +19,7 @@ import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { DateTime, Exit, Match, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import {
+  ChevronRight,
   CircleDashed,
   CircleHelp,
   FolderGit2,
@@ -28,19 +29,24 @@ import {
   PanelLeftOpen,
   SquarePen,
   Trash2,
+  Undo2,
 } from "lucide-react"
 import { cn } from "cn"
 import { useContext, useId, useState } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Kbd } from "@/components/ui/kbd"
 import { TooltipHint } from "@/components/ui/tooltip"
 import {
+  bringBackConversationAtom,
   conversationsAtom,
   conversationsPanelOpenAtom,
   groupConversations,
   placeNames,
   removalWarningsAtom,
   removeConversation,
+  settledConversationsAtom,
+  settledOpenAtom,
   workingConversationsAtom,
 } from "./conversationsArea"
 import { AgentHarnessIcon } from "./AgentHarnessIcon"
@@ -58,7 +64,7 @@ import { shortcutLabel } from "./shortcutLabel"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
-const noneWorking: ReadonlySet<string> = new Set()
+const noConversations: ReadonlySet<string> = new Set()
 
 interface Marker {
   readonly label: string
@@ -215,6 +221,11 @@ function ConversationList() {
   const retry = useAtomRefresh(conversationsAtom)
   const now = useMinuteClock()
 
+  const settledIds = Option.getOrElse(
+    AsyncResult.value(useAtomValue(settledConversationsAtom)),
+    () => noConversations,
+  )
+
   return AsyncResult.builder(conversations)
     .onInitial(() => (
       <output className="px-2 text-sm text-muted-foreground">Loading Conversations…</output>
@@ -224,27 +235,73 @@ function ConversationList() {
     ))
     .onSuccess((list) => {
       const shown = list.filter((conversation) => !conversation.forReview)
+      const going = shown.filter(({ id }) => !settledIds.has(id))
+      const settled = shown.filter(({ id }) => settledIds.has(id))
 
       return shown.length === 0 ? (
         <p className="px-2 text-sm text-muted-foreground">No Conversations yet.</p>
       ) : (
         <nav aria-label="Conversations list" className="flex flex-col gap-4">
-          {groupConversations(shown).map(({ machine, conversations: onMachine }) => (
+          {groupConversations(going).map(({ machine, conversations: onMachine }) => (
             <section key={machine} aria-label={groupNames[machine]} className="flex flex-col gap-1">
               <h2 className="px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
                 {groupNames[machine]}
               </h2>
-              <ul className="flex flex-col gap-0.5">
-                {onMachine.map((conversation) => (
-                  <ConversationRow key={conversation.id} conversation={conversation} now={now} />
-                ))}
-              </ul>
+              <ConversationRows conversations={onMachine} now={now} settled={false} />
             </section>
           ))}
+          {settled.length > 0 && <SettledSection conversations={settled} now={now} />}
         </nav>
       )
     })
     .render()
+}
+
+function ConversationRows(props: {
+  conversations: ReadonlyArray<Conversation>
+  now: Date
+  settled: boolean
+}) {
+  return (
+    <ul className="flex flex-col gap-0.5">
+      {props.conversations.map((conversation) => (
+        <ConversationRow
+          key={conversation.id}
+          conversation={conversation}
+          now={props.now}
+          settled={props.settled}
+        />
+      ))}
+    </ul>
+  )
+}
+
+function SettledSection(props: { conversations: ReadonlyArray<Conversation>; now: Date }) {
+  const [open, setOpen] = useAtom(settledOpenAtom)
+
+  return (
+    <Collapsible
+      open={open}
+      onOpenChange={setOpen}
+      render={<section />}
+      aria-label="Settled"
+      className="flex flex-col gap-1"
+    >
+      <h2>
+        <CollapsibleTrigger className="group/trigger flex w-full items-center gap-1 rounded-sm px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+          Settled
+          <span className="tabular-nums">{props.conversations.length}</span>
+          <ChevronRight
+            aria-hidden
+            className="size-3.5 transition-transform duration-200 ease-out group-data-panel-open/trigger:rotate-90 motion-reduce:transition-none"
+          />
+        </CollapsibleTrigger>
+      </h2>
+      <CollapsibleContent>
+        <ConversationRows conversations={props.conversations} now={props.now} settled />
+      </CollapsibleContent>
+    </Collapsible>
+  )
 }
 
 const removalWarning = (conversation: Conversation, warning: "some" | "unchecked") => {
@@ -260,7 +317,27 @@ const removalWarning = (conversation: Conversation, warning: "some" | "unchecked
     : `Its worktree has uncommitted changes, which removing it discards. The branch ${conversation.name} and its commits stay.`
 }
 
-function ConversationRow(props: { conversation: Conversation; now: Date }) {
+const rowAction = "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
+
+function BringBackButton(props: { conversation: Conversation }) {
+  const bringBack = useAtomSet(bringBackConversationAtom)
+
+  return (
+    <TooltipHint content="Bring back">
+      <Button
+        variant="ghost"
+        size="icon-xs"
+        aria-label={`Bring back ${props.conversation.name}`}
+        onClick={() => bringBack(props.conversation.id)}
+        className={rowAction}
+      >
+        <Undo2 aria-hidden />
+      </Button>
+    </TooltipHint>
+  )
+}
+
+function ConversationRow(props: { conversation: Conversation; now: Date; settled: boolean }) {
   const { conversation } = props
   const navigate = useNavigate()
   const open = useParams({ strict: false }).conversationId === conversation.id
@@ -285,7 +362,7 @@ function ConversationRow(props: { conversation: Conversation; now: Date }) {
 
   const working = Option.getOrElse(
     AsyncResult.value(useAtomValue(workingConversationsAtom)),
-    () => noneWorking,
+    () => noConversations,
   ).has(conversation.id)
 
   const showsWorking = needsYou === undefined && working
@@ -394,16 +471,19 @@ function ConversationRow(props: { conversation: Conversation; now: Date }) {
           </span>
         </span>
       </Link>
-      <Button
-        variant="ghost"
-        size="icon-xs"
-        aria-label={`Remove ${conversation.name}`}
-        disabled={warnings.waiting}
-        onClick={() => void start()}
-        className="absolute right-1 bottom-1 opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
-      >
-        <Trash2 aria-hidden />
-      </Button>
+      <div className="absolute right-1 bottom-1 flex gap-0.5">
+        {props.settled && <BringBackButton conversation={conversation} />}
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={`Remove ${conversation.name}`}
+          disabled={warnings.waiting}
+          onClick={() => void start()}
+          className={rowAction}
+        >
+          <Trash2 aria-hidden />
+        </Button>
+      </div>
       {problem !== null && (
         <p role="alert" className="px-2 pt-0.5 text-xs text-destructive">
           {problem.detail}

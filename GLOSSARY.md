@@ -174,6 +174,12 @@ _Avoid_: Session, thread, bot, box
 The PR whose head is the branch the Conversation's folder has checked out.
 _Avoid_: Linked PR, agent PR
 
+**Settled**:
+A Conversation whose PR merged after the user last wrote to it, with no Turn running or waiting on
+the user. Glass lists it apart from the Conversations still going, and it stops being Settled when
+the user writes to it again or brings it back.
+_Avoid_: Archived, done, finished, closed
+
 **Global chat**:
 The one chat the user has with Glass itself, opened over any Area, which works through
 Glass's tools rather than in a repository. Its model and the work it started stay with it across
