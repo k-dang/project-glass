@@ -67,6 +67,7 @@ import {
 import {
   type Components,
   defaultComponents,
+  defaultRemarkPlugins,
   Streamdown,
   useIsCodeFenceIncomplete,
 } from "streamdown"
@@ -141,7 +142,16 @@ import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
 import { MermaidDiagram } from "./MermaidDiagram"
 import { DiagramPane, useDiagrams } from "./ThreadDiagrams"
-import { FileLink, FileLinks, FilePane, lastEndedOf, useFileLinks } from "./ThreadFiles"
+import {
+  FileImage,
+  FileLink,
+  FileLinks,
+  FilePane,
+  lastEndedOf,
+  localFilePath,
+  remarkLocalFiles,
+  useFileLinks,
+} from "./ThreadFiles"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
 import { useWindowFocused } from "./useWindowFocused"
@@ -951,6 +961,10 @@ const streamdownLinkClass = "wrap-anywhere font-medium text-primary underline"
 
 function MarkdownLink(props: ComponentProps<typeof defaultComponents.a>) {
   const { href } = props
+  const localPath = localFilePath(href)
+
+  if (localPath !== null) return <FileLink text={localPath}>{props.children}</FileLink>
+
   const pullRequest = href === undefined ? null : parsePullRequestReference(href)
 
   if (href === undefined || pullRequest === null) return <defaultComponents.a {...props} />
@@ -967,8 +981,19 @@ function MarkdownLink(props: ComponentProps<typeof defaultComponents.a>) {
   )
 }
 
+function MarkdownImage(props: ComponentProps<typeof defaultComponents.img>) {
+  const localPath = localFilePath(props.src)
+
+  return localPath === null ? (
+    <defaultComponents.img {...props} />
+  ) : (
+    <FileImage path={localPath} alt={props.alt} />
+  )
+}
+
 const markdownComponents: Components = {
   a: MarkdownLink,
+  img: MarkdownImage,
   code: (props) => {
     const language = /language-(\S+)/.exec(props.className ?? "")?.[1] ?? ""
 
@@ -989,9 +1014,15 @@ const markdownComponents: Components = {
   },
 }
 
+const remarkPlugins = [...Object.values(defaultRemarkPlugins), remarkLocalFiles]
+
 function ThreadMarkdown(props: { text: string }) {
   return (
-    <Streamdown className="thread-markdown text-sm" components={markdownComponents}>
+    <Streamdown
+      className="thread-markdown text-sm"
+      components={markdownComponents}
+      remarkPlugins={remarkPlugins}
+    >
       {props.text}
     </Streamdown>
   )
