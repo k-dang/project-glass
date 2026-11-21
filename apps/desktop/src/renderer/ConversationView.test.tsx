@@ -208,6 +208,35 @@ it("marks a Conversation in the Conversations panel as working while its Turn ru
   ).toBeTruthy()
 })
 
+it("lists Settled Conversations apart from the ones still going, in a section that collapses", async () => {
+  const broughtBack: Array<string> = []
+
+  mount(
+    {
+      WatchSettledConversations: () => Stream.make([conversation.id]),
+      BringBackConversation: ({ conversationId }) =>
+        Effect.sync(() => void broughtBack.push(conversationId)),
+    },
+    "/conversations",
+  )
+
+  const settled = await screen.findByRole("region", { name: "Settled" })
+
+  expect(within(settled).getByRole("link", { name: conversation.name })).toBeTruthy()
+  expect(screen.queryByRole("region", { name: "Local" })).toBeNull()
+
+  const user = userEvent.setup()
+  const toggle = within(settled).getByRole("button", { name: "Settled 1" })
+  await user.click(toggle)
+  await waitFor(() => expect(within(settled).queryByRole("link")).toBeNull())
+
+  await user.click(toggle)
+  expect(await within(settled).findByRole("link", { name: conversation.name })).toBeTruthy()
+
+  await user.click(within(settled).getByRole("button", { name: `Bring back ${conversation.name}` }))
+  await waitFor(() => expect(broughtBack).toEqual([conversation.id]))
+})
+
 it("says in the Conversations panel how a Turn that finished unseen ended", async () => {
   const ended = {
     at: DateTime.add(sentAt, { seconds: 3 }),
@@ -538,7 +567,7 @@ it("tells the user the Conversation's PR merged, in its header and its row in th
   mount({
     WatchConversations: () => Stream.make([conversation]),
     WatchConversationPullRequests: () =>
-      Stream.make([conversationPullRequest(PullRequestMerged.make({}))]),
+      Stream.make([conversationPullRequest(PullRequestMerged.make({ mergedAt: sentAt }))]),
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
   })

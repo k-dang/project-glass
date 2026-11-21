@@ -35,6 +35,8 @@ export const conversationsPanelOpenAtom = Atom.make(true)
 
 export const conversationDetailsPinnedAtom = Atom.make(true).pipe(Atom.keepAlive)
 
+export const settledOpenAtom = Atom.make(true).pipe(Atom.keepAlive)
+
 export const ConversationSearch = Schema.Struct({
   view: Schema.optional(Schema.Literal("changes")),
 })
@@ -66,6 +68,18 @@ export const workingConversationsAtom = backendRuntime
     ),
   )
   .pipe(Atom.keepAlive)
+
+export const settledConversationsAtom = backendRuntime
+  .atom(
+    Stream.unwrap(Backend.useSync((backend) => backend.WatchSettledConversations())).pipe(
+      Stream.map((ids): ReadonlySet<string> => new Set(ids)),
+    ),
+  )
+  .pipe(Atom.keepAlive)
+
+export const bringBackConversationAtom = backendRuntime.fn((conversationId: string) =>
+  Backend.use((backend) => backend.BringBackConversation({ conversationId })),
+)
 
 export const conversationPullRequestsAtom = backendRuntime
   .atom(

@@ -44,6 +44,7 @@ import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
 import { AgentCommands, SettingsStore } from "./SettingsStore"
 import { SavedPlaces } from "./SavedPlaces"
+import { SettledConversations } from "./SettledConversations"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { StartedWork } from "./StartedWork"
@@ -105,7 +106,9 @@ const services = (
   Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates)
     .pipe(
       Layer.provide(NeedsYou.layer),
-      Layer.provide(ConversationPullRequests.layer),
+      Layer.provide(
+        SettledConversations.layer.pipe(Layer.provideMerge(ConversationPullRequests.layer)),
+      ),
       Layer.provide(StartedWork.layer),
       Layer.provide(PullRequestLists.layer),
       Layer.provide(PullRequestMirror.layer),
