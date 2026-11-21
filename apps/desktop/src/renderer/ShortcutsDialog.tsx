@@ -14,6 +14,7 @@ import {
 import { useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
+  createDialogHandle,
   Dialog,
   DialogClose,
   DialogContent,
@@ -119,11 +120,32 @@ const groups: ReadonlyArray<ShortcutGroup> = [
   },
 ]
 
+export const shortcutsDialog = createDialogHandle()
+
+export function ShortcutsButton() {
+  return (
+    <DialogTrigger
+      handle={shortcutsDialog}
+      render={
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-6 gap-1.5 px-1.5 text-[11px] font-normal text-muted-foreground"
+          aria-keyshortcuts="?"
+          title="Keyboard shortcuts (?)"
+        />
+      }
+    >
+      <Keyboard aria-hidden />
+      Keyboard shortcuts
+      <Kbd>?</Kbd>
+    </DialogTrigger>
+  )
+}
+
 export function ShortcutsDialog() {
-  const [open, setOpen] = useState(false)
   const [query, setQuery] = useState("")
   const search = useRef<HTMLInputElement>(null)
-  const opener = useRef<HTMLElement | null>(null)
   const modifier = navigator.platform.startsWith("Mac") ? "⌘" : "Ctrl"
   const term = query.trim().toLowerCase()
 
@@ -145,43 +167,18 @@ export function ShortcutsDialog() {
     return key === "Escape" ? "Esc" : key
   }
 
-  const show = () => {
-    opener.current = document.activeElement instanceof HTMLElement ? document.activeElement : null
-    setQuery("")
-    setOpen(true)
-  }
-
-  useShortcuts([{ key: "?", shift: "any", run: show }])
+  useShortcuts([{ key: "?", shift: "any", run: () => shortcutsDialog.open(null) }])
 
   return (
     <Dialog
-      open={open}
+      handle={shortcutsDialog}
       onOpenChange={(next, details) => {
-        if (refusedEscape(details)) return
-
-        if (next) show()
-        else setOpen(false)
+        if (!refusedEscape(details) && next) setQuery("")
       }}
     >
-      <DialogTrigger
-        render={
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-6 gap-1.5 px-1.5 text-[11px] font-normal text-muted-foreground"
-            aria-keyshortcuts="?"
-            title="Keyboard shortcuts (?)"
-          />
-        }
-      >
-        <Keyboard aria-hidden />
-        Keyboard shortcuts
-        <Kbd>?</Kbd>
-      </DialogTrigger>
       <DialogContent
         instant
         initialFocus={search}
-        finalFocus={() => opener.current}
         showCloseButton={false}
         className="flex max-h-[min(48rem,calc(100dvh-2rem))] flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl"
       >
