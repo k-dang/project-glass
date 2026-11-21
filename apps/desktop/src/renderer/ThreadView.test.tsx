@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import {
   ActivityPage,
+  AllowRequest,
   Thread,
   ThreadChanges,
   ThreadNeedsYou,
@@ -1092,6 +1093,28 @@ it("marks a Thread waiting on a Permission request, and denies it with a reason 
   expect(answers).toEqual([
     { requestId: "bash-1", answer: DenyRequest.make({ reason: "Use git clean" }) },
   ])
+})
+
+it("allows a Permission request from its card and shows it as Allowed", async () => {
+  const allowed = Deferred.makeUnsafe<RequestAnswer>()
+
+  const user = mount({
+    WatchTranscript: () =>
+      waitingTurn([bashRequest]).pipe(
+        Stream.concat(
+          Stream.fromEffect(Deferred.await(allowed)).pipe(
+            Stream.flatMap(() => waitingTurn([{ ...bashRequest, status: "allowed" }])),
+          ),
+        ),
+      ),
+    AnswerRequest: ({ answer }) => Deferred.succeed(allowed, answer).pipe(Effect.asVoid),
+  })
+
+  const card = await screen.findByRole("region", { name: "Allow Bash?" })
+  await user.click(within(card).getByRole("button", { name: "Allow" }))
+
+  expect(await within(card).findByText("Allowed")).toBeTruthy()
+  expect(await Effect.runPromise(Deferred.await(allowed))).toEqual(AllowRequest.make({}))
 })
 
 const options = (...labels: ReadonlyArray<string>) =>
