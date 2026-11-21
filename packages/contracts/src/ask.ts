@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { CheckoutRunReason } from "./checkoutRun"
-import { DiffSide } from "./discussion"
+import { DiffSide } from "./comment"
 import { AgentRunnerIdentity } from "./engine"
 
 export const AskQuestion = Schema.Trimmed.check(Schema.isNonEmpty())

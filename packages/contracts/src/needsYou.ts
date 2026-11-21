@@ -1,6 +1,6 @@
 import { Match, Predicate, Schema } from "effect"
 import { CheckIn } from "./checkIn"
-import { Conversation, PermissionRequestPart, QuestionPart, TurnEnd } from "./conversation"
+import { Thread, PermissionRequestPart, QuestionPart, TurnEnd } from "./thread"
 import { Check } from "./pullRequest"
 import { PullRequestSummary } from "./pullRequestList"
 
@@ -15,15 +15,15 @@ export const WaitingRequests = Schema.TaggedStruct("WaitingRequests", {
 export const TurnFinished = Schema.TaggedStruct("TurnFinished", { ended: TurnEnd })
 
 export const TurnSeen = Schema.Struct({
-  conversationId: Schema.String,
+  threadId: Schema.String,
   endedAt: Schema.DateTimeUtcFromString,
 })
 
 export type TurnSeen = typeof TurnSeen.Type
 
-export const ConversationReason = Schema.Union([WaitingRequests, TurnFinished])
+export const ThreadReason = Schema.Union([WaitingRequests, TurnFinished])
 
-export type ConversationReason = typeof ConversationReason.Type
+export type ThreadReason = typeof ThreadReason.Type
 
 export const AgentReviewFinished = Schema.TaggedStruct("AgentReviewFinished", {
   writtenAt: Schema.DateTimeUtcFromString,
@@ -36,7 +36,7 @@ export const ChecksFailing = Schema.TaggedStruct("ChecksFailing", {
   failing: Schema.Array(Check),
 })
 
-export const AwaitingReply = Schema.TaggedStruct("AwaitingReply", { threads: Schema.Int })
+export const AwaitingReply = Schema.TaggedStruct("AwaitingReply", { reviewThreads: Schema.Int })
 
 export const ReadyToMerge = Schema.TaggedStruct("ReadyToMerge", {})
 
@@ -50,13 +50,13 @@ export const PullRequestReason = Schema.Union([
 
 export type PullRequestReason = typeof PullRequestReason.Type
 
-export const ConversationNeedsYou = Schema.TaggedStruct("Conversation", {
-  conversation: Conversation,
-  reasons: Schema.NonEmptyArray(ConversationReason),
+export const ThreadNeedsYou = Schema.TaggedStruct("Thread", {
+  thread: Thread,
+  reasons: Schema.NonEmptyArray(ThreadReason),
   since: Schema.DateTimeUtcFromString,
 })
 
-export type ConversationNeedsYou = typeof ConversationNeedsYou.Type
+export type ThreadNeedsYou = typeof ThreadNeedsYou.Type
 
 export const PullRequestNeedsYou = Schema.TaggedStruct("PullRequest", {
   pullRequest: PullRequestSummary,
@@ -114,7 +114,7 @@ export const AskUserResult = Schema.Union([AskUserAnswered, AskUserTimedOut, Ask
 export type AskUserResult = typeof AskUserResult.Type
 
 export const NeedsYouItem = Schema.Union([
-  ConversationNeedsYou,
+  ThreadNeedsYou,
   PullRequestNeedsYou,
   OutsideQuestion,
   CheckIn,
@@ -134,7 +134,7 @@ export const needsYouGroupOf = (item: NeedsYouItem): NeedsYouGroup =>
     OutsideQuestion: () => "stopped" as const,
     CheckIn: () => "stopped" as const,
     GlobalChat: () => "stopped" as const,
-    Conversation: ({ reasons }) =>
+    Thread: ({ reasons }) =>
       reasons.some(Predicate.isTagged("WaitingRequests"))
         ? ("stopped" as const)
         : ("finished" as const),

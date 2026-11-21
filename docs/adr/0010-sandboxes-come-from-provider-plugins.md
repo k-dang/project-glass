@@ -5,7 +5,7 @@ details. A Sandbox provider is a plugin the user installs, and it creates, reach
 Sandboxes. A company's own Sandbox platform is one such plugin, kept outside this repository, so it
 can use internal packages and name internal hosts without Glass depending on them. The agent host,
 its journal, and the backend as the transcript of record (ADR 0007) are the same for every
-provider. A Sandbox's Conversation reaches Glass's tools over the connection Glass already holds to
+provider. A Sandbox's Thread reaches Glass's tools over the connection Glass already holds to
 its host (ADR 0013), so a provider opens no other way into this device.
 
 The seam is coarse: Glass hands a provider what the agent host needs, and the provider does
@@ -13,21 +13,21 @@ everything specific to its platform, including logins, cloning, and starting the
 `@glass/plugin` is the contract. It uses Promises and `AbortSignal`, so a plugin needs no Effect.
 
 Plugins install as files in a folder and run in the backend process, as pi extensions do. Glass
-keeps each provider's state as opaque JSON on the Conversation's row, so that row stays the one
-record of the Conversation and providers need no storage of their own. Because Glass holds that
+keeps each provider's state as opaque JSON on the Thread's row, so that row stays the one
+record of the Thread and providers need no storage of their own. Because Glass holds that
 state, it can delete a half-built Sandbox even after a crash mid-provisioning.
 
 A Sandbox outlives Glass, so its Turns keep running while Glass is closed, and Glass reconnects to
 its host at launch from the last journal position it saved. That position belongs to one host
 instance, so each connection starts with a handshake naming the host's instance and protocol
-version: a replaced host's journal is followed from its start, and its Conversation's running Turn
+version: a replaced host's journal is followed from its start, and its Thread's running Turn
 is cut off; a host of another protocol, which a Sandbox keeps across Glass upgrades, leaves the
-Conversation read-only while that host answers, and Glass checks again on its next connection. Calls
+Thread read-only while that host answers, and Glass checks again on its next connection. Calls
 to a provider stay bounded: Glass stops retrying a Sandbox it can't reach until the user or a
 relaunch starts over.
 
-This device is the same seam's built-in placement, so the Conversations service only calls
-placements and local and Sandbox Conversations differ only in where their host runs.
+This device is the same seam's built-in placement, so the Threads service only calls
+placements and local and Sandbox Threads differ only in where their host runs.
 
 ## Considered options
 
@@ -47,7 +47,7 @@ placements and local and Sandbox Conversations differ only in where their host r
 - **Plugins listed in Glass's settings, with options, as opencode does**: explicit, but a folder
   is how pi extensions install, and a provider that keeps its own values needs no options.
 - **Providers keep their own state**: Glass would need a storage API for plugins, and removing a
-  Conversation would span two stores.
+  Thread would span two stores.
 
 ## Revisit when
 

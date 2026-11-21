@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { AgentHarness } from "./conversation"
+import { AgentHarness } from "./thread"
 
 export const AgentRunnerIdentity = Schema.Struct({
   harness: AgentHarness,

@@ -9,12 +9,12 @@ with coding agents.
 
 **Area**:
 One of the top-level parts of Glass the user moves between from the rail, such as Reviews or
-Conversations.
+Threads.
 _Avoid_: Section, tab, page
 
 **Command menu**:
 The search box opened with ⌘K or Ctrl+K from anywhere in Glass, for running any action the current
-view offers, jumping to a PR or Conversation by name, and starting a Conversation from what was typed.
+view offers, jumping to a PR or Thread by name, and starting a Thread from what was typed.
 _Avoid_: Command palette, quick open (a Command is something an Agent harness runs)
 
 ### Resuming work
@@ -24,7 +24,7 @@ The last piece of work the user was doing in an Area, with their place in it, ke
 for them to continue.
 
 **Needs you**:
-The Conversations, questions, Check-ins, and PRs waiting on the user now, listed in the Inbox and
+The Threads, questions, Check-ins, and PRs waiting on the user now, listed in the Inbox and
 grouped by why they wait.
 
 ### Reviewing
@@ -108,8 +108,8 @@ _Avoid_: Plumbing, noise, skippable file
 
 **Follow-up**:
 A message the user sends about an Agent review and the agent's answer, a Turn of the Agent
-review's own Conversation.
-_Avoid_: Chat, thread
+review's own Thread.
+_Avoid_: Chat
 
 **Suggested draft**:
 A comment the agent proposes in a Follow-up on a line of the diff, which becomes a Draft only when
@@ -137,6 +137,11 @@ A Draft that can't be placed in the current diff, because its line is outdated, 
 file, or its file's diff isn't shown.
 _Avoid_: Broken draft, orphaned comment
 
+**Review thread**:
+A published GitHub thread of comments on a line, range, or whole file of a PR, which the user can
+reply to and resolve.
+_Avoid_: Discussion, thread (a Thread is work with an agent), comment chain
+
 **Feedback state**:
 Where a piece of the user's feedback stands: draft, sending, confirmed by GitHub, or failed.
 _Avoid_: Sync status
@@ -145,7 +150,7 @@ _Avoid_: Sync status
 
 **Activity**:
 One meaningful thing the user did in Glass, such as opening a PR workspace, submitting a review,
-or starting a Conversation, with when it happened and what it was done to.
+or starting a Thread, with when it happened and what it was done to.
 _Avoid_: Event, action, audit entry
 
 **Activity log**:
@@ -156,27 +161,30 @@ _Avoid_: History, audit log, event log, telemetry
 ### Planning
 
 **To-do**:
-Something the user means to do, written down in Glass, open until they mark it done.
+Something the user means to do, written down in Glass, open until they mark it done. A To-do
+mentioned in a Thread's first message is marked done when that Thread's PR merges,
+unless the user marked it done first.
 _Avoid_: Task, action item
 
-### Conversations
+### Threads
 
-**Conversation**:
-A named conversation started from Glass with an agent, run by an Agent harness and a model and
-working in one place: a worktree on this device, a Sandbox, or a checkout of an Agent review's
-Revision. The user starts one, or the Global chat or another Conversation's agent does for
-them. Any Conversation can create and message other Conversations through Glass's tools, but never
-one that asks the user less than it does, and never itself; one in a Sandbox can reach only
-Conversations in a Sandbox.
-_Avoid_: Session, thread, bot, box
+**Thread**:
+The named, lasting history of the user's work with one agent from Glass, run by an Agent harness
+and a model and working in one place: a worktree on this device, a Sandbox, or a checkout of an
+Agent review's Revision. The user starts one, or the Global chat or another
+Thread's agent does for them. Any Thread can create and message other Threads through Glass's
+tools, but never one that asks the user less than it does, and never itself; one in a Sandbox can
+reach only Threads in a Sandbox. A Thread is not a Session, which is one stretch of the Global
+chat.
+_Avoid_: Conversation, chat, bot, box
 
-**Conversation's PR**:
-The PR whose head is the branch the Conversation's folder has checked out.
+**Thread's PR**:
+The PR whose head is the branch the Thread's folder has checked out.
 _Avoid_: Linked PR, agent PR
 
 **Settled**:
-A Conversation whose PR merged after the user last wrote to it, with no Turn running or waiting on
-the user. Glass lists it apart from the Conversations still going, and it stops being Settled when
+A Thread whose PR merged after the user last wrote to it, with no Turn running or waiting on
+the user. Glass lists it apart from the Threads still going, and it stops being Settled when
 the user writes to it again or brings it back.
 _Avoid_: Archived, done, finished, closed
 
@@ -192,7 +200,7 @@ ends the current Session and begins the next; an ended Session stays readable bu
 _Avoid_: Past chat, Past conversation, history, archived chat
 
 **Started work update**:
-A Turn Glass starts in the Global chat or a Conversation to tell it that work it started
+A Turn Glass starts in the Global chat or a Thread to tell it that work it started
 finished, failed, or needs the user's input.
 _Avoid_: Global chat update, notification, event, wake-up
 
@@ -201,24 +209,24 @@ Claude Code or pi, the harness that runs an agent and decides which models and E
 _Avoid_: Engine, provider
 
 **Effort**:
-How hard a Conversation's model works on each Turn, from the levels its Agent harness offers.
+How hard a Thread's model works on each Turn, from the levels its Agent harness offers.
 _Avoid_: Thinking level, reasoning budget
 
 **Local checkout**:
 A clone of a repository on this device that the user links in Glass, from which each local
-Conversation gets a worktree of its own.
+Thread gets a worktree of its own.
 
 **Sandbox**:
-The remote machine a Sandbox provider creates for one Conversation.
+The remote machine a Sandbox provider creates for one Thread.
 _Avoid_: Box, computer, devbox, pod
 
 **Sandbox provider**:
-A kind of Sandbox the user can start Conversations in, added to Glass by a plugin.
+A kind of Sandbox the user can start Threads in, added to Glass by a plugin.
 _Avoid_: Backend, platform, adapter
 
 **Skill pack**:
 A named set of skills from one GitHub folder, pinned to a commit, that the user picks for a
-Conversation when creating it.
+Thread when creating it.
 _Avoid_: Skill set, registry, bundle, plugin
 
 **Local skills**:
@@ -226,22 +234,22 @@ The skills in the user's skill folders on this device that the Agent harness rea
 _Avoid_: My skills, user skills
 
 **Turn**:
-One message to a Conversation and its agent's whole response, or work the agent starts on its own
+One message to a Thread and its agent's whole response, or work the agent starts on its own
 when background work reports back.
 _Avoid_: Run, execution, exchange
 
 **Agent status**:
-A short line about what a Conversation's agent has going besides its Turn, such as background
+A short line about what a Thread's agent has going besides its Turn, such as background
 subagents or commands.
 _Avoid_: Extension status, widget, banner
 
 **Diagram**:
-A named Mermaid picture a Conversation's agent draws beside the Conversation when the user asks for
+A named Mermaid picture a Thread's agent draws beside the Thread when the user asks for
 one.
 _Avoid_: Artifact, chart, whiteboard
 
 **File pane**:
-A file from a Conversation's folder shown beside the Conversation, opened from a path the agent
+A file from a Thread's folder shown beside the Thread, opened from a path the agent
 named.
 _Avoid_: Artifact, preview, viewer
 
@@ -249,7 +257,7 @@ _Avoid_: Artifact, preview, viewer
 A message sent while a Turn runs, waiting to start the next Turn.
 
 **Mention**:
-A To-do or file the user points at from a message to a Conversation by typing `@` and picking it.
+A To-do or file the user points at from a message to a Thread by typing `@` and picking it.
 _Avoid_: Reference, attachment, tag, chip
 
 **Command**:
@@ -262,17 +270,17 @@ A message sent into the running Turn, for the agent to take in before it finishe
 _Avoid_: Interrupt, inject
 
 **Unsent message**:
-What the user has written to a Conversation or the Global chat and not sent yet, kept on
+What the user has written to a Thread or the Global chat and not sent yet, kept on
 this device.
 _Avoid_: Draft (a Draft is a GitHub comment)
 
 **Feedback note**:
-An instruction the user leaves on a line or range of a Conversation's or Check-in's changes, or on
+An instruction the user leaves on a line or range of a Thread's or Check-in's changes, or on
 part of an HTML page in a File pane, sent to the agent and never published.
 _Avoid_: Draft, review comment
 
 **Permission mode**:
-How much the agent in a local Claude Code Conversation may do without asking: default, accept
+How much the agent in a local Claude Code Thread may do without asking: default, accept
 edits, auto, or bypass.
 
 **Question**:
@@ -299,7 +307,7 @@ _Avoid_: Session, account, login
 
 **Storage group**:
 One part of the disk space Glass's database takes on this device, shown in Settings:
-Conversations, Reviews, Activity, To-dos, Glass internals, or SQLite overhead.
+Threads, Reviews, Activity, To-dos, Glass internals, or SQLite overhead.
 _Avoid_: Disk usage, Area
 
 ### Developing Glass

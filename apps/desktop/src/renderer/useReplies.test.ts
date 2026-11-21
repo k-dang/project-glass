@@ -15,7 +15,7 @@ import { recordedPullRequest } from "../../test/workspace"
 const replyStore = (unsent?: ReadonlyMap<string, string>) => {
   const replies: Array<
     Held<
-      { readonly discussionId: string; readonly body: string },
+      { readonly reviewThreadId: string; readonly body: string },
       PublishedComment,
       typeof ReplyError.Type
     >
@@ -24,7 +24,7 @@ const replyStore = (unsent?: ReadonlyMap<string, string>) => {
   const recorded: Array<Activity> = []
 
   const store = new ReplyStore(
-    testRegistry({ ReplyToDiscussion: hold(replies) }),
+    testRegistry({ ReplyToReviewThread: hold(replies) }),
     recordedPullRequest,
     (activity) => {
       recorded.push(activity)
@@ -52,7 +52,7 @@ describe("ReplyStore", () => {
     store.send("T1")
     const failed = await next(replies)
 
-    expect(failed.payload).toEqual({ discussionId: "T1", body: "To greet them." })
+    expect(failed.payload).toEqual({ reviewThreadId: "T1", body: "To greet them." })
 
     failed.answer(Effect.fail(new DraftsBlockReply()))
 
@@ -68,7 +68,7 @@ describe("ReplyStore", () => {
     store.send("T1")
     const retry = await next(replies)
 
-    expect(retry.payload).toEqual({ discussionId: "T1", body: "To greet them." })
+    expect(retry.payload).toEqual({ reviewThreadId: "T1", body: "To greet them." })
     expect(store.view("T1")).toEqual({
       body: "To greet them.",
       feedback: { type: "sending" },
@@ -83,7 +83,7 @@ describe("ReplyStore", () => {
     expect(recorded).toEqual([
       ReplySent.make({
         pullRequest: recordedPullRequest,
-        discussionId: "T1",
+        reviewThreadId: "T1",
         body: "To greet them.",
       }),
     ])

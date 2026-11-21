@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { GitHubComment } from "./discussions"
+import { GitHubComment } from "./comments"
 import { REACTION_GROUPS } from "./reactions"
 
 export const REPLY_MUTATION = `mutation AddPullRequestReviewThreadReply($pullRequestReviewThreadId: ID!, $body: String!) {

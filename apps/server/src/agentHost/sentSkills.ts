@@ -1,7 +1,7 @@
 import { Effect, FileSystem, type Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { dirname, isAbsolute, join, relative } from "node:path"
-import { HostConversationError, type SkillSource } from "./protocol"
+import { HostThreadError, type SkillSource } from "./protocol"
 import { scopedFolder } from "./scopedFolder"
 
 export interface WrittenSkills {
@@ -11,11 +11,11 @@ export interface WrittenSkills {
 
 const WRITES_AT_ONCE = 8
 
-const couldNotWrite = new HostConversationError({
-  message: "Glass couldn't write the Conversation's skills. Try again.",
+const couldNotWrite = new HostThreadError({
+  message: "Glass couldn't write the Thread's skills. Try again.",
 })
 
-const inside = (folder: string, path: string): Effect.Effect<string, HostConversationError> => {
+const inside = (folder: string, path: string): Effect.Effect<string, HostThreadError> => {
   const target = join(folder, path)
   const relation = relative(folder, target)
 
@@ -29,7 +29,7 @@ export const writeSentSkills = (
   sources: ReadonlyArray<SkillSource>,
 ): Effect.Effect<
   ReadonlyArray<WrittenSkills>,
-  HostConversationError,
+  HostThreadError,
   FileSystem.FileSystem | Scope.Scope
 > =>
   Effect.gen(function* () {
@@ -85,7 +85,7 @@ export const writeSentSkills = (
     return planned.map(({ written }) => written)
   }).pipe(
     Effect.catchTag("PlatformError", (cause) =>
-      Effect.logWarning("Couldn't write a Conversation's skills", cause).pipe(
+      Effect.logWarning("Couldn't write a Thread's skills", cause).pipe(
         Effect.andThen(Effect.fail(couldNotWrite)),
       ),
     ),

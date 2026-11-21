@@ -13,7 +13,7 @@ const hostile = [
   '  C@{ img: "https://example.com/i.png", label: "img" }',
 ].join("\n")
 
-it("draws a Conversation's diagram without scripts, links, or remote images", async () => {
+it("draws a Thread's diagram without scripts, links, or remote images", async () => {
   const onInvalid = vi.fn<() => void>()
   const { container } = render(<MermaidDiagram source={hostile} onInvalid={onInvalid} />)
 

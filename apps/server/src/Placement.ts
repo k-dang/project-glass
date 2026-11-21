@@ -1,8 +1,8 @@
 import {
-  type Conversation,
+  type Thread,
   type AgentCommand,
   type AgentHarness,
-  ConversationError,
+  ThreadError,
   AgentModels,
   type ConnectionError,
   FollowedRepository,
@@ -10,31 +10,28 @@ import {
 } from "@glass/contracts"
 import { type Effect, type Option, Predicate, type Scope, type Stream } from "effect"
 import type { RpcClient, RpcClientError } from "effect/rpc"
-import type { AgentHostRpcs, HostConversationError } from "./agentHost/protocol"
+import type { AgentHostRpcs, HostThreadError } from "./agentHost/protocol"
 
 export type HostClient = RpcClient.FromGroup<typeof AgentHostRpcs, RpcClientError.RpcClientError>
 
 export const hostFailure = (
-  error: RpcClientError.RpcClientError | HostConversationError | ConversationError,
+  error: RpcClientError.RpcClientError | HostThreadError | ThreadError,
 ) =>
   Predicate.isTagged(error, "RpcClientError")
-    ? "Glass lost the process that runs Conversations. Try again."
+    ? "Glass lost the process that runs Threads. Try again."
     : error.message
 
-export type HostCallError =
-  | RpcClientError.RpcClientError
-  | HostConversationError
-  | ConversationError
+export type HostCallError = RpcClientError.RpcClientError | HostThreadError | ThreadError
 
-export const asConversationError = (error: HostCallError) =>
-  new ConversationError({ message: hostFailure(error) })
+export const asThreadError = (error: HostCallError) =>
+  new ThreadError({ message: hostFailure(error) })
 
-export type LostConversationIds = ReadonlyArray<string>
+export type LostThreadIds = ReadonlyArray<string>
 
-export type SubscribeLost = Effect.Effect<Stream.Stream<LostConversationIds>, never, Scope.Scope>
+export type SubscribeLost = Effect.Effect<Stream.Stream<LostThreadIds>, never, Scope.Scope>
 
-export interface PlacedConversation {
-  readonly conversation: Conversation
+export interface PlacedThread {
+  readonly thread: Thread
   readonly folder: string
   readonly forReview: boolean
 }
@@ -46,38 +43,35 @@ export interface Placed {
   readonly discard: Effect.Effect<void>
 }
 
-export interface ConversationHosting {
-  readonly prepareHost: (placed: PlacedConversation) => Effect.Effect<HostClient, ConversationError>
+export interface ThreadHosting {
+  readonly prepareHost: (placed: PlacedThread) => Effect.Effect<HostClient, ThreadError>
   readonly hostIfPrepared: (
-    placed: PlacedConversation,
-  ) => Effect.Effect<Option.Option<HostClient>, ConversationError>
-  readonly connectedHost: (placed: PlacedConversation) => Effect.Effect<Option.Option<HostClient>>
-  readonly baseRef: (placed: PlacedConversation) => Effect.Effect<string, ConversationError>
-  readonly remove: (placed: PlacedConversation) => Effect.Effect<void, ConversationError>
+    placed: PlacedThread,
+  ) => Effect.Effect<Option.Option<HostClient>, ThreadError>
+  readonly connectedHost: (placed: PlacedThread) => Effect.Effect<Option.Option<HostClient>>
+  readonly baseRef: (placed: PlacedThread) => Effect.Effect<string, ThreadError>
+  readonly remove: (placed: PlacedThread) => Effect.Effect<void, ThreadError>
 }
 
-export interface Placement extends ConversationHosting {
+export interface Placement extends ThreadHosting {
   readonly harnesses: ReadonlyArray<AgentHarness>
-  readonly models: (harness: AgentHarness) => Effect.Effect<AgentModels, ConversationError>
+  readonly models: (harness: AgentHarness) => Effect.Effect<AgentModels, ThreadError>
   readonly commands: (
     harness: AgentHarness,
     repository: FollowedRepository,
-  ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | ConversationError>
+  ) => Effect.Effect<ReadonlyArray<AgentCommand>, InvalidLocalCheckout | ThreadError>
   readonly defaultBranch: (
     repository: FollowedRepository,
-  ) => Effect.Effect<string | null, InvalidLocalCheckout | ConnectionError | ConversationError>
+  ) => Effect.Effect<string | null, InvalidLocalCheckout | ConnectionError | ThreadError>
   readonly branches: (
     repository: FollowedRepository,
-  ) => Effect.Effect<
-    ReadonlyArray<string>,
-    InvalidLocalCheckout | ConnectionError | ConversationError
-  >
+  ) => Effect.Effect<ReadonlyArray<string>, InvalidLocalCheckout | ConnectionError | ThreadError>
   readonly files: (
     repository: FollowedRepository,
     baseBranch: string,
-  ) => Effect.Effect<ReadonlyArray<string>, InvalidLocalCheckout | ConversationError>
+  ) => Effect.Effect<ReadonlyArray<string>, InvalidLocalCheckout | ThreadError>
   readonly place: (
     repository: FollowedRepository,
     baseBranch: string,
-  ) => Effect.Effect<Placed, InvalidLocalCheckout | ConversationError>
+  ) => Effect.Effect<Placed, InvalidLocalCheckout | ThreadError>
 }

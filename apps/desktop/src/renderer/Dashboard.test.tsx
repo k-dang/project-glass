@@ -11,7 +11,7 @@ import {
 } from "@glass/contracts"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Effect } from "effect"
+import { DateTime, Effect, Stream } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
@@ -57,8 +57,8 @@ afterEach(() => {
 it("lists the Queue and the open To-dos", async () => {
   mount({
     ListSavedQueue: () => Effect.succeed([queued(42, "Greet the world"), queued(7, "Wave")]),
-    ListToDos: () =>
-      Effect.succeed([
+    WatchToDos: () =>
+      Stream.make([
         new ToDo({ id: 1, title: "Reply to Mona", notes: "", done: false }),
         new ToDo({ id: 3, title: "Rebase the branch", notes: "", done: false }),
         new ToDo({ id: 2, title: "Ship the flag", notes: "", done: true }),
@@ -121,14 +121,14 @@ it("totals what the user got done over the chosen days", async () => {
     within(totals)
       .getAllByRole("listitem")
       .map((item) => item.textContent),
-  ).toEqual(["Reviews 0", "Replies 2", "Conversations started 0", "To-dos done 1"])
+  ).toEqual(["Reviews 0", "Replies 2", "Threads started 0", "To-dos done 1"])
 
   await userEvent.setup().click(screen.getByRole("button", { name: "7 days" }))
   expect(
     within(screen.getByRole("list", { name: "Activity totals" }))
       .getAllByRole("listitem")
       .map((item) => item.textContent),
-  ).toEqual(["Reviews 0", "Replies 1", "Conversations started 0", "To-dos done 1"])
+  ).toEqual(["Reviews 0", "Replies 1", "Threads started 0", "To-dos done 1"])
 })
 
 it("keeps the Activity chart visible while refreshing on a return to the Dashboard", async () => {
@@ -146,10 +146,10 @@ it("keeps the Activity chart visible while refreshing on a return to the Dashboa
   mount({ ListActivityStamps: hold(reads) })
   const first = await next(reads)
   expect(screen.getByText("Loading your Activity…")).toBeTruthy()
-  first.answer(Effect.succeed([stamp("ConversationStarted", now)]))
-  await screen.findByText("Conversations started", { exact: false })
+  first.answer(Effect.succeed([stamp("ThreadStarted", now)]))
+  await screen.findByText("Threads started", { exact: false })
   expect(screen.getByRole("list", { name: "Activity totals" }).textContent).toContain(
-    "Conversations started 1",
+    "Threads started 1",
   )
 
   await user.click(screen.getByRole("link", { name: "Go to Activity" }))
@@ -159,15 +159,13 @@ it("keeps the Activity chart visible while refreshing on a return to the Dashboa
 
   expect(screen.queryByText("Loading your Activity…")).toBeNull()
   expect(screen.getByRole("list", { name: "Activity totals" }).textContent).toContain(
-    "Conversations started 1",
+    "Threads started 1",
   )
 
-  refresh.answer(
-    Effect.succeed([stamp("ConversationStarted", now), stamp("ConversationStarted", now)]),
-  )
+  refresh.answer(Effect.succeed([stamp("ThreadStarted", now), stamp("ThreadStarted", now)]))
   await waitFor(() =>
     expect(screen.getByRole("list", { name: "Activity totals" }).textContent).toContain(
-      "Conversations started 2",
+      "Threads started 2",
     ),
   )
 })

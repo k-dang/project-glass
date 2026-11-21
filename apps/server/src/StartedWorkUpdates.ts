@@ -1,6 +1,6 @@
 import { StartedWorkUpdate } from "@glass/contracts"
 import { Array as Arr, Effect, Layer, Stream } from "effect"
-import { Conversations } from "./Conversations"
+import { Threads } from "./Threads"
 import { GlobalChat } from "./GlobalChat"
 import { StartedWork } from "./StartedWork"
 import { Transcripts } from "./Transcripts"
@@ -8,7 +8,7 @@ import { Transcripts } from "./Transcripts"
 export const StartedWorkUpdates = Layer.effectDiscard(
   Effect.gen(function* () {
     const global = yield* GlobalChat
-    const conversations = yield* Conversations
+    const threads = yield* Threads
     const started = yield* StartedWork
     const transcripts = yield* Transcripts
 
@@ -40,7 +40,7 @@ export const StartedWorkUpdates = Layer.effectDiscard(
               startedBy,
               startedBy === global.id
                 ? global.whenIdle
-                : (effect) => conversations.whenIdle(startedBy, effect),
+                : (effect) => threads.whenIdle(startedBy, effect),
             ).pipe(
               Effect.catch((cause) =>
                 Effect.logWarning("Couldn't send a Started work update", cause),
@@ -49,7 +49,7 @@ export const StartedWorkUpdates = Layer.effectDiscard(
           { discard: true },
         ),
       ),
-      Effect.catch((cause) => Effect.logWarning("Couldn't read what conversations started", cause)),
+      Effect.catch((cause) => Effect.logWarning("Couldn't read what threads started", cause)),
     )
 
     yield* Stream.merge(started.changes, yield* transcripts.subscribeMaybeIdle).pipe(

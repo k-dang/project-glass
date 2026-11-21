@@ -215,7 +215,7 @@ const GraphQLRequest = Schema.Union([
   }),
   Schema.Struct({
     operationName: Schema.Literals(["ResolveReviewThread", "UnresolveReviewThread"]),
-    variables: Schema.Struct({ threadId: Schema.String }),
+    variables: Schema.Struct({ reviewThreadId: Schema.String }),
   }),
   Schema.Struct({
     operationName: Schema.Literals(["AddReaction", "RemoveReaction"]),
@@ -277,23 +277,23 @@ const commentNode = (comment: FakeComment, pr?: FakePullRequest) => ({
 const DRAFT_CREATED_AT = "2026-01-01T00:00:00Z"
 
 const reviewThreads = (pr: FakePullRequest) => [
-  ...pr.reviewThreads.map((thread) =>
-    threadNode(
-      thread,
-      thread.comments.map((comment) => ({
+  ...pr.reviewThreads.map((reviewThread) =>
+    reviewThreadNode(
+      reviewThread,
+      reviewThread.comments.map((comment) => ({
         id: comment.id,
         author: author(comment.author),
         body: comment.bodyHtml,
         bodyHTML: comment.bodyHtml,
         createdAt: comment.createdAt,
         state: "SUBMITTED",
-        diffHunk: thread.diffHunk,
+        diffHunk: reviewThread.diffHunk,
         reactionGroups: reactionGroups(pr, comment.id),
       })),
     ),
   ),
   ...(pr.pendingReview?.drafts ?? []).map((draft) =>
-    threadNode({ ...draft, id: `PRRT_${draft.id}`, resolved: false }, [
+    reviewThreadNode({ ...draft, id: `PRRT_${draft.id}`, resolved: false }, [
       {
         id: draft.id,
         author: author(VIEWER.login),
@@ -308,18 +308,18 @@ const reviewThreads = (pr: FakePullRequest) => [
   ),
 ]
 
-const threadNode = <Comment>(
-  thread: Omit<FakeReviewThread, "comments" | "diffHunk">,
+const reviewThreadNode = <Comment>(
+  reviewThread: Omit<FakeReviewThread, "comments" | "diffHunk">,
   comments: ReadonlyArray<Comment>,
 ) => ({
-  id: thread.id,
-  isResolved: thread.resolved,
-  isOutdated: thread.outdated,
-  path: thread.path,
-  line: thread.outdated ? null : (thread.line ?? 1),
-  originalLine: thread.line ?? 1,
-  diffSide: thread.side,
-  subjectType: thread.line === undefined ? "FILE" : "LINE",
+  id: reviewThread.id,
+  isResolved: reviewThread.resolved,
+  isOutdated: reviewThread.outdated,
+  path: reviewThread.path,
+  line: reviewThread.outdated ? null : (reviewThread.line ?? 1),
+  originalLine: reviewThread.line ?? 1,
+  diffSide: reviewThread.side,
+  subjectType: reviewThread.line === undefined ? "FILE" : "LINE",
   comments: { nodes: comments },
 })
 
@@ -629,10 +629,10 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
   const publishedCommentById = (id: string) => {
     for (const pr of pullRequests) {
-      for (const [threadIndex, thread] of pr.reviewThreads.entries()) {
-        const index = thread.comments.findIndex((comment) => comment.id === id)
+      for (const [reviewThreadIndex, reviewThread] of pr.reviewThreads.entries()) {
+        const index = reviewThread.comments.findIndex((comment) => comment.id === id)
 
-        if (index !== -1) return { pr, threadIndex, thread, index }
+        if (index !== -1) return { pr, reviewThreadIndex, reviewThread, index }
       }
     }
 
@@ -655,9 +655,9 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
     if (found === undefined) return false
 
-    const comments = [...found.thread.comments]
+    const comments = [...found.reviewThread.comments]
     edit(comments, found.index)
-    found.pr.reviewThreads[found.threadIndex] = { ...found.thread, comments }
+    found.pr.reviewThreads[found.reviewThreadIndex] = { ...found.reviewThread, comments }
 
     return true
   }
@@ -806,22 +806,22 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     return unresolvedMutationNode(field, pullRequestReviewThreadId)
   }
 
-  const setThreadResolved = (
+  const setReviewThreadResolved = (
     operationName: "ResolveReviewThread" | "UnresolveReviewThread",
-    threadId: string,
+    reviewThreadId: string,
   ) => {
     const resolved = operationName === "ResolveReviewThread"
     const field = resolved ? "resolveReviewThread" : "unresolveReviewThread"
 
     for (const pr of pullRequests) {
-      const updated = pr.setResolved(threadId, resolved)
+      const updated = pr.setResolved(reviewThreadId, resolved)
 
       if (updated === undefined) continue
 
       return { data: { [field]: { thread: { isResolved: updated } } } }
     }
 
-    return unresolvedMutationNode(field, threadId)
+    return unresolvedMutationNode(field, reviewThreadId)
   }
 
   const setReaction = (
@@ -999,7 +999,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
       case "ResolveReviewThread":
       case "UnresolveReviewThread":
-        return setThreadResolved(request.operationName, request.variables.threadId)
+        return setReviewThreadResolved(request.operationName, request.variables.reviewThreadId)
 
       case "AddReaction":
       case "RemoveReaction":

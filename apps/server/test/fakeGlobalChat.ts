@@ -26,7 +26,7 @@ export const globalChatReply = (input: FakeModelRequest): ReadonlyArray<FakeMode
   const words = lastUserText(input)
 
   if (words.startsWith("<glass_started_work_update>"))
-    return [{ text: "The Conversation you started is done. Want me to look at what it changed?" }]
+    return [{ text: "The Thread you started is done. Want me to look at what it changed?" }]
 
   const call = (name: string, args: Schema.JsonObject): ReadonlyArray<FakeModelDelta> => [
     { toolCall: { id: `call-${input.messages.length}`, name, arguments: args } },
@@ -45,12 +45,12 @@ export const globalChatReply = (input: FakeModelRequest): ReadonlyArray<FakeMode
     })
   }
 
-  const delegated = /^Start a Conversation in ([\w-]+)\/([\w.-]+) from (\S+): (.+)$/m.exec(words)
+  const delegated = /^Start a Thread in ([\w-]+)\/([\w.-]+) from (\S+): (.+)$/m.exec(words)
 
   if (delegated !== null) {
     const [, owner = "", repo = "", baseBranch = "", message = ""] = delegated
 
-    return call("mcp__glass__create_conversation", {
+    return call("mcp__glass__create_thread", {
       repository: { owner, repo },
       baseBranch,
       place: localPlace,

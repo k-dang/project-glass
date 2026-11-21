@@ -26,16 +26,15 @@ const viewing = (context: CapturedContext) =>
     Match.tagsExhaustive({
       PullRequest: ({ pullRequest: { owner, repo, number }, revision: { base, head } }) =>
         `PR ${owner}/${repo}#${number} at Revision base ${base}, head ${head}`,
-      Conversation: ({ conversationId, name }) =>
-        `the Conversation "${withoutBlockTags(name)}" (id ${conversationId})`,
+      Thread: ({ threadId, name }) => `the Thread "${withoutBlockTags(name)}" (id ${threadId})`,
     }),
   )
 
 const workOutcomeEntry = (work: WorkOutcome) => {
   const subject = Match.value(work).pipe(
     Match.tagsExhaustive({
-      Conversation: ({ conversationId, name }) =>
-        `kind="Conversation" conversation_id="${conversationId}" name="${attribute(name)}"`,
+      Thread: ({ threadId, name }) =>
+        `kind="Thread" thread_id="${threadId}" name="${attribute(name)}"`,
       AgentReview: ({ pullRequest: { owner, repo, number } }) =>
         `kind="AgentReview" pull_request="${owner}/${repo}#${number}"`,
     }),

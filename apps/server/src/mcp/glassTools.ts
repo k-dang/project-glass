@@ -3,14 +3,14 @@ import {
   CheckInResult,
   type ActivityLogError,
   ActivityPage,
-  Conversation,
+  Thread,
   AgentHarness,
-  ConversationError,
+  ThreadError,
   AgentModels,
   type AgentReviewFailure,
   AgentReviewState,
   Branches,
-  type ConversationNotFound,
+  type ThreadNotFound,
   type ConnectionError,
   FollowedRepository,
   type InvalidLocalCheckout,
@@ -33,7 +33,7 @@ import {
   ToDo,
   type Turn,
   TurnEnding,
-  ConversationPlace,
+  ThreadPlace,
   localPlace,
 } from "@glass/contracts"
 import {
@@ -52,7 +52,7 @@ import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
 import { PullRequestMaterial, pullRequestMaterial } from "../agentReviewPrompt"
 import type { FileMaterial } from "../tourPrompt"
-import { Conversations } from "../Conversations"
+import { Threads } from "../Threads"
 import { GitHubClient } from "../github/GitHubClient"
 import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
@@ -118,31 +118,31 @@ const ListRecentActivity = Tool.make("list_recent_activity", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const ListedConversation = Schema.Struct({
-  conversation: Conversation,
+const ListedThread = Schema.Struct({
+  thread: Thread,
   waiting: Schema.Boolean.annotate({
     description:
-      "Whether the Conversation's agent is waiting for the user to answer a Question or Permission request.",
+      "Whether the Thread's agent is waiting for the user to answer a Question or Permission request.",
   }),
 })
 
-const ListConversations = Tool.make("list_conversations", {
+const ListThreads = Tool.make("list_threads", {
   description:
-    "Lists the user's Conversations: the named coding conversations working in a repository, with each one's repository, base branch, harness, and whether it waits for the user's answer.",
-  success: Schema.Struct({ conversations: Schema.Array(ListedConversation) }),
+    "Lists the user's Threads, each with its repository, base branch, harness, and whether it waits for the user's answer.",
+  success: Schema.Struct({ threads: Schema.Array(ListedThread) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
 const ListNeedsYou = Tool.make("list_needs_you", {
   description:
-    "Lists what waits on the user in Glass now: Conversations with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Conversations and outside questions come first, then the longest waiting.",
+    "Lists what waits on the user in Glass now: Threads with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, Review threads awaiting their reply, or ready to merge. Threads and outside questions come first, then the longest waiting.",
   success: Schema.Struct({ items: Schema.Array(NeedsYouItem) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
 const ListStartedWork = Tool.make("list_started_work", {
   description:
-    "Lists the Conversations and Agent reviews this conversation started, or Conversations it messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Conversations and reviews the user started themselves, and deleted Conversations, aren't listed.",
+    "Lists the Threads and Agent reviews you started, or Threads you messaged, oldest first: each with its state now and the user's message that asked for it. Answer how the work you started is going from this, not from the chat. Threads and reviews the user started themselves, and deleted Threads, aren't listed.",
   success: Schema.Struct({ items: Schema.Array(StartedItem) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
@@ -158,12 +158,12 @@ const TurnSummary = Schema.Struct({
   }),
 })
 
-const ReadConversationTranscript = Tool.make("read_conversation_transcript", {
+const ReadThreadTranscript = Tool.make("read_thread_transcript", {
   description:
-    "Reads a Conversation's most recent Turns: each message the user sent, what its agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
+    "Reads a Thread's most recent Turns: each message the user sent, what its agent wrote and which tools it used, and how the Turn ended. Includes Queued messages not yet delivered.",
   parameters: Schema.Struct({
-    conversationId: Schema.String.annotate({
-      description: "The Conversation's id, from list_conversations.",
+    threadId: Schema.String.annotate({
+      description: "The Thread's id, from list_threads.",
     }),
     turns: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: MAX_TURNS })).annotate({
       description: `How many of the latest Turns to read, at most ${MAX_TURNS}.`,
@@ -179,7 +179,7 @@ const ReadConversationTranscript = Tool.make("read_conversation_transcript", {
 
 const ReadPullRequest = Tool.make("read_pull_request", {
   description:
-    "Reads a PR's title, description, changed files with their diffs, and published Discussions at one Revision. Pass the Revision the user means, such as the one in a message's glass_context; leave it out to read the PR as it is now.",
+    "Reads a PR's title, description, changed files with their diffs, and published comments at one Revision. Pass the Revision the user means, such as the one in a message's glass_context; leave it out to read the PR as it is now.",
   parameters: Schema.Struct({
     pullRequest: PullRequestRef,
     revision: Schema.optional(Revision),
@@ -194,9 +194,9 @@ const ReadPullRequest = Tool.make("read_pull_request", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const ListConversationPlaces = Tool.make("list_conversation_places", {
+const ListThreadPlaces = Tool.make("list_thread_places", {
   description:
-    "Lists where the user can start a Conversation. A Conversation on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. A Conversation in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent harnesses listed with it.",
+    "Lists where the user can start a Thread. A Thread on this device works in a copy of a Local checkout, so its repository must be one of localCheckouts. A Thread in a Sandbox works in any followed repository, in a Sandbox from one of sandboxProviders. Each place runs only the Agent harnesses listed with it.",
   success: Schema.Struct({
     local: Schema.Struct({
       harnesses: Schema.Array(AgentHarness),
@@ -208,11 +208,11 @@ const ListConversationPlaces = Tool.make("list_conversation_places", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const ListConversationOptions = Tool.make("list_conversation_options", {
+const ListThreadOptions = Tool.make("list_thread_options", {
   description:
-    "Lists the base branches and models a Conversation can start with, for a repository, place, and Agent harness from list_conversation_places.",
+    "Lists the base branches and models a Thread can start with, for a repository, place, and Agent harness from list_thread_places.",
   parameters: Schema.Struct({
-    place: ConversationPlace,
+    place: ThreadPlace,
     repository: FollowedRepository,
     harness: AgentHarness,
   }),
@@ -229,46 +229,46 @@ const action = Context.make(Tool.Readonly, false).pipe(
   Context.add(Tool.OpenWorld, false),
 )
 
-const CreateConversation = Tool.make("create_conversation", {
+const CreateThread = Tool.make("create_thread", {
   description:
-    "Creates a Conversation: a named coding conversation working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Conversations. This returns once Glass created the Conversation, not when it finishes its Turn. When you are the Global chat or a Conversation, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_conversation_transcript shows its progress. A Conversation that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Conversation in a Sandbox can only create Conversations in a Sandbox. Choose the place, harness, base branch, and model from list_conversation_places and list_conversation_options, never from guesses. If this call fails without saying why, or is cut off, call list_conversations before trying again rather than creating a second Conversation.",
+    "Creates a Thread: a named piece of work with a coding agent, on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
   parameters: Schema.Struct({
     repository: FollowedRepository,
     baseBranch: Schema.String.annotate({
-      description: "The branch the Conversation's branch starts from.",
+      description: "The branch the Thread's branch starts from.",
     }),
-    place: ConversationPlace.annotate({
+    place: ThreadPlace.annotate({
       description:
-        "Where the Conversation's agent works: on this device, or in a Sandbox from a provider.",
+        "Where the Thread's agent works: on this device, or in a Sandbox from a provider.",
     }),
     harness: AgentHarness.annotate({
-      description: "The Agent harness that runs the Conversation.",
+      description: "The Agent harness that runs the Thread.",
     }),
     model: Schema.NullOr(Schema.String).annotate({
-      description: "A model id from list_conversation_options, or null for the harness's default.",
+      description: "A model id from list_thread_options, or null for the harness's default.",
     }),
     effort: Schema.NullOr(Schema.String).annotate({
       description: "One of the model's Efforts, or null for its default.",
     }),
-    message: MessageText.annotate({ description: "The Conversation's first message: its task." }),
+    message: MessageText.annotate({ description: "The Thread's first message: its task." }),
   }),
-  success: Schema.Struct({ conversation: Conversation }),
+  success: Schema.Struct({ thread: Thread }),
   failure: GlassToolFailure,
 }).annotateMerge(action)
 
-const SendConversationMessage = Tool.make("send_conversation_message", {
+const SendThreadMessage = Tool.make("send_thread_message", {
   description:
-    "Sends a message to one of the user's Conversations, as the user would from the Conversation. An idle Conversation starts a Turn with it; a busy Conversation keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when its agent answers. When you are the Global chat or a Conversation, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_conversation_transcript shows its progress. A Conversation can't message itself, or one that asks the user less than it does, and one in a Sandbox can only message Conversations in a Sandbox. If this call fails without saying why, or is cut off, read the Conversation's transcript before sending again rather than sending it twice.",
+    "Sends a message to one of the user's Threads, as the user would from the Thread. An idle Thread starts a Turn with it; a busy Thread keeps it as a Queued message and starts on it after its running Turn. This returns once Glass accepted the message, not when its agent answers. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread can't message itself, or one that asks the user less than it does, and one in a Sandbox can only message Threads in a Sandbox. If this call fails without saying why, or is cut off, read the Thread's transcript before sending again rather than sending it twice.",
   parameters: Schema.Struct({
-    conversationId: Schema.String.annotate({
-      description: "The Conversation's id, from list_conversations.",
+    threadId: Schema.String.annotate({
+      description: "The Thread's id, from list_threads.",
     }),
     message: MessageText,
   }),
   success: Schema.Struct({
     delivery: MessageDelivery.annotate({
       description:
-        "started: the Conversation started a Turn with it. queued: it waits behind the running Turn.",
+        "started: the Thread started a Turn with it. queued: it waits behind the running Turn.",
     }),
   }),
   failure: GlassToolFailure,
@@ -285,7 +285,7 @@ const ReadAgentReview = Tool.make("read_agent_review", {
 const AskUser = Tool.make("ask_user", {
   description:
     `For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. ` +
-    `A Conversation Glass launched asks with its own Question tool instead. ` +
+    `A Thread Glass launched asks with its own Question tool instead. ` +
     `Waits ${ASK_TIMEOUT_SECONDS / 60} minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to ${ASK_TIMEOUT_SECONDS}. ` +
     `Glass sends a progress notification immediately and every ${ASK_PROGRESS_SECONDS} seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. ` +
     `Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. ` +
@@ -367,26 +367,26 @@ export const GlassTools = Toolkit.make(
   ListQueue,
   ListToDos,
   ListRecentActivity,
-  ListConversations,
+  ListThreads,
   ListNeedsYou,
   ListStartedWork,
-  ReadConversationTranscript,
+  ReadThreadTranscript,
   ReadPullRequest,
   ReadAgentReview,
   StartAgentReview,
-  ListConversationPlaces,
-  ListConversationOptions,
-  CreateConversation,
-  SendConversationMessage,
+  ListThreadPlaces,
+  ListThreadOptions,
+  CreateThread,
+  SendThreadMessage,
   AskUser,
   CheckIn,
 )
 
 type ServiceFailure =
   | ActivityLogError
-  | ConversationError
+  | ThreadError
   | AgentReviewFailure
-  | ConversationNotFound
+  | ThreadNotFound
   | ConnectionError
   | InvalidLocalCheckout
   | PullRequestAccessDenied
@@ -407,17 +407,17 @@ const explained = (error: ServiceFailure) =>
           "GitHub has no such PR, or the user's GitHub login can't see it.",
         NoCredentials: () => "Glass isn't signed in to GitHub.",
         TokenRejected: () => "GitHub rejected Glass's GitHub login.",
-        ConversationNotFound: () =>
-          "There's no Conversation with that id. list_conversations names the Conversations there are.",
+        ThreadNotFound: () =>
+          "There's no Thread with that id. list_threads names the Threads there are.",
         InvalidLocalCheckout: ({ message }) =>
-          `${message} The user links one from New Conversation in Conversations; a Conversation in a Sandbox needs none.`,
+          `${message} The user links one from New Thread in Threads; a Thread in a Sandbox needs none.`,
         PullRequestAccessDenied: ({ message }) => message,
         GitHubUnavailable: ({ message }) => message,
         ActivityLogError: ({ message }) => message,
-        ConversationError: ({ message }) => message,
+        ThreadError: ({ message }) => message,
         AgentReviewFailure: ({ message }) => message,
         RequestWaiting: () =>
-          "The Conversation's agent is waiting for the user to answer its Question or Permission request, so it took no message. The user answers it in the Conversation.",
+          "The Thread's agent is waiting for the user to answer its Question or Permission request, so it took no message. The user answers it in the Thread.",
         QueueError: ({ message }) => message,
         SettingsError: ({ message }) => message,
         ToDoError: ({ message }) => message,
@@ -469,8 +469,7 @@ const starterOf = (caller: McpCallerIdentity): Option.Option<Starter> =>
     Match.tagsExhaustive({
       GlobalChat: ({ globalChatId, sessionId }) =>
         Option.some({ startedBy: globalChatId, sessionId }),
-      Conversation: ({ conversationId }) =>
-        Option.some({ startedBy: conversationId, sessionId: conversationId }),
+      Thread: ({ threadId }) => Option.some({ startedBy: threadId, sessionId: threadId }),
       OutsideAgent: () => Option.none(),
     }),
   )
@@ -524,7 +523,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const toDos = yield* ToDos
     const activityLog = yield* ActivityLog
     const github = yield* GitHubClient
-    const conversations = yield* Conversations
+    const threads = yield* Threads
     const followed = yield* FollowedRepositories
     const checkouts = yield* LocalCheckouts
     const sandboxes = yield* Sandboxes
@@ -539,26 +538,24 @@ export const GlassToolHandlers = GlassTools.toLayer(
       place,
       model,
       effort,
-    }: Tool.Parameters<typeof CreateConversation>) {
-      const { defaultModel, models } = yield* conversations.models(harness, place)
+    }: Tool.Parameters<typeof CreateThread>) {
+      const { defaultModel, models } = yield* threads.models(harness, place)
       const chosen = model === null ? defaultModel : models.find(({ id }) => id === model)
 
       if (model !== null && chosen === undefined)
-        yield* new ConversationError({
-          message: `That place has no model "${model}". list_conversation_options lists the models a place offers.`,
+        yield* new ThreadError({
+          message: `That place has no model "${model}". list_thread_options lists the models a place offers.`,
         })
 
       if (effort !== null && !(chosen?.efforts.includes(effort) ?? false))
-        yield* new ConversationError({
-          message: `That model has no Effort "${effort}". list_conversation_options lists each model's Efforts.`,
+        yield* new ThreadError({
+          message: `That model has no Effort "${effort}". list_thread_options lists each model's Efforts.`,
         })
     })
 
-    const callingConversationId = McpCaller.current.pipe(
+    const callingThreadId = McpCaller.current.pipe(
       Effect.map((caller) =>
-        Predicate.isTagged(caller, "Conversation")
-          ? Option.some(caller.conversationId)
-          : Option.none(),
+        Predicate.isTagged(caller, "Thread") ? Option.some(caller.threadId) : Option.none(),
       ),
     )
 
@@ -582,12 +579,12 @@ export const GlassToolHandlers = GlassTools.toLayer(
           Effect.flatMap(({ login }) => activityLog.list(login, limit)),
           Effect.mapError(explained),
         ),
-      list_conversations: () =>
-        Effect.all([first(conversations.watch()), first(conversations.watchWaiting())]).pipe(
+      list_threads: () =>
+        Effect.all([first(threads.watch()), first(threads.watchWaiting())]).pipe(
           Effect.map(([listed, waiting]) => ({
-            conversations: listed.map((conversation) => ({
-              conversation,
-              waiting: waiting.some((found) => found.conversation.id === conversation.id),
+            threads: listed.map((thread) => ({
+              thread,
+              waiting: waiting.some((found) => found.thread.id === thread.id),
             })),
           })),
           Effect.mapError(explained),
@@ -610,8 +607,8 @@ export const GlassToolHandlers = GlassTools.toLayer(
             })),
           }
         }),
-      read_conversation_transcript: ({ conversationId, turns }) =>
-        conversations.readTranscript(conversationId, turns).pipe(
+      read_thread_transcript: ({ threadId, turns }) =>
+        threads.readTranscript(threadId, turns).pipe(
           Effect.map((transcript) => ({
             turns: transcript.turns.map((turn) => ({
               message: textOf(turn.message),
@@ -637,50 +634,50 @@ export const GlassToolHandlers = GlassTools.toLayer(
         recordedFor(agentReviews.start(pullRequest, revision), (starter, since) =>
           startedWork.startedAgentReview(starter, pullRequest, since),
         ).pipe(Effect.andThen(first(agentReviews.watch(pullRequest))), Effect.mapError(explained)),
-      list_conversation_places: () =>
+      list_thread_places: () =>
         Effect.gen(function* () {
           return {
             local: {
-              harnesses: conversations.harnesses(localPlace),
+              harnesses: threads.harnesses(localPlace),
               localCheckouts: yield* checkouts.list(),
             },
             sandboxProviders: sandboxes.providers,
             followedRepositories: yield* followed.list(),
           }
         }).pipe(Effect.mapError(explained)),
-      list_conversation_options: ({ place, repository, harness }) =>
+      list_thread_options: ({ place, repository, harness }) =>
         Effect.all(
           {
-            defaultBranch: conversations.newConversationDefaultBranch(place, repository),
-            branches: conversations.newConversationBranches(place, repository),
-            models: conversations.models(harness, place),
+            defaultBranch: threads.newThreadDefaultBranch(place, repository),
+            branches: threads.newThreadBranches(place, repository),
+            models: threads.models(harness, place),
           },
           { concurrency: "unbounded" },
         ).pipe(Effect.mapError(explained)),
-      create_conversation: (input) =>
+      create_thread: (input) =>
         Effect.gen(function* () {
           yield* refuseUnofferedModel(input)
 
           const created = { ...input, skillPacks: [], localSkills: false, images: [] }
-          const parent = yield* callingConversationId
+          const parent = yield* callingThreadId
 
-          const conversation = yield* recordedFor(
+          const thread = yield* recordedFor(
             Option.isSome(parent)
-              ? conversations.createFrom(parent.value, created)
-              : conversations.create({ ...created, permissionMode: null }),
-            (starter, since, { id }) => startedWork.linkConversation(starter, id, since),
+              ? threads.createFrom(parent.value, created)
+              : threads.create({ ...created, permissionMode: null }),
+            (starter, since, { id }) => startedWork.linkThread(starter, id, since),
           )
 
-          return { conversation }
+          return { thread }
         }).pipe(Effect.mapError(explained)),
-      send_conversation_message: ({ conversationId, message }) =>
-        callingConversationId.pipe(
+      send_thread_message: ({ threadId, message }) =>
+        callingThreadId.pipe(
           Effect.flatMap((sender) =>
             recordedFor(
               Option.isSome(sender)
-                ? conversations.sendFrom(sender.value, conversationId, { message, images: [] })
-                : conversations.send(conversationId, { message, images: [] }),
-              (starter, since) => startedWork.linkConversation(starter, conversationId, since),
+                ? threads.sendFrom(sender.value, threadId, { message, images: [] })
+                : threads.send(threadId, { message, images: [] }),
+              (starter, since) => startedWork.linkThread(starter, threadId, since),
             ),
           ),
           Effect.map((delivery) => ({ delivery })),
@@ -688,7 +685,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
         ),
       ask_user: ({ question, choices, timeoutSeconds }) =>
         waitingOnTheUser(
-          "A Conversation Glass launched asks the user with its own Question tool.",
+          "A Thread Glass launched asks the user with its own Question tool.",
           (caller) =>
             outsideQuestions
               .ask({
@@ -709,7 +706,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
         ),
       check_in: ({ folder, baseRef, summary, timeoutSeconds }) =>
         waitingOnTheUser(
-          "Only an agent outside Glass checks in. A Conversation's changes are beside it already.",
+          "Only an agent outside Glass checks in. A Thread's changes are beside it already.",
           (caller) =>
             checkIns
               .ask({

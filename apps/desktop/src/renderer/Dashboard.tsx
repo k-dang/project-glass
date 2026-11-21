@@ -1,17 +1,18 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import type { QueuedPullRequest } from "@glass/contracts"
 import { Link, type LinkProps } from "@tanstack/react-router"
+import type { Cause } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { Circle } from "lucide-react"
 import { type ReactNode, useId } from "react"
 import { ActivityChart } from "./ActivityChart"
-import { ConversationContinueCard } from "./ConversationContinueCard"
+import { ThreadContinueCard } from "./ThreadContinueCard"
 import { ContinueCardLoading } from "./ContinueCard"
 import type { BackendError } from "./backend"
 import { Count, SectionLink } from "./Lists"
 import { NeedsYouSummary } from "./NeedsYouCount"
 import { ProblemAlert } from "./ProblemAlert"
-import { problemOf } from "./problems"
+import { problemOf, streamProblem } from "./problems"
 import { repositoryLabeller } from "./PullRequestRow"
 import { savedQueueAtom, watchedQueueAtom } from "./queue"
 import { QueueWorkStatus } from "./QueueWorkStatus"
@@ -52,7 +53,7 @@ function Continue() {
         .onSuccess((destinations) => (
           <div className={continueGrid}>
             <ReviewContinueCard destination={savedIn(destinations, "reviews")} />
-            <ConversationContinueCard destination={savedIn(destinations, "conversations")} />
+            <ThreadContinueCard destination={savedIn(destinations, "threads")} />
           </div>
         ))
         .onFailure((cause) => (
@@ -61,7 +62,7 @@ function Continue() {
         .orElse(() => (
           <div className={continueGrid}>
             <ContinueCardLoading label="Loading your last pull request…" />
-            <ContinueCardLoading label="Loading your last Conversation…" />
+            <ContinueCardLoading label="Loading your last Thread…" />
           </div>
         ))}
     </section>
@@ -72,7 +73,7 @@ function Panel<A>(props: {
   title: string
   link: LinkProps
   linkLabel: string
-  result: AsyncResult.AsyncResult<ReadonlyArray<A>, BackendError>
+  result: AsyncResult.AsyncResult<ReadonlyArray<A>, BackendError | Cause.NoSuchElementError>
   retry: () => void
   loading: string
   empty: string
@@ -100,7 +101,7 @@ function Panel<A>(props: {
           )
           .onFailure((cause) => (
             <ProblemAlert
-              problem={problemOf(cause)}
+              problem={streamProblem(cause)}
               action={{ label: "Retry", run: props.retry }}
             />
           ))

@@ -191,7 +191,7 @@ export const startedWorkUpdateDelivery = (
   return {
     state: "responding",
     prompt:
-      "Glass restarted while you were writing the Started work update above. Finish that Started work update using the saved conversation. Do not repeat what you already said or take any action on the user's behalf.",
+      "Glass restarted while you were writing the Started work update above. Finish that Started work update using the saved thread. Do not repeat what you already said or take any action on the user's behalf.",
     events,
   }
 }

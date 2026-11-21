@@ -410,10 +410,10 @@ it.live("reviews on the engine chosen for Agent reviews", () =>
 
 const transcript = (
   client: BackendClient,
-  conversationId: string,
+  threadId: string,
   until: (turns: ReadonlyArray<Turn>) => boolean,
 ) =>
-  client.WatchTranscript({ conversationId }).pipe(
+  client.WatchTranscript({ threadId }).pipe(
     Stream.scan(() => emptyTranscript, applyTranscriptUpdate),
     Stream.map(({ turns }) => turns),
     Stream.filter(until),
@@ -427,14 +427,14 @@ const ended = (count: number) => (turns: ReadonlyArray<Turn>) =>
 const texts = (turn: Turn | undefined) =>
   (turn?.parts ?? []).flatMap((part) => (Predicate.isTagged(part, "Text") ? [part.text] : []))
 
-const withConversation = (state: AgentReviewState) =>
-  state.job.status === "idle" && state.review?.conversationId != null
+const withThread = (state: AgentReviewState) =>
+  state.job.status === "idle" && state.review?.threadId != null
 
 const followUp = (f: Effect.Success<ReturnType<typeof fixture>>, message: string) =>
   f.client.FollowUpAgentReview({ pullRequest: f.ref, revision: f.revision, message })
 
 it.live(
-  "starts the review's Conversation in a checkout of its Revision, sending it every Follow-up",
+  "starts the review's Thread in a checkout of its Revision, sending it every Follow-up",
   () =>
     Effect.gen(function* () {
       const f = yield* fixture()
@@ -442,11 +442,11 @@ it.live(
       const { review } = yield* f.state(reviewed)
 
       yield* followUp(f, "show the review")
-      const started = yield* f.state(withConversation)
-      const conversationId = started.review!.conversationId!
+      const started = yield* f.state(withThread)
+      const threadId = started.review!.threadId!
       assert.strictEqual(started.review?.markdown, review?.markdown)
 
-      const [first] = yield* transcript(f.client, conversationId, ended(1))
+      const [first] = yield* transcript(f.client, threadId, ended(1))
       const [instructions, files] = texts(first)
       assert.strictEqual(first?.message, "show the review")
       assert.include(instructions, defaultReviewPrompt)
@@ -457,14 +457,14 @@ it.live(
       assert.strictEqual(files, ".git,greet.ts,main.ts,src")
 
       yield* followUp(f, "And the rename?")
-      const turns = yield* transcript(f.client, conversationId, ended(2))
+      const turns = yield* transcript(f.client, threadId, ended(2))
       assert.deepStrictEqual(texts(turns[1]), ["Reply to: And the rename?"])
 
-      const listed = yield* f.client.WatchConversations().pipe(Stream.runHead)
-      const conversations = Option.getOrThrow(listed)
-      assert.strictEqual(conversations.length, 1)
-      assert.strictEqual(conversations[0]?.id, conversationId)
-      assert.strictEqual(conversations[0]?.forReview, true)
+      const listed = yield* f.client.WatchThreads().pipe(Stream.runHead)
+      const threads = Option.getOrThrow(listed)
+      assert.strictEqual(threads.length, 1)
+      assert.strictEqual(threads[0]?.id, threadId)
+      assert.strictEqual(threads[0]?.forReview, true)
       assert.deepStrictEqual(yield* f.restart, started)
     }),
 )
@@ -476,11 +476,11 @@ it.live("keeps the Suggested drafts the agent places on lines of the diff", () =
     yield* f.state(reviewed)
 
     yield* followUp(f, "suggest new:greet.ts:2 Could this keep the caller's `!`?")
-    const conversationId = (yield* f.state(withConversation)).review!.conversationId!
+    const threadId = (yield* f.state(withThread)).review!.threadId!
     yield* followUp(f, "suggest new:main.ts:1 Unrelated aside.")
     yield* followUp(f, "suggest old:greet.ts:1 Why drop hello?")
 
-    const turns = yield* transcript(f.client, conversationId, ended(3))
+    const turns = yield* transcript(f.client, threadId, ended(3))
 
     const suggested = turns.map((turn) =>
       turn.parts.flatMap((part) =>
@@ -496,38 +496,34 @@ it.live("keeps the Suggested drafts the agent places on lines of the diff", () =
   }),
 )
 
-it.live("removes the Conversation and its checkout when the Agent review is written again", () =>
+it.live("removes the Thread and its checkout when the Agent review is written again", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.start
     yield* f.state(reviewed)
 
     yield* followUp(f, "Why?")
-    const conversationId = (yield* f.state(withConversation)).review!.conversationId!
-    yield* transcript(f.client, conversationId, ended(1))
+    const threadId = (yield* f.state(withThread)).review!.threadId!
+    yield* transcript(f.client, threadId, ended(1))
     const checkouts = join(f.home, ".project-glass", "agent-review-checkouts")
     assert.lengthOf(readdirSync(checkouts), 1)
 
     yield* f.start
 
-    const rewritten = yield* f.state(
-      (state) => reviewed(state) && state.review?.conversationId === null,
-    )
+    const rewritten = yield* f.state((state) => reviewed(state) && state.review?.threadId === null)
 
     assert.strictEqual(rewritten.review?.markdown, answer.markdown)
 
     yield* eventually(Effect.sync(() => assert.isEmpty(readdirSync(checkouts))))
 
-    const gone = yield* f.client
-      .WatchTranscript({ conversationId })
-      .pipe(Stream.runHead, Effect.flip)
+    const gone = yield* f.client.WatchTranscript({ threadId }).pipe(Stream.runHead, Effect.flip)
 
-    assert.strictEqual(gone._tag, "ConversationNotFound")
-    assert.strictEqual((yield* f.restart).review?.conversationId, null)
+    assert.strictEqual(gone._tag, "ThreadNotFound")
+    assert.strictEqual((yield* f.restart).review?.threadId, null)
   }),
 )
 
-it.live("refuses a follow-up on another Revision without starting the Conversation", () =>
+it.live("refuses a follow-up on another Revision without starting the Thread", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.start
@@ -547,7 +543,7 @@ it.live("refuses a follow-up on another Revision without starting the Conversati
   }),
 )
 
-it.live("keeps the message of a follow-up whose Conversation couldn't start", () =>
+it.live("keeps the message of a follow-up whose Thread couldn't start", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.start
@@ -557,14 +553,11 @@ it.live("keeps the message of a follow-up whose Conversation couldn't start", ()
     yield* followUp(f, "Why?")
 
     const { job, review: after } = yield* f.state(
-      (state) => state.job.status === "conversation-start-failed",
+      (state) => state.job.status === "thread-start-failed",
     )
 
-    assert.strictEqual(job.status === "conversation-start-failed" && job.message, "Why?")
-    assert.strictEqual(
-      job.status === "conversation-start-failed" && job.reason.reason,
-      "stale-revision",
-    )
+    assert.strictEqual(job.status === "thread-start-failed" && job.message, "Why?")
+    assert.strictEqual(job.status === "thread-start-failed" && job.reason.reason, "stale-revision")
     assert.deepStrictEqual(after, review)
     const checkouts = join(f.home, ".project-glass", "agent-review-checkouts")
     assert.isEmpty(existsSync(checkouts) ? readdirSync(checkouts) : [])

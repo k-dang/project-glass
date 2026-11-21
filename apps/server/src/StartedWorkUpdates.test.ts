@@ -2,22 +2,22 @@ import { assert, it } from "@effect/vitest"
 import { AnswerQuestion, localPlace, type NeedsYou, type Turn } from "@glass/contracts"
 import { Effect, Option, Predicate, Stream } from "effect"
 import {
-  conversationsFixture,
+  threadsFixture,
   glassCalls,
   globalTurns,
   holding,
   lastSettled,
   outcomesInStartedWorkUpdates,
-  conversationOutcomesInStartedWorkUpdates,
+  threadOutcomesInStartedWorkUpdates,
   repository,
   sendGlobal,
   settled,
-} from "../test/conversationsFixture"
+} from "../test/threadsFixture"
 
 const hiddenFromScriptedAskUser = (json: string) => json.replaceAll("ask", "\\u0061sk")
 
-const createConversation = (message: string) =>
-  `call:create_conversation ${hiddenFromScriptedAskUser(
+const createThread = (message: string) =>
+  `call:create_thread ${hiddenFromScriptedAskUser(
     JSON.stringify({
       repository: { owner: repository.owner, repo: repository.repo },
       baseBranch: "main",
@@ -33,33 +33,27 @@ const startedWorkUpdates = (turns: ReadonlyArray<Turn>) =>
   turns.filter(({ context }) => Predicate.isTagged(context, "StartedWorkUpdate"))
 
 it.live(
-  "sends one Started work update for Conversations that finished during its own Turn, marking them seen",
+  "sends one Started work update for Threads that finished during its own Turn, marking them seen",
   () =>
     Effect.gen(function* () {
-      const f = yield* conversationsFixture
+      const f = yield* threadsFixture
       yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
 
-      yield* sendGlobal(f.client, createConversation("hold:first"))
-      yield* sendGlobal(f.client, createConversation("hold:second"))
+      yield* sendGlobal(f.client, createThread("hold:first"))
+      yield* sendGlobal(f.client, createThread("hold:second"))
       yield* sendGlobal(f.client, "hold:global")
       yield* globalTurns(f.client, holding)
 
-      const started = yield* f.conversations
+      const started = yield* f.threads
       assert.lengthOf(started, 2)
 
       yield* f.release("first")
       yield* f.release("second")
 
-      const asked = yield* Effect.forEach(started, (conversation) =>
+      const asked = yield* Effect.forEach(started, (thread) =>
         f
-          .transcript(conversation.id, settled(1))
-          .pipe(
-            Effect.map(([turn]) => [
-              conversation.id,
-              "finished",
-              createConversation(turn!.message),
-            ]),
-          ),
+          .transcript(thread.id, settled(1))
+          .pipe(Effect.map(([turn]) => [thread.id, "finished", createThread(turn!.message)])),
       )
 
       yield* f.release("global")
@@ -69,7 +63,7 @@ it.live(
       assert.strictEqual(turns[3]?.message, "")
       assert.sameDeepMembers(
         outcomesInStartedWorkUpdates(turns).map((work) => [
-          Predicate.isTagged(work, "Conversation") && work.conversationId,
+          Predicate.isTagged(work, "Thread") && work.threadId,
           work.outcome,
           work.askedWith,
         ]),
@@ -80,8 +74,8 @@ it.live(
         Stream.filter((items: NeedsYou) =>
           items.every(
             (item) =>
-              !Predicate.isTagged(item, "Conversation") ||
-              !started.some(({ id }) => id === item.conversation.id),
+              !Predicate.isTagged(item, "Thread") ||
+              !started.some(({ id }) => id === item.thread.id),
           ),
         ),
         Stream.runHead,
@@ -91,56 +85,54 @@ it.live(
 )
 
 it.live(
-  "sends a Started work update for a Conversation waiting on a Question, and another when it ends",
+  "sends a Started work update for a Thread waiting on a Question, and another when it ends",
   () =>
     Effect.gen(function* () {
-      const f = yield* conversationsFixture
+      const f = yield* threadsFixture
       yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
 
-      yield* sendGlobal(f.client, createConversation("Please ask a question"))
+      yield* sendGlobal(f.client, createThread("Please ask a question"))
       yield* globalTurns(f.client, settled(1))
-      const [conversation] = yield* f.conversations
-      assert.isDefined(conversation)
+      const [thread] = yield* f.threads
+      assert.isDefined(thread)
 
       const waiting = yield* globalTurns(
         f.client,
         (all) =>
-          conversationOutcomesInStartedWorkUpdates(all).length === 1 &&
+          threadOutcomesInStartedWorkUpdates(all).length === 1 &&
           all.every(({ ended }) => ended !== null),
       )
 
-      assert.deepStrictEqual(conversationOutcomesInStartedWorkUpdates(waiting), [
-        [conversation.id, "waiting"],
-      ])
+      assert.deepStrictEqual(threadOutcomesInStartedWorkUpdates(waiting), [[thread.id, "waiting"]])
 
-      yield* f.answering(conversation.id, settled(1), () =>
+      yield* f.answering(thread.id, settled(1), () =>
         AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
       )
 
       const turns = yield* globalTurns(
         f.client,
-        (all) => conversationOutcomesInStartedWorkUpdates(all).length === 2,
+        (all) => threadOutcomesInStartedWorkUpdates(all).length === 2,
       )
 
-      assert.deepStrictEqual(conversationOutcomesInStartedWorkUpdates(turns), [
-        [conversation.id, "waiting"],
-        [conversation.id, "finished"],
+      assert.deepStrictEqual(threadOutcomesInStartedWorkUpdates(turns), [
+        [thread.id, "waiting"],
+        [thread.id, "finished"],
       ])
     }),
 )
 
-it.live("leaves out a Conversation it started that the user stopped", () =>
+it.live("leaves out a Thread it started that the user stopped", () =>
   Effect.gen(function* () {
-    const f = yield* conversationsFixture
+    const f = yield* threadsFixture
     yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
 
-    yield* sendGlobal(f.client, createConversation("hold:never"))
+    yield* sendGlobal(f.client, createThread("hold:never"))
     yield* globalTurns(f.client, settled(1))
-    const [conversation] = yield* f.conversations
-    assert.isDefined(conversation)
-    yield* f.transcript(conversation.id, holding)
-    yield* f.client.StopTurn({ conversationId: conversation.id })
-    yield* f.transcript(conversation.id, settled(1))
+    const [thread] = yield* f.threads
+    assert.isDefined(thread)
+    yield* f.transcript(thread.id, holding)
+    yield* f.client.StopTurn({ threadId: thread.id })
+    yield* f.transcript(thread.id, settled(1))
 
     yield* sendGlobal(f.client, "After")
 
@@ -152,9 +144,9 @@ it.live("leaves out a Conversation it started that the user stopped", () =>
 
 it.live("keeps a sent Started work update after restart without repeating the same outcome", () =>
   Effect.gen(function* () {
-    const f = yield* conversationsFixture
+    const f = yield* threadsFixture
     yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
-    yield* sendGlobal(f.client, createConversation("Finish this"))
+    yield* sendGlobal(f.client, createThread("Finish this"))
 
     const before = yield* globalTurns(
       f.client,
@@ -171,44 +163,42 @@ it.live("keeps a sent Started work update after restart without repeating the sa
       [startedWorkUpdateId],
     )
     assert.deepStrictEqual(
-      conversationOutcomesInStartedWorkUpdates(after),
-      conversationOutcomesInStartedWorkUpdates(before),
+      threadOutcomesInStartedWorkUpdates(after),
+      threadOutcomesInStartedWorkUpdates(before),
     )
   }),
 )
 
-it.live(
-  "sends a Started work update in the new conversation for work started before Start fresh",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* conversationsFixture
-      yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
+it.live("sends a Started work update in the new Session for work started before Start fresh", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
 
-      const asked = createConversation("hold:first")
-      yield* sendGlobal(f.client, asked)
-      yield* globalTurns(f.client, settled(1))
-      const [conversation] = yield* f.conversations
-      assert.isDefined(conversation)
+    const asked = createThread("hold:first")
+    yield* sendGlobal(f.client, asked)
+    yield* globalTurns(f.client, settled(1))
+    const [thread] = yield* f.threads
+    assert.isDefined(thread)
 
-      yield* f.client.StartGlobalChatFresh()
-      yield* f.release("first")
+    yield* f.client.StartGlobalChatFresh()
+    yield* f.release("first")
 
-      const [startedWorkUpdate] = yield* globalTurns(f.client, settled(1))
+    const [startedWorkUpdate] = yield* globalTurns(f.client, settled(1))
 
-      assert.deepStrictEqual(
-        outcomesInStartedWorkUpdates(
-          startedWorkUpdate === undefined ? [] : [startedWorkUpdate],
-        ).map((work) => [
-          Predicate.isTagged(work, "Conversation") && work.conversationId,
+    assert.deepStrictEqual(
+      outcomesInStartedWorkUpdates(startedWorkUpdate === undefined ? [] : [startedWorkUpdate]).map(
+        (work) => [
+          Predicate.isTagged(work, "Thread") && work.threadId,
           work.outcome,
           work.askedWith,
-        ]),
-        [[conversation.id, "finished", asked]],
-      )
+        ],
+      ),
+      [[thread.id, "finished", asked]],
+    )
 
-      yield* sendGlobal(f.client, "call:list_started_work")
-      const [, listed] = yield* globalTurns(f.client, settled(2))
+    yield* sendGlobal(f.client, "call:list_started_work")
+    const [, listed] = yield* globalTurns(f.client, settled(2))
 
-      assert.include(glassCalls(listed)?.[0]?.output, conversation.id)
-    }),
+    assert.include(glassCalls(listed)?.[0]?.output, thread.id)
+  }),
 )

@@ -1,7 +1,7 @@
 import type { SDKMessage, SDKResultMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk"
 import {
   type AgentEvent,
-  applyConversationEvent,
+  applyThreadEvent,
   type BackgroundWork,
   endTurnEvents,
   PartAppended,
@@ -151,7 +151,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 
   const emit = (event: AgentEvent) => {
     events.push(event)
-    state = { ...state, turn: applyConversationEvent([state.turn], event)[0] ?? state.turn }
+    state = { ...state, turn: applyThreadEvent([state.turn], event)[0] ?? state.turn }
   }
 
   const addPart = (part: TurnPart) => {

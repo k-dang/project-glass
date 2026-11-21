@@ -1,13 +1,7 @@
-import {
-  BinaryFile,
-  type ConversationFile,
-  FileTooLarge,
-  ImageFile,
-  TextFile,
-} from "@glass/contracts"
+import { BinaryFile, type ThreadFile, FileTooLarge, ImageFile, TextFile } from "@glass/contracts"
 import { Context, Effect, FileSystem, Layer } from "effect"
 import { extname, isAbsolute, join, relative, sep } from "node:path"
-import { failure, type HostConversationError } from "./protocol"
+import { failure, type HostThreadError } from "./protocol"
 
 const MAX_FILE_BYTES = 10_000_000
 
@@ -44,11 +38,8 @@ export class FolderFiles extends Context.Service<
     readonly existing: (
       folder: string,
       paths: ReadonlyArray<string>,
-    ) => Effect.Effect<ReadonlyArray<string>, HostConversationError>
-    readonly read: (
-      folder: string,
-      path: string,
-    ) => Effect.Effect<ConversationFile, HostConversationError>
+    ) => Effect.Effect<ReadonlyArray<string>, HostThreadError>
+    readonly read: (folder: string, path: string) => Effect.Effect<ThreadFile, HostThreadError>
   }
 >()("@glass/server/agentHost/FolderFiles") {
   static readonly layer = Layer.effect(
@@ -84,7 +75,7 @@ export class FolderFiles extends Context.Service<
               ),
             ),
             Effect.map((found) => paths.filter((_, index) => found[index])),
-            failure("Couldn't look for files in the Conversation's folder."),
+            failure("Couldn't look for files in the Thread's folder."),
           ),
         read: (folder, path) =>
           Effect.gen(function* () {
@@ -101,7 +92,7 @@ export class FolderFiles extends Context.Service<
             const text = textOf(bytes)
 
             return text === null ? BinaryFile.make({}) : TextFile.make({ text })
-          }).pipe(failure(`Couldn't read ${path} in the Conversation's folder.`)),
+          }).pipe(failure(`Couldn't read ${path} in the Thread's folder.`)),
       })
     }),
   )

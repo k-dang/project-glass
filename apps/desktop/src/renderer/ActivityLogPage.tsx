@@ -27,7 +27,7 @@ import { Button } from "@/components/ui/button"
 import { Backend, backendRuntime } from "./backend"
 import { Empty, LoadMore } from "./Lists"
 import { plural } from "./plural"
-import { placeNames } from "./conversationsArea"
+import { placeNames } from "./threadsArea"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 import { dayOf } from "./recency"
@@ -113,8 +113,8 @@ const describe = (activity: Activity): Described =>
       tone: "text-added",
       subject: toDo.title,
     }),
-    ConversationStarted: ({ name, repository, machine, message }) => ({
-      verb: "Started Conversation",
+    ThreadStarted: ({ name, repository, machine, message }) => ({
+      verb: "Started Thread",
       icon: Sparkles,
       subject: name,
       where: `${repositoryKey(repository)} on ${placeNames[machine]}`,

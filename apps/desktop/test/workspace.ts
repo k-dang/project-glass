@@ -1,7 +1,6 @@
 import {
   ActivityPullRequest,
   ChangedFile,
-  Discussions,
   type Draft,
   PullRequest,
   PullRequestRef,
@@ -99,6 +98,8 @@ export const workspace = (
     updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
     files: changes.files ?? [],
     viewedPaths: changes.viewedPaths ?? [],
-    discussions: new Discussions({ onLines: [], outdated: [], timeline: [] }),
+    lineReviewThreads: [],
+    outdatedReviewThreads: [],
+    timeline: [],
     drafts,
   })

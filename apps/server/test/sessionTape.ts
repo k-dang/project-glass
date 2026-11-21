@@ -127,7 +127,7 @@ const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
 const personal =
   /email|organization|account|subscription|rate_limit_info|username|team[_-]?id|(?:access|refresh|auth)[_-]?token|api[_-]?key|^sections$/i
 
-const machine = /^pid$|^output_style$|^baseUrl$/
+const machine = /^pid$|^output_style$|^baseUrl$|^powershell_path$/
 
 const usage = /usage|^total_cost_usd$|^estimated_tokens(?:_delta)?$|^first_request_input_tokens$/i
 
@@ -497,11 +497,11 @@ export const sessionTape = (
   )
 
   const sessionInfo = (
-    conversation: string,
+    thread: string,
     dir: string | undefined,
     live: () => Promise<SDKSessionInfo | undefined>,
   ): Promise<SDKSessionInfo | undefined> => {
-    const args = normalize({ conversation, dir: dir ?? "" })
+    const args = normalize({ thread, dir: dir ?? "" })
 
     if (recordingSessions)
       return live().then((info) => {
@@ -516,7 +516,7 @@ export const sessionTape = (
     const call = recorded.calls[nextCall++]
 
     if (call === undefined || show(call.args) !== show(args)) {
-      problem(`Glass looked up a conversation the recording doesn't have: ${show(args)}`)
+      problem(`Glass looked up a thread the recording doesn't have: ${show(args)}`)
 
       return Promise.resolve(undefined)
     }

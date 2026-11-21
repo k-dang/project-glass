@@ -1,4 +1,4 @@
-import type { LineDiscussion } from "@glass/contracts"
+import type { LineReviewThread } from "@glass/contracts"
 import type {
   CodeViewItem,
   CodeViewLineSelection,
@@ -24,7 +24,7 @@ import { Button } from "@/components/ui/button"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { lineOptions } from "./codeCard"
-import { DiscussionThread } from "./Discussions"
+import { ReviewThread } from "./ReviewThreads"
 import { LineAsk } from "./Asks"
 import { LineDraft } from "./Drafts"
 import {
@@ -365,7 +365,7 @@ export interface ChangedFilesViewProps extends Omit<
   | "collapsedWhenSuggested"
 > {
   onCurrentPathChange: (path: string) => void
-  discussions: ReadonlyArray<LineDiscussion>
+  reviewThreads: ReadonlyArray<LineReviewThread>
   drafts: DraftStore
   asks: AskStore
   replies: ReplyStore
@@ -379,7 +379,7 @@ export interface ChangedFilesViewProps extends Omit<
 }
 
 export function ChangedFilesView(props: ChangedFilesViewProps) {
-  const { discussions, drafts, asks, replies, resolutions, reactions, ...rest } = props
+  const { reviewThreads, drafts, asks, replies, resolutions, reactions, ...rest } = props
   const { onReload, viewedFiles, onViewedChange, lowAttention, ...diff } = rest
   const draftPlaces = useLineDraftPlaces(drafts)
   const askPlaces = useLineAskPlaces(asks)
@@ -387,11 +387,11 @@ export function ChangedFilesView(props: ChangedFilesViewProps) {
   const annotationsFor = useMemo(
     () =>
       lineNoteAnnotations({
-        discussions,
+        reviewThreads,
         drafts: draftPlaces,
         asks: askPlaces,
       } satisfies LineNotes),
-    [discussions, draftPlaces, askPlaces],
+    [reviewThreads, draftPlaces, askPlaces],
   )
 
   const renderGutterUtility = useCallback(
@@ -508,8 +508,8 @@ function renderNote(note: LineNote, context: NoteContext) {
 
   return (
     <div className="px-3 py-2">
-      <DiscussionThread
-        discussion={note.discussion}
+      <ReviewThread
+        reviewThread={note.reviewThread}
         replies={replies}
         resolutions={resolutions}
         reactions={reactions}

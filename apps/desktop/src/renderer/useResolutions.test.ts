@@ -7,12 +7,12 @@ import { createResolutions } from "./useResolutions"
 import { type Held, hold, next, testRegistry } from "../../test/testBackend"
 
 it("lets a resolve finish after its workspace is evicted, then releases its atom state", async () => {
-  const calls: Array<Held<{ discussionId: string; resolved: boolean }, boolean, never>> = []
+  const calls: Array<Held<{ reviewThreadId: string; resolved: boolean }, boolean, never>> = []
   const finished = vi.fn<() => void>()
   const interrupted = vi.fn<() => void>()
 
   const registry = testRegistry({
-    SetDiscussionResolved: (payload) =>
+    SetReviewThreadResolved: (payload) =>
       hold(calls)(payload).pipe(
         Effect.tap(() => Effect.sync(finished)),
         Effect.onInterrupt(() => Effect.sync(interrupted)),

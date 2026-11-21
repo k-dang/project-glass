@@ -27,8 +27,8 @@ Markdown.
   but kept the validation, the inline rendering, and the failures a stray path causes.
 - **Plain text that Glass parses into Findings**: no schema at all, but Glass would own a parser
   that any heading in a body could break.
-- **The review as the start of a Conversation**: follow-up questions help, but it needs a
-  Conversation and its checkout for every review. Instead, a review gets a Conversation only when
+- **The review as the start of a Thread**: follow-up questions help, but it needs a
+  Thread and its checkout for every review. Instead, a review gets a Thread only when
   the user sends a Follow-up (ADR 0009).
 - **Markdown only, with no Hotspots**: the simplest answer, but the reviewer can't jump to the risky
   lines, the diff can't collapse the plumbing, and the Tour can't say where to look first.

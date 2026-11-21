@@ -1,6 +1,6 @@
 # Feedback notes on a page
 
-A Conversation's HTML file opens in a File pane beside the Chat. The user selects text in the page, or turns on Pick element and clicks part of it, and leaves a Feedback note in an editor over the page. Each note is pinned on the page, numbered, and attached to the next message at once. Sending the message delivers the notes with what each points at, and their pins leave the page.
+A Thread's HTML file opens in a File pane beside the Chat. The user selects text in the page, or turns on Pick element and clicks part of it, and leaves a Feedback note in an editor over the page. Each note is pinned on the page, numbered, and attached to the next message at once. Sending the message delivers the notes with what each points at, and their pins leave the page.
 
 ## Sub-features
 
@@ -11,11 +11,11 @@ A Conversation's HTML file opens in a File pane beside the Chat. The user select
 
 ## How to get to it (user POV)
 
-Open a Conversation whose agent named an `.html` file in inline code, and click that path once the Turn ends. The File pane's toolbar reads "Select text, or pick an element, to leave a Feedback note." with a Pick element button.
+Open a Thread whose agent named an `.html` file in inline code, and click that path once the Turn ends. The File pane's toolbar reads "Select text, or pick an element, to leave a Feedback note." with a Pick element button.
 
 ## Driving it with glass-verify
 
-1. `node $V launch --backend fake`, doctor. Open Conversations, then the seeded pi Conversation whose transcript starts "Show me around this repository.". `wait --text README`.
+1. `node $V launch --backend fake`, doctor. Open Threads, then the seeded pi Thread whose transcript starts "Show me around this repository.". `wait --text README`.
 2. `type --role textbox --name Message --text "Write a page"`, `press --key Enter`, `wait --text "I wrote the plan to"`. `click --role button --name plan.html`, `wait --text "pick an element"`. Screenshot.
 3. Click `Pick element`, `wait --text "Click part of the page"`. Move the mouse over the table's `5` cell and click it (see Gotchas), then `wait --text "Add feedback"`. Snapshot: `form "Add Feedback note"` names `Table cell · Token bucket × Refill / min`.
 4. `type --role textbox --name "Feedback on the selected part of the page" --text "Make this ten"`, `press --key Enter --meta`, `wait --text "attached to this message"`. Screenshot: pin 1 on the cell.

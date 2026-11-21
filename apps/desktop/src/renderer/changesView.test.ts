@@ -1,7 +1,7 @@
 import {
   BinaryFile,
   FlaggedPlace,
-  LineDiscussion,
+  LineReviewThread,
   LinePlace,
   PublishedComment,
   TextPatch,
@@ -31,8 +31,8 @@ const comment = (id: string) =>
     reactions: [],
   })
 
-const discussion = (path: string, line: number, resolved = false, replies = 0) =>
-  new LineDiscussion({
+const reviewThread = (path: string, line: number, resolved = false, replies = 0) =>
+  new LineReviewThread({
     id: `T-${path}-${line}`,
     path,
     side: "new",
@@ -49,7 +49,7 @@ const draft = (key: string, path: string): LineNotePlace => ({ key, path, side: 
 const none = new Map<string, boolean>()
 
 const lineNotes = (some: Partial<LineNotes> = {}): LineNotes => ({
-  discussions: [],
+  reviewThreads: [],
   drafts: [],
   asks: [],
   ...some,
@@ -107,34 +107,34 @@ describe("toItems", () => {
     expect(redrawn(started, plain)).toEqual(["b.ts"])
   })
 
-  it("redraws only the file whose Discussions changed", () => {
-    const one = toItems(files, notesOf({ discussions: [discussion("a.ts", 2)] }), choose())
+  it("redraws only the file whose Review threads changed", () => {
+    const one = toItems(files, notesOf({ reviewThreads: [reviewThread("a.ts", 2)] }), choose())
 
     const two = toItems(
       files,
-      notesOf({ discussions: [discussion("a.ts", 2), discussion("c.ts", 1)] }),
+      notesOf({ reviewThreads: [reviewThread("a.ts", 2), reviewThread("c.ts", 1)] }),
       choose(),
     )
 
     expect(redrawn(one, two)).toEqual(["c.ts"])
   })
 
-  it("redraws a Discussion's file when it gains a Reply or is resolved", () => {
+  it("redraws a Review thread's file when it gains a Reply or is resolved", () => {
     const before = toItems(
       files,
-      notesOf({ discussions: [discussion("a.ts", 2), discussion("c.ts", 1)] }),
+      notesOf({ reviewThreads: [reviewThread("a.ts", 2), reviewThread("c.ts", 1)] }),
       choose(),
     )
 
     const replied = toItems(
       files,
-      notesOf({ discussions: [discussion("a.ts", 2, false, 1), discussion("c.ts", 1)] }),
+      notesOf({ reviewThreads: [reviewThread("a.ts", 2, false, 1), reviewThread("c.ts", 1)] }),
       choose(),
     )
 
     const resolved = toItems(
       files,
-      notesOf({ discussions: [discussion("a.ts", 2, true), discussion("c.ts", 1)] }),
+      notesOf({ reviewThreads: [reviewThread("a.ts", 2, true), reviewThread("c.ts", 1)] }),
       choose(),
     )
 
@@ -149,10 +149,10 @@ describe("toItems", () => {
     expect(closed.map((item) => item.collapsed)).toEqual([true, false, false])
   })
 
-  it("places Discussions and Drafts under their lines", () => {
+  it("places Review threads and Drafts under their lines", () => {
     const [a, b] = toItems(
       files,
-      notesOf({ discussions: [discussion("a.ts", 3)], drafts: [draft("1", "a.ts")] }),
+      notesOf({ reviewThreads: [reviewThread("a.ts", 3)], drafts: [draft("1", "a.ts")] }),
       choose(),
     )
 
@@ -160,7 +160,7 @@ describe("toItems", () => {
       {
         side: "additions",
         lineNumber: 3,
-        metadata: expect.objectContaining({ type: "discussion" }),
+        metadata: expect.objectContaining({ type: "reviewThread" }),
       },
       { side: "additions", lineNumber: 2, metadata: { type: "draft", key: "1" } },
     ])
@@ -225,7 +225,7 @@ const summary = (sections: ReturnType<typeof toNoteSections>) =>
   sections.map(({ path, notes }) => [
     path,
     notes.map((note) =>
-      note.type === "discussion" ? `T${note.discussion.line}` : `D:${note.draft.key}`,
+      note.type === "reviewThread" ? `T${note.reviewThread.line}` : `D:${note.draft.key}`,
     ),
   ])
 
@@ -235,7 +235,7 @@ describe("toNoteSections", () => {
   it("groups notes by file in the diffs' order, each file's notes by line", () => {
     const sections = toNoteSections(
       shown,
-      [discussion("a.ts", 9), discussion("src/b.ts", 4), discussion("a.ts", 2)],
+      [reviewThread("a.ts", 9), reviewThread("src/b.ts", 4), reviewThread("a.ts", 2)],
       [view("1", "a.ts", LinePlace.make({ side: "new", line: 5 }))],
     )
 
@@ -250,7 +250,7 @@ describe("toNoteSections", () => {
 
     const sections = toNoteSections(
       shown,
-      [discussion("a.ts", 7)],
+      [reviewThread("a.ts", 7)],
       [view("1", "gone.ts", flagged), view("2", "a.ts", flagged)],
     )
 

@@ -75,6 +75,6 @@ it.effect("opens a Turn with no message for a run the harness starts with no Tur
       .begin("turn-1", { message: "Build it", images: [], context: null })
       .pipe(Effect.flip)
 
-    assert.equal(refused.message, "The Conversation is still working on a Turn.")
+    assert.equal(refused.message, "The Thread is still working on a Turn.")
   }).pipe(Effect.scoped),
 )

@@ -5,12 +5,22 @@ import {
   noListings,
   nothingUnsent,
   SavedPlace,
+  type ToDo,
   TranscriptSnapshot,
   UnsentFeedback,
 } from "@glass/contracts"
-import { DateTime, Effect, Layer, ManagedRuntime, Stream } from "effect"
+import {
+  type Cause,
+  DateTime,
+  Deferred,
+  Effect,
+  Layer,
+  ManagedRuntime,
+  Queue,
+  Stream,
+} from "effect"
 import { AtomRegistry } from "effect/reactivity"
-import { type Rpc, type RpcGroup, RpcTest } from "effect/rpc"
+import { Rpc, type RpcGroup, RpcTest } from "effect/rpc"
 import { expect } from "vite-plus/test"
 import { eventually } from "./eventually"
 import { Backend, backendLayerAtom } from "../src/renderer/backend"
@@ -23,6 +33,50 @@ export type Handlers = {
 }
 
 const unused = () => Effect.die("The test doesn't expect this RPC")
+
+const settled = <A, E>(result: A | Deferred.Deferred<A, E>) =>
+  Deferred.isDeferred<A, E>(result) ? Deferred.await(result) : Effect.succeed(result)
+
+const watchedToDos = (
+  handlers: Partial<Handlers>,
+): Pick<Handlers, "WatchToDos"> & Partial<Handlers> => {
+  const watchers = new Set<Queue.Queue<ReadonlyArray<ToDo>, Cause.Done>>()
+  const { AddToDo, EditToDo, SetToDoDone, DeleteToDo, AttachToDoImages, RemoveToDoImage } = handlers
+
+  const announce = <E>(
+    saved: Rpc.WrapperOr<
+      Effect.Effect<ReadonlyArray<ToDo> | Deferred.Deferred<ReadonlyArray<ToDo>, E>, E>
+    >,
+  ) =>
+    Rpc.unwrap(saved).pipe(
+      Effect.flatMap(settled),
+      Effect.tap((toDos) =>
+        Effect.sync(() => watchers.forEach((queue) => Queue.offerUnsafe(queue, toDos))),
+      ),
+    )
+
+  return {
+    WatchToDos: (payload, options) => {
+      const given = handlers.WatchToDos && Rpc.unwrap(handlers.WatchToDos(payload, options))
+
+      return Stream.concat(
+        given === undefined ? Stream.make([]) : Stream.isStream(given) ? given : Stream.die(given),
+        Stream.callback<ReadonlyArray<ToDo>>((queue) =>
+          Effect.acquireRelease(
+            Effect.sync(() => watchers.add(queue)),
+            () => Effect.sync(() => watchers.delete(queue)),
+          ),
+        ),
+      )
+    },
+    ...(AddToDo && { AddToDo: (...args) => announce(AddToDo(...args)) }),
+    ...(EditToDo && { EditToDo: (...args) => announce(EditToDo(...args)) }),
+    ...(SetToDoDone && { SetToDoDone: (...args) => announce(SetToDoDone(...args)) }),
+    ...(DeleteToDo && { DeleteToDo: (...args) => announce(DeleteToDo(...args)) }),
+    ...(AttachToDoImages && { AttachToDoImages: (...args) => announce(AttachToDoImages(...args)) }),
+    ...(RemoveToDoImage && { RemoveToDoImage: (...args) => announce(RemoveToDoImage(...args)) }),
+  }
+}
 
 export const testLayer = (handlers: Partial<Handlers>) =>
   Layer.effect(Backend, RpcTest.makeClient(GlassRpcs)).pipe(
@@ -74,9 +128,9 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         UpdateDraft: unused,
         DeleteDraft: unused,
         SubmitReview: unused,
-        ReplyToDiscussion: unused,
+        ReplyToReviewThread: unused,
         MergePullRequest: unused,
-        SetDiscussionResolved: unused,
+        SetReviewThreadResolved: unused,
         SetReaction: unused,
         RecordActivity: () => Effect.void,
         ListActivity: unused,
@@ -89,30 +143,30 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         AttachToDoImages: unused,
         RemoveToDoImage: unused,
         ReadToDoImage: unused,
-        WatchConversations: () => Stream.make([]),
-        WatchWorkingConversations: () => Stream.make([]),
-        WatchSettledConversations: () => Stream.make([]),
-        BringBackConversation: unused,
-        WatchConversationPullRequests: () => Stream.make([]),
+        WatchThreads: () => Stream.make([]),
+        WatchWorkingThreads: () => Stream.make([]),
+        WatchSettledThreads: () => Stream.make([]),
+        BringBackThread: unused,
+        WatchThreadPullRequests: () => Stream.make([]),
         WatchNeedsYou: () => Stream.make([]),
         MarkTurnSeen: () => Effect.void,
         WatchTranscript: unused,
         LoadEarlierTurns: unused,
         ListLocalCheckouts: () => Effect.succeed([]),
         LinkLocalCheckout: unused,
-        GetNewConversationDefaultBranch: unused,
-        ListNewConversationBranches: unused,
+        GetNewThreadDefaultBranch: unused,
+        ListNewThreadBranches: unused,
         ListAgentModels: unused,
-        ListNewConversationCommands: () => Effect.succeed([]),
-        ListConversationCommands: () => Effect.succeed([]),
-        ListNewConversationFiles: () => Effect.succeed([]),
-        ListConversationFiles: () => Effect.succeed([]),
-        FindConversationFiles: () => Effect.succeed([]),
-        GetConversationFile: unused,
+        ListNewThreadCommands: () => Effect.succeed([]),
+        ListThreadCommands: () => Effect.succeed([]),
+        ListNewThreadFiles: () => Effect.succeed([]),
+        ListThreadFiles: () => Effect.succeed([]),
+        FindThreadFiles: () => Effect.succeed([]),
+        GetThreadFile: unused,
         ListSandboxProviders: () => Effect.succeed([]),
-        CreateConversation: unused,
+        CreateThread: unused,
         SendMessage: unused,
-        GetConversationChanges: unused,
+        GetThreadChanges: unused,
         ListFeedbackNotes: () => Effect.succeed(new UnsentFeedback({ notes: [], staged: [] })),
         StageFeedbackNotes: unused,
         SaveFeedbackNote: unused,
@@ -124,7 +178,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         Steer: unused,
         GetUnsentMessage: () => Effect.succeed(nothingUnsent),
         SaveUnsentMessage: () => Effect.void,
-        ChangeConversationModel: unused,
+        ChangeThreadModel: unused,
         ChangePermissionMode: unused,
         AnswerRequest: unused,
         AnswerOutsideQuestion: unused,
@@ -137,7 +191,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         WatchOutsideAgents: () => Stream.make([]),
         RevokeOutsideAgent: unused,
         GetRemovalWarnings: unused,
-        RemoveConversation: unused,
+        RemoveThread: unused,
         GetGlobalChatModel: () => Effect.succeed({ model: null, effort: null }),
         ChangeGlobalChatModel: unused,
         WatchGlobalTranscript: () => Stream.make(TranscriptSnapshot.make(emptyTranscript)),
@@ -157,6 +211,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         WatchGlobalChatSession: unused,
         LoadEarlierGlobalChatSessionTurns: unused,
         ...handlers,
+        ...watchedToDos(handlers),
       }),
     ),
   )

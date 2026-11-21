@@ -18,10 +18,10 @@ import { writeAgentCommands } from "./agentCommands"
 import {
   bundledPi,
   demoCheckout,
-  seedDemoConversations,
+  seedDemoThreads,
   startDemoClaude,
   startDemoPi,
-} from "./demoConversation"
+} from "./demoThread"
 import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
@@ -30,7 +30,7 @@ import { seedDemoToDos } from "./demoToDos"
 import { seedTourOverviewPullRequests } from "./demoTourOverviews"
 import { FAKE_PI_MODEL } from "./fakeModelProvider"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
-import { seedReplayedConversations } from "./replayedConversations"
+import { seedReplayedThreads } from "./replayedThreads"
 
 const seedDemoSettings = (dataDirectory: string) => {
   const settings = join(dataDirectory, "settings.json")
@@ -103,11 +103,11 @@ const main = Effect.gen(function* () {
 
   const fresh = yield* Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
-    const existing = yield* sql`SELECT 1 FROM conversation LIMIT 1`
+    const existing = yield* sql`SELECT 1 FROM thread LIMIT 1`
 
     if (existing.length > 0) return false
 
-    if (replayed !== undefined) yield* seedReplayedConversations(replayed, checkout)
+    if (replayed !== undefined) yield* seedReplayedThreads(replayed, checkout)
 
     return true
   }).pipe(
@@ -157,15 +157,8 @@ const main = Effect.gen(function* () {
   )
 
   if (fresh)
-    yield* seedDemoConversations(
-      config.port,
-      Redacted.value(config.token),
-      checkout,
-      reviewed,
-    ).pipe(
-      Effect.catchCause((cause) =>
-        Effect.logWarning("Couldn't start the demo Conversations", cause),
-      ),
+    yield* seedDemoThreads(config.port, Redacted.value(config.token), checkout, reviewed).pipe(
+      Effect.catchCause((cause) => Effect.logWarning("Couldn't start the demo Threads", cause)),
     )
 
   return yield* Effect.never

@@ -23,7 +23,7 @@ export const groupLooks: Record<NeedsYouGroup, { readonly label: string; readonl
     stopped: { label: "Stopped on you", tone: warningTone },
     reviews: { label: "Agent reviews to read", tone: "text-muted-foreground" },
     mine: { label: "Your pull requests", tone: "text-muted-foreground" },
-    finished: { label: "Conversations that finished", tone: "text-muted-foreground" },
+    finished: { label: "Threads that finished", tone: "text-muted-foreground" },
   }
 
 export const inboxKeys = ["E", "A"] as const
@@ -50,8 +50,11 @@ const pullRequestReason = (reason: PullRequestReason): Reason =>
     AgentReviewFinished: () => ({ label: "Agent review finished", tone: toneClass.review }),
     ChangesRequested: () => ({ label: "Changes requested", tone: toneClass.danger }),
     ChecksFailing: () => ({ label: "CI failing", tone: toneClass.danger }),
-    AwaitingReply: ({ threads }) => ({
-      label: threads === 1 ? "1 thread awaiting reply" : `${threads} threads awaiting reply`,
+    AwaitingReply: ({ reviewThreads }) => ({
+      label:
+        reviewThreads === 1
+          ? "1 Review thread awaiting reply"
+          : `${reviewThreads} Review threads awaiting reply`,
       tone: toneClass.neutral,
     }),
     ReadyToMerge: () => ({ label: "Ready to merge", tone: toneClass.success }),
@@ -60,7 +63,7 @@ const pullRequestReason = (reason: PullRequestReason): Reason =>
 const reasonsOf = (item: NeedsYouItem): ReadonlyArray<Reason> =>
   Arr.dedupeWith(
     Match.valueTags(item, {
-      Conversation: ({ reasons }) =>
+      Thread: ({ reasons }) =>
         reasons.flatMap((reason) =>
           Match.valueTags(reason, {
             WaitingRequests: ({ requests }) => requests.map(requestReason),
@@ -89,7 +92,7 @@ export function Reasons(props: { item: NeedsYouItem }) {
 
 export function ItemIcon(props: { item: NeedsYouItem; className: string }) {
   return Match.valueTags(props.item, {
-    Conversation: () => <Sparkles className={props.className} aria-hidden />,
+    Thread: () => <Sparkles className={props.className} aria-hidden />,
     OutsideQuestion: () => <CircleHelp className={props.className} aria-hidden />,
     CheckIn: () => <FileDiff className={props.className} aria-hidden />,
     PullRequest: () => <GitPullRequest className={props.className} aria-hidden />,
@@ -99,7 +102,7 @@ export function ItemIcon(props: { item: NeedsYouItem; className: string }) {
 
 const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
   Match.valueTags(item, {
-    Conversation: ({ reasons }) =>
+    Thread: ({ reasons }) =>
       reasons.flatMap((reason) =>
         Match.valueTags(reason, {
           WaitingRequests: ({ requests }) => requests,
@@ -114,14 +117,12 @@ const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
 
 export const firstPermission = (item: NeedsYouItem) =>
   Match.valueTags(item, {
-    Conversation: (waiting) => {
+    Thread: (waiting) => {
       const part = requestsOf(waiting).find((request) =>
         Predicate.isTagged(request, "PermissionRequest"),
       )
 
-      return part === undefined
-        ? null
-        : { conversationId: waiting.conversation.id, requestId: part.requestId }
+      return part === undefined ? null : { threadId: waiting.thread.id, requestId: part.requestId }
     },
     OutsideQuestion: () => null,
     CheckIn: () => null,
@@ -139,7 +140,7 @@ export const summaryParts = (summary: string | null) => {
 
 export const titleOf = (item: NeedsYouItem) =>
   Match.valueTags(item, {
-    Conversation: ({ conversation }) => conversation.name,
+    Thread: ({ thread }) => thread.name,
     OutsideQuestion: ({ question }) => question,
     CheckIn: ({ folder, summary }) => summaryParts(summary)?.title ?? fileName(folder),
     PullRequest: ({ pullRequest }) => pullRequest.title,
@@ -148,8 +149,7 @@ export const titleOf = (item: NeedsYouItem) =>
 
 export const contextOf = (item: NeedsYouItem) =>
   Match.valueTags(item, {
-    Conversation: ({ conversation }) =>
-      `${conversation.repository.owner}/${conversation.repository.repo}`,
+    Thread: ({ thread }) => `${thread.repository.owner}/${thread.repository.repo}`,
     OutsideQuestion: ({ askedBy }) => `Asked by ${askedBy}`,
     CheckIn: ({ askedBy, folder }) => `${folder} · Asked by ${askedBy}`,
     GlobalChat: () => "",

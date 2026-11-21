@@ -26,7 +26,7 @@ export class Journal extends Context.Service<
   Journal,
   {
     readonly host: string
-    readonly append: (conversationId: string, event: HostEvent) => Effect.Effect<boolean>
+    readonly append: (threadId: string, event: HostEvent) => Effect.Effect<boolean>
     readonly watch: (host: string, after: number) => Stream.Stream<JournalEntry, HostReplaced>
     readonly acknowledge: (host: string, through: number) => Effect.Effect<void>
     readonly attendance: SubscriptionRef.SubscriptionRef<Attendance>
@@ -61,9 +61,9 @@ export class Journal extends Context.Service<
 
       return Journal.of({
         host,
-        append: (conversationId, event) =>
+        append: (threadId, event) =>
           Effect.suspend(() => {
-            const entry = { sequence: ++sequence, conversationId, event }
+            const entry = { sequence: ++sequence, threadId, event }
             const chars = JSON.stringify(event).length
             kept.push({ entry, chars })
             keptChars += chars
@@ -102,10 +102,8 @@ export class Journal extends Context.Service<
           }),
         attendance,
         unacknowledgedEnds: Effect.sync(() =>
-          kept.flatMap(({ entry: { conversationId, event } }) =>
-            Predicate.isTagged(event, "TurnEnded")
-              ? [{ conversationId, turnId: event.turnId }]
-              : [],
+          kept.flatMap(({ entry: { threadId, event } }) =>
+            Predicate.isTagged(event, "TurnEnded") ? [{ threadId, turnId: event.turnId }] : [],
           ),
         ),
       })

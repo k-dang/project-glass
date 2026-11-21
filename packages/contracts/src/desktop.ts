@@ -1,4 +1,4 @@
-import type { CapturedContext } from "./conversation"
+import type { CapturedContext } from "./thread"
 import type { AgentReview } from "./agentReview"
 import type { Tour } from "./tour"
 import type { ColorSchemePreference, Layout, Theme } from "./appearance"

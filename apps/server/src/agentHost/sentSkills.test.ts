@@ -62,7 +62,7 @@ it.live("refuses a file that would land outside its skill's folder", () =>
       },
     ]).pipe(Effect.scoped, Effect.provide(NodeFileSystem.layer), Effect.flip)
 
-    assert.strictEqual(refused._tag, "HostConversationError")
+    assert.strictEqual(refused._tag, "HostThreadError")
   }),
 )
 
@@ -173,7 +173,7 @@ it.live("lets writes in flight finish before removing a failed write's output", 
       Effect.flip,
     )
 
-    assert.strictEqual(failed._tag, "HostConversationError")
+    assert.strictEqual(failed._tag, "HostThreadError")
     assert.deepStrictEqual(inFlightAtRemoval, [0])
   }),
 )

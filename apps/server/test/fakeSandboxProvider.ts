@@ -244,7 +244,7 @@ export const fakeSandboxProvider =
         const settings = readSettings(settingsPath)
 
         progress("Creating the Sandbox")
-        const folder = join(settings.root, request.conversationId)
+        const folder = join(settings.root, request.threadId)
         mkdirSync(folder, { recursive: true })
         record({ folder })
 
@@ -333,29 +333,29 @@ export const installFakeSandboxProvider = (
       `export default fakeSandboxProvider(${JSON.stringify(settingsPath)})\n`,
   )
 
-  const sandboxFolder = (conversationId: string) => join(settings.root, conversationId)
-  const hostFile = (conversationId: string) => join(sandboxFolder(conversationId), "host.json")
+  const sandboxFolder = (threadId: string) => join(settings.root, threadId)
+  const hostFile = (threadId: string) => join(sandboxFolder(threadId), "host.json")
 
-  const host = (conversationId: string) =>
-    Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(conversationId), "utf8"))
+  const host = (threadId: string) =>
+    Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(threadId), "utf8"))
 
   return {
-    dropConnections: (conversationId: string) => {
-      const folder = sandboxFolder(conversationId)
+    dropConnections: (threadId: string) => {
+      const folder = sandboxFolder(threadId)
       writeFileSync(join(folder, "dropped"), "")
 
       return whenExists(droppedAll(folder))
     },
-    reconnect: (conversationId: string) => {
-      rmSync(join(sandboxFolder(conversationId), "dropped"))
-      rmSync(droppedAll(sandboxFolder(conversationId)), { force: true })
+    reconnect: (threadId: string) => {
+      rmSync(join(sandboxFolder(threadId), "dropped"))
+      rmSync(droppedAll(sandboxFolder(threadId)), { force: true })
     },
     host,
-    killHost: (conversationId: string) => killTree(host(conversationId).pid),
-    remove: (conversationId: string) => removeSandbox(sandboxFolder(conversationId)),
+    killHost: (threadId: string) => killTree(host(threadId).pid),
+    remove: (threadId: string) => removeSandbox(sandboxFolder(threadId)),
     stopHosts: async () => {
-      for (const conversationId of readdirSync(settings.root))
-        if (existsSync(hostFile(conversationId))) await killTree(host(conversationId).pid)
+      for (const threadId of readdirSync(settings.root))
+        if (existsSync(hostFile(threadId))) await killTree(host(threadId).pid)
     },
   }
 }

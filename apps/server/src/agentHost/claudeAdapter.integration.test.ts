@@ -25,10 +25,10 @@ import {
   writeGreeter,
   writeGreetSkill,
 } from "../../test/adapterSessions"
-import { settled } from "../../test/conversationsFixture"
+import { settled } from "../../test/threadsFixture"
 import { ReviewRole } from "./protocol"
 
-const conversationId = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+const threadId = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
 
 const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
@@ -41,7 +41,7 @@ const pixel = Image.make({
 it.live("answers Claude Code's Permission requests and Questions through Glass", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-requests")
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
     yield* session.configure({ permissionMode: "default" })
 
     yield* session.send(run("Bash", "touch compatible.txt", "DONE"))
@@ -88,7 +88,7 @@ it.live("lists a sent Skill pack's skills as `/pack:skill`", () =>
 it.live("streams a long reply in small pieces to its end", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-long-reply")
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
     const long = "Every word of this reply streams in its own small piece. ".repeat(8).trim()
 
     yield* session.send(`Reply with exactly this text and nothing else: ${long}`)
@@ -109,7 +109,7 @@ it.live("streams a long reply in small pieces to its end", () =>
 it.live("sends a message's images to Claude Code", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-image")
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     yield* session.send(
       "What's in this image? Answer in one short sentence without using any tools.",
@@ -154,7 +154,7 @@ it.live("lists the folder's skills among what Claude Code runs as `/name`", () =
 it.live("starts on the chosen model and effort, and changes the effort for the next Turn", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-model-change")
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     yield* session.configure({ model: "haiku", effort: "high" })
     yield* session.send("Reply with exactly: FIRST")
@@ -174,7 +174,7 @@ it.live("starts on the chosen model and effort, and changes the effort for the n
 it.live("Steers a running Turn, showing the Steer where Claude Code takes it in", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-steer")
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
     yield* session.configure({ permissionMode: "default" })
 
     yield* session.send(run("Bash", "touch steer.txt", "FIRST"))
@@ -201,7 +201,7 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* claudeSession("claude-background-agent")
-      const session = yield* f.open(conversationId)
+      const session = yield* f.open(threadId)
 
       yield* session.send(
         "Use the Agent tool with run_in_background set to true to start a general-purpose subagent with this prompt: " +
@@ -247,19 +247,19 @@ it.live(
     }).pipe(Effect.scoped),
 )
 
-it.live("continues a conversation when Claude Code starts again", () =>
+it.live("continues a Thread's session when Claude Code starts again", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-resume")
 
     yield* Effect.scoped(
       Effect.gen(function* () {
-        const session = yield* f.open(conversationId)
+        const session = yield* f.open(threadId)
         yield* session.send("Remember the word lantern. Reply with exactly: Noted.")
         yield* f.until(settled(1))
       }),
     )
 
-    const again = yield* f.open(conversationId)
+    const again = yield* f.open(threadId)
     yield* again.send(
       "Which word did I ask you to remember? Reply with only that word, in lowercase.",
     )
@@ -274,7 +274,7 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* claudeSession("claude-deny")
-      const session = yield* f.open(conversationId)
+      const session = yield* f.open(threadId)
       yield* session.configure({ permissionMode: "default" })
 
       yield* session.send(run("Bash", "touch notes.txt", "DONE"))
@@ -287,7 +287,7 @@ it.live(
         )
         .pipe(Effect.flip)
 
-      assert.equal(refused._tag, "HostConversationError")
+      assert.equal(refused._tag, "HostThreadError")
 
       yield* session.answer(
         request.requestId,
@@ -310,7 +310,7 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* claudeSession("claude-stop-in-request")
-      const session = yield* f.open(conversationId)
+      const session = yield* f.open(threadId)
       yield* session.configure({ permissionMode: "default" })
 
       const turnId = yield* session.send(run("Bash", "touch notes.txt", "DONE"))
@@ -330,7 +330,7 @@ it.live(
 it.live("runs the next Turn in a newly chosen Permission mode", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-permission-mode-change")
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
     yield* session.configure({ permissionMode: "default" })
 
     yield* session.send(run("Bash", "touch first.txt", "DONE"))
@@ -350,12 +350,12 @@ it.live("runs the next Turn in a newly chosen Permission mode", () =>
 )
 
 it.live(
-  "runs commands in its checkout and proposes Suggested drafts as an Agent review's Conversation",
+  "runs commands in its checkout and proposes Suggested drafts as an Agent review's Thread",
   () =>
     Effect.gen(function* () {
       const f = yield* claudeSession("claude-review")
       yield* writeGreeter(f.folder)
-      const session = yield* f.open(conversationId, ReviewRole.make({ brief: reviewBrief }))
+      const session = yield* f.open(threadId, ReviewRole.make({ brief: reviewBrief }))
 
       yield* session.send(
         "Run `cat greet.ts` with the Bash tool. Then call the suggest_draft tool once for each of these drafts, one call after the other: " +

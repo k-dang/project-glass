@@ -27,7 +27,7 @@ const formatBytes = (bytes: number) => {
 const formatShare = (share: number) => (share < 0.01 ? "<1%" : `${Math.round(share * 100)}%`)
 
 const groups = {
-  conversations: { label: "Conversations", color: "var(--viewed)" },
+  threads: { label: "Threads", color: "var(--viewed)" },
   reviews: { label: "Reviews", color: "var(--added)" },
   activity: { label: "Activity", color: "var(--modified)" },
   toDos: { label: "To-dos", color: "color-mix(in srgb, var(--viewed) 50%, var(--added))" },

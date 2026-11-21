@@ -18,10 +18,10 @@ import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
 import { Marker, MarkerContent } from "@/components/ui/marker"
 import { Textarea } from "@/components/ui/textarea"
-import { conversationAtoms, ConversationAtomsContext } from "./conversation"
-import { ConversationComposer, ToolCallView, Transcript, UserMessage } from "./ConversationView"
+import { threadAtoms, ThreadAtomsContext } from "./thread"
+import { ThreadComposer, ToolCallView, Transcript, UserMessage } from "./ThreadView"
 import type { ShowNote } from "./changesView"
-import { LineLocation, pathLineName } from "./Discussions"
+import { LineLocation, pathLineName } from "./ReviewThreads"
 import { Elapsed } from "./Elapsed"
 import { type HotspotLinks, HotspotPoints } from "./Hotspots"
 import { rankHotspots } from "./rankedHotspots"
@@ -166,15 +166,14 @@ function FollowUpsMarker() {
 function FirstFollowUp(props: { controls: AgentReviewControls }) {
   const { job } = props.controls
 
-  if (job?.status !== "starting-conversation" && job?.status !== "conversation-start-failed")
-    return null
+  if (job?.status !== "starting-thread" && job?.status !== "thread-start-failed") return null
 
   return (
     <>
       <FollowUpsMarker />
       <div className="flex flex-col gap-3 enter-motion">
         <UserMessage message={job.message} images={[]} />
-        {job.status === "starting-conversation" ? (
+        {job.status === "starting-thread" ? (
           <output className="flex items-center gap-2 text-sm text-muted-foreground">
             <LoaderCircle
               aria-hidden
@@ -211,13 +210,13 @@ function FirstFollowUpComposer(props: { controls: AgentReviewControls; reviewing
       textOnly
       holdUntilAccepted
       blocked={
-        props.controls.followUpPending || props.reviewing || job?.status === "starting-conversation"
+        props.controls.followUpPending || props.reviewing || job?.status === "starting-thread"
       }
       problem={props.controls.followUpProblem}
       send={({ message }) => props.controls.followUp(message)}
       steer={null}
       recall={null}
-      onStop={job?.status === "starting-conversation" ? props.controls.cancel : null}
+      onStop={job?.status === "starting-thread" ? props.controls.cancel : null}
       suggestions={followUpSuggestions}
     />
   )
@@ -231,15 +230,15 @@ function OutdatedNote() {
   )
 }
 
-function ReviewConversation(props: {
-  conversationId: string
+function ReviewThread(props: {
+  threadId: string
   lead: ReactNode
   outdated: boolean
   drafts: DraftStore
   show: ShowNote
 }) {
-  const { conversationId, drafts, show, outdated } = props
-  const atoms = useMemo(() => conversationAtoms(conversationId), [conversationId])
+  const { threadId, drafts, show, outdated } = props
+  const atoms = useMemo(() => threadAtoms(threadId), [threadId])
   const transcript = useAtomValue(atoms.transcript)
   const reconnect = useAtomRefresh(atoms.transcript)
 
@@ -262,7 +261,7 @@ function ReviewConversation(props: {
   )
 
   return (
-    <ConversationAtomsContext value={atoms}>
+    <ThreadAtomsContext value={atoms}>
       <ToolCallView value={suggestedDraftView}>
         {AsyncResult.isFailure(transcript) && !transcript.waiting && (
           <div className="px-5 pt-4">
@@ -287,7 +286,7 @@ function ReviewConversation(props: {
         {outdated ? (
           <OutdatedNote />
         ) : (
-          <ConversationComposer
+          <ThreadComposer
             turns={turns}
             queued={queued}
             label="Follow up"
@@ -297,7 +296,7 @@ function ReviewConversation(props: {
           />
         )}
       </ToolCallView>
-    </ConversationAtomsContext>
+    </ThreadAtomsContext>
   )
 }
 
@@ -312,11 +311,11 @@ export function AgentReviewPanel(props: {
   const { job, outdated } = props.controls
   const markdown = <ReviewBody review={review} links={props.hotspotLinks} outdated={outdated} />
 
-  if (review.conversationId !== null)
+  if (review.threadId !== null)
     return (
-      <ReviewConversation
-        key={review.conversationId}
-        conversationId={review.conversationId}
+      <ReviewThread
+        key={review.threadId}
+        threadId={review.threadId}
         lead={markdown}
         outdated={outdated}
         drafts={props.drafts}

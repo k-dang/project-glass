@@ -1,4 +1,4 @@
-import type { ChangedFile, DiffSide, LineDiscussion } from "@glass/contracts"
+import type { ChangedFile, DiffSide, LineReviewThread } from "@glass/contracts"
 import {
   type AnnotationSide,
   type CodeViewDiffItem,
@@ -12,7 +12,7 @@ import type { DraftView } from "./draftSync"
 import type { LineNotePlace } from "./lineNotePlace"
 
 export type LineNote =
-  | { readonly type: "discussion"; readonly discussion: LineDiscussion }
+  | { readonly type: "reviewThread"; readonly reviewThread: LineReviewThread }
   | { readonly type: "draft"; readonly key: string }
   | { readonly type: "ask"; readonly key: string }
 
@@ -151,18 +151,18 @@ export const groupByPath = <A>(values: ReadonlyArray<A>, pathOf: (value: A) => s
 }
 
 export interface LineNotes {
-  readonly discussions: ReadonlyArray<LineDiscussion>
+  readonly reviewThreads: ReadonlyArray<LineReviewThread>
   readonly drafts: ReadonlyArray<LineNotePlace>
   readonly asks: ReadonlyArray<LineNotePlace>
 }
 
 const notesOn = (notes: LineNotes) => {
-  const discussions = groupByPath(notes.discussions, (discussion) => discussion.path)
+  const reviewThreads = groupByPath(notes.reviewThreads, (reviewThread) => reviewThread.path)
   const drafts = groupByPath(notes.drafts, (draft) => draft.path)
   const asks = groupByPath(notes.asks, (ask) => ask.path)
 
   return (path: string): LineNotes => ({
-    discussions: discussions.get(path) ?? [],
+    reviewThreads: reviewThreads.get(path) ?? [],
     drafts: drafts.get(path) ?? [],
     asks: asks.get(path) ?? [],
   })
@@ -174,10 +174,10 @@ export interface FileAnnotations<M> {
 }
 
 const annotationsOf = (notes: LineNotes): Array<DiffLineAnnotation<LineNote>> => [
-  ...notes.discussions.map((discussion): DiffLineAnnotation<LineNote> => ({
-    side: annotationSides[discussion.side],
-    lineNumber: discussion.line,
-    metadata: { type: "discussion", discussion },
+  ...notes.reviewThreads.map((reviewThread): DiffLineAnnotation<LineNote> => ({
+    side: annotationSides[reviewThread.side],
+    lineNumber: reviewThread.line,
+    metadata: { type: "reviewThread", reviewThread },
   })),
   ...notes.drafts.map(({ key, side, line }): DiffLineAnnotation<LineNote> => ({
     side: annotationSides[side],
@@ -200,7 +200,7 @@ export const lineNoteAnnotations = (notes: LineNotes) => {
     return {
       annotations: annotationsOf(fileNotes),
       drawn: [
-        fileNotes.discussions.map(({ id, resolved, comments }) => [
+        fileNotes.reviewThreads.map(({ id, resolved, comments }) => [
           id,
           resolved,
           comments.map((comment) => [comment.id, comment.bodyHtml]),
@@ -250,7 +250,7 @@ export const toItems = <M>(
   })
 
 export type ListedNote =
-  | { readonly type: "discussion"; readonly discussion: LineDiscussion }
+  | { readonly type: "reviewThread"; readonly reviewThread: LineReviewThread }
   | { readonly type: "draft"; readonly draft: DraftView }
 
 export interface NoteSection {
@@ -264,7 +264,7 @@ export interface ShowNote {
 }
 
 const noteLine = (note: ListedNote) => {
-  if (note.type === "discussion") return note.discussion.line
+  if (note.type === "reviewThread") return note.reviewThread.line
 
   const { place } = note.draft
 
@@ -273,15 +273,15 @@ const noteLine = (note: ListedNote) => {
 
 export const toNoteSections = (
   shown: ReadonlyArray<string>,
-  discussions: ReadonlyArray<LineDiscussion>,
+  reviewThreads: ReadonlyArray<LineReviewThread>,
   drafts: ReadonlyArray<DraftView>,
 ): Array<NoteSection> => {
   const byPath = groupByPath<ListedNote>(
     [
-      ...discussions.map((discussion): ListedNote => ({ type: "discussion", discussion })),
+      ...reviewThreads.map((reviewThread): ListedNote => ({ type: "reviewThread", reviewThread })),
       ...drafts.map((draft): ListedNote => ({ type: "draft", draft })),
     ],
-    (note) => (note.type === "discussion" ? note.discussion.path : note.draft.path),
+    (note) => (note.type === "reviewThread" ? note.reviewThread.path : note.draft.path),
   )
 
   const shownSet = new Set(shown)

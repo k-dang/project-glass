@@ -10,7 +10,7 @@ export * from "./checkIn"
 
 export * from "./checkoutRun"
 
-export * from "./conversation"
+export * from "./thread"
 
 export * from "./connection"
 
@@ -18,7 +18,7 @@ export * from "./desktop"
 
 export * from "./diagram"
 
-export * from "./discussion"
+export * from "./comment"
 
 export * from "./draft"
 

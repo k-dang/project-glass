@@ -1,7 +1,7 @@
 import { type ChangedFile, Draft, FlaggedPlace, LinePlace } from "@glass/contracts"
 import { Schema } from "effect"
 import { fromGitHubSide, GitHubDiffSide } from "./diffSide"
-import { type GitHubReviewThread, isOnLine, textDiffPaths } from "./discussions"
+import { type GitHubReviewThread, isOnLine, textDiffPaths } from "./comments"
 
 export const ADD_DRAFT_MUTATION = `mutation AddPullRequestReviewThread($pullRequestId: ID!, $path: String!, $line: Int!, $side: DiffSide!, $body: String!) {
   addPullRequestReviewThread(input: { pullRequestId: $pullRequestId, path: $path, line: $line, side: $side, body: $body }) {
@@ -45,25 +45,25 @@ export const AddedDraft = Schema.Struct({
 
 export const toDrafts = (
   files: ReadonlyArray<ChangedFile>,
-  threads: ReadonlyArray<typeof GitHubReviewThread.Type>,
+  reviewThreads: ReadonlyArray<typeof GitHubReviewThread.Type>,
 ) => {
   const shown = textDiffPaths(files)
   const drafts: Array<Draft> = []
 
-  for (const thread of threads) {
-    const { path } = thread
-    const onLine = isOnLine(thread, shown)
+  for (const reviewThread of reviewThreads) {
+    const { path } = reviewThread
+    const onLine = isOnLine(reviewThread, shown)
 
-    for (const { id, body, state, diffHunk } of thread.comments.nodes) {
+    for (const { id, body, state, diffHunk } of reviewThread.comments.nodes) {
       if (state !== "PENDING") continue
 
       const place = onLine
-        ? LinePlace.make({ side: fromGitHubSide(thread.diffSide), line: thread.line })
+        ? LinePlace.make({ side: fromGitHubSide(reviewThread.diffSide), line: reviewThread.line })
         : FlaggedPlace.make({
             originalLine:
-              thread.subjectType === "FILE" || thread.originalLine === null
+              reviewThread.subjectType === "FILE" || reviewThread.originalLine === null
                 ? "whole-file"
-                : thread.originalLine,
+                : reviewThread.originalLine,
             diffHunk,
           })
 

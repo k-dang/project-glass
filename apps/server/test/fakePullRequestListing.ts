@@ -68,10 +68,10 @@ const attentionNode = (pr: FakePullRequest) => ({
   mergeStateStatus: mergeStateStatus(pr),
   latestOpinionatedReviews: { nodes: latestOpinionatedReviews(pr) },
   reviewThreads: {
-    nodes: pr.reviewThreads.map((thread) => ({
-      isResolved: thread.resolved,
+    nodes: pr.reviewThreads.map((reviewThread) => ({
+      isResolved: reviewThread.resolved,
       comments: {
-        nodes: thread.comments
+        nodes: reviewThread.comments
           .slice(-1)
           .map((comment) => ({ viewerDidAuthor: comment.author === VIEWER.login })),
       },

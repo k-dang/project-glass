@@ -12,12 +12,10 @@ import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
 import { daysAgo, daysBetween } from "./recency"
 
-const doneKinds = [
-  "ReviewSubmitted",
-  "ReplySent",
-  "ConversationStarted",
-  "ToDoDone",
-] as const satisfies [ActivityKind, ...Array<ActivityKind>]
+const doneKinds = ["ReviewSubmitted", "ReplySent", "ThreadStarted", "ToDoDone"] as const satisfies [
+  ActivityKind,
+  ...Array<ActivityKind>,
+]
 
 type DoneKind = (typeof doneKinds)[number]
 
@@ -26,7 +24,7 @@ const isDone = Schema.is(Schema.Literals(doneKinds))
 const series: Record<DoneKind, { label: string; color: string }> = {
   ReviewSubmitted: { label: "Reviews", color: "var(--added)" },
   ReplySent: { label: "Replies", color: "var(--viewed)" },
-  ConversationStarted: { label: "Conversations started", color: "var(--modified)" },
+  ThreadStarted: { label: "Threads started", color: "var(--modified)" },
   ToDoDone: { label: "To-dos done", color: "var(--muted-foreground)" },
 }
 
@@ -59,7 +57,7 @@ export const activityByDay = (
     day: daysAgo(days - 1 - offset, now).getTime(),
     ReviewSubmitted: 0,
     ReplySent: 0,
-    ConversationStarted: 0,
+    ThreadStarted: 0,
     ToDoDone: 0,
   }))
 
@@ -151,7 +149,7 @@ function DailyActivity(props: { rows: Array<ActivityDay>; days: Range }) {
         <span className="font-medium text-foreground">
           Nothing done in the last {props.days} days
         </span>
-        Submit a Review, send a Reply, start a Conversation, or finish a To-do to see it here.
+        Submit a Review, send a Reply, start a Thread, or finish a To-do to see it here.
       </p>
     )
   }

@@ -33,8 +33,8 @@ function mount() {
         <CommandMenu
           current={pullRequest.ref}
           onOpen={() => {}}
-          onOpenConversation={() => {}}
-          onStartConversation={() => {}}
+          onOpenThread={() => {}}
+          onStartThread={() => {}}
           onViewQueue={() => {}}
         />
         <CopyMenu pullRequest={pullRequest} />

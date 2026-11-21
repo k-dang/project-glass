@@ -1,22 +1,22 @@
-import type { LineDiscussion } from "@glass/contracts"
+import type { LineReviewThread } from "@glass/contracts"
 import { Predicate } from "effect"
 import { CircleCheck, MessageSquare, PenLine, Plus } from "lucide-react"
 import type { MouseEvent, ReactNode } from "react"
 import { Button } from "@/components/ui/button"
-import { LineLocation } from "./Discussions"
+import { LineLocation } from "./ReviewThreads"
 import { DraftLocation, draftBody, feedbackText, showDraft } from "./Drafts"
 import { type ListedNote, type ShowNote, toNoteSections } from "./changesView"
 import { type DraftStore, useDraftViews } from "./useDrafts"
 
-const previews = new WeakMap<LineDiscussion, string>()
+const previews = new WeakMap<LineReviewThread, string>()
 
-const preview = (discussion: LineDiscussion) => {
-  let text = previews.get(discussion)
+const preview = (reviewThread: LineReviewThread) => {
+  let text = previews.get(reviewThread)
 
   if (text === undefined) {
-    const html = discussion.comments[0].bodyHtml
+    const html = reviewThread.comments[0].bodyHtml
     text = new DOMParser().parseFromString(html, "text/html").body.textContent?.trim() ?? ""
-    previews.set(discussion, text)
+    previews.set(reviewThread, text)
   }
 
   return text
@@ -69,14 +69,14 @@ function NoteRow(props: {
 function NoteItem(props: { path: string; note: ListedNote; show: ShowNote }) {
   const { path, note, show } = props
 
-  if (note.type === "discussion") {
-    const { discussion } = note
-    const [first] = discussion.comments
+  if (note.type === "reviewThread") {
+    const { reviewThread } = note
+    const [first] = reviewThread.comments
 
     return (
       <NoteRow
         icon={
-          discussion.resolved ? (
+          reviewThread.resolved ? (
             <CircleCheck className="size-4 text-muted-foreground" aria-hidden />
           ) : (
             <MessageSquare className="size-4 text-muted-foreground" aria-hidden />
@@ -84,13 +84,13 @@ function NoteItem(props: { path: string; note: ListedNote; show: ShowNote }) {
         }
         location={
           <>
-            {first.author} on <LineLocation side={discussion.side} line={discussion.line} />
+            {first.author} on <LineLocation side={reviewThread.side} line={reviewThread.line} />
           </>
         }
-        aside={discussion.resolved && <span>Resolved</span>}
-        text={preview(discussion)}
-        label={`Show Discussion on ${path} line ${discussion.line}`}
-        onShow={() => show.line(path, discussion.side, discussion.line)}
+        aside={reviewThread.resolved && <span>Resolved</span>}
+        text={preview(reviewThread)}
+        label={`Show Review thread on ${path} line ${reviewThread.line}`}
+        onShow={() => show.line(path, reviewThread.side, reviewThread.line)}
       />
     )
   }
@@ -116,17 +116,17 @@ function NoteItem(props: { path: string; note: ListedNote; show: ShowNote }) {
 
 export function NotesList(props: {
   paths: ReadonlyArray<string>
-  discussions: ReadonlyArray<LineDiscussion>
+  reviewThreads: ReadonlyArray<LineReviewThread>
   drafts: DraftStore
   show: ShowNote
 }) {
   const drafts = useDraftViews(props.drafts)
-  const sections = toNoteSections(props.paths, props.discussions, drafts)
+  const sections = toNoteSections(props.paths, props.reviewThreads, drafts)
 
   if (sections.length === 0) {
     return (
       <p className="px-6 py-8 text-center text-sm text-balance text-muted-foreground">
-        No Discussions or Drafts on lines yet. Hover a line in Changes and choose{" "}
+        No Review threads or Drafts on lines yet. Hover a line in Changes and choose{" "}
         <Plus className="inline size-3.5 align-[-2px]" aria-label="the plus button" /> to start a
         Draft.
       </p>
@@ -151,7 +151,7 @@ export function NotesList(props: {
           <ul className="pb-2">
             {notes.map((note) => (
               <NoteItem
-                key={note.type === "draft" ? note.draft.key : note.discussion.id}
+                key={note.type === "draft" ? note.draft.key : note.reviewThread.id}
                 path={path}
                 note={note}
                 show={props.show}

@@ -3,8 +3,7 @@ import {
   type ChangedFile,
   CommentNotFound,
   type ConnectionError,
-  DiscussionNotFound,
-  type Discussions,
+  ReviewThreadNotFound,
   Draft,
   DraftNotFound,
   DraftsBlockReply,
@@ -66,13 +65,13 @@ import {
   GitHubComment,
   GitHubReview,
   GitHubReviewThread,
-  RESOLVE_THREAD_MUTATION,
+  RESOLVE_REVIEW_THREAD_MUTATION,
   REVIEW_THREADS_QUERY,
   REVIEWS_QUERY,
   toComment,
-  toDiscussions,
-  UNRESOLVE_THREAD_MUTATION,
-} from "./discussions"
+  toReviewThreadsAndTimeline,
+  UNRESOLVE_REVIEW_THREAD_MUTATION,
+} from "./comments"
 import { reactionContents, reactionMutation, toReactionGroups } from "./reactions"
 import {
   ADD_DRAFT_MUTATION,
@@ -146,7 +145,7 @@ import {
   DraftStateResponse,
   AddReplyResponse,
   MutationResponse,
-  ThreadResolutionResponse,
+  ReviewThreadResolutionResponse,
   ReactionMutationResponse,
   REPOSITORY_BRANCHES_QUERY,
   REPOSITORY_DEFAULT_BRANCH_QUERY,
@@ -176,9 +175,11 @@ export interface TourInput {
   readonly files: ReadonlyArray<ChangedFile>
 }
 
-export interface ReviewInput extends TourInput {
+export interface ReviewInput
+  extends
+    TourInput,
+    Pick<PullRequestWorkspace, "lineReviewThreads" | "outdatedReviewThreads" | "timeline"> {
   readonly revision: Revision
-  readonly discussions: Discussions
 }
 
 const GitTree = Schema.Struct({
@@ -368,14 +369,14 @@ export class GitHubClient extends Context.Service<
       revision: Revision,
       action: MergeAction,
     ) => Effect.Effect<void, StaleRevision | MergeRejected | ConnectionError>
-    readonly replyToDiscussion: (
-      discussionId: string,
+    readonly replyToReviewThread: (
+      reviewThreadId: string,
       body: string,
-    ) => Effect.Effect<PublishedComment, DiscussionNotFound | DraftsBlockReply | ConnectionError>
-    readonly setDiscussionResolved: (
-      discussionId: string,
+    ) => Effect.Effect<PublishedComment, ReviewThreadNotFound | DraftsBlockReply | ConnectionError>
+    readonly setReviewThreadResolved: (
+      reviewThreadId: string,
       resolved: boolean,
-    ) => Effect.Effect<boolean, DiscussionNotFound | ConnectionError>
+    ) => Effect.Effect<boolean, ReviewThreadNotFound | ConnectionError>
     readonly setReaction: (
       commentId: string,
       reaction: Reaction,
@@ -619,10 +620,10 @@ export class GitHubClient extends Context.Service<
           number: pr.number,
         })
 
-        const [gitHubFiles, [threads, comments, reviews], viewedFiles] = yield* Effect.all(
+        const [gitHubFiles, [reviewThreads, comments, reviews], viewedFiles] = yield* Effect.all(
           [
             changedFiles(canonical),
-            discussionNodes(pr.id),
+            publishedCommentNodes(pr.id),
             allNodes("PullRequestViewedFiles", VIEWED_FILES_QUERY, GitHubViewedFile, pr.id),
           ],
           { concurrency: "unbounded" },
@@ -652,8 +653,8 @@ export class GitHubClient extends Context.Service<
           viewedPaths: viewedFiles.flatMap((file) =>
             file.viewerViewedState === "VIEWED" ? [file.path] : [],
           ),
-          discussions: toDiscussions(files, threads, comments, reviews),
-          drafts: toDrafts(files, threads),
+          ...toReviewThreadsAndTimeline(files, reviewThreads, comments, reviews),
+          drafts: toDrafts(files, reviewThreads),
         })
       })
 
@@ -727,7 +728,7 @@ export class GitHubClient extends Context.Service<
         )
       }
 
-      const discussionNodes = (pullRequestId: string) =>
+      const publishedCommentNodes = (pullRequestId: string) =>
         Effect.all(
           [
             allNodes(
@@ -812,25 +813,29 @@ export class GitHubClient extends Context.Service<
       ) {
         const pinned = revision ?? (yield* pullRequestInput(ref, undefined)).revision
 
-        const [{ pr, discussions }, files] = yield* alongsideChangedFiles(
+        const [
+          {
+            pr,
+            nodes: [reviewThreads, comments, reviews],
+          },
+          files,
+        ] = yield* alongsideChangedFiles(
           ref,
           Effect.gen(function* () {
             const read = yield* pullRequestInput(ref, pinned)
 
-            return { pr: read, discussions: yield* discussionNodes(read.id) }
+            return { pr: read, nodes: yield* publishedCommentNodes(read.id) }
           }),
         )
 
         if (!(yield* isCurrent(pr.id, pinned))) return yield* new StaleRevision()
-
-        const [threads, comments, reviews] = discussions
 
         return {
           title: pr.title,
           body: pr.body,
           revision: pinned,
           files,
-          discussions: toDiscussions(files, threads, comments, reviews),
+          ...toReviewThreadsAndTimeline(files, reviewThreads, comments, reviews),
         }
       })
 
@@ -1161,21 +1166,24 @@ export class GitHubClient extends Context.Service<
           domainError: () => undefined,
         })
 
-        const thread = addPullRequestReviewThread?.thread
-        const comment = thread?.comments.nodes[0]
+        const reviewThread = addPullRequestReviewThread?.thread
+        const comment = reviewThread?.comments.nodes[0]
 
-        if (thread == null || thread.line === null || comment === undefined) {
+        if (reviewThread == null || reviewThread.line === null || comment === undefined) {
           return yield* unavailable(
             "GitHub didn't accept a Draft on that line. Reload, then try again.",
           )({
-            message: `GraphQL AddPullRequestReviewThread placed no thread on ${draft.path}:${draft.line}`,
+            message: `GraphQL AddPullRequestReviewThread placed no review thread on ${draft.path}:${draft.line}`,
           })
         }
 
         return new Draft({
           id: comment.id,
-          path: thread.path,
-          place: LinePlace.make({ side: fromGitHubSide(thread.diffSide), line: thread.line }),
+          path: reviewThread.path,
+          place: LinePlace.make({
+            side: fromGitHubSide(reviewThread.diffSide),
+            line: reviewThread.line,
+          }),
           body: comment.body,
         })
       }, pendingReviewWrites.withPermits(1))
@@ -1274,18 +1282,18 @@ export class GitHubClient extends Context.Service<
         })
       })
 
-      const replyToDiscussion = Effect.fn("GitHubClient.replyToDiscussion")(function* (
-        discussionId: string,
+      const replyToReviewThread = Effect.fn("GitHubClient.replyToReviewThread")(function* (
+        reviewThreadId: string,
         body: string,
       ) {
         const { addPullRequestReviewThreadReply } = yield* Effect.acquireUseRelease(
           graphql({
             name: "AddPullRequestReviewThreadReply",
             query: REPLY_MUTATION,
-            variables: { pullRequestReviewThreadId: discussionId, body },
+            variables: { pullRequestReviewThreadId: reviewThreadId, body },
             response: AddReplyResponse,
             domainError: ({ type }) =>
-              type === "NOT_FOUND" ? new DiscussionNotFound({ id: discussionId }) : undefined,
+              type === "NOT_FOUND" ? new ReviewThreadNotFound({ id: reviewThreadId }) : undefined,
           }),
           Effect.succeed,
           (result) => {
@@ -1299,7 +1307,7 @@ export class GitHubClient extends Context.Service<
 
         if (comment == null) {
           return yield* unavailable("GitHub didn't accept the Reply. Try again in a moment.")({
-            message: `GraphQL AddPullRequestReviewThreadReply added no comment to ${discussionId}`,
+            message: `GraphQL AddPullRequestReviewThreadReply added no comment to ${reviewThreadId}`,
           })
         }
 
@@ -1310,30 +1318,33 @@ export class GitHubClient extends Context.Service<
         return toComment(comment)
       }, pendingReviewWrites.withPermits(1))
 
-      const setDiscussionResolved = Effect.fn("GitHubClient.setDiscussionResolved")(function* (
-        discussionId: string,
+      const setReviewThreadResolved = Effect.fn("GitHubClient.setReviewThreadResolved")(function* (
+        reviewThreadId: string,
         resolved: boolean,
       ) {
         const name = resolved ? "ResolveReviewThread" : "UnresolveReviewThread"
 
         const data = yield* graphql({
           name,
-          query: resolved ? RESOLVE_THREAD_MUTATION : UNRESOLVE_THREAD_MUTATION,
-          variables: { threadId: discussionId },
-          response: ThreadResolutionResponse,
+          query: resolved ? RESOLVE_REVIEW_THREAD_MUTATION : UNRESOLVE_REVIEW_THREAD_MUTATION,
+          variables: { reviewThreadId },
+          response: ReviewThreadResolutionResponse,
           domainError: ({ type }) =>
-            type === "NOT_FOUND" ? new DiscussionNotFound({ id: discussionId }) : undefined,
+            type === "NOT_FOUND" ? new ReviewThreadNotFound({ id: reviewThreadId }) : undefined,
         })
 
-        const thread = (resolved ? data.resolveReviewThread : data.unresolveReviewThread)?.thread
+        const reviewThread = (resolved ? data.resolveReviewThread : data.unresolveReviewThread)
+          ?.thread
 
-        if (thread == null) {
-          return yield* unavailable("GitHub didn't update the Discussion. Try again in a moment.")({
-            message: `GraphQL ${name} returned no thread for ${discussionId}`,
+        if (reviewThread == null) {
+          return yield* unavailable(
+            "GitHub didn't update the Review thread. Try again in a moment.",
+          )({
+            message: `GraphQL ${name} returned no review thread for ${reviewThreadId}`,
           })
         }
 
-        return thread.isResolved
+        return reviewThread.isResolved
       })
 
       const setReaction = Effect.fn("GitHubClient.setReaction")(function* (
@@ -1390,8 +1401,8 @@ export class GitHubClient extends Context.Service<
         deleteDraft,
         submitReview,
         mergePullRequest,
-        replyToDiscussion,
-        setDiscussionResolved,
+        replyToReviewThread,
+        setReviewThreadResolved,
         setReaction,
       })
     }),

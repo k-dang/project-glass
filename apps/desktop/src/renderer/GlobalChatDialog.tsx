@@ -16,10 +16,10 @@ import { type ReactNode, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { Dialog, DialogClose, DialogContent, DialogTitle } from "@/components/ui/dialog"
-import { placeKey } from "./conversationsArea"
-import { ConversationComposer, contextLabel, Transcript } from "./ConversationView"
+import { placeKey } from "./threadsArea"
+import { ThreadComposer, contextLabel, Transcript } from "./ThreadView"
 import { ConfirmationDialog } from "./ConfirmationDialog"
-import { ConversationAtomsContext } from "./conversation"
+import { ThreadAtomsContext } from "./thread"
 import {
   capturedContextAtom,
   changeGlobalModelAtom,
@@ -79,9 +79,9 @@ export function GlobalChatDialog() {
         showCloseButton={false}
         className="flex h-[min(48rem,calc(100vh-4rem))] flex-col gap-0 p-0 sm:max-w-2xl"
       >
-        <ConversationAtomsContext value={globalChat}>
+        <ThreadAtomsContext value={globalChat}>
           <Shown showing={showing} show={setShowing} />
-        </ConversationAtomsContext>
+        </ThreadAtomsContext>
       </DialogContent>
     </Dialog>
   )
@@ -239,9 +239,9 @@ function GlobalChat(props: { onShowEnded: () => void }) {
         status={status}
       />
       <p className="truncate px-6 pb-1 text-xs text-muted-foreground">
-        {context === null ? "No PR or Conversation in view" : `Sends with ${contextLabel(context)}`}
+        {context === null ? "No PR or Thread in view" : `Sends with ${contextLabel(context)}`}
       </p>
-      <ConversationComposer
+      <ThreadComposer
         turns={turns}
         queued={queued}
         idlePlaceholder="Ask Glass about your work"

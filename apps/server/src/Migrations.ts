@@ -19,8 +19,11 @@ import startedWork from "./migrations/0017_started_work"
 import conversationKeptGoing from "./migrations/0018_conversation_kept_going"
 import globalChatSessions from "./migrations/0019_global_chat_sessions"
 import pageNotes from "./migrations/0020_page_notes"
+import conversationToDos from "./migrations/0021_conversation_to_dos"
+import reviewThreadReplies from "./migrations/0022_review_thread_replies"
+import threads from "./migrations/0023_threads"
 
-export const migrationLoader = SqliteMigrator.fromRecord({
+export const migrations = {
   "0001_baseline": baseline,
   "0002_agent_review_hotspots": agentReviewHotspots,
   "0003_agent_review_done": agentReviewDone,
@@ -41,4 +44,9 @@ export const migrationLoader = SqliteMigrator.fromRecord({
   "0018_conversation_kept_going": conversationKeptGoing,
   "0019_global_chat_sessions": globalChatSessions,
   "0020_page_notes": pageNotes,
-})
+  "0021_conversation_to_dos": conversationToDos,
+  "0022_review_thread_replies": reviewThreadReplies,
+  "0023_threads": threads,
+}
+
+export const migrationLoader = SqliteMigrator.fromRecord(migrations)

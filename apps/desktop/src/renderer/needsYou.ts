@@ -2,7 +2,7 @@ import {
   type AgentReviewDone,
   AgentReviewFinished,
   ChecksFailing,
-  ConversationNeedsYou,
+  ThreadNeedsYou,
   type NeedsYouItem,
   type PullRequestNeedsYou,
   referenceKey,
@@ -29,15 +29,15 @@ export const watchedNeedsYouAtom = Atom.make((get): NeedsYouResult => {
   return get(needsYouStreamAtom)
 })
 
-export const conversationsNeedingYouAtom = Atom.make(
-  (get): ReadonlyMap<string, ConversationNeedsYou> =>
+export const threadsNeedingYouAtom = Atom.make(
+  (get): ReadonlyMap<string, ThreadNeedsYou> =>
     new Map(
       Option.getOrElse(
         AsyncResult.value(get(watchedNeedsYouAtom)),
         (): ReadonlyArray<NeedsYouItem> => [],
       )
-        .filter(Schema.is(ConversationNeedsYou))
-        .map((item) => [item.conversation.id, item]),
+        .filter(Schema.is(ThreadNeedsYou))
+        .map((item) => [item.thread.id, item]),
     ),
 )
 
@@ -46,7 +46,7 @@ export const needsYouCount = (result: NeedsYouResult): Option.Option<number> =>
 
 export const needsYouKey = (item: NeedsYouItem): string =>
   Match.valueTags(item, {
-    Conversation: ({ conversation }) => `conversation:${conversation.id}`,
+    Thread: ({ thread }) => `thread:${thread.id}`,
     OutsideQuestion: ({ id }) => `ask:${id}`,
     CheckIn: ({ id }) => `check-in:${id}`,
     PullRequest: ({ pullRequest }) => `pr:${referenceKey(pullRequest.ref)}`,
@@ -67,12 +67,10 @@ export const reviewDoneOf = (item: PullRequestNeedsYou): AgentReviewDone | null 
     : { pullRequest: item.pullRequest.ref, writtenAt: review.writtenAt }
 }
 
-export const turnSeenOf = ({ conversation, reasons }: ConversationNeedsYou): TurnSeen | null => {
+export const turnSeenOf = ({ thread, reasons }: ThreadNeedsYou): TurnSeen | null => {
   const finished = reasons.find(Schema.is(TurnFinished))
 
-  return finished === undefined
-    ? null
-    : { conversationId: conversation.id, endedAt: finished.ended.at }
+  return finished === undefined ? null : { threadId: thread.id, endedAt: finished.ended.at }
 }
 
 export const markDoneAtom = backendRuntime.fn((review: AgentReviewDone) =>

@@ -1,25 +1,25 @@
 # Replies
 
-Every Discussion, in Changes under its line and in Overview's outdated list, ends in a "Reply. It publishes to GitHub right away." box. Typing shows a Reply button (Ctrl+Enter sends too); while sending it reads "Sending…" and the text can't change. Once GitHub confirms, the text leaves the box and the Reply joins the thread's comments marked "✓ Published". A failed Reply keeps its text, says "Couldn't publish your Reply." with why, and the button becomes Retry. While the user has Drafts, GitHub would hold a Reply until the Review is submitted, so Glass refuses it: "GitHub won't publish a Reply while you have Drafts". Reload keeps text not yet published, except on a Discussion deleted since, whose error says so; Replies published since load come back from GitHub as ordinary comments.
+Every Review thread, in Changes under its line and in Overview's outdated list, ends in a "Reply. It publishes to GitHub right away." box. Typing shows a Reply button (Ctrl+Enter sends too); while sending it reads "Sending…" and the text can't change. Once GitHub confirms, the text leaves the box and the Reply joins the Review thread's comments marked "✓ Published". A failed Reply keeps its text, says "Couldn't publish your Reply." with why, and the button becomes Retry. While the user has Drafts, GitHub would hold a Reply until the Review is submitted, so Glass refuses it: "GitHub won't publish a Reply while you have Drafts". Reload keeps text not yet published, except on a Review thread deleted since, whose error says so; Replies published since load come back from GitHub as ordinary comments.
 
 ## Sub-features
 
-- `reply-publish` publishes a Reply to a line Discussion or an outdated one and shows it Published.
+- `reply-publish` publishes a Reply to a line Review thread or an outdated one and shows it Published.
 - `reply-blocked` refuses a Reply while the user has Drafts, keeping its text with Retry.
 - `reply-retry` publishes a failed Reply on Retry once the cause is gone.
 - `reply-reload` keeps unpublished text across Reload and shows published Replies once.
 
 ## How to get to it (user POV)
 
-- Open a PR (see [PR workspace](./pr-workspace.md)) with Discussions.
-- In Changes, open a file with a line Discussion; or on Overview, scroll to Outdated Discussions.
+- Open a PR (see [PR workspace](./pr-workspace.md)) with Review threads.
+- In Changes, open a file with a line Review thread; or on Overview, scroll to Outdated Review threads.
 
 ## Driving it with glass-verify
 
-Preconditions, except for the fake-GitHub step: a real-GitHub run (`node $V launch --github real`) as `k-dang`. PR #1 of the kept probe repo `k-dang/glass-api-probe` has a thread on `b.txt`'s old line 2 and an outdated thread on `a.txt` line 2. Start with no pending review on it (`pullRequest(number: 1) { reviews(states: PENDING) { totalCount } }`), and delete every Reply you publish afterwards with `deletePullRequestReviewComment`.
+Preconditions, except for the fake-GitHub step: a real-GitHub run (`node $V launch --github real`) as `k-dang`. PR #1 of the kept probe repo `k-dang/glass-api-probe` has a Review thread on `b.txt`'s old line 2 and an outdated Review thread on `a.txt` line 2. Start with no pending review on it (`pullRequest(number: 1) { reviews(states: PENDING) { totalCount } }`), and delete every Reply you publish afterwards with `deletePullRequestReviewComment`.
 
-- **Fake GitHub (`reply-publish`).** Without real writes: `node $V launch --github fake`, open `octo-org/glass#95` ("Cache followed repositories"), choose Changes, and `wait --text "Cache the list, or the lookup?"`. `type --role textbox --name "Reply to thread on greet.ts line +1" --text "Probe reply"`, `click --role button --name Reply`, `wait --text Published`, and `wait --text "Probe reply"`.
-- **Publish (`reply-publish`).** Open PR #1, `click --role treeitem --name b.txt`, `wait --text "Reload probe reply"`. `type --role textbox --name "Reply to thread on b.txt line −2" --text <text>`, `click --role button --name Reply`, `wait --text Published`. Confirm with `gh api graphql` `node(id: <thread>) { ... on PullRequestReviewThread { comments(last: 1) { nodes { body state } } } }`: `SUBMITTED`. On Overview, the same with `"Reply to thread on a.txt line 2"`.
+- **Fake GitHub (`reply-publish`).** Without real writes: `node $V launch --github fake`, open `octo-org/glass#95` ("Cache followed repositories"), choose Changes, and `wait --text "Cache the list, or the lookup?"`. `type --role textbox --name "Reply to Review thread on greet.ts line +1" --text "Probe reply"`, `click --role button --name Reply`, `wait --text Published`, and `wait --text "Probe reply"`.
+- **Publish (`reply-publish`).** Open PR #1, `click --role treeitem --name b.txt`, `wait --text "Reload probe reply"`. `type --role textbox --name "Reply to Review thread on b.txt line −2" --text <text>`, `click --role button --name Reply`, `wait --text Published`. Confirm with `gh api graphql` `node(id: <review thread id>) { ... on PullRequestReviewThread { comments(last: 1) { nodes { body state } } } }`: `SUBMITTED`. On Overview, the same with `"Reply to Review thread on a.txt line 2"`.
 - **Blocked and retry (`reply-blocked`, `reply-retry`).** Add a Draft to PR #1 with `addPullRequestReviewThread` before opening it, then reply as above: `wait --text "Couldn't publish your Reply"`, and the pending review still holds only the Draft. `click --role button --name "Delete Draft on b.txt line +2"`, then `click --role button --name Retry`: published.
 - **Reload (`reply-reload`).** Type a Reply without sending, `click --role button --name Reload`: the box keeps the text, and earlier Replies show once, without Published.
 - **Proof.** Screenshots of each state and the `gh api` answers.

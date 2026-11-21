@@ -15,13 +15,13 @@ import {
 } from "effect"
 import { OtlpLogger, OtlpSerialization, OtlpTracer } from "effect/observability"
 import { randomUUID } from "node:crypto"
-import type { Delivery } from "./ConversationTurns"
+import type { Delivery } from "./ThreadTurns"
 
 // WARNING: Fields hold only IDs, counts, choices and durations, never message text, prompts, diffs, transcripts or credentials: users attach backend.log to bug reports.
 export interface UnitFields {
   readonly pr?: string
   readonly head?: string
-  readonly conversation_id?: string
+  readonly thread_id?: string
   readonly turn_id?: string
   readonly tool?: string
   readonly caller_id?: string
@@ -39,6 +39,7 @@ export interface UnitFields {
   readonly tool_calls?: number
   readonly failed_tool_calls?: number
   readonly ended_lookups?: number
+  readonly to_dos_done?: number
 }
 
 type DurationField = "checkout_ms" | "agent_ms"

@@ -4,7 +4,7 @@ import {
   type AgentEvent,
   type AgentHarness,
   AgentStatusesChanged,
-  applyConversationEvent,
+  applyThreadEvent,
   type Image,
   isWaiting,
   type RequestAnswer,
@@ -37,7 +37,7 @@ import { piAdapter } from "../src/agentHost/piAdapter"
 import { AgentRunners } from "../src/agentRunners"
 import { GlassMcpTools } from "../src/mcp/server"
 import {
-  type ConversationRole,
+  type ThreadRole,
   GlobalRole,
   type HostEvent,
   type ReviewBrief,
@@ -45,7 +45,7 @@ import {
   type TurnSettings,
   WorkRole,
 } from "../src/agentHost/protocol"
-import { bundledPi, bundledPiProgram } from "./demoConversation"
+import { bundledPi, bundledPiProgram } from "./demoThread"
 import { type FakeModelSettings, fakeModelProvider } from "./fakeModelProvider"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
@@ -54,7 +54,7 @@ import { PI_MODEL, PI_PROVIDER, type PiSettings, writePiLogin, writePiSettings }
 import { realHome } from "./isolateHome"
 import { claudeLoginEnvironment, pinnedClaude, pinnedClaudeProgram } from "./pinnedClaude"
 import { writeSentSkills } from "../src/agentHost/sentSkills"
-import { ReplayedTranscript } from "./replayedConversations"
+import { ReplayedTranscript } from "./replayedThreads"
 import { recordingSessions, sessionTape } from "./sessionTape"
 
 export const run = (tool: string, command: string, reply: string) =>
@@ -81,7 +81,7 @@ type Work = typeof WorkRole.Type
 
 const transcriptsDirectory = process.env["GLASS_TRANSCRIPTS_DIR"]
 
-const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
+const drive = Effect.fnUntraced(function* <Role extends ThreadRole>(
   scenario: string,
   harness: AgentHarness,
   adapter: HarnessAdapter<Role | Work>,
@@ -115,7 +115,7 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
           ? SubscriptionRef.set(activity, event)
           : Effect.sync(() => events.push(event)).pipe(
               Effect.andThen(
-                SubscriptionRef.update(turns, (current) => applyConversationEvent(current, event)),
+                SubscriptionRef.update(turns, (current) => applyThreadEvent(current, event)),
               ),
             ),
       ),
@@ -141,11 +141,11 @@ const drive = Effect.fnUntraced(function* <Role extends ConversationRole>(
     Effect.map((current) => waiting(current)!),
   )
 
-  const open = (conversation: string, role: Role | Work = WorkRole.make({})) =>
+  const open = (thread: string, role: Role | Work = WorkRole.make({})) =>
     adapter
       .start({
         folder,
-        conversation,
+        thread,
         role,
         glassTools: Predicate.isTagged(role, "Global") ? role.tools : undefined,
         skills: [],

@@ -22,8 +22,7 @@ const layoutDetails = {
   classic: { label: "Classic", description: "An icon rail beside the page." },
   inset: {
     label: "Inset",
-    description:
-      "Experimental. The page sits in a raised card, with Conversations in a panel beside it.",
+    description: "Experimental. The page sits in a raised card, with Threads in a panel beside it.",
   },
 } satisfies Record<Layout, { label: string; description: string }>
 

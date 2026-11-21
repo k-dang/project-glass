@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import {
-  DiscussionNotFound,
+  ReviewThreadNotFound,
   DraftsBlockReply,
   GitHubUnavailable,
   PublishedComment,
@@ -20,7 +20,7 @@ const patch = "@@ -1,2 +1,3 @@\n hello\n+there\n world"
 
 const changedFiles = [{ path: "greet.ts", status: "modified", additions: 1, patch }] as const
 
-const thread = {
+const greetReviewThread = {
   path: "greet.ts",
   line: 2,
   side: "RIGHT",
@@ -67,14 +67,14 @@ const heldReplyBackend = Effect.gen(function* () {
 })
 
 describe("Replies", () => {
-  it.live("publishes a Reply to a Discussion immediately", () =>
+  it.live("publishes a Reply to a Review thread immediately", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
-      const discussion = pr.addReviewThread(thread)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
-      const reply = yield* client.ReplyToDiscussion({
-        discussionId: discussion.id,
+      const reply = yield* client.ReplyToReviewThread({
+        reviewThreadId: reviewThread.id,
         body: "To greet them.",
       })
 
@@ -92,10 +92,12 @@ describe("Replies", () => {
         }),
       )
 
-      const { discussions } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { lineReviewThreads } = yield* client.LoadPullRequest({
+        pullRequest: new PullRequestRef(pr),
+      })
 
       assert.deepStrictEqual(
-        discussions.onLines[0]?.comments.map((comment) => comment.bodyHtml),
+        lineReviewThreads[0]?.comments.map((comment) => comment.bodyHtml),
         ["<p>Why <code>there</code>?</p>", "<p>To greet them.</p>"],
       )
     }),
@@ -114,10 +116,10 @@ describe("Replies", () => {
         },
       })
 
-      const discussion = pr.addReviewThread(thread)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
       const error = yield* client
-        .ReplyToDiscussion({ discussionId: discussion.id, body: "To greet them." })
+        .ReplyToReviewThread({ reviewThreadId: reviewThread.id, body: "To greet them." })
         .pipe(Effect.flip)
 
       assert.deepStrictEqual(error, new DraftsBlockReply())
@@ -144,7 +146,7 @@ describe("Replies", () => {
           },
         })
 
-        const discussion = pr.addReviewThread(thread)
+        const reviewThread = pr.addReviewThread(greetReviewThread)
 
         const { pullRequest, revision } = yield* client.LoadPullRequest({
           pullRequest: new PullRequestRef(pr),
@@ -153,7 +155,7 @@ describe("Replies", () => {
         operations.length = 0
 
         const reply = yield* client
-          .ReplyToDiscussion({ discussionId: discussion.id, body: "To greet them." })
+          .ReplyToReviewThread({ reviewThreadId: reviewThread.id, body: "To greet them." })
           .pipe(Effect.flip, Effect.forkChild())
 
         const deletingId = yield* Effect.promise(() => deleting)
@@ -216,7 +218,7 @@ describe("Replies", () => {
         },
       })
 
-      const discussion = pr.addReviewThread(thread)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
       const { pullRequest, revision } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
@@ -225,7 +227,7 @@ describe("Replies", () => {
       operations.length = 0
 
       const reply = yield* client
-        .ReplyToDiscussion({ discussionId: discussion.id, body: "To greet them." })
+        .ReplyToReviewThread({ reviewThreadId: reviewThread.id, body: "To greet them." })
         .pipe(Effect.forkChild())
 
       const deletingId = yield* Effect.promise(() => deleting)
@@ -272,9 +274,7 @@ describe("Replies", () => {
       assert.strictEqual(pr.reviews.length, 1)
 
       assert.deepStrictEqual(
-        pr.reviewThreads.flatMap((reviewThread) =>
-          reviewThread.comments.map((comment) => comment.bodyHtml),
-        ),
+        pr.reviewThreads.flatMap(({ comments }) => comments.map((comment) => comment.bodyHtml)),
         ["<p>Why <code>there</code>?</p>", "<p>Nit</p>"],
       )
     }),
@@ -284,10 +284,10 @@ describe("Replies", () => {
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
-      const discussion = pr.addReviewThread(thread)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
       const error = yield* client
-        .ReplyToDiscussion({ discussionId: discussion.id, body: "  " })
+        .ReplyToReviewThread({ reviewThreadId: reviewThread.id, body: "  " })
         .pipe(Effect.flip)
 
       assert.deepStrictEqual(
@@ -300,15 +300,15 @@ describe("Replies", () => {
     }),
   )
 
-  it.live("fails to reply to a Discussion that's gone from GitHub", () =>
+  it.live("fails to reply to a Review thread that's gone from GitHub", () =>
     Effect.gen(function* () {
       const { client } = yield* startSignedInBackend
 
       const error = yield* client
-        .ReplyToDiscussion({ discussionId: "PRRT_gone", body: "Hm" })
+        .ReplyToReviewThread({ reviewThreadId: "PRRT_gone", body: "Hm" })
         .pipe(Effect.flip)
 
-      assert.deepStrictEqual(error, new DiscussionNotFound({ id: "PRRT_gone" }))
+      assert.deepStrictEqual(error, new ReviewThreadNotFound({ id: "PRRT_gone" }))
     }),
   )
 })
