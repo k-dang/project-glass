@@ -7,3 +7,7 @@ export type Theme = typeof Theme.Type
 export const ColorSchemePreference = Schema.Literals(["system", "light", "dark"])
 
 export type ColorSchemePreference = typeof ColorSchemePreference.Type
+
+export const Layout = Schema.Literals(["classic", "inset"])
+
+export type Layout = typeof Layout.Type

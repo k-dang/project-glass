@@ -107,32 +107,43 @@ const openInBrowser = (url: string) => {
   if (scheme === "https:" || scheme === "http:") void shell.openExternal(url)
 }
 
-let theme: Theme = "glass"
+let appearance: Pick<Appearance, "theme" | "layout"> = { theme: "glass", layout: "classic" }
 
 const titleBarColors = {
   glass: {
-    light: { color: "#ffffff", symbolColor: "#0a0a0a" },
-    dark: { color: "#0a0a0a", symbolColor: "#fafafa" },
+    light: { background: "#ffffff", chrome: "#f5f5f5", symbolColor: "#0a0a0a" },
+    dark: { background: "#0a0a0a", chrome: "#050505", symbolColor: "#fafafa" },
   },
   charcoal: {
-    light: { color: "#f4f4f4", symbolColor: "#2b2b2b" },
-    dark: { color: "#111111", symbolColor: "#cecece" },
+    light: { background: "#f4f4f4", chrome: "#eaeaea", symbolColor: "#2b2b2b" },
+    dark: { background: "#111111", chrome: "#0b0b0b", symbolColor: "#cecece" },
   },
   catppuccin: {
-    light: { color: "#e6e9ef", symbolColor: "#4c4f69" },
-    dark: { color: "#181825", symbolColor: "#cdd6f4" },
+    light: { background: "#e6e9ef", chrome: "#dce0e8", symbolColor: "#4c4f69" },
+    dark: { background: "#181825", chrome: "#11111b", symbolColor: "#cdd6f4" },
   },
   linear: {
-    light: { color: "#fcfcfd", symbolColor: "#282a30" },
-    dark: { color: "#010102", symbolColor: "#f7f8f8" },
+    light: { background: "#fcfcfd", chrome: "#f3f3f5", symbolColor: "#282a30" },
+    dark: { background: "#010102", chrome: "#000000", symbolColor: "#f7f8f8" },
   },
   vercel: {
-    light: { color: "#fafafa", symbolColor: "#171717" },
-    dark: { color: "#000000", symbolColor: "#ededed" },
+    light: { background: "#fafafa", chrome: "#f0f0f0", symbolColor: "#171717" },
+    dark: { background: "#000000", chrome: "#000000", symbolColor: "#ededed" },
   },
-} satisfies Record<Theme, Record<"light" | "dark", { color: string; symbolColor: string }>>
+} satisfies Record<
+  Theme,
+  Record<"light" | "dark", { background: string; chrome: string; symbolColor: string }>
+>
 
-const windowColors = () => titleBarColors[theme][nativeTheme.shouldUseDarkColors ? "dark" : "light"]
+const windowColors = () => {
+  const colors =
+    titleBarColors[appearance.theme][nativeTheme.shouldUseDarkColors ? "dark" : "light"]
+
+  return {
+    color: appearance.layout === "inset" ? colors.chrome : colors.background,
+    symbolColor: colors.symbolColor,
+  }
+}
 
 const updateWindowTheme = (window: BrowserWindow) => {
   const colors = windowColors()
@@ -276,7 +287,7 @@ void app.whenReady().then(() => {
   ipcMain.handle(BACKEND_FAILURE_CHANNEL, () => backendFailed.promise)
   ipcMain.handle(RESOURCE_USAGE_CHANNEL, () => summarizeResourceUsage(app.getAppMetrics()))
   ipcMain.handle(SET_APPEARANCE_CHANNEL, (_event, next: Appearance) => {
-    theme = next.theme
+    appearance = next
     nativeTheme.themeSource = next.colorScheme
 
     for (const window of BrowserWindow.getAllWindows()) updateWindowTheme(window)
