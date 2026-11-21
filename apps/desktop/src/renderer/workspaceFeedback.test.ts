@@ -1,6 +1,5 @@
 import {
   type ConnectionError,
-  PublishedComments,
   Draft,
   GitHubUnavailable,
   LinePlace,
@@ -35,29 +34,27 @@ const withReviewThread = () => {
     files: original.files,
     viewedPaths: original.viewedPaths,
     drafts: original.drafts,
-    comments: new PublishedComments({
-      onLines: [],
-      outdated: [
-        new OutdatedReviewThread({
-          id: "T1",
-          path: "greet.ts",
-          originalLine: 2,
-          diffHunk: "",
-          resolved: false,
-          comments: [
-            new PublishedComment({
-              id: "C1",
-              author: "hubot",
-              avatarUrl: null,
-              bodyHtml: "Why?",
-              createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
-              reactions: [],
-            }),
-          ],
-        }),
-      ],
-      timeline: [],
-    }),
+    lineReviewThreads: [],
+    outdatedReviewThreads: [
+      new OutdatedReviewThread({
+        id: "T1",
+        path: "greet.ts",
+        originalLine: 2,
+        diffHunk: "",
+        resolved: false,
+        comments: [
+          new PublishedComment({
+            id: "C1",
+            author: "hubot",
+            avatarUrl: null,
+            bodyHtml: "Why?",
+            createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+            reactions: [],
+          }),
+        ],
+      }),
+    ],
+    timeline: [],
   })
 }
 

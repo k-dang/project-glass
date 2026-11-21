@@ -30,8 +30,8 @@ describe("Review thread resolution", () => {
         true,
       )
       assert.strictEqual(
-        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })).comments.onLines[0]
-          ?.resolved,
+        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) }))
+          .lineReviewThreads[0]?.resolved,
         true,
       )
 
@@ -46,8 +46,8 @@ describe("Review thread resolution", () => {
         false,
       )
       assert.strictEqual(
-        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })).comments.onLines[0]
-          ?.resolved,
+        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) }))
+          .lineReviewThreads[0]?.resolved,
         false,
       )
       assert.strictEqual(pr.reviewThreads[0]?.resolved, false)
@@ -87,8 +87,8 @@ describe("Review thread resolution", () => {
       )
       assert.strictEqual(pr.reviewThreads[0]?.resolved, false)
       assert.strictEqual(
-        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })).comments.onLines[0]
-          ?.resolved,
+        (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) }))
+          .lineReviewThreads[0]?.resolved,
         false,
       )
     }),

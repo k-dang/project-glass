@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { ConnectionError } from "./connection"
-import { PublishedComments } from "./comment"
+import { LineReviewThread, OutdatedReviewThread, TimelineItem } from "./comment"
 import { Draft } from "./draft"
 import { MergeAction, MergeUnderWay } from "./merge"
 import { Revision } from "./revision"
@@ -114,7 +114,9 @@ export class PullRequestWorkspace extends Schema.Class<PullRequestWorkspace>(
   updatedAt: Schema.DateTimeUtcFromString,
   files: Schema.Array(ChangedFile),
   viewedPaths: Schema.Array(Schema.String),
-  comments: PublishedComments,
+  lineReviewThreads: Schema.Array(LineReviewThread),
+  outdatedReviewThreads: Schema.Array(OutdatedReviewThread),
+  timeline: Schema.Array(TimelineItem),
   drafts: Schema.Array(Draft),
 }) {}
 

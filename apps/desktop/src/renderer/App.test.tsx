@@ -14,7 +14,6 @@ import {
   ActivityPage,
   ActivityPullRequest,
   ActivityToDo,
-  PublishedComments,
   Draft,
   FollowedRepository,
   FileTooLarge,
@@ -72,7 +71,9 @@ const workspace = new PullRequestWorkspace({
   updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
   files: [],
   viewedPaths: [],
-  comments: new PublishedComments({ onLines: [], outdated: [], timeline: [] }),
+  lineReviewThreads: [],
+  outdatedReviewThreads: [],
+  timeline: [],
   drafts: [
     new Draft({
       id: "D1",

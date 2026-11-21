@@ -59,11 +59,9 @@ export class OutdatedReviewThread extends Schema.Class<OutdatedReviewThread>(
   comments: Schema.NonEmptyArray(PublishedComment),
 }) {}
 
-export class PublishedComments extends Schema.Class<PublishedComments>("PublishedComments")({
-  onLines: Schema.Array(LineReviewThread),
-  outdated: Schema.Array(OutdatedReviewThread),
-  timeline: Schema.Array(Schema.Union([PublishedComment, Review])),
-}) {}
+export const TimelineItem = Schema.Union([PublishedComment, Review])
+
+export type TimelineItem = typeof TimelineItem.Type
 
 export class ReviewThreadNotFound extends Schema.TaggedError<ReviewThreadNotFound>()(
   "ReviewThreadNotFound",

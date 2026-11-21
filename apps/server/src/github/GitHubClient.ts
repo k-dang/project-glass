@@ -4,7 +4,6 @@ import {
   CommentNotFound,
   type ConnectionError,
   ReviewThreadNotFound,
-  type PublishedComments,
   Draft,
   DraftNotFound,
   DraftsBlockReply,
@@ -70,7 +69,7 @@ import {
   REVIEW_THREADS_QUERY,
   REVIEWS_QUERY,
   toComment,
-  toPublishedComments,
+  toReviewThreadsAndTimeline,
   UNRESOLVE_REVIEW_THREAD_MUTATION,
 } from "./comments"
 import { reactionContents, reactionMutation, toReactionGroups } from "./reactions"
@@ -176,9 +175,11 @@ export interface TourInput {
   readonly files: ReadonlyArray<ChangedFile>
 }
 
-export interface ReviewInput extends TourInput {
+export interface ReviewInput
+  extends
+    TourInput,
+    Pick<PullRequestWorkspace, "lineReviewThreads" | "outdatedReviewThreads" | "timeline"> {
   readonly revision: Revision
-  readonly comments: PublishedComments
 }
 
 const GitTree = Schema.Struct({
@@ -652,7 +653,7 @@ export class GitHubClient extends Context.Service<
           viewedPaths: viewedFiles.flatMap((file) =>
             file.viewerViewedState === "VIEWED" ? [file.path] : [],
           ),
-          comments: toPublishedComments(files, reviewThreads, comments, reviews),
+          ...toReviewThreadsAndTimeline(files, reviewThreads, comments, reviews),
           drafts: toDrafts(files, reviewThreads),
         })
       })
@@ -834,7 +835,7 @@ export class GitHubClient extends Context.Service<
           body: pr.body,
           revision: pinned,
           files,
-          comments: toPublishedComments(files, reviewThreads, comments, reviews),
+          ...toReviewThreadsAndTimeline(files, reviewThreads, comments, reviews),
         }
       })
 

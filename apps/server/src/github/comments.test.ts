@@ -45,7 +45,7 @@ const review = (fake: FakeReview, state: ReviewState) =>
     submittedAt: DateTime.makeUnsafe(fake.submittedAt),
   })
 
-describe("PublishedComments", () => {
+describe("Review threads and the timeline", () => {
   it.live("places Review threads on their lines, each with its resolved state", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
@@ -69,11 +69,11 @@ describe("PublishedComments", () => {
         comments: [{ author: "hubot", bodyHtml: "<p>Gone?</p>" }],
       })
 
-      const { comments } = yield* client.LoadPullRequest({
+      const { lineReviewThreads, outdatedReviewThreads } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
-      assert.deepStrictEqual(comments.onLines, [
+      assert.deepStrictEqual(lineReviewThreads, [
         new LineReviewThread({
           id: open.id,
           path: "greet.ts",
@@ -91,7 +91,7 @@ describe("PublishedComments", () => {
           comments: [published(resolved.comments[0]!)],
         }),
       ])
-      assert.deepStrictEqual(comments.outdated, [])
+      assert.deepStrictEqual(outdatedReviewThreads, [])
     }),
   )
 
@@ -115,12 +115,12 @@ describe("PublishedComments", () => {
 
       pr.push({ head: { sha: "h2", files: head.files }, outdatedReviewThreads: [outdated.id] })
 
-      const { comments } = yield* client.LoadPullRequest({
+      const { lineReviewThreads, outdatedReviewThreads } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
-      assert.deepStrictEqual(comments.onLines, [])
-      assert.deepStrictEqual(comments.outdated, [
+      assert.deepStrictEqual(lineReviewThreads, [])
+      assert.deepStrictEqual(outdatedReviewThreads, [
         new OutdatedReviewThread({
           id: outdated.id,
           path: "greet.ts",
@@ -159,12 +159,12 @@ describe("PublishedComments", () => {
         comments: [{ author: "hubot", bodyHtml: "<p>Typo</p>" }],
       })
 
-      const { comments } = yield* client.LoadPullRequest({
+      const { lineReviewThreads, outdatedReviewThreads } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
-      assert.deepStrictEqual(comments.onLines, [])
-      assert.deepStrictEqual(comments.outdated, [
+      assert.deepStrictEqual(lineReviewThreads, [])
+      assert.deepStrictEqual(outdatedReviewThreads, [
         new OutdatedReviewThread({
           id: reviewThread.id,
           path: "greet.ts",
@@ -197,11 +197,11 @@ describe("PublishedComments", () => {
       const dismissed = pr.addReview({ author: "hubot", state: "DISMISSED" })
       pr.addReview({ author: "hubot", state: "COMMENTED" })
 
-      const { comments } = yield* client.LoadPullRequest({
+      const { timeline } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
-      assert.deepStrictEqual(comments.timeline, [
+      assert.deepStrictEqual(timeline, [
         published(comment),
         review(approved, "approve"),
         published(followUp),
@@ -236,13 +236,13 @@ describe("PublishedComments", () => {
 
       pr.push({ head: { sha: "h2", files: head.files }, outdatedDrafts: [outdatedDraft.id] })
 
-      const { comments } = yield* client.LoadPullRequest({
+      const { lineReviewThreads, outdatedReviewThreads, timeline } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
-      assert.deepStrictEqual(comments.onLines, [])
-      assert.deepStrictEqual(comments.outdated, [])
-      assert.deepStrictEqual(comments.timeline, [])
+      assert.deepStrictEqual(lineReviewThreads, [])
+      assert.deepStrictEqual(outdatedReviewThreads, [])
+      assert.deepStrictEqual(timeline, [])
     }),
   )
 
@@ -282,12 +282,12 @@ describe("PublishedComments", () => {
         expectedTimeline.push(published(comment), review(submittedReview, "comment"))
       }
 
-      const { comments } = yield* client.LoadPullRequest({
+      const { lineReviewThreads, timeline } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
-      assert.deepStrictEqual(comments.onLines, expectedOnLines)
-      assert.deepStrictEqual(comments.timeline, expectedTimeline)
+      assert.deepStrictEqual(lineReviewThreads, expectedOnLines)
+      assert.deepStrictEqual(timeline, expectedTimeline)
     }),
   )
 })

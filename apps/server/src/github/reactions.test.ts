@@ -30,7 +30,7 @@ describe("Reactions", () => {
 
       const open = Effect.map(
         client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) }),
-        (workspace) => workspace.comments.onLines[0]?.comments[0].reactions,
+        (workspace) => workspace.lineReviewThreads[0]?.comments[0].reactions,
       )
 
       assert.deepStrictEqual(yield* open, [
@@ -59,8 +59,7 @@ describe("Reactions", () => {
 
       yield* client.SetReaction({ commentId: comment.id, reaction: "rocket", reacted: true })
 
-      const { timeline } = (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) }))
-        .comments
+      const { timeline } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
 
       assert.deepStrictEqual(timeline.find((item) => item instanceof PublishedComment)?.reactions, [
         new ReactionGroup({ reaction: "rocket", count: 1, reacted: true }),

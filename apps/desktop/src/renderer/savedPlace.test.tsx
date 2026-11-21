@@ -324,7 +324,9 @@ it("keeps tracking the Tour after Reload removes the selected file", async () =>
     updatedAt: pr.updatedAt,
     files: pr.files.filter(({ path }) => path !== "third.ts"),
     viewedPaths: [],
-    comments: pr.comments,
+    lineReviewThreads: pr.lineReviewThreads,
+    outdatedReviewThreads: pr.outdatedReviewThreads,
+    timeline: pr.timeline,
     drafts: [],
   })
 
@@ -389,7 +391,9 @@ it("continues the newest work even while an older destination is still saving", 
     updatedAt: pr.updatedAt,
     files: pr.files,
     viewedPaths: [],
-    comments: pr.comments,
+    lineReviewThreads: pr.lineReviewThreads,
+    outdatedReviewThreads: pr.outdatedReviewThreads,
+    timeline: pr.timeline,
     drafts: [],
   })
 

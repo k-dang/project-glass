@@ -14,7 +14,6 @@ import {
   CheckInChanges,
   ChecksFailing,
   FeedbackNote,
-  PublishedComments,
   emptyTranscript,
   GitHubConnection,
   type NeedsYou,
@@ -721,7 +720,9 @@ const loadedWorkspace = () =>
       updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
       files: [],
       viewedPaths: [],
-      comments: new PublishedComments({ onLines: [], outdated: [], timeline: [] }),
+      lineReviewThreads: [],
+      outdatedReviewThreads: [],
+      timeline: [],
       drafts: [],
     }),
   )

@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 import { RegistryProvider } from "@effect/atom-react"
 import {
-  PublishedComments,
   GitHubConnection,
   GitHubUnavailable,
   PullRequest,
@@ -77,7 +76,9 @@ const workspaceOf = (pr: PullRequestSummary) =>
     updatedAt: pr.updatedAt,
     files: [],
     viewedPaths: [],
-    comments: new PublishedComments({ onLines: [], outdated: [], timeline: [] }),
+    lineReviewThreads: [],
+    outdatedReviewThreads: [],
+    timeline: [],
     drafts: [],
   })
 

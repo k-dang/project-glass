@@ -1,7 +1,6 @@
 // @vitest-environment happy-dom
 import {
   type ConnectionError,
-  PublishedComments,
   Draft,
   FollowedRepository,
   GitHubConnection,
@@ -168,7 +167,7 @@ const workspaceOf = (
   pr: PullRequestSummary,
   head: string,
   drafts: ReadonlyArray<Draft> = [],
-  comments = new PublishedComments({ onLines: [], outdated: [], timeline: [] }),
+  outdatedReviewThreads: ReadonlyArray<OutdatedReviewThread> = [],
 ) =>
   new PullRequestWorkspace({
     viewer,
@@ -194,7 +193,9 @@ const workspaceOf = (
     updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
     files: [],
     viewedPaths: [],
-    comments,
+    lineReviewThreads: [],
+    outdatedReviewThreads,
+    timeline: [],
     drafts,
   })
 
@@ -794,29 +795,25 @@ const withReviewThread = (head: string, resolved = false) =>
     greet,
     head,
     [],
-    new PublishedComments({
-      onLines: [],
-      outdated: [
-        new OutdatedReviewThread({
-          id: "T1",
-          path: "greet.ts",
-          originalLine: 2,
-          diffHunk: "",
-          resolved,
-          comments: [
-            new PublishedComment({
-              id: "C1",
-              author: "hubot",
-              avatarUrl: null,
-              bodyHtml: "<p>Why there?</p>",
-              createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
-              reactions: [],
-            }),
-          ],
-        }),
-      ],
-      timeline: [],
-    }),
+    [
+      new OutdatedReviewThread({
+        id: "T1",
+        path: "greet.ts",
+        originalLine: 2,
+        diffHunk: "",
+        resolved,
+        comments: [
+          new PublishedComment({
+            id: "C1",
+            author: "hubot",
+            avatarUrl: null,
+            bodyHtml: "<p>Why there?</p>",
+            createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+            reactions: [],
+          }),
+        ],
+      }),
+    ],
   )
 
 it.each(["resolution", "Viewed-file"])(

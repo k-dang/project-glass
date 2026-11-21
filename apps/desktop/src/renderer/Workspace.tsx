@@ -57,7 +57,8 @@ import {
 } from "./ChangedFilesView"
 import { ChangesToolbar } from "./ChangesToolbar"
 import { CopyMenu } from "./CopyMenu"
-import { OutdatedReviewThreads, Timeline } from "./ReviewThreads"
+import { OutdatedReviewThreads } from "./ReviewThreads"
+import { Timeline } from "./Timeline"
 import { DescriptionBody } from "./GitHubHtml"
 import { DraftList, showDraft } from "./Drafts"
 import { NotesList } from "./Notes"
@@ -112,7 +113,9 @@ export function Workspace(props: {
   onBack: () => void
   onOpen: (pullRequest: PullRequestRef) => void
 }) {
-  const { pullRequest, revision, files, comments } = props.workspace
+  const { pullRequest, revision, files, lineReviewThreads, outdatedReviewThreads, timeline } =
+    props.workspace
+
   const tour = useTour(pullRequest.ref, revision)
   const agentReview = useAgentReview(pullRequest.ref, revision, closedAs(pullRequest))
   const currentReview = agentReview.current
@@ -398,7 +401,7 @@ export function Workspace(props: {
   const additions = files.reduce((sum, file) => sum + file.additions, 0)
   const deletions = files.reduce((sum, file) => sum + file.deletions, 0)
   const filePanelLabel = filePanelOpen ? "Hide file panel" : "Show file panel"
-  const noteCount = comments.onLines.length + draftCount
+  const noteCount = lineReviewThreads.length + draftCount
 
   const filePanelToggle = (
     <Button
@@ -500,7 +503,7 @@ export function Workspace(props: {
               <TabsContent value="notes" className="flex min-h-0 flex-col">
                 <NotesList
                   paths={layout.tree.paths}
-                  reviewThreads={comments.onLines}
+                  reviewThreads={lineReviewThreads}
                   drafts={drafts}
                   show={show}
                 />
@@ -565,9 +568,9 @@ export function Workspace(props: {
                 />
                 <Description html={pullRequest.descriptionHtml} />
                 <DraftList store={drafts} onShow={(draft) => showDraft(show, draft)} />
-                <Timeline items={comments.timeline} reactions={reactions} />
+                <Timeline items={timeline} reactions={reactions} />
                 <OutdatedReviewThreads
-                  reviewThreads={comments.outdated}
+                  reviewThreads={outdatedReviewThreads}
                   replies={replies}
                   resolutions={resolutions}
                   reactions={reactions}
@@ -596,7 +599,7 @@ export function Workspace(props: {
                 reading={tourShown}
                 onShowInReview={showInReview}
                 lowAttention={lowAttention}
-                reviewThreads={comments.onLines}
+                reviewThreads={lineReviewThreads}
                 drafts={drafts}
                 asks={asks}
                 replies={replies}
@@ -619,7 +622,7 @@ export function Workspace(props: {
                   initialPath={currentPath}
                   ref={view}
                   files={shown}
-                  reviewThreads={comments.onLines}
+                  reviewThreads={lineReviewThreads}
                   drafts={drafts}
                   asks={asks}
                   replies={replies}

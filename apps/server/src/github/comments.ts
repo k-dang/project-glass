@@ -1,6 +1,5 @@
 import {
   type ChangedFile,
-  PublishedComments,
   LineReviewThread,
   OutdatedReviewThread,
   PublishedComment,
@@ -147,7 +146,7 @@ export const isOnLine = (
   reviewThread.line !== null &&
   shown.has(reviewThread.path)
 
-export const toPublishedComments = (
+export const toReviewThreadsAndTimeline = (
   files: ReadonlyArray<ChangedFile>,
   reviewThreads: ReadonlyArray<typeof GitHubReviewThread.Type>,
   prComments: ReadonlyArray<typeof GitHubComment.Type>,
@@ -214,9 +213,9 @@ export const toPublishedComments = (
     )
   }
 
-  return new PublishedComments({
-    onLines,
-    outdated,
+  return {
+    lineReviewThreads: onLines,
+    outdatedReviewThreads: outdated,
     timeline: Arr.sortWith(timeline, timelineTime, DateTime.Order),
-  })
+  }
 }

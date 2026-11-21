@@ -1,6 +1,5 @@
 import {
   DiffSide,
-  type PublishedComments,
   Hotspot,
   LowAttentionFile,
   OriginalLine,
@@ -20,31 +19,29 @@ export const PullRequestMaterial = Schema.Struct({
   title: Schema.String,
   description: Schema.String,
   files: Schema.Array(FileMaterial),
-  comments: Schema.Struct({
-    onLines: Schema.Array(
-      Schema.Struct({
-        path: Schema.String,
-        side: DiffSide,
-        line: Schema.Int,
-        resolved: Schema.Boolean,
-        comments: Schema.Array(CommentMaterial),
-      }),
-    ),
-    outdated: Schema.Array(
-      Schema.Struct({
-        path: Schema.String,
-        originalLine: OriginalLine,
-        resolved: Schema.Boolean,
-        comments: Schema.Array(CommentMaterial),
-      }),
-    ),
-    timeline: Schema.Array(
-      Schema.Union([
-        Schema.Struct({ ...CommentMaterial.fields, review: ReviewState }),
-        CommentMaterial,
-      ]),
-    ),
-  }),
+  lineReviewThreads: Schema.Array(
+    Schema.Struct({
+      path: Schema.String,
+      side: DiffSide,
+      line: Schema.Int,
+      resolved: Schema.Boolean,
+      comments: Schema.Array(CommentMaterial),
+    }),
+  ),
+  outdatedReviewThreads: Schema.Array(
+    Schema.Struct({
+      path: Schema.String,
+      originalLine: OriginalLine,
+      resolved: Schema.Boolean,
+      comments: Schema.Array(CommentMaterial),
+    }),
+  ),
+  timeline: Schema.Array(
+    Schema.Union([
+      Schema.Struct({ ...CommentMaterial.fields, review: ReviewState }),
+      CommentMaterial,
+    ]),
+  ),
 })
 
 export type PullRequestMaterial = typeof PullRequestMaterial.Type
@@ -92,31 +89,29 @@ Return only the JSON answer matching the supplied schema, without a code fence o
 const commentsOf = (comments: ReadonlyArray<PublishedComment>) =>
   comments.map((comment) => ({ author: comment.author, bodyHtml: comment.bodyHtml }))
 
-const publishedCommentsOf = (published: PublishedComments) => ({
-  onLines: published.onLines.map(({ path, side, line, resolved, comments }) => ({
+const describedPullRequest = (input: ReviewInput) => ({
+  title: input.title,
+  description: input.body,
+  lineReviewThreads: input.lineReviewThreads.map(({ path, side, line, resolved, comments }) => ({
     path,
     side,
     line,
     resolved,
     comments: commentsOf(comments),
   })),
-  outdated: published.outdated.map(({ path, originalLine, resolved, comments }) => ({
-    path,
-    originalLine,
-    resolved,
-    comments: commentsOf(comments),
-  })),
-  timeline: published.timeline.map((item) =>
+  outdatedReviewThreads: input.outdatedReviewThreads.map(
+    ({ path, originalLine, resolved, comments }) => ({
+      path,
+      originalLine,
+      resolved,
+      comments: commentsOf(comments),
+    }),
+  ),
+  timeline: input.timeline.map((item) =>
     item instanceof PublishedComment
       ? { author: item.author, bodyHtml: item.bodyHtml }
       : { author: item.author, review: item.state, bodyHtml: item.bodyHtml },
   ),
-})
-
-const describedPullRequest = (input: ReviewInput) => ({
-  title: input.title,
-  description: input.body,
-  comments: publishedCommentsOf(input.comments),
 })
 
 export const pullRequestMaterial = (input: ReviewInput): PullRequestMaterial => ({

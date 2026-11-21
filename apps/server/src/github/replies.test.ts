@@ -92,12 +92,12 @@ describe("Replies", () => {
         }),
       )
 
-      const { comments } = yield* client.LoadPullRequest({
+      const { lineReviewThreads } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
       })
 
       assert.deepStrictEqual(
-        comments.onLines[0]?.comments.map((comment) => comment.bodyHtml),
+        lineReviewThreads[0]?.comments.map((comment) => comment.bodyHtml),
         ["<p>Why <code>there</code>?</p>", "<p>To greet them.</p>"],
       )
     }),
