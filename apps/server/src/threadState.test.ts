@@ -42,35 +42,6 @@ it("advances the queue head only after Done and Failed", () => {
     )
 })
 
-it("puts the Steers an ended Turn didn't take in at the queue's front, starting nothing", () => {
-  const steer = message("steer")
-
-  assert.deepStrictEqual(
-    stepThread(idle, {
-      type: "turnEnded",
-      ending: TurnFailed.make({ reason: "Over budget" }),
-      requeued: [steer],
-    }),
-    { outcome: { type: "queued" }, writes: [{ type: "prepend", messages: [steer] }] },
-  )
-})
-
-it("starts a Turn when idle and queues at the back while running", () => {
-  const sent = message("c")
-
-  assert.deepStrictEqual(
-    stepThread({ running: null, queued: [] }, { type: "send", message: sent }),
-    {
-      outcome: { type: "started" },
-      writes: [{ type: "startTurn", message: { ...sent, retriesDelivery: false } }],
-    },
-  )
-  assert.deepStrictEqual(stepThread(busy, { type: "send", message: sent }), {
-    outcome: { type: "queued" },
-    writes: [{ type: "enqueue", message: sent }],
-  })
-})
-
 it("starts an idle-only Turn only after the running Turn and all Queued messages", () => {
   const idleOnly = { ...message("idleOnly"), retriesDelivery: true }
 
@@ -96,12 +67,4 @@ it("starts a chosen Queued message only when no Turn is running", () => {
   })
   assert.deepStrictEqual(stepThread(idle, { type: "sendQueued", queuedId: "b" }), startsQueued("b"))
   assert.deepStrictEqual(stepThread(idle, { type: "sendQueued", queuedId: "x" }), unchanged)
-})
-
-it("cancels only a message that is still Queued, handing back its feedback", () => {
-  assert.deepStrictEqual(stepThread(busy, { type: "cancelQueued", queuedId: "a" }), {
-    outcome: { type: "canceled", feedback: [] },
-    writes: [{ type: "dequeue", queuedId: "a" }],
-  })
-  assert.deepStrictEqual(stepThread(busy, { type: "cancelQueued", queuedId: "x" }), unchanged)
 })

@@ -40,5 +40,6 @@ it.live("takes its token only from a header, so it never sits in a URL", () =>
 
     assert.strictEqual(yield* status(`${RPC_PATH}?token=${TOKEN}`), 401)
     assert.strictEqual(yield* status(RPC_PATH, { [HOST_TOKEN_HEADER]: "wrong" }), 401)
+    assert.notStrictEqual(yield* status(RPC_PATH, { [HOST_TOKEN_HEADER]: TOKEN }), 401)
   }).pipe(Effect.scoped),
 )

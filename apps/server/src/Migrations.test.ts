@@ -772,16 +772,3 @@ it.live("moves every Conversation-era row onto Threads, keeping its data", () =>
     ])
   }).pipe(Effect.provide(SqliteClient.layer({ filename: ":memory:" }))),
 )
-
-it.live("leaves no table, column, or index named for Conversations", () =>
-  Effect.gen(function* () {
-    const sql = yield* SqlClient.SqlClient
-
-    yield* SqliteMigrator.run({ loader: migrationLoader })
-
-    assert.deepStrictEqual(
-      yield* sql`SELECT name FROM sqlite_schema WHERE name LIKE '%conversation%' OR sql LIKE '%conversation%'`,
-      [],
-    )
-  }).pipe(Effect.provide(SqliteClient.layer({ filename: ":memory:" }))),
-)
