@@ -8,7 +8,7 @@ import {
   localPlace,
   toDoMention,
 } from "@glass/contracts"
-import { Effect, Option, Predicate, Stream } from "effect"
+import { Effect, Fiber, Option, Predicate, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { mkdir, rename, symlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -20,7 +20,6 @@ import {
   scriptedHost,
   settled,
 } from "../test/conversationsFixture"
-import { eventually } from "../test/eventually"
 import type { FakePullRequest } from "../test/fakePullRequest"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome } from "../test/harness"
@@ -590,12 +589,17 @@ ${toDoMention({ id: 1, title: "Fix spacing" })}`)
     yield* f.send(conversation.id, toDoMention({ id: 2, title: "Tidy later" }))
     yield* f.transcript(conversation.id, settled(2))
 
+    const finished = yield* f.client.WatchToDos().pipe(
+      Stream.filter((toDos) => toDos.some(({ done }) => done)),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+      Effect.forkChild,
+    )
+
     pr.edit({ state: "MERGED" })
     yield* f.client.ListPullRequests()
 
-    const listed = yield* eventually(
-      f.client.ListToDos().pipe(Effect.filterOrFail((toDos) => toDos.some(({ done }) => done))),
-    )
+    const listed = yield* Fiber.join(finished)
 
     assert.deepStrictEqual(
       listed.map(({ title, done }) => ({ title, done })),

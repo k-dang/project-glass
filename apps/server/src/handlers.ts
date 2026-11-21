@@ -146,6 +146,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListActivityStamps: ({ since, kinds }) =>
         github.viewer.pipe(Effect.flatMap(({ login }) => activityLog.stamps(login, since, kinds))),
       ListToDos: () => toDos.list(),
+      WatchToDos: () => toDos.watch(),
       AddToDo: ({ title, notes, images = [] }) => toDos.add(title, notes, images),
       EditToDo: ({ id, title, notes }) => toDos.edit(id, title, notes),
       SetToDoDone: ({ id, done }) => toDos.setDone(id, done),

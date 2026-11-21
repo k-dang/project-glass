@@ -1,5 +1,5 @@
-import type { ToDo } from "@glass/contracts"
-import { Effect, Option } from "effect"
+import { ToDo } from "@glass/contracts"
+import { Effect, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Backend, type BackendError, backendRuntime } from "./backend"
 import { newestFirst } from "./toDoOrder"
@@ -11,7 +11,7 @@ export interface ToDoChange {
 }
 
 export const savedToDosAtom = backendRuntime
-  .atom(Backend.use((backend) => backend.ListToDos()))
+  .atom(Stream.unwrap(Backend.useSync((backend) => backend.WatchToDos())))
   .pipe(Atom.keepAlive)
 
 export const pendingToggleAtom = Atom.make<ToDoChange["toggle"]>(undefined).pipe(Atom.keepAlive)
@@ -36,12 +36,18 @@ export const changeAtom = backendRuntime
   )
   .pipe(Atom.keepAlive)
 
-export const toDosAtom = Atom.make((get) =>
-  Option.match(AsyncResult.value(get(changeAtom)), {
-    onSome: (saved) => AsyncResult.success(saved),
-    onNone: () => get(savedToDosAtom),
-  }),
-)
+export const toDosAtom = Atom.make((get) => {
+  const toggle = get(pendingToggleAtom)
+
+  return AsyncResult.map(get(savedToDosAtom), (toDos) =>
+    toggle === undefined
+      ? toDos
+      : toDos.map(
+          ({ id, title, notes, done, images }) =>
+            new ToDo({ id, title, notes, images, done: id === toggle.id ? !toggle.done : done }),
+        ),
+  )
+})
 
 export const openToDosAtom = Atom.make((get) =>
   AsyncResult.map(get(toDosAtom), (toDos) => newestFirst(toDos.filter((toDo) => !toDo.done))),

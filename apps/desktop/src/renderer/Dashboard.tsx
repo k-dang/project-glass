@@ -1,6 +1,7 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import type { QueuedPullRequest } from "@glass/contracts"
 import { Link, type LinkProps } from "@tanstack/react-router"
+import type { Cause } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { Circle } from "lucide-react"
 import { type ReactNode, useId } from "react"
@@ -11,7 +12,7 @@ import type { BackendError } from "./backend"
 import { Count, SectionLink } from "./Lists"
 import { NeedsYouSummary } from "./NeedsYouCount"
 import { ProblemAlert } from "./ProblemAlert"
-import { problemOf } from "./problems"
+import { problemOf, streamProblem } from "./problems"
 import { repositoryLabeller } from "./PullRequestRow"
 import { savedQueueAtom, watchedQueueAtom } from "./queue"
 import { QueueWorkStatus } from "./QueueWorkStatus"
@@ -72,7 +73,7 @@ function Panel<A>(props: {
   title: string
   link: LinkProps
   linkLabel: string
-  result: AsyncResult.AsyncResult<ReadonlyArray<A>, BackendError>
+  result: AsyncResult.AsyncResult<ReadonlyArray<A>, BackendError | Cause.NoSuchElementError>
   retry: () => void
   loading: string
   empty: string
@@ -100,7 +101,7 @@ function Panel<A>(props: {
           )
           .onFailure((cause) => (
             <ProblemAlert
-              problem={problemOf(cause)}
+              problem={streamProblem(cause)}
               action={{ label: "Retry", run: props.retry }}
             />
           ))

@@ -33,7 +33,7 @@ import { newConversationWrittenAtom } from "./conversationsArea"
 import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { imageFiles, imageSrc, maxToDoImageBytes, readToDoImages } from "./pastedImages"
 import { ProblemAlert } from "./ProblemAlert"
-import { problemOf, settledProblem } from "./problems"
+import { settledProblem, streamProblem } from "./problems"
 import { shortcutLabel } from "./shortcutLabel"
 import { submitOnShortcut } from "./submitShortcut"
 import {
@@ -243,9 +243,9 @@ export function ToDos() {
     <div className="page-content flex flex-col gap-6 py-6">
       <h1 className="text-2xl font-semibold tracking-tight">To-dos</h1>
       {AsyncResult.builder(toDos)
-        .onInitialOrWaiting(() => <output>Loading to-dos…</output>)
+        .onInitial(() => <output>Loading to-dos…</output>)
         .onFailure((cause) => (
-          <ProblemAlert problem={problemOf(cause)} action={{ label: "Retry", run: retry }} />
+          <ProblemAlert problem={streamProblem(cause)} action={{ label: "Retry", run: retry }} />
         ))
         .onSuccess((value) => <ToDoList toDos={value} />)
         .render()}

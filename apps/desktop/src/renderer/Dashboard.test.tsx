@@ -11,7 +11,7 @@ import {
 } from "@glass/contracts"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Effect } from "effect"
+import { DateTime, Effect, Stream } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { App } from "./App"
 import { backendLayerAtom } from "./backend"
@@ -57,8 +57,8 @@ afterEach(() => {
 it("lists the Queue and the open To-dos", async () => {
   mount({
     ListSavedQueue: () => Effect.succeed([queued(42, "Greet the world"), queued(7, "Wave")]),
-    ListToDos: () =>
-      Effect.succeed([
+    WatchToDos: () =>
+      Stream.make([
         new ToDo({ id: 1, title: "Reply to Mona", notes: "", done: false }),
         new ToDo({ id: 3, title: "Rebase the branch", notes: "", done: false }),
         new ToDo({ id: 2, title: "Ship the flag", notes: "", done: true }),

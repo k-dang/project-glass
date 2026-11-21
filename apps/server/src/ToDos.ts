@@ -11,7 +11,18 @@ import {
   ToDoError,
   ToDoImage,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, FileSystem, Layer, Result, Schema } from "effect"
+import {
+  Context,
+  DateTime,
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+  Result,
+  Schema,
+  Stream,
+  SubscriptionRef,
+} from "effect"
 import { Base64 } from "effect/encoding"
 import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
@@ -94,6 +105,7 @@ export class ToDos extends Context.Service<
   ToDos,
   {
     readonly list: () => ToDoList
+    readonly watch: () => Stream.Stream<ReadonlyArray<ToDo>, ToDoError>
     readonly add: (title: string, notes: string, images: ReadonlyArray<ToDoImageUpload>) => ToDoList
     readonly edit: (id: number, title: string, notes: string) => ToDoList
     readonly setDone: (id: number, done: boolean) => ToDoList
@@ -156,12 +168,18 @@ export class ToDos extends Context.Service<
         Effect.mapError(loadFailed),
       )
 
+      const published = yield* SubscriptionRef.make(Option.none<ReadonlyArray<ToDo>>())
+
+      const publish = list.pipe(
+        Effect.tap((toDos) => SubscriptionRef.set(published, Option.some(toDos))),
+      )
+
       const logSaveFailure = Effect.tapError((cause: unknown) =>
         Effect.logWarning("Couldn't save a to-do", cause),
       )
 
       const change = <E, R>(statement: Effect.Effect<unknown, E, R>) =>
-        statement.pipe(logSaveFailure, Effect.mapError(saveFailed), Effect.andThen(list))
+        statement.pipe(logSaveFailure, Effect.mapError(saveFailed), Effect.andThen(publish))
 
       const record = <E, R>(
         statement: Effect.Effect<ReadonlyArray<unknown>, E, R>,
@@ -179,7 +197,7 @@ export class ToDos extends Context.Service<
       const changeAndRecord = <E, R>(
         statement: Effect.Effect<ReadonlyArray<unknown>, E, R>,
         activity: (toDo: ActivityToDo) => Activity,
-      ) => record(statement, activity).pipe(Effect.andThen(list))
+      ) => record(statement, activity).pipe(Effect.andThen(publish))
 
       const deletePaths = (paths: ReadonlyArray<string>) =>
         Effect.forEach(paths, (path) => fs.remove(path, { force: true }).pipe(Effect.ignore), {
@@ -279,6 +297,10 @@ export class ToDos extends Context.Service<
 
       return ToDos.of({
         list: Effect.fn("ToDos.list")(() => list),
+        watch: () =>
+          SubscriptionRef.changes(published).pipe(
+            Stream.mapEffect(Option.match({ onNone: () => list, onSome: Effect.succeed })),
+          ),
         add: Effect.fn("ToDos.add")(function* (title, notes, images) {
           const stored = yield* decodeUploads(images)
 
@@ -458,6 +480,8 @@ export class ToDos extends Context.Service<
           )
 
           yield* annotateUnit({ to_dos_done: done.length })
+
+          if (done.length > 0) yield* publish
         }),
       })
     }),
