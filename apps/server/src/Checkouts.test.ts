@@ -168,8 +168,7 @@ it.live("clones a repository once and only fetches for later checkouts", () =>
   }).pipe(Effect.scoped),
 )
 
-// Flaky: timed out at 30 s in a full server run; passed when its file was rerun alone.
-it.live.skip("checks out one repository at a time and different repositories at once", () =>
+it.live("checks out one repository at a time and different repositories at once", () =>
   Effect.gen(function* () {
     const { github, checkout } = yield* fixture()
 
