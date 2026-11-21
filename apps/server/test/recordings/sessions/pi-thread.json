@@ -1,5 +1,5 @@
 {
-  "scenario": "pi-conversation",
+  "scenario": "pi-thread",
   "program": "@earendil-works/pi-coding-agent 1.5.2",
   "processes": [
     {
@@ -31,11 +31,16 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "<pi-provider>-messages",
-                "provider": "<pi-provider>",
+                "api": "anthropic-messages",
                 "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
+                "compat": {
+                  "allowEmptySignature": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false
+                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -54,29 +59,11 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "minimal": null,
-                  "low": "low",
-                  "medium": "medium",
-                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
-                "compat": {
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false,
-                  "supportsMidConvoEffort": true,
-                  "supportsMidConvoSystemMessages": true,
-                  "supportsMidConvoToolChanges": true,
-                  "supportsStrictTools": true
-                },
-                "promptCache": {
-                  "short": 300,
-                  "long": 3600
-                },
                 "inputLimits": {
-                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -92,7 +79,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-27-782Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-47-954Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -136,7 +123,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794877528023,
+              "timestamp": 1795232208207,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -246,7 +233,7 @@
                 },
                 {
                   "name": "draw_diagram",
-                  "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                  "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -279,7 +266,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794877528023,
+              "timestamp": 1795232208207,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -389,7 +376,7 @@
                 },
                 {
                   "name": "draw_diagram",
-                  "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                  "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -426,7 +413,7 @@
                   "text": "Remember the word lantern. Reply with exactly: Noted."
                 }
               ],
-              "timestamp": 1794877528021
+              "timestamp": 1795232208206
             }
           }
         },
@@ -441,7 +428,7 @@
                   "text": "Remember the word lantern. Reply with exactly: Noted."
                 }
               ],
-              "timestamp": 1794877528021
+              "timestamp": 1795232208206
             }
           }
         },
@@ -451,7 +438,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-messages",
+              "api": "anthropic-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -469,8 +456,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794877528057,
-              "providerThinkingLevel": "medium"
+              "timestamp": 1795232208227
             }
           }
         },
@@ -562,7 +548,7 @@
                   "text": "Noted."
                 }
               ],
-              "api": "<pi-provider>-messages",
+              "api": "anthropic-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -583,11 +569,10 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794877528057,
-              "providerThinkingLevel": "medium",
-              "responseId": "msg_011Ch7bticWT88koCjkGqdK2",
+              "timestamp": 1795232208227,
+              "responseId": "gen_01M7Y2V5DMTEYNX276C2YHM2X0",
               "rawStopReason": "end_turn",
-              "durationMs": 630,
+              "durationMs": 526,
               "thinkingLevel": "medium"
             }
           }
@@ -603,7 +588,7 @@
                   "text": "Noted."
                 }
               ],
-              "api": "<pi-provider>-messages",
+              "api": "anthropic-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -624,11 +609,10 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794877528057,
-              "providerThinkingLevel": "medium",
-              "responseId": "msg_011Ch7bticWT88koCjkGqdK2",
+              "timestamp": 1795232208227,
+              "responseId": "gen_01M7Y2V5DMTEYNX276C2YHM2X0",
               "rawStopReason": "end_turn",
-              "durationMs": 630,
+              "durationMs": 526,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -642,7 +626,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794877528023,
+                "timestamp": 1795232208207,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -752,7 +736,7 @@
                   },
                   {
                     "name": "draw_diagram",
-                    "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                    "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
                     "parameters": {
                       "type": "object",
                       "properties": {
@@ -784,7 +768,7 @@
                     "text": "Remember the word lantern. Reply with exactly: Noted."
                   }
                 ],
-                "timestamp": 1794877528021
+                "timestamp": 1795232208206
               },
               {
                 "role": "assistant",
@@ -794,7 +778,7 @@
                     "text": "Noted."
                   }
                 ],
-                "api": "<pi-provider>-messages",
+                "api": "anthropic-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -815,11 +799,10 @@
                   "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1794877528057,
-                "providerThinkingLevel": "medium",
-                "responseId": "msg_011Ch7bticWT88koCjkGqdK2",
+                "timestamp": 1795232208227,
+                "responseId": "gen_01M7Y2V5DMTEYNX276C2YHM2X0",
                 "rawStopReason": "end_turn",
-                "durationMs": 630,
+                "durationMs": 526,
                 "thinkingLevel": "medium"
               }
             ],
@@ -848,11 +831,16 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "<pi-provider>-messages",
-                "provider": "<pi-provider>",
+                "api": "anthropic-messages",
                 "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
+                "compat": {
+                  "allowEmptySignature": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false
+                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -871,29 +859,11 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "minimal": null,
-                  "low": "low",
-                  "medium": "medium",
-                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
-                "compat": {
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false,
-                  "supportsMidConvoEffort": true,
-                  "supportsMidConvoSystemMessages": true,
-                  "supportsMidConvoToolChanges": true,
-                  "supportsStrictTools": true
-                },
-                "promptCache": {
-                  "short": 300,
-                  "long": 3600
-                },
                 "inputLimits": {
-                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -909,7 +879,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-27-782Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-47-954Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
@@ -957,7 +927,7 @@
                   "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                 }
               ],
-              "timestamp": 1794877528690
+              "timestamp": 1795232208756
             }
           }
         },
@@ -972,7 +942,7 @@
                   "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                 }
               ],
-              "timestamp": 1794877528690
+              "timestamp": 1795232208756
             }
           }
         },
@@ -982,7 +952,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "<pi-provider>-messages",
+              "api": "anthropic-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1000,8 +970,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794877528692,
-              "providerThinkingLevel": "medium"
+              "timestamp": 1795232208759
             }
           }
         },
@@ -1093,7 +1062,7 @@
                   "text": "lantern"
                 }
               ],
-              "api": "<pi-provider>-messages",
+              "api": "anthropic-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1114,11 +1083,10 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794877528692,
-              "providerThinkingLevel": "medium",
-              "responseId": "msg_011Ch7btm27WQxb7m5sQGtAa",
+              "timestamp": 1795232208759,
+              "responseId": "gen_01M7Y2V5X5NVHH2NWY889MTR6Q",
               "rawStopReason": "end_turn",
-              "durationMs": 509,
+              "durationMs": 472,
               "thinkingLevel": "medium"
             }
           }
@@ -1134,7 +1102,7 @@
                   "text": "lantern"
                 }
               ],
-              "api": "<pi-provider>-messages",
+              "api": "anthropic-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1155,11 +1123,10 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1794877528692,
-              "providerThinkingLevel": "medium",
-              "responseId": "msg_011Ch7btm27WQxb7m5sQGtAa",
+              "timestamp": 1795232208759,
+              "responseId": "gen_01M7Y2V5X5NVHH2NWY889MTR6Q",
               "rawStopReason": "end_turn",
-              "durationMs": 509,
+              "durationMs": 472,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1177,7 +1144,7 @@
                     "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                   }
                 ],
-                "timestamp": 1794877528690
+                "timestamp": 1795232208756
               },
               {
                 "role": "assistant",
@@ -1187,7 +1154,7 @@
                     "text": "lantern"
                   }
                 ],
-                "api": "<pi-provider>-messages",
+                "api": "anthropic-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1208,11 +1175,10 @@
                   "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1794877528692,
-                "providerThinkingLevel": "medium",
-                "responseId": "msg_011Ch7btm27WQxb7m5sQGtAa",
+                "timestamp": 1795232208759,
+                "responseId": "gen_01M7Y2V5X5NVHH2NWY889MTR6Q",
                 "rawStopReason": "end_turn",
-                "durationMs": 509,
+                "durationMs": 472,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1241,11 +1207,16 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "<pi-provider>-messages",
-                "provider": "<pi-provider>",
+                "api": "anthropic-messages",
                 "baseUrl": "<redacted>",
+                "provider": "<pi-provider>",
                 "reasoning": true,
                 "input": ["text", "image"],
+                "compat": {
+                  "allowEmptySignature": true,
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false
+                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -1264,29 +1235,11 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
-                  "minimal": null,
-                  "low": "low",
-                  "medium": "medium",
-                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
-                "compat": {
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false,
-                  "supportsMidConvoEffort": true,
-                  "supportsMidConvoSystemMessages": true,
-                  "supportsMidConvoToolChanges": true,
-                  "supportsStrictTools": true
-                },
-                "promptCache": {
-                  "short": 300,
-                  "long": 3600
-                },
                 "inputLimits": {
-                  "maxRequestBytes": 33554432,
                   "images": {
-                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1302,7 +1255,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-27-782Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-47-954Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

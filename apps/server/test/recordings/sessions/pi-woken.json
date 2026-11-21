@@ -50,7 +50,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-24-470Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-44-723Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -94,7 +94,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794877524712,
+              "timestamp": 1795232204946,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -204,7 +204,7 @@
                 },
                 {
                   "name": "draw_diagram",
-                  "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                  "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -237,7 +237,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1794877524712,
+              "timestamp": 1795232204946,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -347,7 +347,7 @@
                 },
                 {
                   "name": "draw_diagram",
-                  "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                  "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -384,7 +384,7 @@
                   "text": "Start the background task"
                 }
               ],
-              "timestamp": 1794877524710
+              "timestamp": 1795232204944
             }
           }
         },
@@ -399,7 +399,7 @@
                   "text": "Start the background task"
                 }
               ],
-              "timestamp": 1794877524710
+              "timestamp": 1795232204944
             }
           }
         },
@@ -427,7 +427,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794877524752
+              "timestamp": 1795232204969
             }
           }
         },
@@ -531,10 +531,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794877524752,
+              "timestamp": 1795232204969,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 32,
+              "durationMs": 20,
               "thinkingLevel": "off"
             }
           }
@@ -568,10 +568,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794877524752,
+              "timestamp": 1795232204969,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 32,
+              "durationMs": 20,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -585,7 +585,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1794877524712,
+                "timestamp": 1795232204946,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -695,7 +695,7 @@
                   },
                   {
                     "name": "draw_diagram",
-                    "description": "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                    "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
                     "parameters": {
                       "type": "object",
                       "properties": {
@@ -727,7 +727,7 @@
                     "text": "Start the background task"
                   }
                 ],
-                "timestamp": 1794877524710
+                "timestamp": 1795232204944
               },
               {
                 "role": "assistant",
@@ -755,10 +755,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794877524752,
+                "timestamp": 1795232204969,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 32,
+                "durationMs": 20,
                 "thinkingLevel": "off"
               }
             ],
@@ -806,7 +806,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-24-470Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-44-723Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
@@ -832,7 +832,7 @@
               "customType": "report",
               "content": "The background task finished.",
               "display": true,
-              "timestamp": 1794877524791
+              "timestamp": 1795232204992
             }
           }
         },
@@ -844,7 +844,7 @@
               "customType": "report",
               "content": "The background task finished.",
               "display": true,
-              "timestamp": 1794877524791
+              "timestamp": 1795232204992
             }
           }
         },
@@ -872,7 +872,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1794877524794
+              "timestamp": 1795232204995
             }
           }
         },
@@ -976,10 +976,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794877524794,
+              "timestamp": 1795232204995,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 4,
+              "durationMs": 3,
               "thinkingLevel": "off"
             }
           }
@@ -1013,10 +1013,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1794877524794,
+              "timestamp": 1795232204995,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 4,
+              "durationMs": 3,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -1031,7 +1031,7 @@
                 "customType": "report",
                 "content": "The background task finished.",
                 "display": true,
-                "timestamp": 1794877524791
+                "timestamp": 1795232204992
               },
               {
                 "role": "assistant",
@@ -1059,10 +1059,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1794877524794,
+                "timestamp": 1795232204995,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 4,
+                "durationMs": 3,
                 "thinkingLevel": "off"
               }
             ],
@@ -1110,7 +1110,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-17T01-05-24-470Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-44-723Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

@@ -127,7 +127,7 @@ const tryMatch = (recorded: Json, actual: Json, ids: Map<string, string>) => {
 const personal =
   /email|organization|account|subscription|rate_limit_info|username|team[_-]?id|(?:access|refresh|auth)[_-]?token|api[_-]?key|^sections$/i
 
-const machine = /^pid$|^output_style$|^baseUrl$/
+const machine = /^pid$|^output_style$|^baseUrl$|^powershell_path$/
 
 const usage = /usage|^total_cost_usd$|^estimated_tokens(?:_delta)?$|^first_request_input_tokens$/i
 
