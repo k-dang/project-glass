@@ -54,6 +54,7 @@ import { ToDos } from "./ToDos"
 import { AgentRunners } from "./agentRunners"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
+import { ThreadNames } from "./threadNames"
 import { StartedWorkUpdates } from "./StartedWorkUpdates"
 
 const RendererRoutes = Layer.mergeAll(
@@ -193,4 +194,6 @@ export const serve = (
     ),
   )
 
-export const ServerLive = serve(AgentRunners.layer, GlassMcpTools)
+export const ServerLive = serve(AgentRunners.layer, GlassMcpTools).pipe(
+  Layer.provide(ThreadNames.layer),
+)

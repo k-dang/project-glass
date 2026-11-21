@@ -15,7 +15,7 @@ Open a Thread and choose Changes in its Details. On a window at least 1200px wid
 
 ## Driving it with glass-verify
 
-1. `node $V launch --backend fake`, doctor, and snapshot. Choose the Threads rail link, then the seeded pi Thread whose transcript starts "Show me around this repository." (its generated name varies). `wait --text README`.
+1. `node $V launch --backend fake`, doctor, and snapshot. Choose the Threads rail link, then `demo/look-around`. `wait --text README`.
 2. Snapshot and screenshot `chat-before`. `type --role textbox --name Message --text "Write a note"`, `press --key Enter`, then `wait --text "hello from the agent"`. Snapshot the transcript and confirm the latest bash tool is marked Done before opening Changes. This exact demo message makes the real pi CLI write notes.txt using the shared E2E command fixture, with no model call.
 3. `click --role button --name "Changes Ctrl+D"` in the floating Details (the item's name includes its shortcut, `⌘D` on macOS), `wait --text "hello from the agent"`. Snapshot and screenshot `thread-changes`.
 4. Click `Details`, then `Back to Chat Ctrl+D`. Send `Write another` in Message. `wait --text "a second note"`, snapshot and confirm the latest bash tool is Done, then `Changes Ctrl+D`.

@@ -19,6 +19,7 @@ import { AgentRunners } from "../src/agentRunners"
 import { McpCredentials } from "../src/mcp/McpCredentials"
 import { OutsideAgents } from "../src/OutsideAgents"
 import { GlassMcpTools } from "../src/mcp/server"
+import { ThreadNames } from "../src/threadNames"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
 import { AgentCommands } from "../src/SettingsStore"
@@ -79,6 +80,7 @@ export const startBackend = Effect.fnUntraced(function* (
         piCommand: "glass-missing-pi",
       }),
     ).pipe(
+      Layer.provide(ThreadNames.layer),
       Layer.provide(ServerConfig.layer),
       Layer.provide(
         ConfigProvider.layer(

@@ -1,7 +1,7 @@
 import { AgentHarness, ThreadError, type FollowedRepository } from "@glass/contracts"
 import { Context, Effect, Exit, FileSystem, Layer, Option, Stream } from "effect"
 import { join } from "node:path"
-import { shortThreadNames, uniqueThreadName } from "./threadNames"
+import { ThreadNames, uniqueThreadName } from "./threadNames"
 import { Git, type GitFailed } from "./git"
 import { type CarriedOn, LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
@@ -34,6 +34,7 @@ export class LocalPlacement extends Context.Service<
       const git = yield* Git
       const checkouts = yield* LocalCheckouts
       const host = yield* LocalAgentHost
+      const names = yield* ThreadNames
       const hosted = new Set<string>()
 
       const place = Effect.fn("LocalPlacement.place")(function* (
@@ -49,7 +50,7 @@ export class LocalPlacement extends Context.Service<
           ).pipe(Effect.map(Option.isNone))
 
         const name = Option.getOrElse(
-          yield* Effect.findFirst(shortThreadNames(), free),
+          yield* Effect.findFirst(names.candidates(), free),
           uniqueThreadName,
         )
 

@@ -3,7 +3,7 @@ import { Context, Effect, FileSystem, Layer } from "effect"
 import { extname, isAbsolute, relative, resolve, sep } from "node:path"
 import { failure, type HostThreadError } from "./protocol"
 
-const MAX_FILE_BYTES = 10_000_000
+export const MAX_FILE_BYTES = 10_000_000
 
 const imageTypes = new Map([
   [".gif", "image/gif"],
