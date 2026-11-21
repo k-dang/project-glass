@@ -367,7 +367,8 @@ const removalWarning = (thread: Thread, warning: "some" | "unchecked") => {
     : `Its worktree has uncommitted changes, which removing it discards. The branch ${thread.name} and its commits stay.`
 }
 
-const rowAction = "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
+const rowAction =
+  "opacity-0 transition-none group-hover/row:opacity-100 group-hover/row:disabled:opacity-100 focus-visible:opacity-100"
 
 function BringBackButton(props: { thread: Thread }) {
   const bringBack = useAtomSet(bringBackThreadAtom)
