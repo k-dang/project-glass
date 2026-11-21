@@ -45,6 +45,7 @@ import {
   placeNames,
   removalWarningsAtom,
   removeConversation,
+  removeSettledConversations,
   settledConversationsAtom,
   settledOpenAtom,
   workingConversationsAtom,
@@ -278,6 +279,22 @@ function ConversationRows(props: {
 
 function SettledSection(props: { conversations: ReadonlyArray<Conversation>; now: Date }) {
   const [open, setOpen] = useAtom(settledOpenAtom)
+  const registry = useContext(RegistryContext)
+  const navigate = useNavigate()
+  const openId = useParams({ strict: false }).conversationId
+  const [confirming, setConfirming] = useState(false)
+  const [removing, setRemoving] = useState(false)
+
+  const removeAll = async () => {
+    setConfirming(false)
+    setRemoving(true)
+
+    await removeSettledConversations(registry, props.conversations, ({ id }) => {
+      if (id === openId) void navigate({ to: "/conversations" })
+    })
+
+    setRemoving(false)
+  }
 
   return (
     <Collapsible
@@ -287,19 +304,45 @@ function SettledSection(props: { conversations: ReadonlyArray<Conversation>; now
       aria-label="Settled"
       className="flex flex-col gap-1"
     >
-      <h2>
-        <CollapsibleTrigger className="group/trigger flex w-full items-center gap-1 rounded-sm px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
-          Settled
-          <span className="tabular-nums">{props.conversations.length}</span>
-          <ChevronRight
-            aria-hidden
-            className="size-3.5 transition-transform duration-200 ease-out group-data-panel-open/trigger:rotate-90 motion-reduce:transition-none"
-          />
-        </CollapsibleTrigger>
-      </h2>
+      <div className="group/settled flex items-center pr-1">
+        <h2 className="min-w-0 flex-1">
+          <CollapsibleTrigger className="group/trigger flex w-full items-center gap-1 rounded-sm px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
+            Settled
+            <span className="tabular-nums">{props.conversations.length}</span>
+            <ChevronRight
+              aria-hidden
+              className="size-3.5 transition-transform duration-200 ease-out group-data-panel-open/trigger:rotate-90 motion-reduce:transition-none"
+            />
+          </CollapsibleTrigger>
+        </h2>
+        <TooltipHint content="Remove all">
+          <Button
+            variant="ghost"
+            size="icon-xs"
+            aria-label="Remove Settled Conversations"
+            disabled={removing}
+            onClick={() => setConfirming(true)}
+            className="opacity-0 group-hover/settled:opacity-100 focus-visible:opacity-100"
+          >
+            <Trash2 aria-hidden />
+          </Button>
+        </TooltipHint>
+      </div>
       <CollapsibleContent>
         <ConversationRows conversations={props.conversations} now={props.now} settled />
       </CollapsibleContent>
+      <ConfirmationDialog
+        open={confirming}
+        title={
+          props.conversations.length === 1
+            ? "Remove 1 Settled Conversation?"
+            : `Remove ${props.conversations.length} Settled Conversations?`
+        }
+        description="Glass removes each one without uncommitted changes, deleting its worktree or Sandbox and its transcript. Branches and their commits stay. Any with uncommitted changes stay listed for you to check."
+        confirmLabel="Remove Conversations"
+        onConfirm={() => void removeAll()}
+        onCancel={() => setConfirming(false)}
+      />
     </Collapsible>
   )
 }
