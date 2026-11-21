@@ -1,0 +1,8 @@
+{
+  "name": "@glass/example-upstash-boxes",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@upstash/box": "0.8.0"
+  }
+}
