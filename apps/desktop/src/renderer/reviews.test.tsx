@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  Check,
   type ConnectionError,
   Draft,
   FollowedRepository,
@@ -13,6 +14,7 @@ import {
   PullRequest,
   PullRequestNotFound,
   PullRequestRef,
+  PullRequestStatus,
   PullRequestSummary,
   type PullRequestList,
   PullRequestWorkspace,
@@ -697,6 +699,35 @@ it("starts loading a hovered PR and opens it from that same load", async () => {
   preload.answer(Effect.succeed(workspaceOf(greet, "head001")))
   await screen.findByText("head001")
   expect(opens).toHaveLength(0)
+})
+
+const statusWithCheck = (check: "running" | "passed") =>
+  new PullRequestStatus({
+    state: "open",
+    approval: null,
+    reviewers: [],
+    checks: [new Check({ name: "test", state: check, url: null })],
+    mergeable: "mergeable",
+    mergeAction: null,
+    mergeUnderWay: null,
+  })
+
+it("keeps the open PR's checks current as GitHub runs them", async () => {
+  const opens: Array<
+    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
+  > = []
+
+  const statuses: Array<Held<{ pullRequestId: string }, PullRequestStatus, ConnectionError>> = []
+  const user = mount({ LoadPullRequest: hold(opens), GetPullRequestStatus: hold(statuses) })
+
+  await user.click(await rowFor("Greet the world"))
+  ;(await next(opens)).answer(Effect.succeed(workspaceOf(greet, "head001")))
+  ;(await next(statuses)).answer(Effect.succeed(statusWithCheck("running")))
+  await screen.findByText("1 running")
+
+  act(() => void window.dispatchEvent(new Event("focus")))
+  ;(await next(statuses)).answer(Effect.succeed(statusWithCheck("passed")))
+  expect(await screen.findByText("Checks passed")).toBeTruthy()
 })
 
 const deleteDraft = () =>

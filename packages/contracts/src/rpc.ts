@@ -62,7 +62,12 @@ import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository
 import { MergeAction, MergePullRequestError } from "./merge"
 import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./needsYou"
 import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
-import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
+import {
+  LoadPullRequestError,
+  PullRequestRef,
+  PullRequestStatus,
+  PullRequestWorkspace,
+} from "./pullRequest"
 import {
   ThreadPullRequest,
   LatestPullRequestListings,
@@ -267,6 +272,11 @@ export class GlassRpcs extends RpcGroup.make(
       updatedAt: Schema.DateTimeUtcFromString,
     },
     success: Schema.Boolean,
+    error: ConnectionError,
+  }),
+  Rpc.make("GetPullRequestStatus", {
+    payload: { pullRequestId: Schema.String },
+    success: PullRequestStatus,
     error: ConnectionError,
   }),
   Rpc.make("GetFileContents", {

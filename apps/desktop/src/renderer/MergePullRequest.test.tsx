@@ -5,6 +5,7 @@ import {
   Merge,
   type MergeAction,
   MergeRejected,
+  MergeWhenReady,
   PullRequest,
 } from "@glass/contracts"
 import { cleanup, render, screen } from "@testing-library/react"
@@ -29,19 +30,25 @@ const mount = (mergeAction: MergeAction | null, merge: Handlers["MergePullReques
   registries.push(registry)
   const onReload = vi.fn<() => void>()
 
-  render(
+  const view = (action: MergeAction | null) => (
     <RegistryContext.Provider value={registry}>
       <Toaster>
         <MergePullRequest
-          pullRequest={new PullRequest({ ...pullRequestFields, mergeAction })}
+          pullRequest={new PullRequest({ ...pullRequestFields, mergeAction: action })}
           revision={revision}
           onReload={onReload}
         />
       </Toaster>
-    </RegistryContext.Provider>,
+    </RegistryContext.Provider>
   )
 
-  return { onReload, user: userEvent.setup() }
+  const { rerender } = render(view(mergeAction))
+
+  return {
+    onReload,
+    user: userEvent.setup(),
+    changeAction: (action: MergeAction | null) => rerender(view(action)),
+  }
 }
 
 it("merges in one click, then hides Merge and reloads the PR", async () => {
@@ -58,6 +65,30 @@ it("merges in one click, then hides Merge and reloads the PR", async () => {
   )
   expect(screen.queryByRole("button", { name: "Merge" })).toBeNull()
   expect(onReload).toHaveBeenCalledOnce()
+})
+
+it("keeps Merge disabled while sending, even when GitHub's merge action changes", async () => {
+  const { user, changeAction } = mount(
+    MergeWhenReady.make({ method: "squash" }),
+    () => Effect.never,
+  )
+
+  await user.click(screen.getByRole("button", { name: "Merge when ready" }))
+  changeAction(Merge.make({ method: "squash" }))
+
+  expect(screen.getByRole<HTMLButtonElement>("button", { name: "Merge" }).disabled).toBe(true)
+})
+
+it("offers Merge again once GitHub drops the merge it took", async () => {
+  const action = MergeWhenReady.make({ method: "squash" })
+  const { user, changeAction } = mount(action, () => Effect.void)
+
+  await user.click(screen.getByRole("button", { name: "Merge when ready" }))
+  await screen.findByText("Auto-merge on")
+  changeAction(null)
+  changeAction(action)
+
+  expect(screen.getByRole("button", { name: "Merge when ready" })).toBeDefined()
 })
 
 it("names what GitHub would do on the button", async () => {

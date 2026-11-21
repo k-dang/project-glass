@@ -283,7 +283,7 @@ export function ConflictsChip(props: { pullRequest: PullRequest }) {
       label: "Checking conflicts",
       icon: CircleDashed,
       tone: "text-muted-foreground",
-      title: `GitHub was still checking for conflicts with ${baseBranch}. Reload to see the result.`,
+      title: `GitHub is still checking for conflicts with ${baseBranch}`,
     },
   }
 

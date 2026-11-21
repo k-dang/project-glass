@@ -48,6 +48,16 @@ export const Mergeable = Schema.Literals(["mergeable", "behind", "conflicting", 
 
 export type Mergeable = typeof Mergeable.Type
 
+export class PullRequestStatus extends Schema.Class<PullRequestStatus>("PullRequestStatus")({
+  state: PullRequestState,
+  approval: Schema.NullOr(Approval),
+  reviewers: Schema.Array(Reviewer),
+  checks: Schema.Array(Check),
+  mergeable: Mergeable,
+  mergeAction: Schema.NullOr(MergeAction),
+  mergeUnderWay: Schema.NullOr(MergeUnderWay),
+}) {}
+
 export class PullRequest extends Schema.Class<PullRequest>("PullRequest")({
   id: Schema.String,
   ref: PullRequestRef,
@@ -56,16 +66,14 @@ export class PullRequest extends Schema.Class<PullRequest>("PullRequest")({
   author: Schema.String,
   baseBranch: Schema.String,
   headBranch: Schema.String,
-  state: PullRequestState,
   descriptionHtml: Schema.String,
   viewerIsAuthor: Schema.Boolean,
-  approval: Schema.NullOr(Approval),
-  reviewers: Schema.Array(Reviewer),
-  checks: Schema.Array(Check),
-  mergeable: Mergeable,
-  mergeAction: Schema.NullOr(MergeAction),
-  mergeUnderWay: Schema.NullOr(MergeUnderWay),
+  ...PullRequestStatus.fields,
 }) {}
+
+export const withStatus = (pullRequest: PullRequest, status: PullRequestStatus) =>
+  // oxlint-disable-next-line typescript/no-misused-spread -- PullRequest is its own fields plus PullRequestStatus's.
+  new PullRequest({ ...pullRequest, ...status })
 
 export const ChangeType = Schema.Literals(["added", "modified", "deleted", "renamed"])
 

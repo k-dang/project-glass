@@ -92,6 +92,43 @@ const unprocessable = (field: string, message: string) => ({
   errors: [{ type: "UNPROCESSABLE", path: [field], message }],
 })
 
+const prNode = (pr: FakePullRequest) => ({
+  id: pr.id,
+  repository: {
+    owner: { login: pr.owner },
+    name: pr.repo,
+    viewerPermission: pr.viewerPermission,
+    viewerDefaultMergeMethod: pr.mergeMethods[0] ?? "MERGE",
+    squashMergeAllowed: pr.mergeMethods.includes("SQUASH"),
+    mergeCommitAllowed: pr.mergeMethods.includes("MERGE"),
+    rebaseMergeAllowed: pr.mergeMethods.includes("REBASE"),
+  },
+  number: pr.number,
+  url: pr.url,
+  title: pr.title,
+  author: author(pr.author),
+  baseRefName: pr.baseBranch,
+  headRefName: pr.headBranch,
+  baseRefOid: pr.base.sha,
+  headRefOid: pr.head.sha,
+  updatedAt: pr.updatedAt,
+  state: pr.state,
+  isDraft: pr.isDraft,
+  bodyHTML: pr.bodyHtml,
+  body: pr.body,
+  viewerDidAuthor: pr.author === VIEWER.login,
+  reviewDecision: pr.reviewDecision,
+  mergeable: pr.mergeable,
+  latestOpinionatedReviews: { nodes: latestOpinionatedReviews(pr) },
+  reviewRequests: { nodes: reviewRequestNodes(pr) },
+  commits: checkContextsNode(pr),
+  mergeStateStatus: pr.mergeStateStatus,
+  isMergeQueueEnabled: pr.mergeQueue,
+  isInMergeQueue: pr.inMergeQueue,
+  autoMergeRequest: pr.autoMerge ? { __typename: "AutoMergeRequest" } : null,
+  viewerCanEnableAutoMerge: pr.viewerCanEnableAutoMerge,
+})
+
 const refuseReview = (field: string, pr: FakePullRequest, event: ReviewEvent) => {
   const refusal = pr.author === VIEWER.login ? ownPullRequestRefusals[event] : undefined
 
@@ -175,6 +212,10 @@ const GraphQLRequest = Schema.Union([
   ListingRequest,
   Schema.Struct({
     operationName: Schema.Literal("PullRequestRevision"),
+    variables: Schema.Struct({ id: Schema.String }),
+  }),
+  Schema.Struct({
+    operationName: Schema.Literal("PullRequestStatus"),
     variables: Schema.Struct({ id: Schema.String }),
   }),
   Schema.Struct({
@@ -566,48 +607,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       }
     }
 
-    return {
-      data: {
-        repository: {
-          pullRequest: {
-            id: pr.id,
-            repository: {
-              owner: { login: pr.owner },
-              name: pr.repo,
-              viewerPermission: pr.viewerPermission,
-              viewerDefaultMergeMethod: pr.mergeMethods[0] ?? "MERGE",
-              squashMergeAllowed: pr.mergeMethods.includes("SQUASH"),
-              mergeCommitAllowed: pr.mergeMethods.includes("MERGE"),
-              rebaseMergeAllowed: pr.mergeMethods.includes("REBASE"),
-            },
-            number: pr.number,
-            url: pr.url,
-            title: pr.title,
-            author: author(pr.author),
-            baseRefName: pr.baseBranch,
-            headRefName: pr.headBranch,
-            baseRefOid: pr.base.sha,
-            headRefOid: pr.head.sha,
-            updatedAt: pr.updatedAt,
-            state: pr.state,
-            isDraft: pr.isDraft,
-            bodyHTML: pr.bodyHtml,
-            body: pr.body,
-            viewerDidAuthor: pr.author === VIEWER.login,
-            reviewDecision: pr.reviewDecision,
-            mergeable: pr.mergeable,
-            latestOpinionatedReviews: { nodes: latestOpinionatedReviews(pr) },
-            reviewRequests: { nodes: reviewRequestNodes(pr) },
-            commits: checkContextsNode(pr),
-            mergeStateStatus: pr.mergeStateStatus,
-            isMergeQueueEnabled: pr.mergeQueue,
-            isInMergeQueue: pr.inMergeQueue,
-            autoMergeRequest: pr.autoMerge ? { __typename: "AutoMergeRequest" } : null,
-            viewerCanEnableAutoMerge: pr.viewerCanEnableAutoMerge,
-          },
-        },
-      },
-    }
+    return { data: { repository: { pullRequest: prNode(pr) } } }
   }
 
   const fileContentsQuery = ({ owner, name, expression }: FileContentsVariables) => {
@@ -937,6 +937,14 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       case "QueuedPullRequests":
       case "EndedBranchPullRequests":
         return answerListing(request, pullRequests, unavailableRepositories, timingOutRepositories)
+
+      case "PullRequestStatus": {
+        const pr = pullRequestById(request.variables.id)
+
+        if (pr === undefined) return unresolvedNode(request.variables.id)
+
+        return { data: { node: prNode(pr) } }
+      }
 
       case "PullRequestRevision": {
         const pr = pullRequestById(request.variables.id)
