@@ -4,7 +4,5 @@ A flaky test fails in a run, then passes on rerun with no code change. Every tes
 
 When a test flakes, add 1 to its sightings and update the last-seen date, or add a row with 1 for a test not listed yet. Keep the table sorted by sightings, highest first. Delete a test's row once it is fixed and unskipped, or deleted.
 
-| Sightings | Last seen  | Test                                                                                                                              | Notes                                                                                                                                                                                                   |
-| --------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 1         | 2026-11-19 | `apps/desktop/src/renderer/NewThread.test.tsx` > starts a Thread with the Skill packs picked, and picks the same ones next time   | Failed once in a full desktop run; passed alone on rerun. Not load: took at most 2.9 s in loaded full `pnpm test` runs, against a 25 s `waitFor` timeout.                                               |
-| 1         | 2026-11-19 | `apps/desktop/src/renderer/NewThread.test.tsx` > keeps branches per repository and falls back when a remembered branch disappears | Failed once in a full desktop run; message not recorded. An earlier sighting found no "develop" option. Not load: took at most 3.4 s in loaded full `pnpm test` runs, against a 25 s `waitFor` timeout. |
+| Sightings | Last seen | Test | Notes |
+| --------- | --------- | ---- | ----- |
