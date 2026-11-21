@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { AgentRunnerIdentity } from "./engine"
 import { CheckoutRunReason } from "./checkoutRun"
-import { DiffSide } from "./discussion"
+import { DiffSide } from "./comment"
 import { Revision } from "./revision"
 
 export const TourCodeTarget = Schema.Struct({

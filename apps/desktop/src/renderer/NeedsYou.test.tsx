@@ -14,7 +14,7 @@ import {
   CheckInChanges,
   ChecksFailing,
   FeedbackNote,
-  Discussions,
+  PublishedComments,
   emptyTranscript,
   GitHubConnection,
   type NeedsYou,
@@ -619,7 +619,7 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
               (name) => new Check({ name, state: "failed", url: null }),
             ),
           }),
-          AwaitingReply.make({ threads: 2 }),
+          AwaitingReply.make({ reviewThreads: 2 }),
         ],
         since: ago({ hours: 2 }),
       }),
@@ -634,7 +634,7 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
   const mine = await screen.findByRole("region", { name: "Your pull requests" })
   const cache = within(mine).getByRole("option", { name: /Cache the diff/ })
 
-  for (const reason of ["Changes requested", "CI failing", "2 threads awaiting reply"]) {
+  for (const reason of ["Changes requested", "CI failing", "2 Review threads awaiting reply"]) {
     expect(within(cache).getByText(reason)).toBeTruthy()
   }
 
@@ -729,7 +729,7 @@ const loadedWorkspace = () =>
       updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
       files: [],
       viewedPaths: [],
-      discussions: new Discussions({ onLines: [], outdated: [], timeline: [] }),
+      comments: new PublishedComments({ onLines: [], outdated: [], timeline: [] }),
       drafts: [],
     }),
   )

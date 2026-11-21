@@ -50,8 +50,11 @@ const pullRequestReason = (reason: PullRequestReason): Reason =>
     AgentReviewFinished: () => ({ label: "Agent review finished", tone: toneClass.review }),
     ChangesRequested: () => ({ label: "Changes requested", tone: toneClass.danger }),
     ChecksFailing: () => ({ label: "CI failing", tone: toneClass.danger }),
-    AwaitingReply: ({ threads }) => ({
-      label: threads === 1 ? "1 thread awaiting reply" : `${threads} threads awaiting reply`,
+    AwaitingReply: ({ reviewThreads }) => ({
+      label:
+        reviewThreads === 1
+          ? "1 Review thread awaiting reply"
+          : `${reviewThreads} Review threads awaiting reply`,
       tone: toneClass.neutral,
     }),
     ReadyToMerge: () => ({ label: "Ready to merge", tone: toneClass.success }),

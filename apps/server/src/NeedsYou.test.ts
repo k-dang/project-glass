@@ -49,7 +49,9 @@ const itemOf = (items: NeedsYou, pr: FakePullRequest) =>
 
 const reasonsOf = (items: NeedsYou, pr: FakePullRequest) =>
   itemOf(items, pr)?.reasons.map((reason) =>
-    Predicate.isTagged(reason, "AwaitingReply") ? `AwaitingReply:${reason.threads}` : reason._tag,
+    Predicate.isTagged(reason, "AwaitingReply")
+      ? `AwaitingReply:${reason.reviewThreads}`
+      : reason._tag,
   )
 
 const sinceOf = (items: NeedsYou, pr: FakePullRequest) => {

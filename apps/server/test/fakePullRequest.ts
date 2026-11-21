@@ -150,7 +150,7 @@ export interface FakePush {
   readonly base?: FakeCommit
   readonly changedFiles?: ReadonlyArray<FakeChangedFile>
   readonly outdatedDrafts?: ReadonlyArray<string>
-  readonly outdatedThreads?: ReadonlyArray<string>
+  readonly outdatedReviewThreads?: ReadonlyArray<string>
 }
 
 export interface PullRequestCommits {
@@ -279,7 +279,7 @@ export class FakePullRequest {
   push(change: FakePush): void {
     const drafts = this.pendingReview?.drafts ?? []
     const outdatedDrafts = new Set(change.outdatedDrafts)
-    const outdatedThreads = new Set(change.outdatedThreads)
+    const outdatedReviewThreads = new Set(change.outdatedReviewThreads)
     requireKnown(
       "Draft",
       outdatedDrafts,
@@ -287,8 +287,8 @@ export class FakePullRequest {
     )
     requireKnown(
       "review thread",
-      outdatedThreads,
-      this.reviewThreads.map((thread) => thread.id),
+      outdatedReviewThreads,
+      this.reviewThreads.map((reviewThread) => reviewThread.id),
     )
 
     this.publishHead({ base: change.base ?? this.#base, head: change.head ?? this.#head })
@@ -299,12 +299,13 @@ export class FakePullRequest {
       if (outdatedDrafts.has(draft.id)) drafts[index] = { ...draft, outdated: true }
     }
 
-    for (const [index, thread] of this.reviewThreads.entries()) {
-      if (outdatedThreads.has(thread.id)) this.reviewThreads[index] = { ...thread, outdated: true }
+    for (const [index, reviewThread] of this.reviewThreads.entries()) {
+      if (outdatedReviewThreads.has(reviewThread.id))
+        this.reviewThreads[index] = { ...reviewThread, outdated: true }
     }
   }
 
-  addReviewThread(thread: {
+  addReviewThread(reviewThread: {
     readonly path: string
     readonly line?: number
     readonly side?: "LEFT" | "RIGHT"
@@ -312,7 +313,7 @@ export class FakePullRequest {
     readonly resolved?: boolean
     readonly comments: ReadonlyArray<FakeCommentSeed>
   }): FakeReviewThread {
-    const { comments, ...location } = thread
+    const { comments, ...location } = reviewThread
 
     const added: FakeReviewThread = {
       side: "RIGHT",
@@ -400,17 +401,17 @@ export class FakePullRequest {
   }
 
   reply(
-    threadId: string,
+    reviewThreadId: string,
     body: string,
   ): { readonly comment: FakeComment; readonly pending: boolean } | undefined {
-    const index = this.reviewThreads.findIndex((thread) => thread.id === threadId)
+    const index = this.reviewThreads.findIndex((reviewThread) => reviewThread.id === reviewThreadId)
 
     if (index === -1) return undefined
 
-    const thread = this.reviewThreads[index]!
+    const reviewThread = this.reviewThreads[index]!
 
     if (this.pendingReview !== undefined) {
-      const { path, line = 1, side, diffHunk } = thread
+      const { path, line = 1, side, diffHunk } = reviewThread
       const held = this.addDraft({ path, line, side, diffHunk, body })
 
       return {
@@ -425,14 +426,17 @@ export class FakePullRequest {
     }
 
     const comment = this.publish("PRRC", { author: VIEWER.login, bodyHtml: `<p>${body}</p>` })
-    this.reviewThreads[index] = { ...thread, comments: [...thread.comments, comment] }
+    this.reviewThreads[index] = { ...reviewThread, comments: [...reviewThread.comments, comment] }
     this.addReview({ author: VIEWER.login, state: "COMMENTED" })
 
     return { comment, pending: false }
   }
 
   react(commentId: string, content: FakeReactionContent, login: string, reacted = true): boolean {
-    const comments = [...this.comments, ...this.reviewThreads.flatMap((thread) => thread.comments)]
+    const comments = [
+      ...this.comments,
+      ...this.reviewThreads.flatMap((reviewThread) => reviewThread.comments),
+    ]
 
     if (!comments.some((comment) => comment.id === commentId)) return false
 
@@ -447,8 +451,8 @@ export class FakePullRequest {
     return true
   }
 
-  setResolved(threadId: string, resolved: boolean): boolean | undefined {
-    const index = this.reviewThreads.findIndex((thread) => thread.id === threadId)
+  setResolved(reviewThreadId: string, resolved: boolean): boolean | undefined {
+    const index = this.reviewThreads.findIndex((reviewThread) => reviewThread.id === reviewThreadId)
 
     if (index === -1) return undefined
 

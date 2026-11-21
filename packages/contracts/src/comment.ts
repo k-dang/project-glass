@@ -39,7 +39,7 @@ export class PublishedComment extends Schema.TaggedClass<PublishedComment>()("Pu
 }) {}
 
 // WARNING: GitHub anchors multiline comments on their last line.
-export class LineDiscussion extends Schema.Class<LineDiscussion>("LineDiscussion")({
+export class LineReviewThread extends Schema.Class<LineReviewThread>("LineReviewThread")({
   id: Schema.String,
   path: Schema.String,
   side: DiffSide,
@@ -48,7 +48,9 @@ export class LineDiscussion extends Schema.Class<LineDiscussion>("LineDiscussion
   comments: Schema.NonEmptyArray(PublishedComment),
 }) {}
 
-export class OutdatedDiscussion extends Schema.Class<OutdatedDiscussion>("OutdatedDiscussion")({
+export class OutdatedReviewThread extends Schema.Class<OutdatedReviewThread>(
+  "OutdatedReviewThread",
+)({
   id: Schema.String,
   path: Schema.String,
   originalLine: OriginalLine,
@@ -57,14 +59,14 @@ export class OutdatedDiscussion extends Schema.Class<OutdatedDiscussion>("Outdat
   comments: Schema.NonEmptyArray(PublishedComment),
 }) {}
 
-export class Discussions extends Schema.Class<Discussions>("Discussions")({
-  onLines: Schema.Array(LineDiscussion),
-  outdated: Schema.Array(OutdatedDiscussion),
+export class PublishedComments extends Schema.Class<PublishedComments>("PublishedComments")({
+  onLines: Schema.Array(LineReviewThread),
+  outdated: Schema.Array(OutdatedReviewThread),
   timeline: Schema.Array(Schema.Union([PublishedComment, Review])),
 }) {}
 
-export class DiscussionNotFound extends Schema.TaggedError<DiscussionNotFound>()(
-  "DiscussionNotFound",
+export class ReviewThreadNotFound extends Schema.TaggedError<ReviewThreadNotFound>()(
+  "ReviewThreadNotFound",
   { id: Schema.String },
 ) {}
 
@@ -73,9 +75,9 @@ export class DraftsBlockReply extends Schema.TaggedError<DraftsBlockReply>()(
   {},
 ) {}
 
-export const ReplyError = Schema.Union([DiscussionNotFound, DraftsBlockReply, ConnectionError])
+export const ReplyError = Schema.Union([ReviewThreadNotFound, DraftsBlockReply, ConnectionError])
 
-export const DiscussionResolutionError = Schema.Union([DiscussionNotFound, ConnectionError])
+export const ReviewThreadResolutionError = Schema.Union([ReviewThreadNotFound, ConnectionError])
 
 export class CommentNotFound extends Schema.TaggedError<CommentNotFound>()("CommentNotFound", {
   id: Schema.String,

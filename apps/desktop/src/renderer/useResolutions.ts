@@ -6,11 +6,11 @@ import { createKeyedWrites, type WriteView } from "./keyedWrites"
 export type ResolutionView = WriteView<boolean, boolean>
 
 export const createResolutions = (registry: AtomRegistry.AtomRegistry) =>
-  createKeyedWrites(registry, (discussionId, resolved: boolean) =>
-    Backend.use((backend) => backend.SetDiscussionResolved({ discussionId, resolved })),
+  createKeyedWrites(registry, (reviewThreadId, resolved: boolean) =>
+    Backend.use((backend) => backend.SetReviewThreadResolved({ reviewThreadId, resolved })),
   )
 
 export type Resolutions = ReturnType<typeof createResolutions>
 
-export const useResolution = (resolutions: Resolutions, discussionId: string) =>
-  useAtomValue(resolutions.viewAtom(discussionId))
+export const useResolution = (resolutions: Resolutions, reviewThreadId: string) =>
+  useAtomValue(resolutions.viewAtom(reviewThreadId))

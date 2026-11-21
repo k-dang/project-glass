@@ -1,9 +1,9 @@
 import { useAtomValue } from "@effect/atom-react"
 import {
   type DiffSide,
-  LineDiscussion,
+  LineReviewThread,
   type OriginalLine,
-  type OutdatedDiscussion,
+  type OutdatedReviewThread,
   type PublishedComment,
   Review,
   type ReviewState,
@@ -50,7 +50,7 @@ function Time(props: { time: DateTime.Utc }) {
   )
 }
 
-const threadLine =
+const reviewThreadLine =
   "not-last:before:absolute not-last:before:top-8 not-last:before:-bottom-3 not-last:before:left-[11.5px] not-last:before:w-px not-last:before:bg-border not-last:before:content-['']"
 
 function CommentLayout(props: {
@@ -116,13 +116,13 @@ function Published() {
   )
 }
 
-const threadCard = "overflow-hidden rounded-lg border bg-card font-sans"
+const reviewThreadCard = "overflow-hidden rounded-lg border bg-card font-sans"
 
-const threadHeader = "flex items-center gap-2 px-3 py-2 text-sm"
+const reviewThreadHeader = "flex items-center gap-2 px-3 py-2 text-sm"
 
-const threadComments = "flex flex-col gap-4 px-4 py-3"
+const reviewThreadComments = "flex flex-col gap-4 px-4 py-3"
 
-function ThreadTitle(props: { resolved: boolean; location: ReactNode }) {
+function ReviewThreadTitle(props: { resolved: boolean; location: ReactNode }) {
   return (
     <>
       {props.resolved ? (
@@ -131,17 +131,17 @@ function ThreadTitle(props: { resolved: boolean; location: ReactNode }) {
         <CircleDot className="size-4 text-modified" aria-hidden />
       )}
       <span className="min-w-0 truncate">
-        {props.resolved ? "Resolved" : "Unresolved"} thread on {props.location}
+        {props.resolved ? "Resolved" : "Unresolved"} Review thread on {props.location}
       </span>
     </>
   )
 }
 
-const threadPlace = (discussion: LineDiscussion | OutdatedDiscussion) => {
-  const { path } = discussion
+const reviewThreadPlace = (reviewThread: LineReviewThread | OutdatedReviewThread) => {
+  const { path } = reviewThread
 
-  if (discussion instanceof LineDiscussion) {
-    const { side, line } = discussion
+  if (reviewThread instanceof LineReviewThread) {
+    const { side, line } = reviewThread
 
     return {
       location: <LineLocation side={side} line={line} />,
@@ -151,7 +151,7 @@ const threadPlace = (discussion: LineDiscussion | OutdatedDiscussion) => {
     }
   }
 
-  const { originalLine, diffHunk } = discussion
+  const { originalLine, diffHunk } = reviewThread
 
   return {
     location: (
@@ -170,16 +170,16 @@ const threadPlace = (discussion: LineDiscussion | OutdatedDiscussion) => {
   }
 }
 
-export function DiscussionThread(props: {
-  discussion: LineDiscussion | OutdatedDiscussion
+export function ReviewThread(props: {
+  reviewThread: LineReviewThread | OutdatedReviewThread
   replies: ReplyStore
   resolutions: Resolutions
   reactions: Reactions
 }) {
-  const { id, comments } = props.discussion
+  const { id, comments } = props.reviewThread
   const resolution = useResolution(props.resolutions, id)
-  const resolved = resolution.confirmed ?? props.discussion.resolved
-  const { location, name, aside, context } = threadPlace(props.discussion)
+  const resolved = resolution.confirmed ?? props.reviewThread.resolved
+  const { location, name, aside, context } = reviewThreadPlace(props.reviewThread)
   const [opened, setOpened] = useState(false)
   const published = usePublishedReplies(props.replies, id)
   const open = !resolved || opened
@@ -188,7 +188,7 @@ export function DiscussionThread(props: {
 
   const title = (
     <>
-      <ThreadTitle resolved={resolved} location={location} />
+      <ReviewThreadTitle resolved={resolved} location={location} />
       {!open && (
         <span className="shrink-0 text-muted-foreground">· {plural(count, "comment")}</span>
       )}
@@ -196,8 +196,13 @@ export function DiscussionThread(props: {
   )
 
   return (
-    <Collapsible open={open} onOpenChange={setOpened} render={<section />} className={threadCard}>
-      <header className={threadHeader}>
+    <Collapsible
+      open={open}
+      onOpenChange={setOpened}
+      render={<section />}
+      className={reviewThreadCard}
+    >
+      <header className={reviewThreadHeader}>
         {resolved ? (
           <CollapsibleTrigger
             render={<Button type="button" variant="ghost" />}
@@ -215,7 +220,7 @@ export function DiscussionThread(props: {
         {aside}
         <ResolutionControl
           store={props.resolutions}
-          discussionId={id}
+          reviewThreadId={id}
           name={name}
           resolved={resolved}
           view={resolution}
@@ -223,19 +228,19 @@ export function DiscussionThread(props: {
       </header>
       {failed !== null && (
         <p className="border-t px-3 py-2 text-sm text-destructive">
-          Couldn't {failed.input ? "resolve" : "unresolve"} this Discussion.{" "}
+          Couldn't {failed.input ? "resolve" : "unresolve"} this Review thread.{" "}
           {problemText(failed.problem)}
         </p>
       )}
       <CollapsibleContent className="h-(--collapsible-panel-height) overflow-hidden border-t transition-[height,opacity] duration-200 ease-out data-starting-style:h-0 data-starting-style:opacity-0 data-ending-style:h-0 data-ending-style:opacity-0 motion-reduce:transition-opacity">
         {context}
-        <div className={threadComments}>
+        <div className={reviewThreadComments}>
           {comments.map((comment) => (
             <Comment
               key={comment.id}
               comment={comment}
               reactions={props.reactions}
-              className={threadLine}
+              className={reviewThreadLine}
             />
           ))}
           {published.map((comment) => (
@@ -243,12 +248,12 @@ export function DiscussionThread(props: {
               key={comment.id}
               comment={comment}
               reactions={props.reactions}
-              className={threadLine}
+              className={reviewThreadLine}
               aside={<Published />}
             />
           ))}
         </div>
-        <ReplyComposer store={props.replies} discussionId={id} name={name} />
+        <ReplyComposer store={props.replies} reviewThreadId={id} name={name} />
       </CollapsibleContent>
     </Collapsible>
   )
@@ -256,7 +261,7 @@ export function DiscussionThread(props: {
 
 function ResolutionControl(props: {
   store: Resolutions
-  discussionId: string
+  reviewThreadId: string
   name: string
   resolved: boolean
   view: ResolutionView
@@ -268,8 +273,8 @@ function ResolutionControl(props: {
 
   const accessible =
     failed !== null
-      ? `Retry ${failed.input ? "resolving" : "unresolving"} thread on ${props.name}`
-      : `${label} thread on ${props.name}`
+      ? `Retry ${failed.input ? "resolving" : "unresolving"} Review thread on ${props.name}`
+      : `${label} Review thread on ${props.name}`
 
   return (
     <>
@@ -286,7 +291,7 @@ function ResolutionControl(props: {
         disabled={sending !== null || locked}
         aria-label={accessible}
         onClick={() =>
-          props.store.set(props.discussionId, failed !== null ? failed.input : !props.resolved)
+          props.store.set(props.reviewThreadId, failed !== null ? failed.input : !props.resolved)
         }
       >
         {failed !== null && <RotateCw data-icon="inline-start" aria-hidden />}
@@ -296,27 +301,27 @@ function ResolutionControl(props: {
   )
 }
 
-function ReplyComposer(props: { store: ReplyStore; discussionId: string; name: string }) {
-  const { store, discussionId } = props
-  const { body, feedback } = useReply(store, discussionId)
+function ReplyComposer(props: { store: ReplyStore; reviewThreadId: string; name: string }) {
+  const { store, reviewThreadId } = props
+  const { body, feedback } = useReply(store, reviewThreadId)
   const locked = useRepliesLocked(store)
   const sending = feedback?.type === "sending"
   const problem = feedback?.type === "failed" ? feedback.problem : null
 
   const send = (event: FormEvent) => {
     event.preventDefault()
-    store.send(discussionId)
+    store.send(reviewThreadId)
   }
 
   return (
     <form onSubmit={send} className="flex flex-col gap-2 border-t px-4 py-3">
       <Textarea
         value={body}
-        onChange={(event) => store.edit(discussionId, event.target.value)}
+        onChange={(event) => store.edit(reviewThreadId, event.target.value)}
         onKeyDown={submitOnShortcut}
         readOnly={sending || locked}
         placeholder="Reply. It publishes to GitHub right away."
-        aria-label={`Reply to thread on ${props.name}`}
+        aria-label={`Reply to Review thread on ${props.name}`}
         className="min-h-9 bg-background"
       />
       {problem !== null && (
@@ -439,26 +444,26 @@ export function DiffHunk(props: { hunk: string }) {
   )
 }
 
-export function OutdatedDiscussions(props: {
-  discussions: ReadonlyArray<OutdatedDiscussion>
+export function OutdatedReviewThreads(props: {
+  reviewThreads: ReadonlyArray<OutdatedReviewThread>
   replies: ReplyStore
   resolutions: Resolutions
   reactions: Reactions
 }) {
-  if (props.discussions.length === 0) return null
+  if (props.reviewThreads.length === 0) return null
 
   return (
     <section className="flex flex-col gap-3">
-      <h2 className="text-sm font-semibold">Outdated Discussions</h2>
+      <h2 className="text-sm font-semibold">Outdated Review threads</h2>
       <p className="text-sm text-muted-foreground">
-        Discussions that can't sit on a line of this Revision's diff: their lines changed since,
+        Review threads that can't sit on a line of this Revision's diff: their lines changed since,
         they're on a whole file, or their file's diff isn't shown.
       </p>
       <ul className="flex flex-col gap-3">
-        {props.discussions.map((discussion) => (
-          <li key={discussion.id}>
-            <DiscussionThread
-              discussion={discussion}
+        {props.reviewThreads.map((reviewThread) => (
+          <li key={reviewThread.id}>
+            <ReviewThread
+              reviewThread={reviewThread}
               replies={props.replies}
               resolutions={props.resolutions}
               reactions={props.reactions}

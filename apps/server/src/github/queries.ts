@@ -1,7 +1,7 @@
 import { Schema } from "effect"
 import { GitHubAuthor } from "./author"
 import { AddedDraft, DraftState } from "./drafts"
-import { ThreadResolution } from "./discussions"
+import { ReviewThreadResolution } from "./comments"
 import { ReactionMutationPayload } from "./reactions"
 import { AddedReply } from "./replies"
 import {
@@ -212,7 +212,7 @@ export const DraftStateResponse = GraphQLResponse(DraftState)
 
 export const AddReplyResponse = GraphQLResponse(AddedReply)
 
-export const ThreadResolutionResponse = GraphQLResponse(ThreadResolution)
+export const ReviewThreadResolutionResponse = GraphQLResponse(ReviewThreadResolution)
 
 export const ReactionMutationResponse = GraphQLResponse(ReactionMutationPayload)
 

@@ -138,7 +138,7 @@ describe("Glass tools over MCP", () => {
     }),
   )
 
-  it.live("reads the PR as it is now fetching its files and discussions once", () =>
+  it.live("reads the PR as it is now fetching its files and comments once", () =>
     Effect.gen(function* () {
       const { requests, call } = yield* startGlass
       requests.length = 0

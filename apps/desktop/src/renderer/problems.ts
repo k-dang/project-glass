@@ -135,11 +135,11 @@ export const describeError = (error: BackendError): Problem =>
       }),
       CommentNotFound: () => ({
         title: "This comment is gone from GitHub",
-        detail: "It was deleted. Reload to see the Discussion as it is now.",
+        detail: "It was deleted. Reload to see the Review thread as it is now.",
         fixedByReload: true,
       }),
-      DiscussionNotFound: () => ({
-        title: "This Discussion is gone from GitHub",
+      ReviewThreadNotFound: () => ({
+        title: "This Review thread is gone from GitHub",
         detail:
           "Its comments were deleted. Reloading drops this Reply, so copy its text first if you want it.",
       }),

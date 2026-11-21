@@ -44,7 +44,7 @@ const samples = [
   {
     number: 98,
     list: "needs-review",
-    title: "Show outdated discussions under their file",
+    title: "Show outdated review threads under their file",
     author: "monalisa",
     isDraft: false,
     checks: "PENDING",
@@ -77,7 +77,7 @@ const samples = [
   {
     number: 94,
     list: "reviewing",
-    title: "Collapse resolved discussions",
+    title: "Collapse resolved review threads",
     author: "mona",
     isDraft: false,
     checks: "SUCCESS",
@@ -176,14 +176,14 @@ const seedRepository = (github: FakeGitHub, owner: string, repo: string) => {
     }
 
     if (sample.list === "my-prs" && !sample.isDraft) {
-      const thread = pr.addReviewThread({
+      const reviewThread = pr.addReviewThread({
         path: "greet.ts",
         line: 1,
         side: "RIGHT",
         diffHunk: patch,
         comments: [{ author: "mona", bodyHtml: "<p>Cache the list, or the lookup?</p>" }],
       })
-      pr.react(thread.comments[0]!.id, "EYES", "hubot")
+      pr.react(reviewThread.comments[0]!.id, "EYES", "hubot")
     }
   }
 }

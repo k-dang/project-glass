@@ -18,6 +18,7 @@ import turnRetriesDelivery from "./migrations/0016_turn_retries_delivery"
 import startedWork from "./migrations/0017_started_work"
 import conversationKeptGoing from "./migrations/0018_conversation_kept_going"
 import globalChatSessions from "./migrations/0019_global_chat_sessions"
+import reviewThreadReplies from "./migrations/0020_review_thread_replies"
 
 export const migrationLoader = SqliteMigrator.fromRecord({
   "0001_baseline": baseline,
@@ -39,4 +40,5 @@ export const migrationLoader = SqliteMigrator.fromRecord({
   "0017_started_work": startedWork,
   "0018_conversation_kept_going": conversationKeptGoing,
   "0019_global_chat_sessions": globalChatSessions,
+  "0020_review_thread_replies": reviewThreadReplies,
 })

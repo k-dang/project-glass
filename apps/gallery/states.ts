@@ -192,7 +192,7 @@ export const states: ReadonlyArray<State> = [
   },
   {
     area: "PR workspace",
-    name: "Agent review and Discussions",
+    name: "Agent review and Review threads",
     reach: async (window) => {
       await pullRequest(window, "Rate-limit the public API")
       await workspaceTab(window, "Overview")

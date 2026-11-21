@@ -179,7 +179,7 @@ const ReadConversationTranscript = Tool.make("read_conversation_transcript", {
 
 const ReadPullRequest = Tool.make("read_pull_request", {
   description:
-    "Reads a PR's title, description, changed files with their diffs, and published Discussions at one Revision. Pass the Revision the user means, such as the one in a message's glass_context; leave it out to read the PR as it is now.",
+    "Reads a PR's title, description, changed files with their diffs, and published comments at one Revision. Pass the Revision the user means, such as the one in a message's glass_context; leave it out to read the PR as it is now.",
   parameters: Schema.Struct({
     pullRequest: PullRequestRef,
     revision: Schema.optional(Revision),

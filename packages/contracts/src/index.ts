@@ -18,7 +18,7 @@ export * from "./desktop"
 
 export * from "./diagram"
 
-export * from "./discussion"
+export * from "./comment"
 
 export * from "./draft"
 

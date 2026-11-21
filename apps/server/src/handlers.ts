@@ -124,11 +124,12 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         github
           .submitReview(pullRequestId, revision, decision, summary)
           .pipe(Effect.tap(() => queue.reviewed(pullRequestId))),
-      ReplyToDiscussion: ({ discussionId, body }) => github.replyToDiscussion(discussionId, body),
+      ReplyToReviewThread: ({ reviewThreadId, body }) =>
+        github.replyToReviewThread(reviewThreadId, body),
       MergePullRequest: ({ pullRequestId, revision, action }) =>
         github.mergePullRequest(pullRequestId, revision, action),
-      SetDiscussionResolved: ({ discussionId, resolved }) =>
-        github.setDiscussionResolved(discussionId, resolved),
+      SetReviewThreadResolved: ({ reviewThreadId, resolved }) =>
+        github.setReviewThreadResolved(reviewThreadId, resolved),
       SetReaction: ({ commentId, reaction, reacted }) =>
         github.setReaction(commentId, reaction, reacted),
       RecordActivity: (activity) =>

@@ -39,7 +39,7 @@ export const ReviewSubmitted = Schema.TaggedStruct("ReviewSubmitted", {
 
 export const ReplySent = Schema.TaggedStruct("ReplySent", {
   pullRequest: ActivityPullRequest,
-  discussionId: Schema.String,
+  reviewThreadId: Schema.String,
   body: Schema.String,
 })
 

@@ -47,13 +47,13 @@ import {
 import { ConnectionError, GitHubConnection } from "./connection"
 import {
   DiffSide,
-  DiscussionResolutionError,
+  ReviewThreadResolutionError,
   PublishedComment,
   Reaction,
   ReactionError,
   ReactionGroup,
   ReplyError,
-} from "./discussion"
+} from "./comment"
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
@@ -319,15 +319,15 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { pullRequestId: Schema.String, revision: Revision, action: MergeAction },
     error: MergePullRequestError,
   }),
-  Rpc.make("ReplyToDiscussion", {
-    payload: { discussionId: Schema.String, body: Schema.NonEmptyString },
+  Rpc.make("ReplyToReviewThread", {
+    payload: { reviewThreadId: Schema.String, body: Schema.NonEmptyString },
     success: PublishedComment,
     error: ReplyError,
   }),
-  Rpc.make("SetDiscussionResolved", {
-    payload: { discussionId: Schema.String, resolved: Schema.Boolean },
+  Rpc.make("SetReviewThreadResolved", {
+    payload: { reviewThreadId: Schema.String, resolved: Schema.Boolean },
     success: Schema.Boolean,
-    error: DiscussionResolutionError,
+    error: ReviewThreadResolutionError,
   }),
   Rpc.make("SetReaction", {
     payload: { commentId: Schema.String, reaction: Reaction, reacted: Schema.Boolean },

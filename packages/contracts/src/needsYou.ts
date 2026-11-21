@@ -36,7 +36,7 @@ export const ChecksFailing = Schema.TaggedStruct("ChecksFailing", {
   failing: Schema.Array(Check),
 })
 
-export const AwaitingReply = Schema.TaggedStruct("AwaitingReply", { threads: Schema.Int })
+export const AwaitingReply = Schema.TaggedStruct("AwaitingReply", { reviewThreads: Schema.Int })
 
 export const ReadyToMerge = Schema.TaggedStruct("ReadyToMerge", {})
 

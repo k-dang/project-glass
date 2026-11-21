@@ -13,7 +13,7 @@ const patch = "@@ -1,2 +1,3 @@\n hello\n+there\n world"
 
 const changedFiles = [{ path: "greet.ts", status: "modified", additions: 1, patch }] as const
 
-const thread = {
+const greetLine = {
   path: "greet.ts",
   line: 2,
   side: "RIGHT",
@@ -21,16 +21,16 @@ const thread = {
 } as const
 
 describe("Reactions", () => {
-  it.live("adds and removes the viewer's Reaction beside others' on a Discussion comment", () =>
+  it.live("adds and removes the viewer's Reaction beside others' on a Review thread comment", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
-      const commentId = pr.addReviewThread(thread).comments[0]!.id
+      const commentId = pr.addReviewThread(greetLine).comments[0]!.id
       pr.react(commentId, "THUMBS_UP", "hubot")
 
       const open = Effect.map(
         client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) }),
-        (workspace) => workspace.discussions.onLines[0]?.comments[0].reactions,
+        (workspace) => workspace.comments.onLines[0]?.comments[0].reactions,
       )
 
       assert.deepStrictEqual(yield* open, [
@@ -60,7 +60,7 @@ describe("Reactions", () => {
       yield* client.SetReaction({ commentId: comment.id, reaction: "rocket", reacted: true })
 
       const { timeline } = (yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) }))
-        .discussions
+        .comments
 
       assert.deepStrictEqual(timeline.find((item) => item instanceof PublishedComment)?.reactions, [
         new ReactionGroup({ reaction: "rocket", count: 1, reacted: true }),

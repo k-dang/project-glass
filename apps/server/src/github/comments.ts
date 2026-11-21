@@ -1,8 +1,8 @@
 import {
   type ChangedFile,
-  Discussions,
-  LineDiscussion,
-  OutdatedDiscussion,
+  PublishedComments,
+  LineReviewThread,
+  OutdatedReviewThread,
   PublishedComment,
   Review,
   type ReviewState,
@@ -46,21 +46,21 @@ export const COMMENTS_QUERY = `query PullRequestComments($id: ID!, $after: Strin
   }
 }`
 
-export const RESOLVE_THREAD_MUTATION = `mutation ResolveReviewThread($threadId: ID!) {
-  resolveReviewThread(input: { threadId: $threadId }) { thread { isResolved } }
+export const RESOLVE_REVIEW_THREAD_MUTATION = `mutation ResolveReviewThread($reviewThreadId: ID!) {
+  resolveReviewThread(input: { threadId: $reviewThreadId }) { thread { isResolved } }
 }`
 
-export const UNRESOLVE_THREAD_MUTATION = `mutation UnresolveReviewThread($threadId: ID!) {
-  unresolveReviewThread(input: { threadId: $threadId }) { thread { isResolved } }
+export const UNRESOLVE_REVIEW_THREAD_MUTATION = `mutation UnresolveReviewThread($reviewThreadId: ID!) {
+  unresolveReviewThread(input: { threadId: $reviewThreadId }) { thread { isResolved } }
 }`
 
-const ResolvedThread = Schema.Struct({
+const ResolvedReviewThread = Schema.Struct({
   thread: Schema.NullOr(Schema.Struct({ isResolved: Schema.Boolean })),
 })
 
-export const ThreadResolution = Schema.Struct({
-  resolveReviewThread: Schema.optional(Schema.NullOr(ResolvedThread)),
-  unresolveReviewThread: Schema.optional(Schema.NullOr(ResolvedThread)),
+export const ReviewThreadResolution = Schema.Struct({
+  resolveReviewThread: Schema.optional(Schema.NullOr(ResolvedReviewThread)),
+  unresolveReviewThread: Schema.optional(Schema.NullOr(ResolvedReviewThread)),
 })
 
 export const REVIEWS_QUERY = `query PullRequestReviews($id: ID!, $after: String) {
@@ -139,56 +139,56 @@ export const textDiffPaths = (files: ReadonlyArray<ChangedFile>): ReadonlySet<st
   new Set(files.flatMap((file) => (Predicate.isTagged(file.patch, "TextPatch") ? [file.path] : [])))
 
 export const isOnLine = (
-  thread: typeof GitHubReviewThread.Type,
+  reviewThread: typeof GitHubReviewThread.Type,
   shown: ReadonlySet<string>,
-): thread is typeof GitHubReviewThread.Type & { readonly line: number } =>
-  thread.subjectType === "LINE" &&
-  !thread.isOutdated &&
-  thread.line !== null &&
-  shown.has(thread.path)
+): reviewThread is typeof GitHubReviewThread.Type & { readonly line: number } =>
+  reviewThread.subjectType === "LINE" &&
+  !reviewThread.isOutdated &&
+  reviewThread.line !== null &&
+  shown.has(reviewThread.path)
 
-export const toDiscussions = (
+export const toPublishedComments = (
   files: ReadonlyArray<ChangedFile>,
-  threads: ReadonlyArray<typeof GitHubReviewThread.Type>,
+  reviewThreads: ReadonlyArray<typeof GitHubReviewThread.Type>,
   comments: ReadonlyArray<typeof GitHubComment.Type>,
   reviews: ReadonlyArray<typeof GitHubReview.Type>,
 ) => {
   const shown = textDiffPaths(files)
 
-  const onLines: Array<LineDiscussion> = []
-  const outdated: Array<OutdatedDiscussion> = []
+  const onLines: Array<LineReviewThread> = []
+  const outdated: Array<OutdatedReviewThread> = []
 
-  for (const thread of threads) {
-    const published = thread.comments.nodes.filter((comment) => comment.state === "SUBMITTED")
+  for (const reviewThread of reviewThreads) {
+    const published = reviewThread.comments.nodes.filter((comment) => comment.state === "SUBMITTED")
 
     if (!Arr.isReadonlyArrayNonEmpty(published)) continue
 
-    const { id, path, isResolved: resolved } = thread
-    const discussionComments = Arr.map(published, toComment)
+    const { id, path, isResolved: resolved } = reviewThread
+    const reviewThreadComments = Arr.map(published, toComment)
 
-    if (isOnLine(thread, shown)) {
+    if (isOnLine(reviewThread, shown)) {
       onLines.push(
-        new LineDiscussion({
+        new LineReviewThread({
           id,
           path,
-          side: fromGitHubSide(thread.diffSide),
-          line: thread.line,
+          side: fromGitHubSide(reviewThread.diffSide),
+          line: reviewThread.line,
           resolved,
-          comments: discussionComments,
+          comments: reviewThreadComments,
         }),
       )
     } else {
       outdated.push(
-        new OutdatedDiscussion({
+        new OutdatedReviewThread({
           id,
           path,
           originalLine:
-            thread.subjectType === "FILE" || thread.originalLine === null
+            reviewThread.subjectType === "FILE" || reviewThread.originalLine === null
               ? "whole-file"
-              : thread.originalLine,
+              : reviewThread.originalLine,
           diffHunk: published[0].diffHunk,
           resolved,
-          comments: discussionComments,
+          comments: reviewThreadComments,
         }),
       )
     }
@@ -214,7 +214,7 @@ export const toDiscussions = (
     )
   }
 
-  return new Discussions({
+  return new PublishedComments({
     onLines,
     outdated,
     timeline: Arr.sortWith(timeline, timelineTime, DateTime.Order),

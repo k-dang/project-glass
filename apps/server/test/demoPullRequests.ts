@@ -294,7 +294,7 @@ export const seedDemoPullRequests = (github: FakeGitHub) => {
     bodyHtml: "<p>Can we ship this behind the flag first and turn it on per environment?</p>",
   })
 
-  const proxyThread = rateLimit.addReviewThread({
+  const proxyReviewThread = rateLimit.addReviewThread({
     path: "src/server/middleware.ts",
     line: 14,
     resolved: true,
@@ -310,7 +310,7 @@ export const seedDemoPullRequests = (github: FakeGitHub) => {
     ],
   })
 
-  rateLimit.react(proxyThread.comments[1]!.id, "THUMBS_UP", "monalisa")
+  rateLimit.react(proxyReviewThread.comments[1]!.id, "THUMBS_UP", "monalisa")
 
   rateLimit.addReview({
     author: "monalisa",

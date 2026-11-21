@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { ConnectionError } from "./connection"
-import { DiffSide, OriginalLine } from "./discussion"
+import { DiffSide, OriginalLine } from "./comment"
 import { StaleRevision } from "./revision"
 
 export const LinePlace = Schema.TaggedStruct("LinePlace", {

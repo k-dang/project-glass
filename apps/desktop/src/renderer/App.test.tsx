@@ -14,7 +14,7 @@ import {
   ActivityPage,
   ActivityPullRequest,
   ActivityToDo,
-  Discussions,
+  PublishedComments,
   Draft,
   FollowedRepository,
   FileTooLarge,
@@ -72,7 +72,7 @@ const workspace = new PullRequestWorkspace({
   updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
   files: [],
   viewedPaths: [],
-  discussions: new Discussions({ onLines: [], outdated: [], timeline: [] }),
+  comments: new PublishedComments({ onLines: [], outdated: [], timeline: [] }),
   drafts: [
     new Draft({
       id: "D1",
@@ -406,7 +406,7 @@ it("lists Activity by day, pages older Activity, and keeps the log on return", a
   const reply = logged(
     2,
     new Date(),
-    ReplySent.make({ pullRequest: recorded, discussionId: "PRRT_1", body: "Done." }),
+    ReplySent.make({ pullRequest: recorded, reviewThreadId: "PRRT_1", body: "Done." }),
   )
 
   const opened = logged(

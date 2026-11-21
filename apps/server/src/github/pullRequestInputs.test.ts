@@ -125,7 +125,7 @@ describe("Reading Tour and Agent review inputs", () => {
   )
 
   it.live(
-    "an Agent review reads changed files alongside its metadata, and discussions once it has the PR's id",
+    "an Agent review reads changed files alongside its metadata, and comments once it has the PR's id",
     () =>
       Effect.gen(function* () {
         const { client, ref, revision, requests, arrived, hold } = yield* startRelay

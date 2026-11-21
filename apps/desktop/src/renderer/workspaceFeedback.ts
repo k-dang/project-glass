@@ -36,8 +36,8 @@ export class WorkspaceFeedback {
     record: (activity: Activity) => void,
     previous?: ReloadFeedback,
   ) {
-    const { onLines, outdated } = workspace.discussions
-    const ids = new Set([...onLines, ...outdated].map((discussion) => discussion.id))
+    const { onLines, outdated } = workspace.comments
+    const ids = new Set([...onLines, ...outdated].map((reviewThread) => reviewThread.id))
     const replies = [...(previous?.replies ?? [])].filter(([id]) => ids.has(id))
 
     this.drafts = new DraftStore(workspace, registry, record, previous?.summary)

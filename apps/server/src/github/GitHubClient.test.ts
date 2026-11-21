@@ -3,7 +3,7 @@ import {
   BinaryFile,
   Merge,
   Check,
-  Discussions,
+  PublishedComments,
   FileNotFound,
   FileTooLarge,
   GitHubUnavailable,
@@ -154,7 +154,7 @@ describe("LoadPullRequest", () => {
           updatedAt: DateTime.makeUnsafe(pr.updatedAt),
           files: [],
           viewedPaths: [],
-          discussions: new Discussions({ onLines: [], outdated: [], timeline: [] }),
+          comments: new PublishedComments({ onLines: [], outdated: [], timeline: [] }),
           drafts: [],
         }),
       )

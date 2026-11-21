@@ -1,7 +1,7 @@
 import { assert, describe, it } from "@effect/vitest"
 import {
-  LineDiscussion,
-  OutdatedDiscussion,
+  LineReviewThread,
+  OutdatedReviewThread,
   PublishedComment,
   PullRequestRef,
   Review,
@@ -45,8 +45,8 @@ const review = (fake: FakeReview, state: ReviewState) =>
     submittedAt: DateTime.makeUnsafe(fake.submittedAt),
   })
 
-describe("Discussions", () => {
-  it.live("places Discussions on their lines, each with its resolved state", () =>
+describe("PublishedComments", () => {
+  it.live("places Review threads on their lines, each with its resolved state", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
@@ -69,10 +69,12 @@ describe("Discussions", () => {
         comments: [{ author: "hubot", bodyHtml: "<p>Gone?</p>" }],
       })
 
-      const { discussions } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { comments } = yield* client.LoadPullRequest({
+        pullRequest: new PullRequestRef(pr),
+      })
 
-      assert.deepStrictEqual(discussions.onLines, [
-        new LineDiscussion({
+      assert.deepStrictEqual(comments.onLines, [
+        new LineReviewThread({
           id: open.id,
           path: "greet.ts",
           side: "new",
@@ -80,7 +82,7 @@ describe("Discussions", () => {
           resolved: false,
           comments: [published(open.comments[0]!), published(open.comments[1]!)],
         }),
-        new LineDiscussion({
+        new LineReviewThread({
           id: resolved.id,
           path: "greet.ts",
           side: "old",
@@ -89,11 +91,11 @@ describe("Discussions", () => {
           comments: [published(resolved.comments[0]!)],
         }),
       ])
-      assert.deepStrictEqual(discussions.outdated, [])
+      assert.deepStrictEqual(comments.outdated, [])
     }),
   )
 
-  it.live("lists outdated and whole-file Discussions apart from the diff", () =>
+  it.live("lists outdated and whole-file Review threads apart from the diff", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
@@ -111,13 +113,15 @@ describe("Discussions", () => {
         comments: [{ author: "hubot", bodyHtml: "<p>Too big</p>" }],
       })
 
-      pr.push({ head: { sha: "h2", files: head.files }, outdatedThreads: [outdated.id] })
+      pr.push({ head: { sha: "h2", files: head.files }, outdatedReviewThreads: [outdated.id] })
 
-      const { discussions } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { comments } = yield* client.LoadPullRequest({
+        pullRequest: new PullRequestRef(pr),
+      })
 
-      assert.deepStrictEqual(discussions.onLines, [])
-      assert.deepStrictEqual(discussions.outdated, [
-        new OutdatedDiscussion({
+      assert.deepStrictEqual(comments.onLines, [])
+      assert.deepStrictEqual(comments.outdated, [
+        new OutdatedReviewThread({
           id: outdated.id,
           path: "greet.ts",
           originalLine: 2,
@@ -125,7 +129,7 @@ describe("Discussions", () => {
           resolved: false,
           comments: [published(outdated.comments[0]!)],
         }),
-        new OutdatedDiscussion({
+        new OutdatedReviewThread({
           id: wholeFile.id,
           path: "logo.png",
           originalLine: "whole-file",
@@ -137,7 +141,7 @@ describe("Discussions", () => {
     }),
   )
 
-  it.live("lists Discussions in a file whose diff isn't shown apart from the diff", () =>
+  it.live("lists Review threads in a file whose diff isn't shown apart from the diff", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
 
@@ -147,7 +151,7 @@ describe("Discussions", () => {
         changedFiles: [{ path: "greet.ts", status: "modified", additions: 1 }],
       })
 
-      const thread = pr.addReviewThread({
+      const reviewThread = pr.addReviewThread({
         path: "greet.ts",
         line: 2,
         side: "RIGHT",
@@ -155,17 +159,19 @@ describe("Discussions", () => {
         comments: [{ author: "hubot", bodyHtml: "<p>Typo</p>" }],
       })
 
-      const { discussions } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { comments } = yield* client.LoadPullRequest({
+        pullRequest: new PullRequestRef(pr),
+      })
 
-      assert.deepStrictEqual(discussions.onLines, [])
-      assert.deepStrictEqual(discussions.outdated, [
-        new OutdatedDiscussion({
-          id: thread.id,
+      assert.deepStrictEqual(comments.onLines, [])
+      assert.deepStrictEqual(comments.outdated, [
+        new OutdatedReviewThread({
+          id: reviewThread.id,
           path: "greet.ts",
           originalLine: 2,
           diffHunk: "@@ -1,2 +1,3 @@\n hello\n+there",
           resolved: false,
-          comments: [published(thread.comments[0]!)],
+          comments: [published(reviewThread.comments[0]!)],
         }),
       ])
     }),
@@ -191,9 +197,11 @@ describe("Discussions", () => {
       const dismissed = pr.addReview({ author: "hubot", state: "DISMISSED" })
       pr.addReview({ author: "hubot", state: "COMMENTED" })
 
-      const { discussions } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { comments } = yield* client.LoadPullRequest({
+        pullRequest: new PullRequestRef(pr),
+      })
 
-      assert.deepStrictEqual(discussions.timeline, [
+      assert.deepStrictEqual(comments.timeline, [
         published(comment),
         review(approved, "approve"),
         published(followUp),
@@ -228,23 +236,25 @@ describe("Discussions", () => {
 
       pr.push({ head: { sha: "h2", files: head.files }, outdatedDrafts: [outdatedDraft.id] })
 
-      const { discussions } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { comments } = yield* client.LoadPullRequest({
+        pullRequest: new PullRequestRef(pr),
+      })
 
-      assert.deepStrictEqual(discussions.onLines, [])
-      assert.deepStrictEqual(discussions.outdated, [])
-      assert.deepStrictEqual(discussions.timeline, [])
+      assert.deepStrictEqual(comments.onLines, [])
+      assert.deepStrictEqual(comments.outdated, [])
+      assert.deepStrictEqual(comments.timeline, [])
     }),
   )
 
-  it.live("reads every page of a PR's Discussions", () =>
+  it.live("reads every page of a PR's Review threads", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
-      const expectedOnLines: Array<LineDiscussion> = []
+      const expectedOnLines: Array<LineReviewThread> = []
       const expectedTimeline: Array<PublishedComment | Review> = []
 
       for (let index = 0; index < 101; index++) {
-        const thread = pr.addReviewThread({
+        const reviewThread = pr.addReviewThread({
           path: "greet.ts",
           line: 2,
           side: "RIGHT",
@@ -252,13 +262,13 @@ describe("Discussions", () => {
         })
 
         expectedOnLines.push(
-          new LineDiscussion({
-            id: thread.id,
+          new LineReviewThread({
+            id: reviewThread.id,
             path: "greet.ts",
             side: "new",
             line: 2,
             resolved: false,
-            comments: [published(thread.comments[0]!)],
+            comments: [published(reviewThread.comments[0]!)],
           }),
         )
         const comment = pr.addComment({ author: "hubot", bodyHtml: `<p>Comment ${index}</p>` })
@@ -272,10 +282,12 @@ describe("Discussions", () => {
         expectedTimeline.push(published(comment), review(submittedReview, "comment"))
       }
 
-      const { discussions } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
+      const { comments } = yield* client.LoadPullRequest({
+        pullRequest: new PullRequestRef(pr),
+      })
 
-      assert.deepStrictEqual(discussions.onLines, expectedOnLines)
-      assert.deepStrictEqual(discussions.timeline, expectedTimeline)
+      assert.deepStrictEqual(comments.onLines, expectedOnLines)
+      assert.deepStrictEqual(comments.timeline, expectedTimeline)
     }),
   )
 })

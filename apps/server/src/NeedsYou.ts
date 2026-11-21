@@ -137,7 +137,7 @@ const reasonsOf = ({
   }
 
   if (attention && attention.awaitingReply > 0) {
-    reasons.push(AwaitingReply.make({ threads: attention.awaitingReply }))
+    reasons.push(AwaitingReply.make({ reviewThreads: attention.awaitingReply }))
   }
 
   if (reasons.length === 0 && attention?.approved && attention.mergeClean) {

@@ -30,6 +30,7 @@ import feedbackNotes from "./migrations/0015_feedback_notes"
 import turnRetriesDelivery from "./migrations/0016_turn_retries_delivery"
 import startedWork from "./migrations/0017_started_work"
 import conversationKeptGoing from "./migrations/0018_conversation_kept_going"
+import globalChatSessions from "./migrations/0019_global_chat_sessions"
 import { migrationLoader } from "./Migrations"
 import { Transcripts } from "./Transcripts"
 
@@ -104,6 +105,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [17, "started_work"],
       [18, "conversation_kept_going"],
       [19, "global_chat_sessions"],
+      [20, "review_thread_replies"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -180,6 +182,7 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [17, "started_work"],
         [18, "conversation_kept_going"],
         [19, "global_chat_sessions"],
+        [20, "review_thread_replies"],
       ],
       [],
     ] as const) {
@@ -704,6 +707,7 @@ it.live(
 
         assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), [
           [19, "global_chat_sessions"],
+          [20, "review_thread_replies"],
         ])
         assert.deepStrictEqual(yield* sql`SELECT * FROM global_chat`, [
           { id: "global", model: "gpt-test", effort: null, singleton: 1 },
@@ -724,4 +728,51 @@ it.live(
         Effect.scoped,
       )
     }),
+)
+
+it.live("moves each sent Reply's Activity onto its Review thread's id", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+
+      yield* SqliteMigrator.run({
+        loader: SqliteMigrator.fromRecord({
+          "0001_baseline": baseline,
+          "0002_agent_review_hotspots": agentReviewHotspots,
+          "0003_agent_review_done": agentReviewDone,
+          "0004_outside_agent": outsideAgent,
+          "0005_conversation_started_work": conversationStartedWork,
+          "0006_turn_seen": turnSeen,
+          "0007_work_reports": workReports,
+          "0008_past_global_conversations": pastGlobalConversations,
+          "0009_global_conversation_updates": globalConversationUpdates,
+          "0010_to_do_images": toDoImages,
+          "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
+          "0012_conversations": conversations,
+          "0013_journal_host": journalHost,
+          "0014_conversation_branch": conversationBranch,
+          "0015_feedback_notes": feedbackNotes,
+          "0016_turn_retries_delivery": turnRetriesDelivery,
+          "0017_started_work": startedWork,
+          "0018_conversation_kept_going": conversationKeptGoing,
+          "0019_global_chat_sessions": globalChatSessions,
+        }),
+      })
+
+      const at = "2026-11-20T00:00:00.000Z"
+
+      yield* sql`INSERT INTO activity (kind, payload, occurred_at, login) VALUES
+        ('ReplySent', '{"_tag":"ReplySent","discussionId":"PRRT_1","body":"Done."}', ${at}, 'kevin'),
+        ('ToDoDone', '{"_tag":"ToDoDone","toDo":{"id":1,"title":"Ship it"}}', ${at}, 'kevin')`
+
+      yield* SqliteMigrator.run({ loader: migrationLoader })
+
+      assert.deepStrictEqual(yield* sql`SELECT payload FROM activity ORDER BY id`, [
+        { payload: '{"_tag":"ReplySent","body":"Done.","reviewThreadId":"PRRT_1"}' },
+        { payload: '{"_tag":"ToDoDone","toDo":{"id":1,"title":"Ship it"}}' },
+      ])
+    }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
+  }),
 )

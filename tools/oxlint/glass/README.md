@@ -73,7 +73,7 @@ fake responses, timeout configuration, fake timer advancement and `TestClock.adj
 remain valid. Forked simulated work may contain sleeps; tests can wait for it to become
 stuck and then advance the clock.
 
-These checks prevent the short-default Vitest wait removed from Discussions by
+These checks prevent the short-default Vitest wait removed from the Review thread tests by
 `3511ddf`, without blocking the clock-controlled deadline tests from `86fe313`.
 Testing Library's `waitFor` is the desktop DOM tests' wait and is outside this rule; its
 generous limit comes from `asyncUtilTimeout` in `apps/desktop/test/setup.ts`. It needs a DOM,

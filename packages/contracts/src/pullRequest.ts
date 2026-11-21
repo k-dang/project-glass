@@ -1,6 +1,6 @@
 import { Schema } from "effect"
 import { ConnectionError } from "./connection"
-import { Discussions } from "./discussion"
+import { PublishedComments } from "./comment"
 import { Draft } from "./draft"
 import { MergeAction, MergeUnderWay } from "./merge"
 import { Revision } from "./revision"
@@ -114,7 +114,7 @@ export class PullRequestWorkspace extends Schema.Class<PullRequestWorkspace>(
   updatedAt: Schema.DateTimeUtcFromString,
   files: Schema.Array(ChangedFile),
   viewedPaths: Schema.Array(Schema.String),
-  discussions: Discussions,
+  comments: PublishedComments,
   drafts: Schema.Array(Draft),
 }) {}
 

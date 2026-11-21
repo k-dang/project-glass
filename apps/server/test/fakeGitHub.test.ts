@@ -117,9 +117,9 @@ describe("fake GitHub Draft lines", () => {
         ] as const
 
         for (const [side, line] of rejected) {
-          const thread = yield* addDraft(github.url, pr.id, "greet.ts", side, line)
+          const reviewThread = yield* addDraft(github.url, pr.id, "greet.ts", side, line)
 
-          assert.strictEqual(thread, null, `${side}:${line}`)
+          assert.strictEqual(reviewThread, null, `${side}:${line}`)
           assert.strictEqual(pr.pendingReview, undefined)
         }
       }),
@@ -146,9 +146,9 @@ describe("fake GitHub Draft lines", () => {
       ] as const
 
       for (const [side, line] of accepted) {
-        const thread = yield* addDraft(github.url, pr.id, "greet.ts", side, line)
+        const reviewThread = yield* addDraft(github.url, pr.id, "greet.ts", side, line)
 
-        assert.deepStrictEqual(thread, {
+        assert.deepStrictEqual(reviewThread, {
           path: "greet.ts",
           line,
           diffSide: side,

@@ -137,6 +137,11 @@ A Draft that can't be placed in the current diff, because its line is outdated, 
 file, or its file's diff isn't shown.
 _Avoid_: Broken draft, orphaned comment
 
+**Review thread**:
+A published GitHub thread of comments on a line, range, or whole file of a PR, which the user can
+reply to and resolve.
+_Avoid_: Discussion, thread, comment chain
+
 **Feedback state**:
 Where a piece of the user's feedback stands: draft, sending, confirmed by GitHub, or failed.
 _Avoid_: Sync status
