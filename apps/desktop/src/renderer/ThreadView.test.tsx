@@ -55,7 +55,7 @@ import { DateTime, Deferred, Effect, Exit, Stream } from "effect"
 import { afterEach, expect, it, onTestFinished, vi } from "vite-plus/test"
 import { thread, threadFields } from "../../test/thread"
 import { changedFile, workspace } from "../../test/workspace"
-import { choice, mount, pixel } from "../../test/threadApp"
+import { modelOption, mount, pixel } from "../../test/threadApp"
 import type { PageEvent, PageState } from "./pageMessages"
 import { withPageNotes } from "./pageNotesScript"
 
@@ -770,7 +770,7 @@ it("changes the open Thread's model from the composer, closing the picker", asyn
   })
 
   await user.click(await screen.findByRole("button", { name: "pi: gpt-test" }))
-  await user.click(choice(await screen.findByRole("dialog"), "Model", "Thinker"))
+  await user.click(await modelOption("Thinker"))
 
   expect(changes).toEqual([{ model: "glass-test/thinker", effort: null }])
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())

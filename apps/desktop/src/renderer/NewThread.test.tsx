@@ -23,7 +23,7 @@ import { AsyncResult, AtomRegistry } from "effect/reactivity"
 import { expect, it } from "vite-plus/test"
 import { createThreadAtom, placeKey } from "./threadsArea"
 import { thread, threadFields } from "../../test/thread"
-import { choice, listModels, mount, pixel } from "../../test/threadApp"
+import { choice, listModels, modelOption, mount, pixel } from "../../test/threadApp"
 import { eventually } from "../../test/eventually"
 import { testRegistry } from "../../test/testBackend"
 
@@ -438,7 +438,7 @@ it("keeps local branch, harness, model, effort, and unsent work when exploring a
   )
   await user.click(choice(await screen.findByRole("dialog"), "Agent harness", "pi"))
   await within(await findDraft()).findByRole("button", { name: "pi: gpt-test" })
-  await user.click(choice(await screen.findByRole("dialog"), "Model", "Thinker"))
+  await user.click(await modelOption("Thinker"))
   await select("Effort", "High")
   await user.type(
     within(newThreadDraft()).getByRole("textbox", { name: "Message" }),
@@ -519,7 +519,7 @@ it("restores each harness's choices and keeps local Permission mode separate fro
       name: "Claude Code: Opus 5.5",
     }),
   )
-  await user.click(choice(await screen.findByRole("dialog"), "Model", "Sonnet 5.5"))
+  await user.click(await modelOption("Sonnet 5.5"))
   await select("Effort", "High")
   await select("Permission mode", "Accept edits")
   await user.click(
@@ -856,8 +856,7 @@ it("offers the chosen Agent harness's own models, and efforts only for models th
   await within(draft).findByRole("button", { name: "pi: gpt-test" })
   expect(within(draft).queryByRole("combobox", { name: "Effort" })).toBeNull()
 
-  await within(picker).findByRole("group", { name: "Model" })
-  await user.click(choice(picker, "Model", "Thinker"))
+  await user.click(await modelOption("Thinker"))
   await user.click(await within(draft).findByRole("combobox", { name: "Effort" }))
   await user.click(await screen.findByRole("option", { name: "Low" }))
   await waitFor(() =>
@@ -874,6 +873,32 @@ it("offers the chosen Agent harness's own models, and efforts only for models th
     ]),
   )
   await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
+})
+
+it("narrows the models to every typed word, by name or id, and picks the match on Enter", async () => {
+  const user = mount(newThreadHandlers([], []), "/threads/new")
+
+  const draft = await findDraft()
+  await user.click(await within(draft).findByRole("button", { name: "Claude Code: Opus 5.5" }))
+  const picker = await screen.findByRole("dialog")
+  await user.click(choice(picker, "Agent harness", "pi"))
+
+  expect((await modelOption(/^Default/)).getAttribute("aria-current")).toBe("true")
+
+  const search = await within(picker).findByRole("combobox", { name: "Search models" })
+  await user.type(search, "test think")
+
+  await waitFor(() =>
+    expect(
+      within(picker)
+        .getAllByRole("option")
+        .map((option) => option.textContent),
+    ).toEqual(["Thinker"]),
+  )
+
+  await user.keyboard("{Enter}")
+
+  await within(draft).findByRole("button", { name: "pi: Thinker" })
 })
 
 it("watches a created Thread's transcript while waiting for it to be listed", async () => {
