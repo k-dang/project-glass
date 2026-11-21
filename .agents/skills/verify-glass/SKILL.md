@@ -116,11 +116,15 @@ Proof standards:
 ```sh
 node $V stop        # or: node $V stop --run <id>
 node $V list        # runs that still have live state
+node $V ps          # this checkout's node and Electron processes, orphans marked
+node $V stop --orphans
 ```
 
 `stop` requests app shutdown with CDP `Browser.close` without waiting for a protocol reply. It follows a relaunch in progress and counts Glass as quit once nothing has served the run's CDP port for 2s. After 15s it falls back to killing the tree of whichever process serves that port, and if Glass still runs it fails and keeps the run state. Otherwise it kills the run's fake GitHub and Pi provider, reports whether the backend port closed, copies logs into `evidence/`, and deletes `.verify/<id>/state/`. Evidence survives. Never kill `electron.exe` by name: the user may have their own Glass or another Electron app running. Delete `.verify/<id>/` yourself only once the proof is no longer needed.
 
 If `launch` fails midway, still run `stop --run <id>` so a half-started Electron doesn't linger.
+
+`ps` lists every node and Electron process whose command line points into this checkout, from any run, test, gallery capture or `pnpm dev`. An orphan is one whose parent has exited, such as an agent host left by a failed test or a deleted run. `stop --orphans` kills each orphan's process tree. It spares the agent host recorded in your own `~/.project-glass`, which outlives Glass by design. Use these to find what holds a folder (`EBUSY`, `EPERM`) instead of listing processes with PowerShell.
 
 ## Gotchas
 
