@@ -131,7 +131,8 @@ it("totals what the user got done over the chosen days", async () => {
   ).toEqual(["Reviews 0", "Replies 1", "Threads started 0", "To-dos done 1"])
 })
 
-// Flaky: once in CI, RegistryProvider's dispose 500 ms after unmount ran after the file's DOM was torn down ("window is not defined" in watched.ts); passed on rerun.
+// Flaky: threw "window is not defined" in watched.ts after the file's DOM teardown in a CI run; passed on rerun.
+// oxlint-disable-next-line vitest/no-disabled-tests
 it.skip("keeps the Activity chart visible while refreshing on a return to the Dashboard", async () => {
   const reads: Array<
     Held<
