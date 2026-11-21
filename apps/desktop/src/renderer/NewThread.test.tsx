@@ -912,3 +912,96 @@ it("watches a created Thread's transcript while waiting for it to be listed", as
     registry.dispose()
   }
 })
+
+it("opens on the last Thread's Sandbox when Sandbox providers and Threads load after the checkouts", async () => {
+  const loaded = Deferred.makeUnsafe<void>()
+  const modelPlaces: Array<string> = []
+  let listedCheckouts = false
+
+  mount(
+    {
+      ...newThreadHandlers([], []),
+      ListLocalCheckouts: () =>
+        Effect.sync(() => {
+          listedCheckouts = true
+
+          return [new LocalCheckout({ repository: thread.repository, path: "/src/greeter" })]
+        }),
+      WatchThreads: () =>
+        Stream.fromEffect(
+          Deferred.await(loaded).pipe(
+            Effect.as([
+              new Thread({ ...threadFields, place: SandboxPlace.make({ providerId: "fake" }) }),
+            ]),
+          ),
+        ),
+      ListSandboxProviders: () =>
+        Deferred.await(loaded).pipe(
+          Effect.as([
+            new SandboxProviderInfo({
+              id: "fake",
+              name: "Fake Sandboxes",
+              harnesses: ["claude-code"],
+            }),
+          ]),
+        ),
+      ListFollowedRepositories: () => Effect.succeed([thread.repository]),
+      ListAgentModels: (payload) => {
+        modelPlaces.push(placeKey(payload.place))
+
+        return listModels(payload)
+      },
+    },
+    "/threads/new",
+  )
+
+  await eventually(() => expect(listedCheckouts).toBe(true))
+  Deferred.doneUnsafe(loaded, Exit.void)
+
+  const draft = await findDraft()
+  const where = within(draft).getByRole("combobox", { name: "Where the Thread runs" })
+  expect(within(where).getByText("Fake Sandboxes")).toBeTruthy()
+  expect(within(draft).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
+  expect(modelPlaces).not.toContain(placeKey(localPlace))
+})
+
+it("keeps the New Thread region on screen when first switching to a Sandbox", async () => {
+  const user = mount(
+    {
+      ...newThreadHandlers([], []),
+      ListSandboxProviders: () =>
+        Effect.succeed([
+          new SandboxProviderInfo({
+            id: "fake",
+            name: "Fake Sandboxes",
+            harnesses: ["claude-code"],
+          }),
+        ]),
+      ListFollowedRepositories: () => Effect.yieldNow.pipe(Effect.as([thread.repository])),
+      ...branchesAt({ sandbox: { defaultBranch: "trunk" } }),
+    },
+    "/threads/new",
+  )
+
+  const draft = await findDraft()
+  await user.click(await within(draft).findByRole("combobox", { name: "Where the Thread runs" }))
+  const sandbox = await screen.findByRole("option", { name: "Fake Sandboxes" })
+  let vanished = false
+
+  const observer = new MutationObserver(() => {
+    if (screen.queryByRole("region", { name: "New Thread" }) === null) vanished = true
+  })
+
+  observer.observe(document.body, { childList: true, subtree: true })
+  await user.click(sandbox)
+
+  await waitFor(() =>
+    expect(
+      within(
+        within(newThreadDraft()).getByRole("combobox", { name: "Where the Thread runs" }),
+      ).getByText("Fake Sandboxes"),
+    ).toBeTruthy(),
+  )
+  observer.disconnect()
+  expect(vanished).toBe(false)
+})

@@ -69,6 +69,8 @@ interface Choosable {
   readonly title?: string | undefined
 }
 
+type Followed = Atom.Type<typeof repositoriesAtom>
+
 interface PlaceOptions {
   readonly place: ThreadPlace
   readonly describe: (key: string | undefined) => string
@@ -130,28 +132,32 @@ const unlistedBranches: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<string>,
   Atom.make(AsyncResult.initial())
 
 export function NewThread(props: { repository: string | undefined }) {
-  const checkouts = useAtomValue(localCheckoutsAtom)
+  const places = AsyncResult.all([
+    useAtomValue(localCheckoutsAtom),
+    useAtomValue(sandboxProvidersAtom),
+  ])
 
-  const providers = Option.getOrElse(
-    AsyncResult.value(useAtomValue(sandboxProvidersAtom)),
-    (): ReadonlyArray<SandboxProviderInfo> => [],
-  )
+  const threads = useAtomValue(threadsAtom)
+  const followed = useAtomValue(repositoriesAtom)
 
-  const threads = Option.getOrElse(AsyncResult.value(useAtomValue(threadsAtom)), () => [])
+  if (AsyncResult.isInitial(threads) || AsyncResult.isInitial(followed)) return null
 
-  return AsyncResult.builder(checkouts)
+  return AsyncResult.builder(places)
     .onInitial(() => null)
     .onFailure((cause) => (
       <div className="p-6">
         <ProblemAlert problem={problemOf(cause)} />
       </div>
     ))
-    .onSuccess((linked) => (
+    .onSuccess(([checkouts, providers]) => (
       <ChoosePlace
-        checkouts={linked}
+        checkouts={checkouts}
         providers={providers}
+        followed={followed}
         repository={props.repository}
-        newest={threads.findLast((thread) => !thread.forReview)}
+        newest={Option.getOrElse(AsyncResult.value(threads), () => []).findLast(
+          (thread) => !thread.forReview,
+        )}
       />
     ))
     .render()
@@ -194,6 +200,7 @@ interface DraftChoices {
 function ChoosePlace(props: {
   checkouts: ReadonlyArray<LocalCheckout>
   providers: ReadonlyArray<SandboxProviderInfo>
+  followed: Followed
   repository: string | undefined
   newest: Thread | undefined
 }) {
@@ -254,22 +261,21 @@ function ChoosePlace(props: {
       />
     </>
   ) : (
-    <InSandbox {...choices} />
+    <InSandbox {...choices} followed={props.followed} />
   )
 }
 
-function InSandbox(props: DraftChoices) {
-  const followed = useAtomValue(repositoriesAtom)
+function InSandbox(props: DraftChoices & { followed: Followed }) {
+  const { followed, ...choices } = props
 
   return AsyncResult.builder(followed)
-    .onInitial(() => null)
     .onFailure((cause) => (
       <div className="p-6">
         <ProblemAlert problem={problemOf(cause)} />
       </div>
     ))
     .onSuccess((repositories) => (
-      <Draft {...props} repositories={repositories.map((repository) => ({ repository }))} />
+      <Draft {...choices} repositories={repositories.map((repository) => ({ repository }))} />
     ))
     .render()
 }
