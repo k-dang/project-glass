@@ -1,5 +1,5 @@
 import { type AgentHarness, AgentModels, GitHubConnection } from "@glass/contracts"
-import { cleanup, render, within } from "@testing-library/react"
+import { cleanup, render, screen, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { Effect, Stream } from "effect"
 import { afterEach } from "vite-plus/test"
@@ -56,6 +56,9 @@ afterEach(() => {
 
 export const choice = (picker: HTMLElement, group: string, item: string) =>
   within(within(picker).getByRole("group", { name: group })).getByRole("button", { name: item })
+
+export const modelOption = async (name: string | RegExp) =>
+  within(await screen.findByRole("dialog")).findByRole("option", { name })
 
 export const pixel = {
   mediaType: "image/png",
