@@ -1,17 +1,20 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
 import {
+  LineNote,
   ThreadContext,
   ThreadOutcome,
   StartedWorkUpdate,
   SteerPart,
   TurnDone,
   TurnEnd,
+  UnsentFeedback,
 } from "@glass/contracts"
 import { DateTime, Effect, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 import { join } from "node:path"
 import { isolatedHome } from "../test/harness"
+import { FeedbackNotes } from "./FeedbackNotes"
 import { migrationLoader, migrations } from "./Migrations"
 import { Transcripts } from "./Transcripts"
 
@@ -56,8 +59,13 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
     ] as const)
       yield* sql`INSERT INTO agent_turn (id, agent_id, message, context, sent_at, ended)
         VALUES (${id}, 'global', '', ${context}, ${at}, ${end})`
-    yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, ended)
-      VALUES ('ordinary', 'global', 'Report a bug', ${at}, ${ended})`
+
+    const sentNote =
+      '[{"id":"sent","path":"greet.ts","side":"new","start":1,"end":1,"code":"A",' +
+      '"changesId":"read-0","text":"Rename A"}]'
+
+    yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, ended, feedback)
+      VALUES ('ordinary', 'global', 'Report a bug', ${at}, ${ended}, ${sentNote})`
     yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at, reported_at)
       VALUES ('global', 'started', ${at}, ${at})`
     yield* sql`INSERT INTO conversation_agent_review (conversation_id, owner, repo, number, started_at, reported_at)
@@ -80,8 +88,10 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [17, "started_work"],
       [18, "conversation_kept_going"],
       [19, "global_chat_sessions"],
-      [20, "review_thread_replies"],
-      [21, "threads"],
+      [20, "page_notes"],
+      [21, "conversation_to_dos"],
+      [22, "review_thread_replies"],
+      [23, "threads"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -89,7 +99,20 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       turns.filter((turn) => turn.id !== "ordinary").map((turn) => turn.context),
       [startedWorkUpdate, startedWorkUpdate],
     )
-    assert.equal(turns.find((turn) => turn.id === "ordinary")?.message, "Report a bug")
+    const ordinary = turns.find((turn) => turn.id === "ordinary")
+    assert.equal(ordinary?.message, "Report a bug")
+    assert.deepStrictEqual(ordinary?.feedback, [
+      new LineNote({
+        id: "sent",
+        path: "greet.ts",
+        side: "new",
+        start: 1,
+        end: 1,
+        code: "A",
+        changesId: "read-0",
+        text: "Rename A",
+      }),
+    ])
     assert.deepStrictEqual(
       (yield* transcripts.retryDeliveries(["global"])).map((turn) => turn.turnId),
       ["pending"],
@@ -116,9 +139,24 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       yield* sql`SELECT included_in_started_work_update, done FROM agent_reviews`,
       [{ included_in_started_work_update: 1, done: 0 }],
     )
-    assert.deepStrictEqual(yield* sql`SELECT owner, id, text, staged FROM feedback_note`, [
-      { owner: "thread:started", id: "note", text: "Rename B", staged: 1 },
-    ])
+    assert.deepStrictEqual(
+      yield* (yield* FeedbackNotes).list("thread:started"),
+      new UnsentFeedback({
+        notes: [
+          new LineNote({
+            id: "note",
+            path: "greet.ts",
+            side: "new",
+            start: 2,
+            end: 2,
+            code: "B",
+            changesId: "read-1",
+            text: "Rename B",
+          }),
+        ],
+        staged: ["note"],
+      }),
+    )
     yield* sql`UPDATE started_agent_review SET started_work_update_turn_id = 'completed'`
     yield* sql`DELETE FROM thread_turn WHERE id = 'completed'`
     assert.deepStrictEqual(
@@ -126,7 +164,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [{ started_work_update_turn_id: null }],
     )
   }).pipe(
-    Effect.provide(Transcripts.layer),
+    Effect.provide([Transcripts.layer, FeedbackNotes.layer]),
     Effect.provide(SqliteClient.layer({ filename: ":memory:" })),
     Effect.scoped,
   ),
@@ -158,8 +196,10 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [17, "started_work"],
         [18, "conversation_kept_going"],
         [19, "global_chat_sessions"],
-        [20, "review_thread_replies"],
-        [21, "threads"],
+        [20, "page_notes"],
+        [21, "conversation_to_dos"],
+        [22, "review_thread_replies"],
+        [23, "threads"],
       ],
       [],
     ] as const) {
@@ -572,8 +612,10 @@ it.live(
 
         assert.deepStrictEqual(yield* SqliteMigrator.run({ loader: migrationLoader }), [
           [19, "global_chat_sessions"],
-          [20, "review_thread_replies"],
-          [21, "threads"],
+          [20, "page_notes"],
+          [21, "conversation_to_dos"],
+          [22, "review_thread_replies"],
+          [23, "threads"],
         ])
         assert.deepStrictEqual(yield* sql`SELECT * FROM global_chat`, [
           { id: "global", model: "gpt-test", effort: null, singleton: 1 },
@@ -604,7 +646,7 @@ it.live("moves each sent Reply's Activity onto its Review thread's id", () =>
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: migrationsThrough("0019_global_chat_sessions"),
+        loader: migrationsThrough("0021_conversation_to_dos"),
       })
 
       const at = "2026-11-20T00:00:00.000Z"
@@ -638,7 +680,7 @@ it.live("moves every Conversation-era row onto Threads, keeping its data", () =>
       '{"_tag":"Conversation","conversationId":"otter","name":"agent/otter"},' +
       '{"_tag":"AgentReview","outcome":"finished"}]}'
 
-    yield* SqliteMigrator.run({ loader: migrationsThrough("0020_review_thread_replies") })
+    yield* SqliteMigrator.run({ loader: migrationsThrough("0022_review_thread_replies") })
 
     yield* sql`INSERT INTO conversation (id, name, owner, repo, base_branch, harness, folder, created_at)
       VALUES ('otter', 'agent/otter', 'glass-demo', 'greeter', 'main', 'pi', 'otter', ${at})`
@@ -661,9 +703,9 @@ it.live("moves every Conversation-era row onto Threads, keeping its data", () =>
       ${at}, 'kevin')`
     yield* sql`INSERT INTO saved_place (area, destination, saved_at)
       VALUES ('conversations', '{"area":"conversations","conversationId":"otter"}', ${at})`
-    yield* sql`INSERT INTO feedback_note
-        (owner, id, path, side, start_line, end_line, code, changes_id, text)
-      VALUES ('conversation:otter', 'note', 'greet.ts', 'new', 2, 2, 'B', 'read-1', 'Rename B')`
+    yield* sql`INSERT INTO feedback_note (owner, id, note) VALUES ('conversation:otter', 'note', '{}')`
+    yield* sql`INSERT INTO conversation_to_do (conversation_id, to_do_id, linked_at)
+      VALUES ('otter', 1, ${at})`
 
     yield* SqliteMigrator.run({ loader: migrationLoader })
 
@@ -696,6 +738,9 @@ it.live("moves every Conversation-era row onto Threads, keeping its data", () =>
         FROM thread_queued_message`,
       [{ thread_id: "otter", context: "Thread:otter:agent/otter:-" }],
     )
+    assert.deepStrictEqual(yield* sql`SELECT thread_id, to_do_id FROM thread_to_do`, [
+      { thread_id: "otter", to_do_id: 1 },
+    ])
     assert.deepStrictEqual(yield* sql`SELECT thread_id, name FROM thread_skill_pack`, [
       { thread_id: "otter", name: "team" },
     ])

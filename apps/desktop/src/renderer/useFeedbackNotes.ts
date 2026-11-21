@@ -1,25 +1,36 @@
 import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import { type FeedbackNote, UnsentFeedback } from "@glass/contracts"
+import { type FeedbackNote, isLineNote, type LineNote, UnsentFeedback } from "@glass/contracts"
 import { type Effect, Exit } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { useMemo } from "react"
-import { feedbackNotesAtom, writtenFeedbackAtom } from "./threadsArea"
+import { feedbackNotesAtom, pageNoteEditingAtom, writtenFeedbackAtom } from "./threadsArea"
 import { Backend, type BackendError, useBackendRuntime } from "./backend"
 import { type Problem, problemOf } from "./problems"
 
-export interface FeedbackNotesEditor {
+interface NotesEditor<Note> {
   readonly ready: boolean
-  readonly notes: ReadonlyArray<FeedbackNote>
-  readonly save: (note: FeedbackNote) => Promise<Problem | null>
+  readonly notes: ReadonlyArray<Note>
+  readonly save: (note: Note) => Promise<Problem | null>
   readonly remove: (noteId: string) => Promise<Problem | null>
   readonly refresh: () => void
 }
 
-export interface FeedbackNotesStore extends FeedbackNotesEditor {
+export type LineNotesEditor = NotesEditor<LineNote>
+
+export interface FeedbackNotesStore extends NotesEditor<FeedbackNote> {
   readonly staged: ReadonlyArray<FeedbackNote>
+  readonly editingOnPage: boolean
   readonly stage: () => Promise<Problem | null>
   readonly sent: (noteIds: ReadonlyArray<string>) => void
 }
+
+export const lineNotesOf = (store: FeedbackNotesStore): LineNotesEditor => ({
+  ready: store.ready,
+  notes: store.notes.filter(isLineNote),
+  save: store.save,
+  remove: store.remove,
+  refresh: store.refresh,
+})
 
 export const noteWriteTitles = {
   save: "Couldn't save your Feedback note",
@@ -51,6 +62,7 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
   const listed = useAtomValue(feedbackNotesAtom(threadId))
   const refetch = useAtomRefresh(feedbackNotesAtom(threadId))
   const [written, setWritten] = useAtom(writtenFeedbackAtom(threadId))
+  const editingOnPage = useAtomValue(pageNoteEditingAtom(threadId)) !== null
   const saved = AsyncResult.isSuccess(listed) ? listed.value : null
   const unsent = written ?? saved ?? noFeedback
 
@@ -61,6 +73,7 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
       ready: saved !== null || written !== null,
       notes: unsent.notes,
       staged: unsent.notes.filter(({ id }) => unsent.staged.includes(id)),
+      editingOnPage,
       save: (note) =>
         write(
           noteWriteTitles.save,
@@ -82,5 +95,5 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
         refetch()
       },
     }
-  }, [threadId, runtime, unsent, saved, written, setWritten, refetch])
+  }, [threadId, runtime, unsent, saved, written, setWritten, refetch, editingOnPage])
 }

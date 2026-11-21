@@ -147,7 +147,7 @@ it("starts a Thread from a to-do by mentioning it", async () => {
   const user = mount(
     {
       ...newThreadHandlers(created, []),
-      ListToDos: () => Effect.succeed([toDo]),
+      WatchToDos: () => Stream.make([toDo]),
     },
     "/to-dos",
   )

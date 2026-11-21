@@ -1,0 +1,1730 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Prototype · Feedback notes on an HTML File pane</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        --font-ui:
+          "Geist Variable", "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+        --font-code: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        --radius: 0.625rem;
+        --backdrop: light-dark(oklch(0.965 0 0), oklch(0.11 0 0));
+        --background: light-dark(oklch(1 0 0), oklch(0.145 0 0));
+        --foreground: light-dark(oklch(0.145 0 0), oklch(0.985 0 0));
+        --popover: light-dark(oklch(1 0 0), oklch(0.205 0 0));
+        --primary: light-dark(oklch(0.205 0 0), oklch(0.922 0 0));
+        --primary-foreground: light-dark(oklch(0.985 0 0), oklch(0.205 0 0));
+        --secondary: light-dark(oklch(0.97 0 0), oklch(0.269 0 0));
+        --muted-foreground: light-dark(oklch(0.556 0 0), oklch(0.708 0 0));
+        --border: light-dark(oklch(0.922 0 0), oklch(1 0 0 / 10%));
+        --input: light-dark(oklch(0.922 0 0), oklch(1 0 0 / 15%));
+        --ring: light-dark(oklch(0.708 0 0), oklch(0.556 0 0));
+        --added: light-dark(#1a7f37, #3fb950);
+        --modified: light-dark(#9a6700, #d29922);
+        --note: oklch(0.58 0.19 262);
+        --note-soft: oklch(0.58 0.19 262 / 0.16);
+        --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      body {
+        margin: 0;
+        background: var(--backdrop);
+        color: var(--foreground);
+        font: 14px/1.5 var(--font-ui);
+        -webkit-font-smoothing: antialiased;
+      }
+      button,
+      textarea {
+        font: inherit;
+        color: inherit;
+      }
+      button {
+        cursor: pointer;
+      }
+      :focus-visible {
+        outline: 2px solid var(--ring);
+        outline-offset: 2px;
+      }
+      code,
+      kbd,
+      pre {
+        font-family: var(--font-code);
+      }
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0 0 0 0);
+        white-space: nowrap;
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: calc(var(--radius) * 0.8);
+        border: 1px solid transparent;
+        background: transparent;
+        font-size: 13px;
+        font-weight: 500;
+      }
+      .btn:hover {
+        background: var(--secondary);
+      }
+      .btn-primary {
+        background: var(--primary);
+        color: var(--primary-foreground);
+      }
+      .btn-primary:hover {
+        background: color-mix(in oklab, var(--primary) 85%, transparent);
+      }
+      .btn-outline {
+        border-color: var(--input);
+      }
+      .btn-xs {
+        height: 24px;
+        padding: 0 8px;
+        font-size: 12px;
+      }
+      .btn:disabled {
+        opacity: 0.45;
+        cursor: default;
+      }
+      .btn svg {
+        width: 14px;
+        height: 14px;
+      }
+      kbd {
+        font-size: 11px;
+        padding: 1px 5px;
+        border-radius: 4px;
+        border: 1px solid var(--border);
+        background: var(--secondary);
+        color: var(--muted-foreground);
+      }
+
+      .intro {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding: 22px 24px 14px;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px 24px;
+        align-items: end;
+      }
+      .intro-text {
+        flex: 1 1 420px;
+      }
+      .intro h1 {
+        margin: 0 0 4px;
+        font-size: 17px;
+        font-weight: 600;
+        letter-spacing: -0.01em;
+      }
+      .intro p {
+        margin: 0;
+        color: var(--muted-foreground);
+        max-width: 70ch;
+      }
+      .steps {
+        list-style: none;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        margin: 0;
+        padding: 0;
+      }
+      .step {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        height: 28px;
+        padding: 0 10px 0 4px;
+        border-radius: 999px;
+        border: 1px solid var(--border);
+        background: var(--background);
+        color: var(--muted-foreground);
+        font-size: 12.5px;
+      }
+      .step-n {
+        width: 20px;
+        height: 20px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        font-size: 11px;
+        font-weight: 600;
+        background: var(--secondary);
+      }
+      .step[data-state="current"] {
+        color: var(--foreground);
+        border-color: var(--foreground);
+      }
+      .step[data-state="current"] .step-n {
+        background: var(--note);
+        color: white;
+      }
+      .step[data-state="done"] .step-n {
+        background: color-mix(in oklab, var(--added) 18%, transparent);
+        color: var(--added);
+      }
+
+      .window {
+        max-width: 1320px;
+        margin: 0 auto 28px;
+        height: min(780px, calc(100vh - 150px));
+        min-height: 600px;
+        display: grid;
+        grid-template-rows: 38px minmax(0, 1fr);
+        background: var(--background);
+        border: 1px solid var(--border);
+        border-radius: calc(var(--radius) * 1.4);
+        overflow: hidden;
+        box-shadow:
+          0 1px 2px oklch(0 0 0 / 0.04),
+          0 12px 32px -12px oklch(0 0 0 / 0.18);
+      }
+      .titlebar {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 0 14px;
+        border-bottom: 1px solid var(--border);
+        font-size: 12.5px;
+        color: var(--muted-foreground);
+      }
+      .titlebar strong {
+        color: var(--foreground);
+        font-weight: 500;
+      }
+      .branch {
+        font-family: var(--font-code);
+        font-size: 11.5px;
+        padding: 1px 6px;
+        border-radius: 5px;
+        background: var(--secondary);
+      }
+      .titlebar .spacer {
+        flex: 1;
+      }
+      .app-body {
+        display: grid;
+        grid-template-columns: minmax(340px, 0.82fr) minmax(0, 1.18fr);
+        min-height: 0;
+      }
+
+      .convo {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        border-right: 1px solid var(--border);
+      }
+      .turns {
+        flex: 1;
+        overflow: auto;
+        padding: 20px 20px 8px;
+        display: flex;
+        flex-direction: column;
+        gap: 18px;
+      }
+      .msg-user {
+        align-self: flex-end;
+        max-width: 88%;
+        background: var(--secondary);
+        border-radius: var(--radius);
+        padding: 9px 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .msg-user p {
+        margin: 0;
+        white-space: pre-wrap;
+      }
+      .msg-agent p {
+        margin: 0 0 8px;
+      }
+      .msg-agent p:last-child {
+        margin-bottom: 0;
+      }
+      .path {
+        font-family: var(--font-code);
+        font-size: 12.5px;
+        padding: 1px 5px;
+        border-radius: 5px;
+        background: var(--secondary);
+        border: 1px solid var(--border);
+      }
+      .path.open {
+        border-color: color-mix(in oklab, var(--note) 45%, transparent);
+      }
+      .tool {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        color: var(--muted-foreground);
+        font-size: 12.5px;
+        margin-bottom: 6px;
+      }
+      .tool svg {
+        width: 14px;
+        height: 14px;
+        flex: none;
+      }
+      .tool .spinner {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        border: 2px solid var(--border);
+        border-top-color: var(--muted-foreground);
+        animation: spin 0.8s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+      .scripted {
+        color: var(--muted-foreground);
+        font-size: 12px;
+        font-style: italic;
+      }
+
+      .sent-notes {
+        border-top: 1px solid var(--border);
+        padding-top: 8px;
+      }
+      .sent-notes summary,
+      .agent-reads summary {
+        cursor: pointer;
+        font-size: 12.5px;
+        color: var(--muted-foreground);
+      }
+      .sent-notes ul {
+        list-style: none;
+        margin: 6px 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+      }
+      .sent-notes li {
+        font-size: 13px;
+      }
+      .sent-notes .where {
+        font-size: 12px;
+        color: var(--muted-foreground);
+      }
+      .agent-reads pre {
+        margin: 6px 0 0;
+        padding: 10px;
+        font-size: 11.5px;
+        line-height: 1.45;
+        white-space: pre-wrap;
+        overflow-wrap: anywhere;
+        background: var(--background);
+        border: 1px solid var(--border);
+        border-radius: calc(var(--radius) * 0.8);
+        max-height: 260px;
+        overflow: auto;
+      }
+
+      .composer {
+        padding: 10px 14px 14px;
+      }
+      .composer-box {
+        border: 1px solid var(--input);
+        border-radius: var(--radius);
+        background: var(--background);
+      }
+      .composer-box:focus-within {
+        border-color: var(--ring);
+      }
+      .staged {
+        border-bottom: 1px solid var(--border);
+        padding: 8px 10px 6px;
+      }
+      .staged-head {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        margin-bottom: 6px;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .staged ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+        max-height: 190px;
+        overflow: auto;
+      }
+      .staged li {
+        border-radius: calc(var(--radius) * 0.8);
+        padding: 6px 8px;
+        background: var(--secondary);
+      }
+      .staged-where {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        padding: 0;
+        border: 0;
+        background: none;
+        font-size: 12px;
+        color: var(--muted-foreground);
+        text-align: left;
+      }
+      .staged-where:hover span:last-child {
+        text-decoration: underline;
+      }
+      .staged-text {
+        margin: 3px 0 2px 24px;
+        font-size: 13px;
+        white-space: pre-wrap;
+      }
+      .staged-actions {
+        display: flex;
+        gap: 2px;
+        margin-left: 18px;
+      }
+      .lost {
+        margin: 2px 0 2px 24px;
+        font-size: 12px;
+        color: var(--modified);
+      }
+      .composer textarea {
+        display: block;
+        width: 100%;
+        resize: none;
+        border: 0;
+        background: none;
+        padding: 10px 12px 4px;
+        min-height: 46px;
+        max-height: 140px;
+        outline: none;
+      }
+      .composer-foot {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 4px 8px 8px 12px;
+        font-size: 12px;
+        color: var(--muted-foreground);
+      }
+      .composer-foot .spacer {
+        flex: 1;
+      }
+
+      .pin,
+      .pin-sm {
+        display: inline-grid;
+        place-items: center;
+        border-radius: 999px;
+        background: var(--note);
+        color: white;
+        font-weight: 600;
+        flex: none;
+        font-variant-numeric: tabular-nums;
+      }
+      .pin-sm {
+        width: 18px;
+        height: 18px;
+        font-size: 10.5px;
+      }
+
+      .pane {
+        display: flex;
+        flex-direction: column;
+        min-width: 0;
+        min-height: 0;
+      }
+      .pane-tabs {
+        display: flex;
+        align-items: end;
+        gap: 2px;
+        height: 36px;
+        padding: 0 8px;
+        border-bottom: 1px solid var(--border);
+      }
+      .pane-tab {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        height: 30px;
+        padding: 0 10px;
+        font-size: 12.5px;
+        border: 1px solid var(--border);
+        border-bottom: 0;
+        border-radius: 7px 7px 0 0;
+        margin-bottom: -1px;
+        background: var(--background);
+        color: var(--muted-foreground);
+      }
+      .pane-tab[aria-selected="true"] {
+        color: var(--foreground);
+      }
+      .pane-tab svg {
+        width: 13px;
+        height: 13px;
+      }
+      .pane-tools {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 6px 10px;
+        border-bottom: 1px solid var(--border);
+        min-height: 41px;
+      }
+      .pane-path {
+        font-family: var(--font-code);
+        font-size: 12px;
+        color: var(--muted-foreground);
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        min-width: 0;
+      }
+      .pane-tools .spacer {
+        flex: 1;
+      }
+      .pane-status {
+        font-size: 12px;
+        color: var(--muted-foreground);
+        white-space: nowrap;
+        transition: color 0.3s;
+      }
+      .pane-status.fresh {
+        color: var(--added);
+      }
+      .pick[aria-pressed="true"] {
+        background: var(--note);
+        color: white;
+        border-color: var(--note);
+      }
+      .pick[aria-pressed="true"] kbd {
+        background: oklch(1 0 0 / 0.2);
+        border-color: transparent;
+        color: white;
+      }
+      .pick-hint {
+        font-size: 12px;
+        color: var(--note);
+        white-space: nowrap;
+      }
+
+      .page-scroll {
+        flex: 1;
+        overflow: auto;
+        background: #fffdf8;
+        color-scheme: light;
+        position: relative;
+      }
+      .page-wrap {
+        position: relative;
+        min-height: 100%;
+      }
+      .page-scroll.picking .page {
+        cursor: crosshair;
+        user-select: none;
+        -webkit-user-select: none;
+      }
+      .overlay {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+      }
+      .hl {
+        position: absolute;
+        background: var(--note-soft);
+        border-bottom: 2px solid var(--note);
+        border-radius: 2px;
+      }
+      .hl.draft,
+      .outline.draft {
+        border-style: dashed;
+      }
+      .outline {
+        position: absolute;
+        border: 2px solid var(--note);
+        border-radius: 6px;
+      }
+      .hover-outline {
+        position: absolute;
+        border: 1.5px dashed var(--note);
+        border-radius: 6px;
+        background: oklch(0.58 0.19 262 / 0.06);
+      }
+      .hover-label {
+        position: absolute;
+        transform: translateY(-100%);
+        margin-top: -4px;
+        padding: 2px 7px;
+        border-radius: 5px;
+        background: var(--note);
+        color: white;
+        font-size: 11.5px;
+        white-space: nowrap;
+        font-family: var(--font-ui);
+      }
+      .pin {
+        position: absolute;
+        width: 20px;
+        height: 20px;
+        font-size: 11px;
+        border: 2px solid #fffdf8;
+        pointer-events: auto;
+        padding: 0;
+        box-shadow: 0 1px 3px oklch(0 0 0 / 0.25);
+      }
+      .pin.flash {
+        animation: flash 0.9s var(--ease-out) 2;
+      }
+      @keyframes flash {
+        50% {
+          transform: scale(1.35);
+        }
+      }
+      .sel-btn {
+        position: absolute;
+        pointer-events: auto;
+        color-scheme: light dark;
+        background: var(--popover);
+        color: var(--foreground);
+        border: 1px solid var(--border);
+        box-shadow: 0 4px 14px -4px oklch(0 0 0 / 0.3);
+      }
+      .sel-btn:hover {
+        background: var(--popover);
+        border-color: var(--ring);
+      }
+      .popover {
+        position: absolute;
+        width: 330px;
+        pointer-events: auto;
+        color-scheme: light dark;
+        background: var(--popover);
+        color: var(--foreground);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: 0 10px 30px -10px oklch(0 0 0 / 0.35);
+        padding: 10px;
+        font: 14px/1.5 var(--font-ui);
+      }
+      .pop-target {
+        display: flex;
+        align-items: center;
+        gap: 7px;
+        font-size: 12px;
+        color: var(--muted-foreground);
+        margin-bottom: 7px;
+        min-width: 0;
+      }
+      .pop-target span:last-child {
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .popover textarea {
+        width: 100%;
+        resize: vertical;
+        min-height: 64px;
+        border: 1px solid var(--input);
+        border-radius: calc(var(--radius) * 0.8);
+        padding: 7px 9px;
+        background: var(--background);
+        outline: none;
+      }
+      .popover textarea:focus {
+        border-color: var(--ring);
+      }
+      .pop-foot {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        margin-top: 7px;
+        font-size: 12px;
+        color: var(--muted-foreground);
+      }
+      .pop-foot .spacer {
+        flex: 1;
+      }
+
+      .toast {
+        position: absolute;
+        left: 50%;
+        bottom: 14px;
+        transform: translate(-50%, 8px);
+        opacity: 0;
+        pointer-events: none;
+        background: var(--primary);
+        color: var(--primary-foreground);
+        font-size: 12.5px;
+        padding: 5px 12px;
+        border-radius: 999px;
+        transition:
+          opacity 0.25s,
+          transform 0.25s var(--ease-out);
+        z-index: 2;
+        white-space: nowrap;
+      }
+      .toast.show {
+        opacity: 1;
+        transform: translate(-50%, 0);
+      }
+      .pane-body {
+        position: relative;
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      /* The agent's page: authored styles, deliberately unlike Glass's chrome */
+      .page {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 40px 48px 64px;
+        color: #23201b;
+        font:
+          15px/1.62 ui-sans-serif,
+          system-ui,
+          "Segoe UI",
+          sans-serif;
+      }
+      .page h1 {
+        font:
+          600 30px/1.2 Georgia,
+          "Times New Roman",
+          serif;
+        margin: 0 0 10px;
+        letter-spacing: -0.01em;
+      }
+      .page h2 {
+        font:
+          600 19px/1.3 Georgia,
+          "Times New Roman",
+          serif;
+        margin: 34px 0 10px;
+        padding-top: 18px;
+        border-top: 1px solid #e7e1d4;
+      }
+      .page .lede {
+        color: #5b554a;
+        font-size: 16px;
+        margin: 0;
+      }
+      .page p {
+        margin: 0 0 10px;
+      }
+      .page code {
+        font-size: 13px;
+        background: #f1ede3;
+        padding: 1px 5px;
+        border-radius: 4px;
+      }
+      .page .flow {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin: 6px 0 10px;
+      }
+      .page .node {
+        border: 1.5px solid #cfc6b4;
+        background: #faf6ec;
+        border-radius: 9px;
+        padding: 10px 14px;
+        font-size: 13.5px;
+        font-weight: 600;
+      }
+      .page .node.key {
+        border-color: #a5895a;
+        background: #f6ecd6;
+      }
+      .page .node small {
+        display: block;
+        font-weight: 400;
+        color: #7a705f;
+        font-size: 12px;
+      }
+      .page .arrow {
+        color: #a59b88;
+        font-size: 18px;
+      }
+      .page figcaption {
+        color: #7a705f;
+        font-size: 13.5px;
+      }
+      .page table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 14px;
+      }
+      .page th,
+      .page td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid #e7e1d4;
+        vertical-align: top;
+      }
+      .page th {
+        font-weight: 600;
+        color: #5b554a;
+        font-size: 12.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      .page tr.chosen td {
+        background: #f2f6ea;
+      }
+      .page ol {
+        padding-left: 22px;
+        margin: 0;
+      }
+      .page li {
+        margin-bottom: 6px;
+      }
+
+      .about {
+        max-width: 1320px;
+        margin: 0 auto 40px;
+        padding: 0 24px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 24px;
+      }
+      .about h2 {
+        font-size: 13px;
+        font-weight: 600;
+        margin: 0 0 8px;
+      }
+      .about ul {
+        margin: 0;
+        padding-left: 18px;
+        color: var(--muted-foreground);
+      }
+      .about li {
+        margin-bottom: 6px;
+      }
+      .about code {
+        font-size: 12px;
+      }
+
+      @media (max-width: 900px) {
+        .window {
+          height: auto;
+          min-height: 0;
+        }
+        .app-body {
+          grid-template-columns: minmax(0, 1fr);
+          grid-template-rows: 560px 520px;
+        }
+        .pane {
+          order: -1;
+          border-bottom: 1px solid var(--border);
+        }
+        .convo {
+          border-right: 0;
+        }
+        .about {
+          grid-template-columns: minmax(0, 1fr);
+        }
+        .page {
+          padding: 28px 22px 48px;
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="intro">
+      <div class="intro-text">
+        <h1>Feedback notes on an HTML File pane</h1>
+        <p>
+          A prototype of the flow. The agent has written a plan as an HTML page, and Glass shows it
+          in the File pane. Point at parts of the page, leave Feedback notes, and send them with
+          your next message. The agent's work is scripted.
+        </p>
+      </div>
+      <ol class="steps" aria-label="Try the flow">
+        <li class="step" data-step="select">
+          <span class="step-n">1</span>Select text in the page
+        </li>
+        <li class="step" data-step="pick">
+          <span class="step-n">2</span>Pick element, click the diagram
+        </li>
+        <li class="step" data-step="send"><span class="step-n">3</span>Send</li>
+        <li class="step" data-step="reload"><span class="step-n">4</span>Watch the pane reload</li>
+      </ol>
+      <button class="btn btn-outline" id="reset" type="button">Start over</button>
+    </header>
+
+    <div class="window">
+      <div class="titlebar">
+        <span>Threads</span><span aria-hidden="true">›</span
+        ><strong>Plan the poller rate limit</strong>
+        <span class="branch">agent/poller-rate-limit</span>
+        <span class="spacer"></span>
+        <span>Claude Code · Opus 5.5</span>
+      </div>
+
+      <div class="app-body">
+        <section class="convo" aria-label="Thread">
+          <div class="turns" id="turns" aria-live="polite">
+            <div class="msg-user">
+              <p>
+                We keep hitting GitHub's secondary rate limit on big orgs. Write up a plan for
+                rate-limiting the poller as an HTML page I can look at.
+              </p>
+            </div>
+            <div class="msg-agent">
+              <div class="tool">
+                <svg
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <path d="M20 6 9 17l-5-5" /></svg
+                >Wrote <span class="path">docs/plans/poller-rate-limit.html</span>
+              </div>
+              <p>
+                I wrote the plan to
+                <span class="path open">docs/plans/poller-rate-limit.html</span>. It proposes a
+                token bucket per Connection, compares it with two alternatives, and lays out a
+                three-step rollout.
+              </p>
+            </div>
+          </div>
+
+          <div class="composer">
+            <div class="composer-box">
+              <div class="staged" id="staged" hidden>
+                <div class="staged-head" id="stagedHead"></div>
+                <ul id="stagedList" aria-label="Feedback attached to this message"></ul>
+              </div>
+              <label class="sr-only" for="message">Message</label>
+              <textarea id="message" rows="2" placeholder="Message the agent"></textarea>
+              <div class="composer-foot">
+                <span id="composerHint"><kbd>↵</kbd> to send</span>
+                <span class="spacer"></span>
+                <button class="btn btn-primary" id="send" type="button" disabled>Send</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="pane" aria-label="File pane">
+          <div class="pane-tabs" role="tablist">
+            <span class="pane-tab" role="tab" aria-selected="true">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                <path d="M14 2v6h6" />
+              </svg>
+              poller-rate-limit.html
+            </span>
+          </div>
+          <div class="pane-tools">
+            <span class="pane-path">docs/plans/poller-rate-limit.html</span>
+            <span class="pane-status" id="paneStatus">Updated 2 min ago</span>
+            <span class="spacer"></span>
+            <span class="pick-hint" id="pickHint" hidden
+              >Click part of the page · <kbd>Esc</kbd> to stop</span
+            >
+            <button class="btn btn-outline pick" id="pick" type="button" aria-pressed="false">
+              <svg
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                aria-hidden="true"
+              >
+                <path d="m3 3 7.07 16.97 2.51-7.39 7.39-2.51z" />
+              </svg>
+              Pick element
+            </button>
+          </div>
+          <div class="pane-body">
+            <div class="toast" id="toast" role="status"></div>
+            <div class="page-scroll" id="scroll">
+              <div class="page-wrap" id="wrap">
+                <article class="page" id="page"></article>
+                <div class="overlay" id="overlay">
+                  <div id="marks"></div>
+                  <button class="btn btn-xs sel-btn" id="selBtn" type="button" hidden>
+                    <svg
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      stroke-width="2"
+                      aria-hidden="true"
+                    >
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                      <path d="M12 7v6M9 10h6" />
+                    </svg>
+                    Add Feedback note
+                  </button>
+                  <div id="popLayer"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <section class="about">
+      <div>
+        <h2>What the flow adds</h2>
+        <ul>
+          <li>
+            To leave a Feedback note, select text in the page, or turn on Pick element and click any
+            part of it. Selecting text needs no mode.
+          </li>
+          <li>
+            Notes wait above the composer, just like notes on Changes, and go with your next
+            message. You can send them without writing anything.
+          </li>
+          <li>
+            The pane reloads when the agent rewrites the file. Notes you haven't sent follow their
+            text to the new version. If a note's spot is gone, it stays in the composer and says so.
+            To see this, add a note while the agent is working.
+          </li>
+        </ul>
+      </div>
+      <div>
+        <h2>How it would be built</h2>
+        <ul>
+          <li>
+            The page stays in today's sandboxed iframe. A small script that Glass adds to the page
+            reports the selection and the hovered element to Glass by <code>postMessage</code>.
+          </li>
+          <li>
+            Glass draws the pins, outlines and note editor itself, over the iframe, so the page's
+            own styles can't break them.
+          </li>
+          <li>
+            Each note reaches the agent as a <code>feedback_note</code> inside the
+            <code>glass_feedback</code> block that notes on Changes already use. It carries the
+            file, a selector, the nearest heading and the text it was left on. Open "What the agent
+            reads" on a sent message to see it.
+          </li>
+        </ul>
+      </div>
+      <div>
+        <h2>Decided</h2>
+        <ul>
+          <li>Pick element stays on until you press <kbd>Esc</kbd> or turn it off.</li>
+          <li>
+            Notes leave the page as soon as they're sent. After that they live on the sent message.
+          </li>
+          <li>
+            With Pick element on, clicks go to Glass; with it off, they go to the page's own buttons
+            and forms.
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <script>
+      const PATH = "docs/plans/poller-rate-limit.html"
+      const FILE = "poller-rate-limit.html"
+
+      const PAGE_V1 = `
+  <h1>Rate-limit the GitHub poller</h1>
+  <p class="lede">Glass polls GitHub every 30 seconds for each watched repo. On orgs with more than 40 repos we hit the secondary rate limit by mid-morning, and the Reviews list stops updating.</p>
+  <section id="limits">
+    <h2>Limits</h2>
+    <p>Each Connection gets a token bucket with a burst of 20 requests and a refill of five per minute. Requests beyond that wait their turn instead of failing.</p>
+    <p>Conditional requests that come back <code>304 Not Modified</code> still spend a token, so a quiet org costs the same as a busy one.</p>
+  </section>
+  <section id="flow">
+    <h2>How it fits</h2>
+    <div class="flow">
+      <div class="node">Poll scheduler<small>one timer per repo</small></div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node key">Token bucket<small>20 burst · 5 / min</small></div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node">GitHub REST<small>api.github.com</small></div>
+    </div>
+    <figcaption>Every request the scheduler makes takes a token first.</figcaption>
+  </section>
+  <section id="options">
+    <h2>Options considered</h2>
+    <table>
+      <thead><tr><th>Option</th><th>Burst</th><th>Refill / min</th><th>Trade-off</th></tr></thead>
+      <tbody>
+        <tr><td>Fixed interval</td><td>—</td><td>—</td><td>Simple, but every repo fires at once on startup.</td></tr>
+        <tr class="chosen"><td>Token bucket</td><td>20</td><td>5</td><td>Smooth, but needs one shared bucket per Connection.</td></tr>
+        <tr><td>Conditional requests only</td><td>—</td><td>—</td><td>Cheaper for unchanged repos, but doesn't bound bursts.</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <section id="rollout">
+    <h2>Rollout</h2>
+    <ol>
+      <li>Ship the bucket in front of the existing poller.</li>
+      <li>Watch <code>backend.log</code> for <code>rate_limit.waited_ms</code> on a large org for a week.</li>
+      <li>Remove the fixed 30-second interval.</li>
+    </ol>
+  </section>`
+
+      const PAGE_V2 = `
+  <h1>Rate-limit the GitHub poller</h1>
+  <p class="lede">Glass polls GitHub every 30 seconds for each watched repo. On orgs with more than 40 repos we hit the secondary rate limit by mid-morning, and the Reviews list stops updating.</p>
+  <section id="limits">
+    <h2>Limits</h2>
+    <p>Each Connection gets a token bucket with a burst of 20 requests and a refill of ten per minute. Requests beyond that wait their turn instead of failing.</p>
+    <p>Conditional requests that come back <code>304 Not Modified</code> still spend a token, so a quiet org costs the same as a busy one.</p>
+  </section>
+  <section id="flow">
+    <h2>How it fits</h2>
+    <div class="flow">
+      <div class="node">Poll scheduler<small>one timer per repo</small></div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node key">Token bucket<small>in the backend · 20 burst · 10 / min</small></div>
+      <span class="arrow" aria-hidden="true">→</span>
+      <div class="node">GitHub REST<small>api.github.com</small></div>
+    </div>
+    <figcaption>The bucket lives in the backend, so every window shares one per Connection.</figcaption>
+  </section>
+  <section id="options">
+    <h2>Options considered</h2>
+    <table>
+      <thead><tr><th>Option</th><th>Burst</th><th>Refill / min</th><th>Trade-off</th></tr></thead>
+      <tbody>
+        <tr><td>Fixed interval</td><td>—</td><td>—</td><td>Simple, but every repo fires at once on startup.</td></tr>
+        <tr class="chosen"><td>Token bucket</td><td>20</td><td>10</td><td>Smooth, but needs one shared bucket per Connection.</td></tr>
+        <tr><td>Conditional requests only</td><td>—</td><td>—</td><td>Cheaper for unchanged repos, but doesn't bound bursts.</td></tr>
+      </tbody>
+    </table>
+  </section>
+  <section id="rollout">
+    <h2>Rollout</h2>
+    <ol>
+      <li>Ship the bucket in front of the existing poller.</li>
+      <li>Watch <code>backend.log</code> for <code>rate_limit.waited_ms</code> on a large org for a week.</li>
+      <li>Remove the fixed 30-second interval.</li>
+      <li>To roll back before step 3, revert the PR; the fixed interval is still there.</li>
+    </ol>
+  </section>`
+
+      const $ = (id) => document.getElementById(id)
+      const page = $("page"),
+        wrap = $("wrap"),
+        scroll = $("scroll"),
+        marks = $("marks"),
+        popLayer = $("popLayer")
+      const selBtn = $("selBtn"),
+        pickBtn = $("pick"),
+        message = $("message"),
+        sendBtn = $("send"),
+        turns = $("turns")
+
+      const state = {
+        notes: [],
+        nextN: 1,
+        nextId: 1,
+        pick: false,
+        hover: null,
+        draft: null,
+        pending: null,
+        version: 1,
+        working: false,
+        done: new Set(),
+      }
+
+      const trunc = (text, n) => (text.length > n ? text.slice(0, n - 1).trimEnd() + "…" : text)
+      const squash = (text) => text.replace(/\s+/g, " ").trim()
+      const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v))
+      const escapeAttr = (text) => text.replaceAll('"', "&quot;")
+
+      function rel(rect) {
+        const w = wrap.getBoundingClientRect()
+        return { x: rect.left - w.left, y: rect.top - w.top, w: rect.width, h: rect.height }
+      }
+
+      function headingFor(el) {
+        const section = el.closest("section")
+        return squash(
+          (section ? section.querySelector("h2") : page.querySelector("h1")).textContent,
+        )
+      }
+
+      function selectorFor(el) {
+        const parts = []
+        while (el && el !== page) {
+          if (el.id) {
+            parts.unshift("#" + el.id)
+            break
+          }
+          let part = el.tagName.toLowerCase()
+          const same = [...el.parentElement.children].filter((c) => c.tagName === el.tagName)
+          if (same.length > 1) part += `:nth-of-type(${same.indexOf(el) + 1})`
+          parts.unshift(part)
+          el = el.parentElement
+        }
+        return parts.join(" > ")
+      }
+
+      function pickable(el) {
+        if (!page.contains(el) || el === page) return null
+        return (
+          el.closest(".node, td, th, li, p, h1, h2, figcaption, code") ??
+          el.closest("section, table, .flow") ??
+          el
+        )
+      }
+
+      function describe(el) {
+        const text = trunc(squash(el.textContent), 36)
+        if (el.matches("td, th")) {
+          const row = squash(el.closest("tr").cells[0].textContent)
+          const column = squash(el.closest("table").tHead.rows[0].cells[el.cellIndex].textContent)
+          return el.cellIndex === 0 ? `Table row “${row}”` : `Table cell · ${row} × ${column}`
+        }
+        if (el.matches(".node")) return `Box “${squash(el.firstChild.textContent)}”`
+        if (el.matches("h1, h2")) return `Heading “${text}”`
+        if (el.matches("li")) return `List item “${text}”`
+        if (el.matches("section")) return `Section “${headingFor(el)}”`
+        if (el.matches("p, figcaption")) return `Paragraph “${text}”`
+        return `${el.tagName.toLowerCase()} “${text}”`
+      }
+
+      function anchorRects(target) {
+        if (target.kind === "text")
+          return [...target.range.getClientRects()].filter((r) => r.width > 1).map(rel)
+        return [rel(target.el.getBoundingClientRect())]
+      }
+
+      function box(cls, r, pad = 0) {
+        const d = document.createElement("div")
+        d.className = cls
+        Object.assign(d.style, {
+          left: r.x - pad + "px",
+          top: r.y - pad + "px",
+          width: r.w + pad * 2 + "px",
+          height: r.h + pad * 2 + "px",
+        })
+        return d
+      }
+
+      function pinAt(rects, target, n, noteId) {
+        const last = target.kind === "text" ? rects.at(-1) : rects[0]
+        const pin = document.createElement("button")
+        pin.type = "button"
+        pin.className = "pin"
+        pin.textContent = n
+        pin.dataset.note = noteId ?? ""
+        pin.setAttribute("aria-label", `Feedback note ${n}`)
+        const x = target.kind === "text" ? last.x + last.w - 4 : last.x + last.w - 10
+        Object.assign(pin.style, { left: x + "px", top: last.y - 12 + "px" })
+        if (noteId) pin.addEventListener("click", () => editNote(noteId))
+        return pin
+      }
+
+      function renderMarks() {
+        marks.replaceChildren()
+        for (const note of state.notes) {
+          if (note.lost || (state.draft && state.draft.editingId === note.id)) continue
+          const rects = anchorRects(note)
+          if (rects.length === 0) continue
+          rects.forEach((r) =>
+            marks.append(note.kind === "text" ? box("hl", r) : box("outline", r, 3)),
+          )
+          marks.append(pinAt(rects, note, note.n, note.id))
+        }
+        if (state.draft) {
+          const rects = anchorRects(state.draft.target)
+          rects.forEach((r) =>
+            marks.append(
+              state.draft.target.kind === "text" ? box("hl draft", r) : box("outline draft", r, 3),
+            ),
+          )
+          if (rects.length) marks.append(pinAt(rects, state.draft.target, state.draft.n))
+        } else if (state.pick && state.hover) {
+          const r = rel(state.hover.getBoundingClientRect())
+          marks.append(box("hover-outline", r, 3))
+          const label = box("hover-label", { x: r.x - 3, y: r.y - 3, w: 0, h: 0 })
+          label.style.width = label.style.height = ""
+          label.textContent = describe(state.hover)
+          marks.append(label)
+        }
+      }
+
+      function hideSelBtn() {
+        selBtn.hidden = true
+        state.pending = null
+      }
+
+      document.addEventListener("selectionchange", () => {
+        if (state.draft || state.pick) return hideSelBtn()
+        const sel = getSelection()
+        if (!sel.rangeCount || sel.isCollapsed) return hideSelBtn()
+        const range = sel.getRangeAt(0)
+        if (!page.contains(range.commonAncestorContainer)) return hideSelBtn()
+        const text = squash(sel.toString())
+        if (!text) return hideSelBtn()
+        state.pending = { range: range.cloneRange(), text }
+        const rects = [...range.getClientRects()].filter((r) => r.width > 1)
+        const last = rel(rects.at(-1) ?? range.getBoundingClientRect())
+        selBtn.hidden = false
+        selBtn.style.left =
+          clamp(last.x + last.w - 70, 8, wrap.clientWidth - selBtn.offsetWidth - 8) + "px"
+        selBtn.style.top = last.y + last.h + 8 + "px"
+      })
+
+      selBtn.addEventListener("mousedown", (e) => e.preventDefault())
+      selBtn.addEventListener("click", () => {
+        const { range, text } = state.pending
+        const start =
+          range.startContainer.nodeType === 3
+            ? range.startContainer.parentElement
+            : range.startContainer
+        const block = start.closest("p, li, td, th, h1, h2, figcaption, .node") ?? start
+        getSelection().removeAllRanges()
+        hideSelBtn()
+        openEditor({
+          kind: "text",
+          range,
+          excerpt: text,
+          label: `“${trunc(text, 44)}”`,
+          heading: headingFor(block),
+          selector: selectorFor(block),
+        })
+      })
+
+      function setPick(on) {
+        state.pick = on
+        state.hover = null
+        pickBtn.setAttribute("aria-pressed", String(on))
+        $("pickHint").hidden = !on
+        scroll.classList.toggle("picking", on)
+        if (on) {
+          getSelection().removeAllRanges()
+          hideSelBtn()
+        }
+        renderMarks()
+      }
+      pickBtn.addEventListener("click", () => setPick(!state.pick))
+
+      page.addEventListener("mousemove", (e) => {
+        if (!state.pick || state.draft) return
+        const el = pickable(e.target)
+        if (el !== state.hover) {
+          state.hover = el
+          renderMarks()
+        }
+      })
+      page.addEventListener("mouseleave", () => {
+        if (state.hover) {
+          state.hover = null
+          renderMarks()
+        }
+      })
+      page.addEventListener(
+        "click",
+        (e) => {
+          if (!state.pick || state.draft) return
+          const el = pickable(e.target)
+          if (!el) return
+          e.preventDefault()
+          state.hover = null
+          openEditor({
+            kind: "element",
+            el,
+            label: describe(el),
+            excerpt: trunc(squash(el.textContent), 120),
+            heading: headingFor(el),
+            selector: selectorFor(el),
+          })
+        },
+        true,
+      )
+
+      function openEditor(target, note) {
+        closeEditor()
+        state.draft = { target, editingId: note?.id ?? null, n: note?.n ?? state.nextN }
+        const pop = document.createElement("div")
+        pop.className = "popover"
+        pop.setAttribute("role", "dialog")
+        pop.setAttribute("aria-label", note ? "Edit Feedback note" : "Add Feedback note")
+        pop.innerHTML = `
+    <div class="pop-target"><span class="pin-sm">${state.draft.n}</span><span></span></div>
+    <textarea rows="3" aria-label="Feedback note" placeholder="What should the agent change here?"></textarea>
+    <div class="pop-foot"><span><kbd>↵</kbd> to save</span><span class="spacer"></span>
+      <button type="button" class="btn btn-xs" data-act="cancel">Cancel</button>
+      <button type="button" class="btn btn-xs btn-primary" data-act="save" disabled>${note ? "Save" : "Add note"}</button></div>`
+        pop.querySelector(".pop-target span:last-child").textContent = target.label
+        const area = pop.querySelector("textarea")
+        const save = pop.querySelector('[data-act="save"]')
+        area.value = note?.text ?? ""
+        save.disabled = !area.value.trim()
+        area.addEventListener("input", () => {
+          save.disabled = !area.value.trim()
+        })
+        area.addEventListener("keydown", (e) => {
+          if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault()
+            saveDraft(area.value)
+          }
+          if (e.key === "Escape") {
+            e.stopPropagation()
+            closeEditor()
+          }
+        })
+        save.addEventListener("click", () => saveDraft(area.value))
+        pop.querySelector('[data-act="cancel"]').addEventListener("click", closeEditor)
+        popLayer.append(pop)
+        positionPopover()
+        renderMarks()
+        pop.scrollIntoView({
+          block: "nearest",
+          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        })
+        area.focus({ preventScroll: true })
+      }
+
+      function positionPopover() {
+        const pop = popLayer.firstElementChild
+        if (!pop || !state.draft) return
+        const rects = anchorRects(state.draft.target)
+        const bottom = Math.max(...rects.map((r) => r.y + r.h))
+        const left = Math.min(...rects.map((r) => r.x))
+        pop.style.left = clamp(left, 10, wrap.clientWidth - pop.offsetWidth - 10) + "px"
+        pop.style.top = bottom + 10 + "px"
+      }
+
+      function closeEditor() {
+        popLayer.replaceChildren()
+        if (!state.draft) return
+        state.draft = null
+        renderMarks()
+      }
+
+      function saveDraft(raw) {
+        const text = raw.trim()
+        if (!text || !state.draft) return
+        const { target, editingId } = state.draft
+        if (editingId) {
+          state.notes.find((n) => n.id === editingId).text = text
+        } else {
+          state.notes.push({
+            ...target,
+            id: "n" + state.nextId++,
+            n: state.nextN++,
+            text,
+            lost: false,
+          })
+          markDone(target.kind === "text" ? "select" : "pick")
+        }
+        closeEditor()
+        renderComposer()
+        toast(editingId ? "Feedback note saved" : "Feedback note added to your next message")
+      }
+
+      function editNote(id) {
+        const note = state.notes.find((n) => n.id === id)
+        if (note.lost) return
+        if (state.pick) setPick(false)
+        openEditor(note, note)
+      }
+
+      function removeNote(id) {
+        state.notes = state.notes.filter((n) => n.id !== id)
+        renderComposer()
+        renderMarks()
+      }
+
+      function showNote(id) {
+        const note = state.notes.find((n) => n.id === id)
+        if (note.lost) return
+        const r = anchorRects(note)[0]
+        scroll.scrollTo({
+          top: Math.max(0, r.y - 80),
+          behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth",
+        })
+        const pin = marks.querySelector(`[data-note="${id}"]`)
+        pin?.classList.remove("flash")
+        void pin?.offsetWidth
+        pin?.classList.add("flash")
+      }
+
+      function renderComposer() {
+        const notes = state.notes
+        $("staged").hidden = notes.length === 0
+        $("stagedHead").innerHTML =
+          `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg> ${notes.length} Feedback note${notes.length === 1 ? "" : "s"} attached to this message`
+        const list = $("stagedList")
+        list.replaceChildren(
+          ...notes.map((note) => {
+            const li = document.createElement("li")
+            li.innerHTML = `
+      <button type="button" class="staged-where" title="Show on the page"><span class="pin-sm">${note.n}</span><span></span></button>
+      <p class="staged-text"></p>
+      ${note.lost ? `<p class="lost">This spot isn't on the page any more. The note still goes to the agent, with the text it was on.</p>` : ""}
+      <div class="staged-actions">
+        ${note.lost ? "" : `<button type="button" class="btn btn-xs" data-act="edit">Edit</button>`}
+        <button type="button" class="btn btn-xs" data-act="remove">Remove</button>
+      </div>`
+            li.querySelector(".staged-where span:last-child").textContent =
+              `${FILE} · ${note.label}`
+            li.querySelector(".staged-text").textContent = note.text
+            li.querySelector(".staged-where").addEventListener("click", () => showNote(note.id))
+            li.querySelector('[data-act="edit"]')?.addEventListener("click", () =>
+              editNote(note.id),
+            )
+            li.querySelector('[data-act="remove"]').addEventListener("click", () =>
+              removeNote(note.id),
+            )
+            return li
+          }),
+        )
+        message.placeholder = notes.length
+          ? "Add a message, or send the notes on their own"
+          : "Message the agent"
+        updateSend()
+      }
+
+      function updateSend() {
+        sendBtn.disabled = state.working || (!message.value.trim() && state.notes.length === 0)
+        sendBtn.textContent = state.working ? "Agent is working…" : "Send"
+      }
+      message.addEventListener("input", updateSend)
+      message.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault()
+          if (!sendBtn.disabled) send()
+        }
+      })
+      sendBtn.addEventListener("click", send)
+
+      function agentReads(text, notes) {
+        const entries = notes.map((n) =>
+          [
+            `<feedback_note path="${PATH}" target="${n.kind}" selector="${escapeAttr(n.selector)}" heading="${escapeAttr(n.heading)}">`,
+            n.kind === "text" ? "Page text:" : `Element: ${n.label}\nIts text:`,
+            n.excerpt,
+            "Note:",
+            n.text,
+            "</feedback_note>",
+          ].join("\n"),
+        )
+        const block = notes.length
+          ? [
+              "<glass_feedback>",
+              "The user left these Feedback notes on a page you wrote, each on the part of the page they pointed at. The page may have changed since.",
+              ...entries,
+              "</glass_feedback>",
+            ].join("\n")
+          : null
+        return [block, text].filter(Boolean).join("\n\n")
+      }
+
+      function send() {
+        const text = message.value.trim()
+        const notes = state.notes.map((n) => ({ ...n }))
+        const turn = document.createElement("div")
+        turn.className = "msg-user"
+        if (text) {
+          const p = document.createElement("p")
+          p.textContent = text
+          turn.append(p)
+        }
+        if (notes.length) {
+          const details = document.createElement("details")
+          details.className = "sent-notes"
+          details.open = true
+          details.innerHTML = `<summary>${notes.length} Feedback note${notes.length === 1 ? "" : "s"} on ${FILE}</summary><ul></ul>`
+          details.querySelector("ul").append(
+            ...notes.map((n) => {
+              const li = document.createElement("li")
+              li.innerHTML = `<div class="where"></div><div></div>`
+              li.firstChild.textContent = `${n.n}. ${n.label}`
+              li.lastChild.textContent = n.text
+              return li
+            }),
+          )
+          turn.append(details)
+        }
+        const reads = document.createElement("details")
+        reads.className = "agent-reads"
+        reads.innerHTML = `<summary>What the agent reads</summary><pre></pre>`
+        reads.querySelector("pre").textContent = agentReads(text, notes)
+        turn.append(reads)
+        turns.append(turn)
+
+        state.notes = []
+        state.nextN = 1
+        message.value = ""
+        closeEditor()
+        setPick(false)
+        renderComposer()
+        renderMarks()
+        markDone("send")
+        runAgent()
+        turns.scrollTop = turns.scrollHeight
+      }
+
+      function runAgent() {
+        state.working = true
+        updateSend()
+        const turn = document.createElement("div")
+        turn.className = "msg-agent"
+        turns.append(turn)
+        const changes = state.version === 1
+        const steps = changes
+          ? [`Read <span class="path">${PATH}</span>`, `Edited <span class="path">${PATH}</span>`]
+          : [`Read <span class="path">${PATH}</span>`]
+        const check = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>`
+        let i = 0
+        const next = () => {
+          turn
+            .querySelector(".tool:last-child .spinner")
+            ?.replaceWith(document.createRange().createContextualFragment(check))
+          if (i < steps.length) {
+            const row = document.createElement("div")
+            row.className = "tool"
+            row.innerHTML = `<span class="spinner" aria-hidden="true"></span>${steps[i].replace("Read", "Reading").replace("Edited", "Editing")}`
+            row.dataset.done = steps[i]
+            turn.append(row)
+            i++
+            turns.scrollTop = turns.scrollHeight
+            setTimeout(
+              () => {
+                row.innerHTML = check + row.dataset.done
+                next()
+              },
+              i === 1 ? 1600 : 2600,
+            )
+            return
+          }
+          if (changes) reloadPane()
+          const reply = document.createElement("div")
+          reply.innerHTML = changes
+            ? `<p>I raised the refill to ten per minute, moved the bucket into the backend in the diagram, and added a rollback step to the rollout. The page beside us has reloaded.</p><p class="scripted">Scripted reply: the prototype doesn't read your notes.</p>`
+            : `<p>Got it.</p><p class="scripted">Scripted reply: only the first round changes the page.</p>`
+          turn.append(reply)
+          turns.scrollTop = turns.scrollHeight
+          state.working = false
+          updateSend()
+        }
+        setTimeout(next, 500)
+      }
+
+      function findText(text) {
+        const walker = document.createTreeWalker(page, NodeFilter.SHOW_TEXT)
+        for (let node = walker.nextNode(); node; node = walker.nextNode()) {
+          const at = node.data.replace(/\s+/g, " ").indexOf(text)
+          if (at >= 0 && node.data.indexOf(text) === at) {
+            const range = document.createRange()
+            range.setStart(node, at)
+            range.setEnd(node, at + text.length)
+            return range
+          }
+        }
+        return null
+      }
+
+      function reloadPane() {
+        const top = scroll.scrollTop
+        closeEditor()
+        page.innerHTML = state.version === 1 ? PAGE_V2 : PAGE_V1
+        state.version = state.version === 1 ? 2 : 1
+        scroll.scrollTop = top
+        for (const note of state.notes) {
+          if (note.kind === "text") {
+            const range = findText(note.excerpt)
+            note.lost = !range
+            if (range) note.range = range
+          } else {
+            const el = page.querySelector(note.selector)
+            note.lost = !el
+            if (!note.lost) note.el = el
+          }
+        }
+        renderComposer()
+        renderMarks()
+        const status = $("paneStatus")
+        status.textContent = "Reloaded: the agent changed this file"
+        status.classList.add("fresh")
+        toast("The agent changed this file. The pane reloaded.")
+        setTimeout(() => {
+          status.textContent = "Updated just now"
+          status.classList.remove("fresh")
+        }, 5000)
+        markDone("reload")
+      }
+
+      let toastTimer
+      function toast(text) {
+        const t = $("toast")
+        t.textContent = text
+        t.classList.add("show")
+        clearTimeout(toastTimer)
+        toastTimer = setTimeout(() => t.classList.remove("show"), 2600)
+      }
+
+      function markDone(step) {
+        state.done.add(step)
+        renderSteps()
+      }
+      function renderSteps() {
+        const order = ["select", "pick", "send", "reload"]
+        const current = order.find((s) => !state.done.has(s))
+        document.querySelectorAll(".step").forEach((el) => {
+          const s = el.dataset.step
+          el.dataset.state = state.done.has(s) ? "done" : s === current ? "current" : "todo"
+          el.querySelector(".step-n").textContent = state.done.has(s) ? "✓" : order.indexOf(s) + 1
+        })
+      }
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key !== "Escape") return
+        if (state.draft) closeEditor()
+        else if (state.pick) setPick(false)
+      })
+      $("reset").addEventListener("click", () => location.reload())
+      new ResizeObserver(() => {
+        renderMarks()
+        positionPopover()
+      }).observe(wrap)
+
+      page.innerHTML = PAGE_V1
+      renderSteps()
+      renderComposer()
+    </script>
+  </body>
+</html>

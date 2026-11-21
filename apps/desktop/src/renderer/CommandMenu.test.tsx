@@ -21,6 +21,7 @@ function Registers(props: { actions: ReadonlyArray<Action> }) {
 function mount(props: { actions?: ReadonlyArray<Action>; extra?: ReadonlyArray<Action> } = {}) {
   const user = userEvent.setup()
   const onOpen = vi.fn<(ref: PullRequestRef) => void>()
+  const onStartThread = vi.fn<(message: string) => void>()
 
   const view = render(
     <RegistryProvider>
@@ -31,12 +32,13 @@ function mount(props: { actions?: ReadonlyArray<Action>; extra?: ReadonlyArray<A
         current={undefined}
         onOpen={onOpen}
         onOpenThread={() => {}}
+        onStartThread={onStartThread}
         onViewQueue={() => {}}
       />
     </RegistryProvider>,
   )
 
-  return { user, onOpen, ...view }
+  return { user, onOpen, onStartThread, ...view }
 }
 
 const action = (id: string, title: string, group: Action["group"], run = () => {}): Action => ({
@@ -86,6 +88,7 @@ it("lists only mounted actions, in group order", async () => {
         current={undefined}
         onOpen={() => {}}
         onOpenThread={() => {}}
+        onStartThread={() => {}}
         onViewQueue={() => {}}
       />
     </RegistryProvider>,
@@ -95,16 +98,32 @@ it("lists only mounted actions, in group order", async () => {
   expect(options()).toEqual(["Settings"])
 })
 
-it("narrows by search and says when nothing matches", async () => {
-  const { user } = mount({
-    actions: [action("inbox", "Inbox", "Go to"), action("settings", "Settings", "Go to")],
+it("offers to start a Thread from the search without taking Enter from a match", async () => {
+  const run = vi.fn<() => void>()
+
+  const { user, onStartThread } = mount({
+    actions: [
+      action("inbox", "Inbox", "Go to"),
+      action("next-queued", "Next queued PR", "Pull request", run),
+    ],
   })
 
   await user.keyboard("{Control>}k{/Control}")
-  await user.keyboard("sett")
-  await waitFor(() => expect(options()).toEqual(["Settings"]))
-  await user.keyboard("zzz")
-  await screen.findByText(/Nothing matches/)
+  await user.keyboard("nqp")
+  await waitFor(() => expect(options()).toEqual(["Next queued PR", "nqp"]))
+  expect(screen.getByRole("group", { name: "Start a Thread" })).toBeTruthy()
+  await user.keyboard("{Enter}")
+  await waitFor(() => expect(run).toHaveBeenCalledOnce())
+  expect(onStartThread).not.toHaveBeenCalled()
+})
+
+it("starts a Thread with the typed text when nothing else matches", async () => {
+  const { user, onStartThread } = mount({ actions: [action("inbox", "Inbox", "Go to")] })
+
+  await user.keyboard("{Control>}k{/Control}")
+  await user.keyboard("fix the flaky queue test{Enter}")
+
+  await waitFor(() => expect(onStartThread).toHaveBeenCalledWith("fix the flaky queue test"))
 })
 
 it("opens a PR reference typed or pasted into the search with Enter", async () => {

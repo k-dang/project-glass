@@ -34,6 +34,7 @@ function mount() {
           current={pullRequest.ref}
           onOpen={() => {}}
           onOpenThread={() => {}}
+          onStartThread={() => {}}
           onViewQueue={() => {}}
         />
         <CopyMenu pullRequest={pullRequest} />

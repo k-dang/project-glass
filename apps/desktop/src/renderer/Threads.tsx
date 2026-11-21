@@ -116,7 +116,6 @@ const panelToggleId = "threads-panel-toggle"
 
 export function ThreadsLayout() {
   const [panelOpen, setPanelOpen] = useAtom(threadsPanelOpenAtom)
-  const navigate = useNavigate()
 
   const togglePanel = () => {
     if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
@@ -126,14 +125,6 @@ export function ThreadsLayout() {
   }
 
   useActions([
-    {
-      id: "new-thread",
-      title: "New Thread",
-      group: "Thread",
-      icon: SquarePen,
-      shortcut: { key: "n", mod: true, allowInEditable: true },
-      run: () => void navigate({ to: "/threads/new" }),
-    },
     {
       id: "threads-panel",
       title: panelOpen ? "Hide the Threads list" : "Show the Threads list",

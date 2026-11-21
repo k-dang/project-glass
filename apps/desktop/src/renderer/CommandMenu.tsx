@@ -8,7 +8,6 @@ import {
 } from "@glass/contracts"
 import {
   Command,
-  CommandEmpty,
   CommandGroup,
   CommandGroupLabel,
   CommandInput,
@@ -20,7 +19,14 @@ import {
 } from "@ui-sdk/react/command"
 import { Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { GitPullRequest, GitPullRequestArrow, ListPlus, Search, Sparkles } from "lucide-react"
+import {
+  GitPullRequest,
+  GitPullRequestArrow,
+  ListPlus,
+  Search,
+  Sparkles,
+  SquarePen,
+} from "lucide-react"
 import { type RefObject, useContext, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
@@ -68,6 +74,7 @@ interface Destinations {
   readonly current: PullRequestRef | undefined
   readonly onOpen: (pullRequest: PullRequestRef) => void
   readonly onOpenThread: (threadId: string) => void
+  readonly onStartThread: (message: string) => void
   readonly onViewQueue: () => void
 }
 
@@ -208,7 +215,8 @@ function MenuBody({
   )
 
   const pastedList = [pasted.open, pasted.queue].filter((row) => row !== null)
-  const searching = query.trim() !== ""
+  const trimmed = query.trim()
+  const searching = trimmed !== ""
   const mounted = mountedActions()
 
   const byId = new Map(
@@ -223,6 +231,13 @@ function MenuBody({
         return row === undefined ? [] : [row]
       })
 
+  const startRow: Row = {
+    id: `start-thread:${trimmed}`,
+    title: trimmed,
+    icon: SquarePen,
+    run: () => props.onStartThread(trimmed),
+  }
+
   const sections = (
     pastedList.length > 0
       ? [section("Pasted PR", pastedList)]
@@ -236,6 +251,7 @@ function MenuBody({
           ),
           section("PRs", searching ? jumps.pullRequests : []),
           section("Threads", searching ? jumps.threads : []),
+          section("Start a Thread", searching ? [startRow] : []),
         ]
   ).filter(({ entries }) => entries.length > 0)
 
@@ -244,7 +260,7 @@ function MenuBody({
 
     if (entry === undefined) return
 
-    if (pastedList.length === 0)
+    if (byId.has(entry.row.id))
       setRecent((ids) =>
         [entry.row.id, ...ids.filter((id) => id !== entry.row.id)].slice(0, RECENT_LIMIT),
       )
@@ -278,9 +294,6 @@ function MenuBody({
           className="h-12 min-w-0 flex-1 bg-transparent text-[15px] outline-none placeholder:text-muted-foreground"
         />
       </div>
-      <CommandEmpty className="hidden px-3.5 py-6 text-center text-xs text-muted-foreground data-empty:block">
-        Nothing matches. Paste a PR URL or owner/repo#123 to open it.
-      </CommandEmpty>
       <CommandList className="max-h-[min(24rem,60vh)] overflow-y-auto overscroll-contain p-1.5">
         {sections.map((each) => (
           <MenuSection key={each.label} section={each} />

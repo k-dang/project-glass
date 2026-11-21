@@ -1,3 +1,4 @@
+import { useAtomSet } from "@effect/atom-react"
 import {
   type Thread,
   type ThreadPullRequest,
@@ -21,7 +22,9 @@ import {
   type UnsentFeedback,
   repositoryKey,
   localPlace,
+  nothingUnsent,
 } from "@glass/contracts"
+import { useNavigate } from "@tanstack/react-router"
 import { Data, Effect, Exit, Option, Predicate, Schema, Stream } from "effect"
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity"
 import { Cloud, Laptop, type LucideIcon } from "lucide-react"
@@ -131,6 +134,10 @@ export const feedbackNotesAtom = Atom.family((threadId: string) =>
 
 export const writtenFeedbackAtom = Atom.family((_threadId: string) =>
   Atom.make<UnsentFeedback | null>(null),
+)
+
+export const pageNoteEditingAtom = Atom.family((_threadId: string) =>
+  Atom.make<string | null>(null),
 )
 
 export const localCheckoutsAtom = backendRuntime
@@ -414,6 +421,25 @@ export const writtenAtom = Atom.family((_key: string) =>
 )
 
 export const newThreadWrittenAtom = writtenAtom("new")
+
+export function useStartThread() {
+  const navigate = useNavigate()
+  const setWritten = useAtomSet(newThreadWrittenAtom)
+
+  return (text: string | undefined, repository?: string) => {
+    if (text !== undefined)
+      setWritten((written) => {
+        const composed = written ?? nothingUnsent
+        const before = composed.message.trimEnd()
+
+        return { ...composed, message: before === "" ? `${text} ` : `${before} ${text} ` }
+      })
+    void navigate({
+      to: "/threads/new",
+      search: repository === undefined ? {} : { repository },
+    })
+  }
+}
 
 export const unsentMessageAtom = Atom.family((threadId: string) =>
   backendRuntime.atom(Backend.use((backend) => backend.GetUnsentMessage({ threadId }))),

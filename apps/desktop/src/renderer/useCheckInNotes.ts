@@ -1,9 +1,9 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import type { FeedbackNote } from "@glass/contracts"
+import type { LineNote } from "@glass/contracts"
 import { Atom, AsyncResult } from "effect/reactivity"
 import { useMemo, useState } from "react"
 import { Backend, backendRuntime, useBackendRuntime } from "./backend"
-import { type FeedbackNotesEditor, notesWriter, noteWriteTitles } from "./useFeedbackNotes"
+import { type LineNotesEditor, notesWriter, noteWriteTitles } from "./useFeedbackNotes"
 
 export const checkInChangesAtom = Atom.family((checkInId: string) =>
   backendRuntime.atom(Backend.use((backend) => backend.GetCheckInChanges({ checkInId }))),
@@ -13,11 +13,11 @@ export const checkInNotesAtom = Atom.family((checkInId: string) =>
   backendRuntime.atom(Backend.use((backend) => backend.ListCheckInNotes({ checkInId }))),
 )
 
-export function useCheckInNotes(checkInId: string): FeedbackNotesEditor {
+export function useCheckInNotes(checkInId: string): LineNotesEditor {
   const runtime = useBackendRuntime()
   const listed = useAtomValue(checkInNotesAtom(checkInId))
   const refetch = useAtomRefresh(checkInNotesAtom(checkInId))
-  const [written, setWritten] = useState<ReadonlyArray<FeedbackNote> | null>(null)
+  const [written, setWritten] = useState<ReadonlyArray<LineNote> | null>(null)
   const saved = AsyncResult.isSuccess(listed) ? listed.value : null
 
   return useMemo(() => {

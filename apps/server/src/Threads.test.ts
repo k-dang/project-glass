@@ -1,13 +1,16 @@
 import { assert, it } from "@effect/vitest"
 import {
   ThreadStarted,
-  FeedbackNote,
+  LineNote,
+  PageNote,
+  PageText,
   SandboxPlace,
   TextPatch,
   UnsentFeedback,
   localPlace,
+  toDoMention,
 } from "@glass/contracts"
-import { Effect, Option, Predicate, Stream } from "effect"
+import { Effect, Fiber, Option, Predicate, Stream } from "effect"
 import { existsSync } from "node:fs"
 import { mkdir, rename, symlink, writeFile } from "node:fs/promises"
 import { join, resolve } from "node:path"
@@ -260,9 +263,9 @@ it.live(
         text: "Say three too",
       } as const
 
-      const note = new FeedbackNote(fields)
+      const note = new LineNote(fields)
 
-      const other = new FeedbackNote({
+      const other = new LineNote({
         ...fields,
         id: "note-2",
         start: 2,
@@ -270,7 +273,7 @@ it.live(
         text: "Drop",
       })
 
-      const edited = new FeedbackNote({ ...fields, text: "Say three and four" })
+      const edited = new LineNote({ ...fields, text: "Say three and four" })
 
       yield* f.client.SaveFeedbackNote({ threadId: thread.id, note })
       yield* f.client.SaveFeedbackNote({ threadId: thread.id, note: other })
@@ -294,6 +297,47 @@ it.live(
 )
 
 it.live(
+  "attaches a Feedback note on a page to the next message as soon as it's saved, beside unstaged notes on changes",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadsFixture
+      const thread = yield* f.start("Write a plan")
+      const threadId = thread.id
+      yield* f.transcript(threadId, settled(1))
+
+      const onChanges = new LineNote({
+        id: "line-1",
+        path: "src/retry.ts",
+        side: "new",
+        start: 2,
+        end: 2,
+        code: "attempts++",
+        changesId: "changes-1",
+        text: "Cap the attempts",
+      })
+
+      const onPage = new PageNote({
+        id: "page-1",
+        path: "docs/plan.html",
+        part: PageText.make({
+          selector: "#limits > p",
+          heading: "Limits",
+          excerpt: "five per minute",
+        }),
+        text: "Make this ten",
+      })
+
+      yield* f.client.SaveFeedbackNote({ threadId, note: onChanges })
+      yield* f.client.SaveFeedbackNote({ threadId, note: onPage })
+
+      assert.deepStrictEqual(
+        yield* f.client.ListFeedbackNotes({ threadId }),
+        new UnsentFeedback({ notes: [onChanges, onPage], staged: [onPage.id] }),
+      )
+    }),
+)
+
+it.live(
   "queues staged Feedback notes for the working Thread as one message, taking only those notes",
   () =>
     Effect.gen(function* () {
@@ -311,9 +355,9 @@ it.live(
         changesId: "changes-1",
       } as const
 
-      const capAttempts = new FeedbackNote({ ...fields, id: "note-1", text: "Cap the attempts" })
-      const keepError = new FeedbackNote({ ...fields, id: "note-2", text: "Keep the last error" })
-      const later = new FeedbackNote({ ...fields, id: "note-3", text: "Not staged yet" })
+      const capAttempts = new LineNote({ ...fields, id: "note-1", text: "Cap the attempts" })
+      const keepError = new LineNote({ ...fields, id: "note-2", text: "Keep the last error" })
+      const later = new LineNote({ ...fields, id: "note-3", text: "Not staged yet" })
 
       for (const note of [capAttempts, keepError])
         yield* f.client.SaveFeedbackNote({ threadId, note })
@@ -381,8 +425,8 @@ const queuedFeedback = Effect.gen(function* () {
   } as const
 
   const sent = [
-    new FeedbackNote({ ...fields, id: "note-1", text: "Cap the attempts" }),
-    new FeedbackNote({ ...fields, id: "note-2", changesId: "changes-0", text: "Keep the error" }),
+    new LineNote({ ...fields, id: "note-1", text: "Cap the attempts" }),
+    new LineNote({ ...fields, id: "note-2", changesId: "changes-0", text: "Keep the error" }),
   ]
 
   for (const note of sent) yield* f.client.SaveFeedbackNote({ threadId, note })
@@ -397,7 +441,7 @@ const queuedFeedback = Effect.gen(function* () {
   const { queued } = yield* f.watch(threadId, (transcript) => transcript.queued.length === 1)
   const queuedId = queued[0]!.id
 
-  const newer = new FeedbackNote({ ...fields, id: "note-3", text: "Newer" })
+  const newer = new LineNote({ ...fields, id: "note-3", text: "Newer" })
   yield* f.client.SaveFeedbackNote({ threadId, note: newer })
   yield* f.client.StageFeedbackNotes({ threadId })
 
@@ -537,6 +581,54 @@ it.live("keeps showing a Thread's PR as merged once it merges", () =>
 
     assert.equal(merged?.ref.number, 7)
     assert.equal(merged?.url, pr.url)
+  }),
+)
+
+it.live("marks the To-dos a Thread started from done once its PR merges", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+    yield* f.client.AddToDo({ title: "Fix spacing", notes: "" })
+    yield* f.client.AddToDo({ title: "Tidy later", notes: "" })
+
+    const pr = f.github.seedPullRequest({
+      owner: "glass-demo",
+      repo: "greeter",
+      number: 7,
+      headBranch: "feature/spacing",
+      base: { sha: "b0", files: {} },
+      head: { sha: "h1", files: {} },
+    })
+
+    const thread = yield* f.start(`hold:first
+${toDoMention({ id: 1, title: "Fix spacing" })}`)
+
+    yield* f.transcript(thread.id, holding)
+    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/spacing")
+    yield* f.release("first")
+    yield* f.transcript(thread.id, settled(1))
+    yield* f.send(thread.id, toDoMention({ id: 2, title: "Tidy later" }))
+    yield* f.transcript(thread.id, settled(2))
+
+    const finished = yield* f.client.WatchToDos().pipe(
+      Stream.filter((toDos) => toDos.some(({ done }) => done)),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+      Effect.forkChild,
+    )
+
+    pr.edit({ state: "MERGED" })
+    yield* f.client.ListPullRequests()
+
+    const listed = yield* Fiber.join(finished)
+
+    assert.deepStrictEqual(
+      listed.map(({ title, done }) => ({ title, done })),
+      [
+        { title: "Tidy later", done: false },
+        { title: "Fix spacing", done: true },
+      ],
+    )
   }),
 )
 

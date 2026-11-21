@@ -6,7 +6,14 @@ export default Effect.gen(function* () {
 
   yield* sql`ALTER TABLE conversation RENAME TO thread`
 
-  for (const table of ["queued_message", "skill_pack", "turn", "turn_part", "unsent_message"])
+  for (const table of [
+    "queued_message",
+    "skill_pack",
+    "to_do",
+    "turn",
+    "turn_part",
+    "unsent_message",
+  ])
     yield* sql`ALTER TABLE ${sql(`conversation_${table}`)} RENAME TO ${sql(`thread_${table}`)}`
 
   yield* sql`ALTER TABLE started_conversation RENAME TO started_thread`
@@ -14,6 +21,7 @@ export default Effect.gen(function* () {
   for (const table of [
     "thread_queued_message",
     "thread_skill_pack",
+    "thread_to_do",
     "thread_turn",
     "thread_unsent_message",
     "started_thread",

@@ -60,6 +60,12 @@ export const firstUserText = ({ messages }: FakeModelRequest) =>
 export const lastUserText = ({ messages }: FakeModelRequest) =>
   textOf(messages.findLast(({ role }) => role === "user"))
 
+export const commandFor = (
+  commandsByMessage: Readonly<Record<string, string>>,
+  input: FakeModelRequest,
+) =>
+  Object.entries(commandsByMessage).find(([message]) => lastUserText(input).includes(message))?.[1]
+
 export const runCommands =
   (commandsByMessage: Readonly<Record<string, string>>) =>
   (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> =>
@@ -70,7 +76,7 @@ export const runCommands =
             toolCall: {
               id: `call-${input.messages.length}`,
               name: "bash",
-              arguments: { command: commandsByMessage[lastUserText(input)] ?? "true" },
+              arguments: { command: commandFor(commandsByMessage, input) ?? "true" },
             },
           },
         ]

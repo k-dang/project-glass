@@ -5,12 +5,22 @@ import {
   noListings,
   nothingUnsent,
   SavedPlace,
+  type ToDo,
   TranscriptSnapshot,
   UnsentFeedback,
 } from "@glass/contracts"
-import { DateTime, Effect, Layer, ManagedRuntime, Stream } from "effect"
+import {
+  type Cause,
+  DateTime,
+  Deferred,
+  Effect,
+  Layer,
+  ManagedRuntime,
+  Queue,
+  Stream,
+} from "effect"
 import { AtomRegistry } from "effect/reactivity"
-import { type Rpc, type RpcGroup, RpcTest } from "effect/rpc"
+import { Rpc, type RpcGroup, RpcTest } from "effect/rpc"
 import { expect } from "vite-plus/test"
 import { eventually } from "./eventually"
 import { Backend, backendLayerAtom } from "../src/renderer/backend"
@@ -23,6 +33,50 @@ export type Handlers = {
 }
 
 const unused = () => Effect.die("The test doesn't expect this RPC")
+
+const settled = <A, E>(result: A | Deferred.Deferred<A, E>) =>
+  Deferred.isDeferred<A, E>(result) ? Deferred.await(result) : Effect.succeed(result)
+
+const watchedToDos = (
+  handlers: Partial<Handlers>,
+): Pick<Handlers, "WatchToDos"> & Partial<Handlers> => {
+  const watchers = new Set<Queue.Queue<ReadonlyArray<ToDo>, Cause.Done>>()
+  const { AddToDo, EditToDo, SetToDoDone, DeleteToDo, AttachToDoImages, RemoveToDoImage } = handlers
+
+  const announce = <E>(
+    saved: Rpc.WrapperOr<
+      Effect.Effect<ReadonlyArray<ToDo> | Deferred.Deferred<ReadonlyArray<ToDo>, E>, E>
+    >,
+  ) =>
+    Rpc.unwrap(saved).pipe(
+      Effect.flatMap(settled),
+      Effect.tap((toDos) =>
+        Effect.sync(() => watchers.forEach((queue) => Queue.offerUnsafe(queue, toDos))),
+      ),
+    )
+
+  return {
+    WatchToDos: (payload, options) => {
+      const given = handlers.WatchToDos && Rpc.unwrap(handlers.WatchToDos(payload, options))
+
+      return Stream.concat(
+        given === undefined ? Stream.make([]) : Stream.isStream(given) ? given : Stream.die(given),
+        Stream.callback<ReadonlyArray<ToDo>>((queue) =>
+          Effect.acquireRelease(
+            Effect.sync(() => watchers.add(queue)),
+            () => Effect.sync(() => watchers.delete(queue)),
+          ),
+        ),
+      )
+    },
+    ...(AddToDo && { AddToDo: (...args) => announce(AddToDo(...args)) }),
+    ...(EditToDo && { EditToDo: (...args) => announce(EditToDo(...args)) }),
+    ...(SetToDoDone && { SetToDoDone: (...args) => announce(SetToDoDone(...args)) }),
+    ...(DeleteToDo && { DeleteToDo: (...args) => announce(DeleteToDo(...args)) }),
+    ...(AttachToDoImages && { AttachToDoImages: (...args) => announce(AttachToDoImages(...args)) }),
+    ...(RemoveToDoImage && { RemoveToDoImage: (...args) => announce(RemoveToDoImage(...args)) }),
+  }
+}
 
 export const testLayer = (handlers: Partial<Handlers>) =>
   Layer.effect(Backend, RpcTest.makeClient(GlassRpcs)).pipe(
@@ -157,6 +211,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         WatchGlobalChatSession: unused,
         LoadEarlierGlobalChatSessionTurns: unused,
         ...handlers,
+        ...watchedToDos(handlers),
       }),
     ),
   )

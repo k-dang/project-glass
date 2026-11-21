@@ -1,14 +1,18 @@
-import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import {
+  RegistryContext,
+  useAtom,
+  useAtomRefresh,
+  useAtomSet,
+  useAtomValue,
+} from "@effect/atom-react"
 import {
   mentionedToDoIds,
-  nothingUnsent,
   toDoMention,
   ToDoError,
   type ToDo,
   type ToDoImage,
   type ToDoImageUpload,
 } from "@glass/contracts"
-import { useNavigate } from "@tanstack/react-router"
 import { DialogTrigger } from "@ui-sdk/react/dialog"
 import { cn } from "cn"
 import { AsyncResult, Atom } from "effect/reactivity"
@@ -20,6 +24,7 @@ import {
   type KeyboardEvent,
   type ReactNode,
   useCallback,
+  useContext,
   useState,
 } from "react"
 import { Button } from "@/components/ui/button"
@@ -29,11 +34,11 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
 import { Backend, backendRuntime, useBackendRuntime } from "./backend"
-import { newThreadWrittenAtom } from "./threadsArea"
+import { newThreadWrittenAtom, useStartThread } from "./threadsArea"
 import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { imageFiles, imageSrc, maxToDoImageBytes, readToDoImages } from "./pastedImages"
 import { ProblemAlert } from "./ProblemAlert"
-import { problemOf, settledProblem } from "./problems"
+import { settledProblem, streamProblem } from "./problems"
 import { shortcutLabel } from "./shortcutLabel"
 import { submitOnShortcut } from "./submitShortcut"
 import {
@@ -243,9 +248,9 @@ export function ToDos() {
     <div className="page-content flex flex-col gap-6 py-6">
       <h1 className="text-2xl font-semibold tracking-tight">To-dos</h1>
       {AsyncResult.builder(toDos)
-        .onInitialOrWaiting(() => <output>Loading to-dos…</output>)
+        .onInitial(() => <output>Loading to-dos…</output>)
         .onFailure((cause) => (
-          <ProblemAlert problem={problemOf(cause)} action={{ label: "Retry", run: retry }} />
+          <ProblemAlert problem={streamProblem(cause)} action={{ label: "Retry", run: retry }} />
         ))
         .onSuccess((value) => <ToDoList toDos={value} />)
         .render()}
@@ -516,25 +521,6 @@ function CompactNotes(props: { readonly notes: string }) {
   )
 }
 
-function useStartThread(toDo: ToDo) {
-  const navigate = useNavigate()
-  const setWritten = useAtomSet(newThreadWrittenAtom)
-
-  return () => {
-    setWritten((written) => {
-      const composed = written ?? nothingUnsent
-
-      if (mentionedToDoIds(composed.message).includes(toDo.id)) return composed
-
-      const before = composed.message.trimEnd()
-      const link = `${toDoMention(toDo)} `
-
-      return { ...composed, message: before === "" ? link : `${before} ${link}` }
-    })
-    void navigate({ to: "/threads/new" })
-  }
-}
-
 function ToDoRow(props: { toDo: ToDo }) {
   const { toDo } = props
   const { pending, setDone, remove } = useToDoChanges()
@@ -542,7 +528,14 @@ function ToDoRow(props: { toDo: ToDo }) {
   const sendImages = useAtomSet(sendImagesAtom(toDo.id))
   const toggle = useAtomValue(pendingToggleAtom)
   const checked = toggle?.id === toDo.id ? toggle.done : toDo.done
-  const startThread = useStartThread(toDo)
+  const registry = useContext(RegistryContext)
+  const startThread = useStartThread()
+
+  const startFromToDo = () => {
+    const written = registry.get(newThreadWrittenAtom)?.message ?? ""
+
+    startThread(mentionedToDoIds(written).includes(toDo.id) ? undefined : toDoMention(toDo))
+  }
 
   const paste = (event: ClipboardEvent) => takePastedImages(event, sendImages)
 
@@ -587,7 +580,7 @@ function ToDoRow(props: { toDo: ToDo }) {
           size="icon-xs"
           aria-label={`Start a Thread from ${toDo.title}`}
           title="Start a Thread"
-          onClick={startThread}
+          onClick={startFromToDo}
         >
           <MessageSquarePlus aria-hidden />
         </Button>

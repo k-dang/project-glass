@@ -11,6 +11,7 @@ import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
 import { CheckoutRuns } from "./CheckoutRuns"
 import { Checkouts } from "./Checkouts"
+import { CompleteToDosOnMerge } from "./CompleteToDosOnMerge"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Threads } from "./Threads"
 import { ThreadTurns } from "./ThreadTurns"
@@ -103,7 +104,7 @@ const services = (
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer,
 ) =>
-  Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates)
+  Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge)
     .pipe(
       Layer.provide(NeedsYou.layer),
       Layer.provide(SettledThreads.layer.pipe(Layer.provideMerge(ThreadPullRequests.layer))),

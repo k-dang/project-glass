@@ -8,7 +8,7 @@ import type {
   Revision,
   TourCodeTarget,
 } from "@glass/contracts"
-import { referenceKey } from "@glass/contracts"
+import { referenceKey, repositoryKey } from "@glass/contracts"
 import { cn } from "cn"
 import {
   ChevronRight,
@@ -24,6 +24,7 @@ import {
   RotateCw,
   Route,
   Sparkles,
+  SquarePen,
 } from "lucide-react"
 import {
   type ReactNode,
@@ -56,6 +57,7 @@ import {
   type ViewHandle,
 } from "./ChangedFilesView"
 import { ChangesToolbar } from "./ChangesToolbar"
+import { useStartThread } from "./threadsArea"
 import { CopyMenu } from "./CopyMenu"
 import { OutdatedReviewThreads } from "./ReviewThreads"
 import { Timeline } from "./Timeline"
@@ -387,7 +389,16 @@ export function Workspace(props: {
     />
   )
 
+  const startThread = useStartThread()
+
   useActions([
+    {
+      id: "thread-about-pr",
+      title: "New Thread about this PR",
+      group: "Pull request",
+      icon: SquarePen,
+      run: () => startThread(pullRequest.url, repositoryKey(pullRequest.ref)),
+    },
     agentReview.review !== null && {
       id: "agent-review",
       title: reviewShown ? "Close the Agent review" : "Open the Agent review",

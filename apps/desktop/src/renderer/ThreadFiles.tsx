@@ -1,6 +1,5 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import { type ThreadFile, MAX_FOUND_FILES, type Turn } from "@glass/contracts"
-import { HTML_PAGE_SANDBOX } from "@glass/contracts/desktop"
 import { Data, Effect, Match, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { fromMarkdown } from "mdast-util-from-markdown"
@@ -18,6 +17,7 @@ import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
 import { fileName } from "./fileName"
 import { ProblemAlert } from "./ProblemAlert"
+import { PageWithNotes } from "./PageNotes"
 import { problemOf } from "./problems"
 import { imageSrc } from "./pastedImages"
 import { FileContentsView } from "./RepositoryBrowser"
@@ -174,7 +174,7 @@ export const FilePane = memo(function FilePane(props: {
             <ProblemAlert problem={problemOf(cause)} action={{ label: "Try again", run: retry }} />
           </div>
         ))
-        .onSuccess((file) => <FileView path={props.path} file={file} />)
+        .onSuccess((file) => <FileView threadId={props.threadId} path={props.path} file={file} />)
         .render()}
     </SidePanel>
   )
@@ -182,7 +182,7 @@ export const FilePane = memo(function FilePane(props: {
 
 const extension = (path: string) => /\.([^./\\]+)$/.exec(path)?.[1]?.toLowerCase() ?? ""
 
-function FileView(props: { path: string; file: ThreadFile }) {
+function FileView(props: { threadId: string; path: string; file: ThreadFile }) {
   const { path, file } = props
 
   return Match.value(file).pipe(
@@ -194,7 +194,15 @@ function FileView(props: { path: string; file: ThreadFile }) {
       ),
       TextFile: (text) =>
         Match.value(extension(path)).pipe(
-          Match.when(Match.is("html", "htm"), () => <HtmlDocument path={path} html={text.text} />),
+          Match.when(Match.is("html", "htm"), () => (
+            <PageWithNotes
+              key={`${path}
+${text.text}`}
+              threadId={props.threadId}
+              path={path}
+              html={text.text}
+            />
+          )),
           Match.when(Match.is("md", "markdown"), () => (
             <AgentReviewMarkdown
               markdown={text.text}
@@ -206,32 +214,5 @@ function FileView(props: { path: string; file: ThreadFile }) {
       BinaryFile: (binary) => <FileContentsView path={path} contents={binary} />,
       FileTooLarge: (tooLarge) => <FileContentsView path={path} contents={tooLarge} />,
     }),
-  )
-}
-
-// WARNING: The page runs in its own sandboxed origin, so files beside it don't load.
-function HtmlDocument(props: { path: string; html: string }) {
-  const [src, setSrc] = useState<string | null>(null)
-
-  useEffect(() => {
-    const opened = window.glass.htmlPages.open(props.html)
-
-    void opened.then(setSrc)
-
-    return () => {
-      setSrc(null)
-      void opened.then(window.glass.htmlPages.close)
-    }
-  }, [props.html])
-
-  return (
-    src !== null && (
-      <iframe
-        title={props.path}
-        src={src}
-        sandbox={HTML_PAGE_SANDBOX}
-        className="min-h-0 flex-1 border-0 bg-white"
-      />
-    )
   )
 }

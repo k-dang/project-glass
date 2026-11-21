@@ -31,6 +31,7 @@ import {
   type RequestWaiting,
   type Revision,
   localPlace,
+  mentionedToDoIds,
   type Transcript,
   type TranscriptUpdate,
   type TurnEnd,
@@ -73,6 +74,7 @@ import { type RepositoryRole, ReviewBrief, ReviewRole, WorkRole } from "./agentH
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { forgetStartedWork } from "./startedWorkRows"
+import { ToDos } from "./ToDos"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
@@ -291,6 +293,7 @@ export class Threads extends Context.Service<
       const turns = yield* ThreadTurns
       const notes = yield* FeedbackNotes
       const skillPacks = yield* SkillPacks
+      const toDos = yield* ToDos
       const localSkills = yield* LocalSkills
       const fs = yield* FileSystem.FileSystem
       const lock = yield* Semaphore.make(1)
@@ -535,6 +538,11 @@ export class Threads extends Context.Service<
                   Review: ({ brief }) => encodeBrief(brief),
                 }),
               })}`
+
+              yield* Purpose.$match(purpose, {
+                Work: () => toDos.linkThread(id, mentionedToDoIds(first.message)),
+                Review: () => Effect.void,
+              })
 
               yield* SubscriptionRef.update(rows, (current) => [...current, { ...placed, thread }])
               yield* setKeptGoing(id, thread.createdAt)
@@ -910,6 +918,7 @@ export class Threads extends Context.Service<
             yield* notes.removeAll(threadNotes(threadId))
             yield* skillPacks.releaseThread(threadId)
             yield* forgetStartedWork(sql, threadId)
+            yield* toDos.unlinkThread(threadId)
             yield* sql`DELETE FROM thread WHERE id = ${threadId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
         }).pipe(

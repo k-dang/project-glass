@@ -14,7 +14,7 @@ _Avoid_: Section, tab, page
 
 **Command menu**:
 The search box opened with ⌘K or Ctrl+K from anywhere in Glass, for running any action the current
-view offers and for jumping to a PR or Thread by name.
+view offers, jumping to a PR or Thread by name, and starting a Thread from what was typed.
 _Avoid_: Command palette, quick open (a Command is something an Agent harness runs)
 
 ### Resuming work
@@ -161,7 +161,9 @@ _Avoid_: History, audit log, event log, telemetry
 ### Planning
 
 **To-do**:
-Something the user means to do, written down in Glass, open until they mark it done.
+Something the user means to do, written down in Glass, open until they mark it done. A To-do
+mentioned in a Thread's first message is marked done when that Thread's PR merges,
+unless the user marked it done first.
 _Avoid_: Task, action item
 
 ### Threads
@@ -273,8 +275,8 @@ this device.
 _Avoid_: Draft (a Draft is a GitHub comment)
 
 **Feedback note**:
-An instruction the user leaves on a line or range of a Thread's or Check-in's changes, sent
-to the agent and never published.
+An instruction the user leaves on a line or range of a Thread's or Check-in's changes, or on
+part of an HTML page in a File pane, sent to the agent and never published.
 _Avoid_: Draft, review comment
 
 **Permission mode**:

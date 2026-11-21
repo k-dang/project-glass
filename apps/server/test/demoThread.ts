@@ -23,6 +23,7 @@ import {
   type FakeModelRequest,
   fakeModelProvider,
   lastUserText,
+  commandFor,
   runCommands,
   textOf,
 } from "./fakeModelProvider"
@@ -114,6 +115,16 @@ const glassToolReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> 
   ]
 }
 
+const demoPage = [
+  "<!doctype html><html><body>",
+  "<h1>Rate-limit the poller</h1>",
+  '<section id="limits"><h2>Limits</h2>',
+  "<p>Each Connection gets a burst of 20 requests and a refill of five per minute.</p></section>",
+  "<table><thead><tr><th>Option</th><th>Refill / min</th></tr></thead>",
+  "<tbody><tr><td>Token bucket</td><td>5</td></tr></tbody></table>",
+  "</body></html>",
+].join("")
+
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   if (isGlobalChat(input)) return globalChatReply(input)
 
@@ -125,13 +136,19 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
 
   if (scripted !== undefined) return scripted
 
+  if (lastUserText(input) === "Write a page")
+    return input.messages.at(-1)?.role === "tool"
+      ? [{ text: "I wrote the plan to `plan.html`." }]
+      : runCommands({ "Write a page": `printf '%s' '${demoPage}' > plan.html` })(input)
+
   const changes = {
     "Write a note": "printf 'hello from the agent\\n' > notes.txt",
     "Write another": "printf 'a second note\\n' > more.txt",
     "Pick up the README typo PR": "git switch -c fix-the-typo-in-the-readme",
+    "Pick up the slow query PR": "git switch -c log-slow-database-queries",
   }
 
-  if (Object.hasOwn(changes, lastUserText(input))) return runCommands(changes)(input)
+  if (commandFor(changes, input) !== undefined) return runCommands(changes)(input)
   const { messages } = input
   const last = messages.at(-1)
 

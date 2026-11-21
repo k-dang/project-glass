@@ -4,7 +4,8 @@ import {
   ThreadChanges,
   ThreadError,
   AgentModels,
-  FeedbackNote,
+  type FeedbackNote,
+  LineNote,
   GitHubConnection,
   TranscriptSnapshot,
   TurnDone,
@@ -26,7 +27,7 @@ const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 const idle = () => Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null }))
 
 const note = (id: string, changesId: string, text: string) =>
-  new FeedbackNote({
+  new LineNote({
     id,
     path: "greet.ts",
     side: "new",
@@ -372,7 +373,7 @@ it("shows sent and Queued Feedback notes with the code they were left on", async
 
   await user.keyboard("{Control>}d{/Control}")
   const queue = await screen.findByRole("region", { name: "Queued messages" })
-  expect(within(queue).getByText("Feedback on the Thread's changes")).toBeTruthy()
+  expect(within(queue).getByText("Feedback notes without a message")).toBeTruthy()
   expect(within(queue).getByText("1 Feedback note")).toBeTruthy()
 
   const transcript = screen.getByRole("region", { name: "Transcript" })
@@ -422,7 +423,7 @@ it("returns a canceled Queued message's Feedback notes beside newer work once a 
   const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
 
   const queue = await screen.findByRole("region", { name: "Queued messages" })
-  const cancelFeedback = "Cancel: Feedback on the Thread's changes"
+  const cancelFeedback = "Cancel: Feedback notes without a message"
   await user.click(within(queue).getByRole("button", { name: cancelFeedback }))
   expect(await screen.findByText("Couldn't cancel a Queued message.")).toBeTruthy()
 

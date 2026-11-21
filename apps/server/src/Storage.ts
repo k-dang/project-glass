@@ -46,6 +46,7 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["activity", "activity"],
   ["to_do", "toDos"],
   ["to_do_image", "toDos"],
+  ["thread_to_do", "toDos"],
   ["To-do images", "toDos"],
   [FREE_SPACE, "overhead"],
   [WRITE_AHEAD_LOG, "overhead"],
