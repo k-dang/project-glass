@@ -681,6 +681,12 @@ it.live("moves every Conversation-era row onto Threads, keeping its data", () =>
       [{ work: "Thread:otter:agent/otter:-" }, { work: null }],
     )
     assert.deepStrictEqual(
+      yield* sql`SELECT json(work.value) AS review
+        FROM thread_turn, json_each(context, '$.work') AS work
+        WHERE thread_turn.id = 'update' AND json_extract(work.value, '$._tag') = 'AgentReview'`,
+      [{ review: '{"_tag":"AgentReview","outcome":"finished"}' }],
+    )
+    assert.deepStrictEqual(
       yield* sql`SELECT ${sql.literal(contextOf("json_extract(part, '$.context')"))} AS context
         FROM thread_turn_part`,
       [{ context: "Thread:otter:agent/otter:-" }],
