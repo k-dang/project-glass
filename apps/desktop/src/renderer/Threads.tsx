@@ -258,7 +258,7 @@ function ThreadList() {
       return shown.length === 0 ? (
         <p className="px-2 text-sm text-muted-foreground">No Threads yet.</p>
       ) : (
-        <nav aria-label="Threads list" className="flex flex-col gap-4">
+        <nav aria-label="Threads list" className="flex min-h-full flex-col gap-4">
           {groupThreads(going).map(({ machine, threads: onMachine }) => (
             <section key={machine} aria-label={groupNames[machine]} className="flex flex-col gap-1">
               <h2 className="px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -309,7 +309,7 @@ function SettledSection(props: { threads: ReadonlyArray<Thread>; now: Date }) {
       onOpenChange={setOpen}
       render={<section />}
       aria-label="Settled"
-      className="flex flex-col gap-1"
+      className="mt-auto flex flex-col gap-1"
     >
       <div className="group/settled flex items-center pr-1">
         <h2 className="min-w-0 flex-1">
