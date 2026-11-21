@@ -116,7 +116,6 @@ const panelToggleId = "conversations-panel-toggle"
 
 export function ConversationsLayout() {
   const [panelOpen, setPanelOpen] = useAtom(conversationsPanelOpenAtom)
-  const navigate = useNavigate()
 
   const togglePanel = () => {
     if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
@@ -126,14 +125,6 @@ export function ConversationsLayout() {
   }
 
   useActions([
-    {
-      id: "new-conversation",
-      title: "New Conversation",
-      group: "Conversation",
-      icon: SquarePen,
-      shortcut: { key: "n", mod: true, allowInEditable: true },
-      run: () => void navigate({ to: "/conversations/new" }),
-    },
     {
       id: "conversations-panel",
       title: panelOpen ? "Hide the Conversations list" : "Show the Conversations list",

@@ -50,6 +50,7 @@ const groups: ReadonlyArray<ShortcutGroup> = [
       { label: "Settings", keys: ["Mod", "7"] },
       { label: "Back", keys: ["Mod", "←"] },
       { label: "Forward", keys: ["Mod", "→"] },
+      { label: "New Conversation", keys: ["Mod", "N"] },
       { label: "Open or close the Global chat", keys: ["Mod", "J"] },
       { label: "Open the Command menu", keys: ["Mod", "K"] },
       { label: "Open a PR from the Command menu", keys: ["Mod", "L"] },
@@ -71,7 +72,6 @@ const groups: ReadonlyArray<ShortcutGroup> = [
     icon: Bot,
     note: "In Conversations. Switching between Chat and Changes needs an open Conversation.",
     shortcuts: [
-      { label: "New Conversation", keys: ["Mod", "N"] },
       { label: "Show or hide the Conversations panel", keys: ["Mod", "B"] },
       { label: "Switch between Chat and Changes", keys: ["Mod", "D"] },
     ],

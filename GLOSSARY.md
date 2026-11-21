@@ -14,7 +14,7 @@ _Avoid_: Section, tab, page
 
 **Command menu**:
 The search box opened with ⌘K or Ctrl+K from anywhere in Glass, for running any action the current
-view offers and for jumping to a PR or Conversation by name.
+view offers, jumping to a PR or Conversation by name, and starting a Conversation from what was typed.
 _Avoid_: Command palette, quick open (a Command is something an Agent harness runs)
 
 ### Resuming work
