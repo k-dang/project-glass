@@ -17,12 +17,12 @@ import {
   Match,
   Predicate,
   Scope,
-  Semaphore,
   SubscriptionRef,
 } from "effect"
 import type { HarnessAdapter, HarnessSession } from "./adapter"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import { HostGlassTools } from "./HostGlassTools"
+import { keyedLock } from "../keyedLock"
 import { Journal } from "./Journal"
 import { writeSentSkills } from "./sentSkills"
 import {
@@ -117,30 +117,7 @@ export class HostThreads extends Context.Service<
             return next
           })
 
-        const locks = new Map<string, { semaphore: Semaphore.Semaphore; holders: number }>()
-
-        const withThread = <A, E, R>(threadId: string, effect: Effect.Effect<A, E, R>) =>
-          Effect.suspend(() => {
-            const lock = locks.get(threadId) ?? {
-              semaphore: Semaphore.makeUnsafe(1),
-              holders: 0,
-            }
-
-            lock.holders += 1
-            locks.set(threadId, lock)
-
-            return lock.semaphore
-              .withPermits(1)(effect)
-              .pipe(
-                Effect.ensuring(
-                  Effect.sync(() => {
-                    lock.holders -= 1
-
-                    if (lock.holders === 0 && locks.get(threadId) === lock) locks.delete(threadId)
-                  }),
-                ),
-              )
-          })
+        const withThread = keyedLock().withLock
 
         const retire = (threadId: string, thread: Running | undefined) =>
           Effect.suspend(() => {
