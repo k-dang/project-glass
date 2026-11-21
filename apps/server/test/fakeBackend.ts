@@ -93,7 +93,8 @@ const main = Effect.gen(function* () {
       piCommand: bundledPi,
       claudeCommand,
     },
-    fileURLToPath(new URL("../test/fakeSandboxProvider.ts", import.meta.url)),
+    // WARNING: Resolves next to dist-fake/fakeBackend.mjs, from the fakeSandboxProvider entry in vite.config.ts.
+    fileURLToPath(new URL("fakeSandboxProvider.mjs", import.meta.url)),
   )
 
   seedDemoSettings(config.dataDirectory)

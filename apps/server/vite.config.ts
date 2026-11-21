@@ -64,7 +64,11 @@ export default defineConfig({
       : [
           {
             ...node,
-            entry: { fakeBackend: "test/fakeBackend.ts", sqlReadWorker: "src/sqlReadWorker.ts" },
+            entry: {
+              fakeBackend: "test/fakeBackend.ts",
+              fakeSandboxProvider: "test/fakeSandboxProvider.ts",
+              sqlReadWorker: "src/sqlReadWorker.ts",
+            },
             outDir: "dist-fake",
             // WARNING: @octokit/graphql-schema reads ../schema.json relative to its own module, which breaks once bundled.
             deps: { ...node.deps, neverBundle: ["@octokit/graphql-schema"] },
