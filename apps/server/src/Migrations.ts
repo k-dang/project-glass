@@ -21,7 +21,7 @@ import globalChatSessions from "./migrations/0019_global_chat_sessions"
 import reviewThreadReplies from "./migrations/0020_review_thread_replies"
 import threads from "./migrations/0021_threads"
 
-export const migrationLoader = SqliteMigrator.fromRecord({
+export const migrations = {
   "0001_baseline": baseline,
   "0002_agent_review_hotspots": agentReviewHotspots,
   "0003_agent_review_done": agentReviewDone,
@@ -43,4 +43,6 @@ export const migrationLoader = SqliteMigrator.fromRecord({
   "0019_global_chat_sessions": globalChatSessions,
   "0020_review_thread_replies": reviewThreadReplies,
   "0021_threads": threads,
-})
+}
+
+export const migrationLoader = SqliteMigrator.fromRecord(migrations)

@@ -12,27 +12,13 @@ import { DateTime, Effect, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 import { join } from "node:path"
 import { isolatedHome } from "../test/harness"
-import baseline from "./migrations/0001_baseline"
-import agentReviewHotspots from "./migrations/0002_agent_review_hotspots"
-import agentReviewDone from "./migrations/0003_agent_review_done"
-import outsideAgent from "./migrations/0004_outside_agent"
-import conversationStartedWork from "./migrations/0005_conversation_started_work"
-import turnSeen from "./migrations/0006_turn_seen"
-import workReports from "./migrations/0007_work_reports"
-import pastGlobalConversations from "./migrations/0008_past_global_conversations"
-import globalConversationUpdates from "./migrations/0009_global_conversation_updates"
-import toDoImages from "./migrations/0010_to_do_images"
-import mermaidTourDiagrams from "./migrations/0011_mermaid_tour_diagrams"
-import conversations from "./migrations/0012_conversations"
-import journalHost from "./migrations/0013_journal_host"
-import conversationBranch from "./migrations/0014_conversation_branch"
-import feedbackNotes from "./migrations/0015_feedback_notes"
-import turnRetriesDelivery from "./migrations/0016_turn_retries_delivery"
-import startedWork from "./migrations/0017_started_work"
-import conversationKeptGoing from "./migrations/0018_conversation_kept_going"
-import globalChatSessions from "./migrations/0019_global_chat_sessions"
-import { migrationLoader } from "./Migrations"
+import { migrationLoader, migrations } from "./Migrations"
 import { Transcripts } from "./Transcripts"
+
+const migrationsThrough = (last: keyof typeof migrations) =>
+  SqliteMigrator.fromRecord(
+    Object.fromEntries(Object.entries(migrations).filter(([id]) => id <= last)),
+  )
 
 const encodeEnd = Schema.encodeSync(Schema.fromJsonString(TurnEnd))
 
@@ -40,18 +26,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
 
-    const previousMigrations = {
-      "0001_baseline": baseline,
-      "0002_agent_review_hotspots": agentReviewHotspots,
-      "0003_agent_review_done": agentReviewDone,
-      "0004_outside_agent": outsideAgent,
-      "0005_conversation_started_work": conversationStartedWork,
-      "0006_turn_seen": turnSeen,
-      "0007_work_reports": workReports,
-      "0008_past_global_conversations": pastGlobalConversations,
-    }
-
-    yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(previousMigrations) })
+    yield* SqliteMigrator.run({ loader: migrationsThrough("0008_past_global_conversations") })
 
     const at = "2026-11-14T12:00:00.000Z"
 
@@ -243,7 +218,7 @@ it.live("keeps Agent reviews written before hotspots, with none", () =>
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({ "0001_baseline": baseline }),
+        loader: migrationsThrough("0001_baseline"),
       })
       yield* sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown)
         VALUES ('octo-org', 'hello-world', 1, 'b', 'h', '2026-11-11T00:00:00Z', 'Looks fine.')`
@@ -266,13 +241,7 @@ it.live("counts the Turns that ended before Turns could be seen as seen", () =>
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-        }),
+        loader: migrationsThrough("0005_conversation_started_work"),
       })
 
       for (const id of ["worked", "fresh"])
@@ -307,14 +276,7 @@ it.live(
         const sql = yield* SqlClient.SqlClient
 
         yield* SqliteMigrator.run({
-          loader: SqliteMigrator.fromRecord({
-            "0001_baseline": baseline,
-            "0002_agent_review_hotspots": agentReviewHotspots,
-            "0003_agent_review_done": agentReviewDone,
-            "0004_outside_agent": outsideAgent,
-            "0005_conversation_started_work": conversationStartedWork,
-            "0006_turn_seen": turnSeen,
-          }),
+          loader: migrationsThrough("0006_turn_seen"),
         })
 
         yield* sql`INSERT INTO global_conversation (id) VALUES ('global')`
@@ -356,15 +318,7 @@ it.live("keeps the Global chat's pi session, started at its first Turn", () =>
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-        }),
+        loader: migrationsThrough("0007_work_reports"),
       })
 
       yield* sql`INSERT INTO global_conversation (id) VALUES ('global')`
@@ -393,16 +347,7 @@ it.live("adds to-do images without touching to-dos written before them", () =>
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-          "0008_past_global_conversations": pastGlobalConversations,
-        }),
+        loader: migrationsThrough("0008_past_global_conversations"),
       })
 
       yield* sql`INSERT INTO to_do (title, notes, created_at)
@@ -432,18 +377,7 @@ it.live("drops node-and-edge Tour diagrams, keeping the rest of each saved Tour"
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-          "0008_past_global_conversations": pastGlobalConversations,
-          "0009_global_conversation_updates": globalConversationUpdates,
-          "0010_to_do_images": toDoImages,
-        }),
+        loader: migrationsThrough("0010_to_do_images"),
       })
 
       const diagram = { nodes: [{ id: "a" }], edges: [] }
@@ -473,19 +407,7 @@ it.live("renames Agents to Threads, keeping their context, Steers, Activity, and
       const at = "2026-11-11T00:00:00.000Z"
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-          "0008_past_global_conversations": pastGlobalConversations,
-          "0009_global_conversation_updates": globalConversationUpdates,
-          "0010_to_do_images": toDoImages,
-          "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
-        }),
+        loader: migrationsThrough("0011_mermaid_tour_diagrams"),
       })
 
       const viewing = '{"_tag":"Agent","agentId":"otter","name":"agent/swift-otter"}'
@@ -561,21 +483,7 @@ it.live("records each work Thread's branch as its name, leaving review checkouts
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-          "0008_past_global_conversations": pastGlobalConversations,
-          "0009_global_conversation_updates": globalConversationUpdates,
-          "0010_to_do_images": toDoImages,
-          "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
-          "0012_conversations": conversations,
-          "0013_journal_host": journalHost,
-        }),
+        loader: migrationsThrough("0013_journal_host"),
       })
 
       for (const [id, brief] of [
@@ -605,25 +513,7 @@ it.live(
         const sql = yield* SqlClient.SqlClient
 
         yield* SqliteMigrator.run({
-          loader: SqliteMigrator.fromRecord({
-            "0001_baseline": baseline,
-            "0002_agent_review_hotspots": agentReviewHotspots,
-            "0003_agent_review_done": agentReviewDone,
-            "0004_outside_agent": outsideAgent,
-            "0005_conversation_started_work": conversationStartedWork,
-            "0006_turn_seen": turnSeen,
-            "0007_work_reports": workReports,
-            "0008_past_global_conversations": pastGlobalConversations,
-            "0009_global_conversation_updates": globalConversationUpdates,
-            "0010_to_do_images": toDoImages,
-            "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
-            "0012_conversations": conversations,
-            "0013_journal_host": journalHost,
-            "0014_conversation_branch": conversationBranch,
-            "0015_feedback_notes": feedbackNotes,
-            "0016_turn_retries_delivery": turnRetriesDelivery,
-            "0017_started_work": startedWork,
-          }),
+          loader: migrationsThrough("0017_started_work"),
         })
 
         for (const id of ["written", "quiet"])
@@ -669,26 +559,7 @@ it.live(
         const at = "2026-11-19T00:00:00.000Z"
 
         yield* SqliteMigrator.run({
-          loader: SqliteMigrator.fromRecord({
-            "0001_baseline": baseline,
-            "0002_agent_review_hotspots": agentReviewHotspots,
-            "0003_agent_review_done": agentReviewDone,
-            "0004_outside_agent": outsideAgent,
-            "0005_conversation_started_work": conversationStartedWork,
-            "0006_turn_seen": turnSeen,
-            "0007_work_reports": workReports,
-            "0008_past_global_conversations": pastGlobalConversations,
-            "0009_global_conversation_updates": globalConversationUpdates,
-            "0010_to_do_images": toDoImages,
-            "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
-            "0012_conversations": conversations,
-            "0013_journal_host": journalHost,
-            "0014_conversation_branch": conversationBranch,
-            "0015_feedback_notes": feedbackNotes,
-            "0016_turn_retries_delivery": turnRetriesDelivery,
-            "0017_started_work": startedWork,
-            "0018_conversation_kept_going": conversationKeptGoing,
-          }),
+          loader: migrationsThrough("0018_conversation_kept_going"),
         })
 
         const ended = "2026-11-19T01:00:00.000Z"
@@ -733,27 +604,7 @@ it.live("moves each sent Reply's Activity onto its Review thread's id", () =>
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-          "0008_past_global_conversations": pastGlobalConversations,
-          "0009_global_conversation_updates": globalConversationUpdates,
-          "0010_to_do_images": toDoImages,
-          "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
-          "0012_conversations": conversations,
-          "0013_journal_host": journalHost,
-          "0014_conversation_branch": conversationBranch,
-          "0015_feedback_notes": feedbackNotes,
-          "0016_turn_retries_delivery": turnRetriesDelivery,
-          "0017_started_work": startedWork,
-          "0018_conversation_kept_going": conversationKeptGoing,
-          "0019_global_chat_sessions": globalChatSessions,
-        }),
+        loader: migrationsThrough("0019_global_chat_sessions"),
       })
 
       const at = "2026-11-20T00:00:00.000Z"

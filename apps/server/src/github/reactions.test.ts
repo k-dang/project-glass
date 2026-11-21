@@ -13,7 +13,7 @@ const patch = "@@ -1,2 +1,3 @@\n hello\n+there\n world"
 
 const changedFiles = [{ path: "greet.ts", status: "modified", additions: 1, patch }] as const
 
-const greetLine = {
+const greetReviewThread = {
   path: "greet.ts",
   line: 2,
   side: "RIGHT",
@@ -25,7 +25,7 @@ describe("Reactions", () => {
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
-      const commentId = pr.addReviewThread(greetLine).comments[0]!.id
+      const commentId = pr.addReviewThread(greetReviewThread).comments[0]!.id
       pr.react(commentId, "THUMBS_UP", "hubot")
 
       const open = Effect.map(

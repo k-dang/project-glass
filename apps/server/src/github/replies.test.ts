@@ -20,7 +20,7 @@ const patch = "@@ -1,2 +1,3 @@\n hello\n+there\n world"
 
 const changedFiles = [{ path: "greet.ts", status: "modified", additions: 1, patch }] as const
 
-const greetLine = {
+const greetReviewThread = {
   path: "greet.ts",
   line: 2,
   side: "RIGHT",
@@ -71,7 +71,7 @@ describe("Replies", () => {
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
-      const reviewThread = pr.addReviewThread(greetLine)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
       const reply = yield* client.ReplyToReviewThread({
         reviewThreadId: reviewThread.id,
@@ -116,7 +116,7 @@ describe("Replies", () => {
         },
       })
 
-      const reviewThread = pr.addReviewThread(greetLine)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
       const error = yield* client
         .ReplyToReviewThread({ reviewThreadId: reviewThread.id, body: "To greet them." })
@@ -146,7 +146,7 @@ describe("Replies", () => {
           },
         })
 
-        const reviewThread = pr.addReviewThread(greetLine)
+        const reviewThread = pr.addReviewThread(greetReviewThread)
 
         const { pullRequest, revision } = yield* client.LoadPullRequest({
           pullRequest: new PullRequestRef(pr),
@@ -218,7 +218,7 @@ describe("Replies", () => {
         },
       })
 
-      const reviewThread = pr.addReviewThread(greetLine)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
       const { pullRequest, revision } = yield* client.LoadPullRequest({
         pullRequest: new PullRequestRef(pr),
@@ -284,7 +284,7 @@ describe("Replies", () => {
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
-      const reviewThread = pr.addReviewThread(greetLine)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
       const error = yield* client
         .ReplyToReviewThread({ reviewThreadId: reviewThread.id, body: "  " })

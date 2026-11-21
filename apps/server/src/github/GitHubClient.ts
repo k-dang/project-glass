@@ -812,7 +812,13 @@ export class GitHubClient extends Context.Service<
       ) {
         const pinned = revision ?? (yield* pullRequestInput(ref, undefined)).revision
 
-        const [{ pr, nodes }, files] = yield* alongsideChangedFiles(
+        const [
+          {
+            pr,
+            nodes: [reviewThreads, comments, reviews],
+          },
+          files,
+        ] = yield* alongsideChangedFiles(
           ref,
           Effect.gen(function* () {
             const read = yield* pullRequestInput(ref, pinned)
@@ -822,8 +828,6 @@ export class GitHubClient extends Context.Service<
         )
 
         if (!(yield* isCurrent(pr.id, pinned))) return yield* new StaleRevision()
-
-        const [reviewThreads, comments, reviews] = nodes
 
         return {
           title: pr.title,

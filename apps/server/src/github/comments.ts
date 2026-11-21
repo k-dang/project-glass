@@ -150,7 +150,7 @@ export const isOnLine = (
 export const toPublishedComments = (
   files: ReadonlyArray<ChangedFile>,
   reviewThreads: ReadonlyArray<typeof GitHubReviewThread.Type>,
-  comments: ReadonlyArray<typeof GitHubComment.Type>,
+  prComments: ReadonlyArray<typeof GitHubComment.Type>,
   reviews: ReadonlyArray<typeof GitHubReview.Type>,
 ) => {
   const shown = textDiffPaths(files)
@@ -164,7 +164,7 @@ export const toPublishedComments = (
     if (!Arr.isReadonlyArrayNonEmpty(published)) continue
 
     const { id, path, isResolved: resolved } = reviewThread
-    const reviewThreadComments = Arr.map(published, toComment)
+    const comments = Arr.map(published, toComment)
 
     if (isOnLine(reviewThread, shown)) {
       onLines.push(
@@ -174,7 +174,7 @@ export const toPublishedComments = (
           side: fromGitHubSide(reviewThread.diffSide),
           line: reviewThread.line,
           resolved,
-          comments: reviewThreadComments,
+          comments,
         }),
       )
     } else {
@@ -188,13 +188,13 @@ export const toPublishedComments = (
               : reviewThread.originalLine,
           diffHunk: published[0].diffHunk,
           resolved,
-          comments: reviewThreadComments,
+          comments,
         }),
       )
     }
   }
 
-  const timeline: Array<PublishedComment | Review> = comments.map(toComment)
+  const timeline: Array<PublishedComment | Review> = prComments.map(toComment)
 
   for (const review of reviews) {
     const bodyHtml = review.bodyHTML.trim()

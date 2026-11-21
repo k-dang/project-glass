@@ -11,7 +11,7 @@ const patch = "@@ -1,2 +1,3 @@\n hello\n+there\n world"
 
 const changedFiles = [{ path: "greet.ts", status: "modified", additions: 1, patch }] as const
 
-const greetLine = {
+const greetReviewThread = {
   path: "greet.ts",
   line: 2,
   side: "RIGHT",
@@ -23,7 +23,7 @@ describe("Review thread resolution", () => {
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
-      const reviewThread = pr.addReviewThread(greetLine)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
       assert.strictEqual(
         yield* client.SetReviewThreadResolved({ reviewThreadId: reviewThread.id, resolved: true }),
@@ -58,7 +58,7 @@ describe("Review thread resolution", () => {
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
-      const reviewThread = pr.addReviewThread(greetLine)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
       assert.deepStrictEqual(
         yield* client
@@ -75,7 +75,7 @@ describe("Review thread resolution", () => {
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
       const pr = github.seedPullRequest({ base, head, changedFiles })
-      const reviewThread = pr.addReviewThread(greetLine)
+      const reviewThread = pr.addReviewThread(greetReviewThread)
 
       github.failNextGraphQL({ type: "FORBIDDEN", message: "Not permitted" })
 
