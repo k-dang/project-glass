@@ -2,6 +2,7 @@
 
 A desktop work hub for reviewing GitHub pull requests and working with coding agents.
 
+- **Single user**: Kevin is Glass's only user, with one install and no releases. A migration only has to carry his one database forward; backward-compatibility shims and tests for already-run migrations protect nobody.
 - **Domain words** come from [`GLOSSARY.md`](GLOSSARY.md); use them in code, UI copy, and specs.
 
 ## Effect 4
@@ -17,7 +18,6 @@ Before using ui-sdk (`@ui-sdk/react`, `@ui-sdk/core` in `apps/desktop`), follow 
 ## Gotchas
 
 - The per-launch secret travels in the `token` query parameter, so request logging stays off (`disableLogger` in `apps/server/src/server.ts`) and HTTP spans redact it (`UrlParams.CurrentRedactedNames` there).
-- `backend.log` is one JSON line per unit of work. Record what a unit learns with `annotateUnit`, following the rule in `apps/server/src/wideEvents.ts` on what never goes in a field. Background work that outlives its RPC needs its own `root: true` span, as `settle` in `apps/server/src/pullRequestJobs.ts` gives each PR job.
 
 ## Tests
 
