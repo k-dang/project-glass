@@ -252,10 +252,10 @@ function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
 
   return (
     <div className="flex min-h-0 flex-1 bg-chrome">
-      <aside className="flex w-14 shrink-0 flex-col items-center gap-4 pb-3">
+      <aside className="flex w-14 shrink-0 flex-col items-center gap-2 pb-3">
         <div className="title-strip title-strip-below-controls flex w-full shrink-0 items-center justify-center">
           <TooltipHint content="Glass" side="right">
-            <span className="flex size-6 items-center justify-center rounded-md bg-primary text-primary-foreground [app-region:no-drag] [&_svg]:size-4">
+            <span className="flex size-9 items-center justify-center [app-region:no-drag]">
               <GlassMark />
               <span className="sr-only">Glass</span>
             </span>
