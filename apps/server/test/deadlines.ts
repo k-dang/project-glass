@@ -1,4 +1,5 @@
 import { Clock, Duration, Effect, Queue } from "effect"
+import { TestClock } from "effect/testing"
 
 export const watchDeadlines = (deadline: number) =>
   Effect.gen(function* () {
@@ -24,3 +25,18 @@ export const withWatchedClock = <A, E, R>(
 
     return yield* test(deadlineSet).pipe(Effect.provideService(Clock.Clock, watched))
   })
+
+export const withSkippableWaits = <A, E, R>(
+  wait: Duration.Duration,
+  test: (skipWaits: Effect.Effect<void>) => Effect.Effect<A, E, R>,
+) =>
+  withWatchedClock(wait, (waitSet) =>
+    test(
+      waitSet.pipe(
+        Effect.andThen(TestClock.adjust(wait)),
+        Effect.forever,
+        Effect.forkChild,
+        Effect.asVoid,
+      ),
+    ),
+  )

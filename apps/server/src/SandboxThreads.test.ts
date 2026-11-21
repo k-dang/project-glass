@@ -8,6 +8,8 @@ import {
   TurnDone,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
+import { TestClock } from "effect/testing"
+import { withSkippableWaits } from "../test/deadlines"
 import {
   glassCall,
   threadOutcomesInStartedWorkUpdates,
@@ -18,6 +20,7 @@ import {
   repository,
   settled,
 } from "../test/threadsFixture"
+import { FIRST_LOST_RETRY_SPACING, QUICK_RETRY_SPACING } from "./reconnecting"
 
 const createIn = (place: ThreadPlace, message: string) =>
   glassCall("create_thread", {
@@ -83,23 +86,26 @@ it.live("a Thread in a Sandbox can't create or message one on this device", () =
   }),
 )
 
-it.live("cuts off only the running Turn of a Thread whose Sandbox host is lost", () =>
-  Effect.gen(function* () {
-    const f = yield* threadsFixture
-    const local = yield* f.start("hold:local")
-    const sandboxed = yield* f.startSandbox("hold:sandboxed")
-    yield* f.transcript(local.id, holding)
-    yield* f.transcript(sandboxed.id, holding)
+it.effect("cuts off only the running Turn of a Thread whose Sandbox host is lost", () =>
+  withSkippableWaits(QUICK_RETRY_SPACING, (skipQuickRetries) =>
+    Effect.gen(function* () {
+      const f = yield* threadsFixture
+      const local = yield* f.start("hold:local")
+      const sandboxed = yield* f.startSandbox("hold:sandboxed")
+      yield* f.transcript(local.id, holding)
+      yield* f.transcript(sandboxed.id, holding)
 
-    yield* Effect.promise(() => f.sandboxes.killHost(sandboxed.id))
+      yield* Effect.promise(() => f.sandboxes.killHost(sandboxed.id))
+      yield* skipQuickRetries
 
-    const [lost] = yield* f.transcript(sandboxed.id, settled(1))
-    assert.deepStrictEqual(lost?.ended?.ending, TurnCutOff.make({}))
+      const [lost] = yield* f.transcript(sandboxed.id, settled(1))
+      assert.deepStrictEqual(lost?.ended?.ending, TurnCutOff.make({}))
 
-    yield* f.release("local")
-    const [kept] = yield* f.transcript(local.id, settled(1))
-    assert.deepStrictEqual(kept?.ended?.ending, TurnDone.make({}))
-  }),
+      yield* f.release("local")
+      const [kept] = yield* f.transcript(local.id, settled(1))
+      assert.deepStrictEqual(kept?.ended?.ending, TurnDone.make({}))
+    }),
+  ),
 )
 
 it.live("fills in what a Sandbox Thread did while Glass was closed, once Glass opens again", () =>
@@ -121,53 +127,60 @@ it.live("fills in what a Sandbox Thread did while Glass was closed, once Glass o
   }),
 )
 
-it.live(
+it.effect(
   "marks a Sandbox it can't reach unreachable without holding up local Threads, then fills in how its Turn ended",
   () =>
-    Effect.gen(function* () {
-      const f = yield* threadsFixture
-      const local = yield* f.start("hold:local")
-      const sandboxed = yield* f.startSandbox("hold:sandboxed")
-      yield* f.transcript(local.id, holding)
-      yield* f.transcript(sandboxed.id, holding)
+    withSkippableWaits(QUICK_RETRY_SPACING, (skipQuickRetries) =>
+      Effect.gen(function* () {
+        const f = yield* threadsFixture
+        const local = yield* f.start("hold:local")
+        const sandboxed = yield* f.startSandbox("hold:sandboxed")
+        yield* f.transcript(local.id, holding)
+        yield* f.transcript(sandboxed.id, holding)
 
-      yield* Effect.promise(() => f.sandboxes.dropConnections(sandboxed.id))
-      yield* f.sandboxStatus(sandboxed.id, ({ reach }) => reach === "unreachable")
-      const [cutOff] = yield* f.transcript(sandboxed.id, settled(1))
-      assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
+        yield* Effect.promise(() => f.sandboxes.dropConnections(sandboxed.id))
+        yield* skipQuickRetries
+        yield* f.sandboxStatus(sandboxed.id, ({ reach }) => reach === "unreachable")
+        const [cutOff] = yield* f.transcript(sandboxed.id, settled(1))
+        assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
 
-      yield* f.release("local")
-      yield* f.release("sandboxed")
-      const [kept] = yield* f.transcript(local.id, settled(1))
-      assert.deepStrictEqual(kept?.ended?.ending, TurnDone.make({}))
+        yield* f.release("local")
+        yield* f.release("sandboxed")
+        const [kept] = yield* f.transcript(local.id, settled(1))
+        assert.deepStrictEqual(kept?.ended?.ending, TurnDone.make({}))
 
-      f.sandboxes.reconnect(sandboxed.id)
-      yield* f.sandboxStatus(sandboxed.id, ({ reach }) => reach === "reachable")
+        f.sandboxes.reconnect(sandboxed.id)
+        yield* TestClock.adjust(FIRST_LOST_RETRY_SPACING)
+        yield* f.sandboxStatus(sandboxed.id, ({ reach }) => reach === "reachable")
 
-      const [filledIn] = yield* f.transcript(
-        sandboxed.id,
-        ([turn]) => turn?.ended?.ending._tag === "Done",
-      )
+        const [filledIn] = yield* f.transcript(
+          sandboxed.id,
+          ([turn]) => turn?.ended?.ending._tag === "Done",
+        )
 
-      assert.deepStrictEqual(
-        lastText(filledIn),
-        TextPart.make({ text: "Reply to: hold:sandboxed" }),
-      )
-    }),
+        assert.deepStrictEqual(
+          lastText(filledIn),
+          TextPart.make({ text: "Reply to: hold:sandboxed" }),
+        )
+      }),
+    ),
 )
 
-it.live("cuts off a Turn whose Sandbox host died while Glass was closed", () =>
-  Effect.gen(function* () {
-    const f = yield* threadsFixture
-    const thread = yield* f.startSandbox("hold:start")
-    yield* f.transcript(thread.id, holding)
+it.effect("cuts off a Turn whose Sandbox host died while Glass was closed", () =>
+  withSkippableWaits(QUICK_RETRY_SPACING, (skipQuickRetries) =>
+    Effect.gen(function* () {
+      const f = yield* threadsFixture
+      const thread = yield* f.startSandbox("hold:start")
+      yield* f.transcript(thread.id, holding)
 
-    yield* f.quit
-    yield* Effect.promise(() => f.sandboxes.killHost(thread.id))
-    const relaunched = yield* f.launch
+      yield* f.quit
+      yield* Effect.promise(() => f.sandboxes.killHost(thread.id))
+      yield* skipQuickRetries
+      const relaunched = yield* f.launch
 
-    yield* f.sandboxStatus(thread.id, ({ reach }) => reach === "unreachable", relaunched)
-    const [turn] = yield* f.transcript(thread.id, settled(1), relaunched)
-    assert.deepStrictEqual(turn?.ended?.ending, TurnCutOff.make({}))
-  }),
+      yield* f.sandboxStatus(thread.id, ({ reach }) => reach === "unreachable", relaunched)
+      const [turn] = yield* f.transcript(thread.id, settled(1), relaunched)
+      assert.deepStrictEqual(turn?.ended?.ending, TurnCutOff.make({}))
+    }),
+  ),
 )
