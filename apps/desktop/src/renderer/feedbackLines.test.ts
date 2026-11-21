@@ -1,4 +1,4 @@
-import { FeedbackNote, TextPatch } from "@glass/contracts"
+import { LineNote, TextPatch } from "@glass/contracts"
 import { describe, expect, it } from "vite-plus/test"
 import { layOut } from "./changesView"
 import {
@@ -65,7 +65,7 @@ describe("feedbackTarget", () => {
 })
 
 const note = (id: string, changesId: string, side: "old" | "new", end: number) =>
-  new FeedbackNote({
+  new LineNote({
     id,
     path: "greet.ts",
     side,

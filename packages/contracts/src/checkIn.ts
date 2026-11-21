@@ -1,5 +1,5 @@
 import { Schema, Struct } from "effect"
-import { FeedbackNote } from "./feedbackNote"
+import { LineNote } from "./feedbackNote"
 import { ChangedFile } from "./pullRequest"
 
 export const CheckIn = Schema.TaggedStruct("CheckIn", {
@@ -40,7 +40,7 @@ export class CheckInError extends Schema.TaggedError<CheckInError>()("CheckInErr
 export const checkInNoteKeys = ["path", "side", "start", "end", "code", "text"] as const
 
 export const CheckInNote = Schema.Struct({
-  ...Struct.pick(FeedbackNote.fields, checkInNoteKeys),
+  ...Struct.pick(LineNote.fields, checkInNoteKeys),
   outdated: Schema.Boolean,
 })
 

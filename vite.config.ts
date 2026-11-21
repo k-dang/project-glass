@@ -102,6 +102,16 @@ export default defineConfig({
         },
       },
       {
+        files: ["apps/desktop/src/renderer/pageNotesScript.ts"],
+        rules: {
+          "unicorn/consistent-function-scoping": "off",
+          "anti-slop-effect/prefer-effect-match": "off",
+          "anti-slop-effect/no-manual-tag-comparison": "off",
+          "anti-slop-effect/no-manual-tagged-construction": "off",
+          "anti-slop/no-runtime-typeof": "off",
+        },
+      },
+      {
         files: ["apps/desktop/src/renderer/components/border-beam/**"],
         rules: {
           "anti-slop/no-conditional-empty-object-spread": "off",

@@ -22,7 +22,7 @@ export function useStagedFeedback(
   const open = editing !== null && included.includes(editing.id) ? editing : null
 
   return {
-    editing: open !== null,
+    editing: open !== null || store.editingOnPage,
     send: async (message: MessageInput) => {
       const accepted = await send({ ...message, feedback: included })
 

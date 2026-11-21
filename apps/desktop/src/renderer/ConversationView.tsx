@@ -1336,7 +1336,7 @@ function QueuedMessages(props: { queued: ReadonlyArray<QueuedMessage>; running: 
           const feedbackOnly = queued.message === ""
 
           const readable = feedbackOnly
-            ? "Feedback on the Conversation's changes"
+            ? "Feedback notes without a message"
             : readableText(queued.message)
 
           return (

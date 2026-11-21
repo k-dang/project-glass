@@ -258,8 +258,8 @@ this device.
 _Avoid_: Draft (a Draft is a GitHub comment)
 
 **Feedback note**:
-An instruction the user leaves on a line or range of a Conversation's or Check-in's changes, sent
-to the agent and never published.
+An instruction the user leaves on a line or range of a Conversation's or Check-in's changes, or on
+part of an HTML page in a File pane, sent to the agent and never published.
 _Avoid_: Draft, review comment
 
 **Permission mode**:

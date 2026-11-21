@@ -18,6 +18,7 @@ import {
   type TurnPart,
   FollowedRepository,
   PartAppended,
+  PageText,
   PartSet,
   PullRequestRef,
   PullRequestMerged,
@@ -54,6 +55,8 @@ import { afterEach, expect, it, onTestFinished, vi } from "vite-plus/test"
 import { conversation, conversationFields } from "../../test/conversation"
 import { changedFile, workspace } from "../../test/workspace"
 import { choice, mount, pixel } from "../../test/conversationApp"
+import type { PageEvent, PageState } from "./pageMessages"
+import { withPageNotes } from "./pageNotesScript"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 
@@ -1595,5 +1598,109 @@ it("links the files a Turn named once it ends, and opens HTML beside the Chat as
 
   expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms allow-popups")
   expect(frame.getAttribute("src")).toBe("glass-page://page/1")
-  expect(opened).toEqual(["<h1>docs/explainer.html</h1>"])
+  expect(opened).toEqual([withPageNotes("<h1>docs/explainer.html</h1>")])
+})
+
+it("leaves a Feedback note on the part of an HTML page the page reports, and sends it with the next message", async () => {
+  let unsent = new UnsentFeedback({ notes: [], staged: [] })
+  const sent: Array<{ message: string; feedback: ReadonlyArray<string> }> = []
+
+  vi.stubGlobal("glass", {
+    htmlPages: {
+      open: () => Promise.resolve("glass-page://page/1"),
+      close: () => Promise.resolve(),
+    },
+  })
+
+  const user = mount({
+    FindConversationFiles: ({ paths }) => Effect.succeed(paths),
+    GetConversationFile: () =>
+      Effect.succeed(TextFile.make({ text: "<p>A refill of five per minute.</p>" })),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              ...runningTurn,
+              parts: [TextPart.make({ text: "Wrote `docs/plan.html`." })],
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+    ListFeedbackNotes: () => Effect.sync(() => unsent),
+    SaveFeedbackNote: ({ note }) =>
+      Effect.sync(
+        () =>
+          (unsent = new UnsentFeedback({
+            notes: [...unsent.notes, note],
+            staged: [...unsent.staged, note.id],
+          })),
+      ),
+    SendMessage: ({ message, feedback }) =>
+      Effect.sync(() => void sent.push({ message, feedback })),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
+
+  const pane = await screen.findByRole("complementary", { name: "File" })
+
+  const frame = await waitFor(() => {
+    const found = pane.querySelector("iframe")
+    expect(found).not.toBeNull()
+
+    return found!
+  })
+
+  const toPage: Array<{ readonly glassPageState: PageState }> = []
+  const { port1: page } = new MessageChannel()
+  page.postMessage = (data: { readonly glassPageState: PageState }) => void toPage.push(data)
+  Object.defineProperty(frame, "contentWindow", { value: page })
+
+  const fromPage = (event: PageEvent) =>
+    window.dispatchEvent(
+      new MessageEvent("message", { source: page, data: { glassPageEvent: event } }),
+    )
+
+  const part = PageText.make({
+    selector: "body > p",
+    heading: null,
+    excerpt: "refill of five per minute",
+  })
+
+  fromPage({ type: "ready" })
+  await waitFor(() =>
+    expect(toPage.at(-1)).toEqual({ glassPageState: { pick: false, notes: [], active: null } }),
+  )
+
+  fromPage({ type: "part", part, rect: { top: 10, left: 10, bottom: 30, right: 200 } })
+
+  await user.type(
+    await within(pane).findByRole("textbox", { name: "Feedback on the selected part of the page" }),
+    "Make this ten",
+  )
+  await user.keyboard("{Control>}{Enter}{/Control}")
+
+  const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
+  expect(within(attached).getByText("docs/plan.html · “refill of five per minute”")).toBeTruthy()
+  expect(within(attached).getByText("Make this ten")).toBeTruthy()
+
+  const [note] = unsent.notes
+  expect(toPage.at(-1)).toEqual({
+    glassPageState: { pick: false, notes: [{ id: note?.id, part }], active: null },
+  })
+
+  fromPage({ type: "open", id: note!.id, rect: { top: 10, left: 10, bottom: 30, right: 200 } })
+  await within(pane).findByRole("form", { name: "Edit Feedback note" })
+  expect(screen.getByRole("button", { name: "Send" }).hasAttribute("disabled")).toBe(true)
+
+  await user.click(within(pane).getByRole("button", { name: "Cancel" }))
+  await user.type(screen.getByRole("textbox", { name: "Message" }), "{Enter}")
+
+  await waitFor(() => expect(sent).toEqual([{ message: "", feedback: [note?.id] }]))
+  await waitFor(() =>
+    expect(toPage.at(-1)).toEqual({ glassPageState: { pick: false, notes: [], active: null } }),
+  )
 })

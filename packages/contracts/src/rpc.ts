@@ -56,7 +56,7 @@ import {
 } from "./discussion"
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
-import { FeedbackNote, UnsentFeedback } from "./feedbackNote"
+import { FeedbackNote, LineNote, UnsentFeedback } from "./feedbackNote"
 import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { MergeAction, MergePullRequestError } from "./merge"
@@ -393,17 +393,17 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("ListCheckInNotes", {
     payload: { checkInId: Schema.String },
-    success: Schema.Array(FeedbackNote),
+    success: Schema.Array(LineNote),
     error: Schema.Union([CheckInNotWaiting, CheckInError]),
   }),
   Rpc.make("SaveCheckInNote", {
-    payload: { checkInId: Schema.String, note: FeedbackNote },
-    success: Schema.Array(FeedbackNote),
+    payload: { checkInId: Schema.String, note: LineNote },
+    success: Schema.Array(LineNote),
     error: Schema.Union([CheckInNotWaiting, CheckInError]),
   }),
   Rpc.make("RemoveCheckInNote", {
     payload: { checkInId: Schema.String, noteId: Schema.String },
-    success: Schema.Array(FeedbackNote),
+    success: Schema.Array(LineNote),
     error: Schema.Union([CheckInNotWaiting, CheckInError]),
   }),
   Rpc.make("AnswerCheckIn", {

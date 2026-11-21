@@ -1,7 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import {
   ChangedFile,
-  FeedbackNote,
+  LineNote,
   FollowedRepository,
   incompatibleExplanation,
   PartSet,
@@ -423,7 +423,7 @@ it.effect(
       const conversation = yield* createSandboxed(f)
       yield* end(yield* f.started)
 
-      const note = new FeedbackNote({
+      const note = new LineNote({
         id: "note",
         path: "notes.txt",
         side: "new",

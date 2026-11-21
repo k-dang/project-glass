@@ -1,6 +1,10 @@
 import {
   type CapturedContext,
   type FeedbackNote,
+  isLineNote,
+  isPageNote,
+  type LineNote,
+  type PageNote,
   replaceMentions,
   type WorkOutcome,
   type ToDo,
@@ -70,7 +74,7 @@ const entry = ({ id, title, notes, done, images }: ToDo) =>
     "</to_do>",
   ].join("\n")
 
-const feedbackEntry = ({ path, side, start, end, code, text }: FeedbackNote) =>
+const lineEntry = ({ path, side, start, end, code, text }: LineNote) =>
   [
     `<feedback_note path="${attribute(path)}" side="${side}" lines="${start === end ? start : `${start}-${end}`}">`,
     "Code:",
@@ -79,6 +83,39 @@ const feedbackEntry = ({ path, side, start, end, code, text }: FeedbackNote) =>
     withoutBlockTags(text),
     "</feedback_note>",
   ].join("\n")
+
+const pageEntry = ({ path, part, text }: PageNote) =>
+  [
+    `<feedback_note path="${attribute(path)}" selector="${attribute(part.selector)}"${
+      part.heading === null ? "" : ` heading="${attribute(part.heading)}"`
+    }>`,
+    ...Match.valueTags(part, {
+      PageText: ({ excerpt }) => ["Selected text:", withoutBlockTags(excerpt)],
+      PageElement: ({ label, excerpt }) => [
+        `Element: ${withoutBlockTags(label)}`,
+        ...(excerpt === "" ? [] : ["Its text:", withoutBlockTags(excerpt)]),
+      ],
+    }),
+    "Note:",
+    withoutBlockTags(text),
+    "</feedback_note>",
+  ].join("\n")
+
+const feedbackEntry = (note: FeedbackNote) =>
+  Match.valueTags(note, { LineNote: lineEntry, PageNote: pageEntry })
+
+const feedbackIntro = (feedback: ReadonlyArray<FeedbackNote>) => {
+  const onLines = feedback.some(isLineNote)
+  const onPages = feedback.some(isPageNote)
+
+  if (!onPages)
+    return "The user left these Feedback notes on your changes, each on the code they read. Lines on the old side are from before your changes, on the new side from after them; the code may have changed since."
+
+  if (!onLines)
+    return "The user left these Feedback notes on pages in your files, each on the part of the page they pointed at; the page may have changed since."
+
+  return "The user left these Feedback notes on your changes and on pages in your files. A note with lines is on the code they read: lines on the old side are from before your changes, on the new side from after them. A note with a selector is on the part of the page they pointed at. Either may have changed since."
+}
 
 const block = (tag: string, lines: ReadonlyArray<string>) =>
   [`<${tag}>`, ...lines, `</${tag}>`].join("\n")
@@ -99,10 +136,7 @@ export const prompt = (
     context === null ? null : contextBlock(context),
     feedback.length === 0
       ? null
-      : block("glass_feedback", [
-          "The user left these Feedback notes on your changes, each on the code they read. Lines on the old side are from before your changes, on the new side from after them; the code may have changed since.",
-          ...feedback.map(feedbackEntry),
-        ]),
+      : block("glass_feedback", [feedbackIntro(feedback), ...feedback.map(feedbackEntry)]),
     toDos.length === 0
       ? null
       : block("glass_to_dos", [

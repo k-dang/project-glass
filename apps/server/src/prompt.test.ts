@@ -1,7 +1,10 @@
 import { assert, it } from "@effect/vitest"
 import {
   ConversationContext,
-  FeedbackNote,
+  LineNote,
+  PageElement,
+  PageNote,
+  PageText,
   fileMention,
   PullRequestContext,
   PullRequestRef,
@@ -111,8 +114,8 @@ it("follows a message with the Conversation the user was viewing", () => {
   )
 })
 
-const note = (fields: Partial<typeof FeedbackNote.Type>) =>
-  new FeedbackNote({
+const note = (fields: Partial<LineNote>) =>
+  new LineNote({
     id: "note-1",
     path: "src/retry.ts",
     side: "new",
@@ -151,6 +154,61 @@ it("follows a message with each Feedback note and the code it was left on", () =
       "</glass_feedback>",
     ].join("\n"),
   )
+})
+
+const pageNote = (fields: Partial<PageNote>) =>
+  new PageNote({
+    id: "page-1",
+    path: "docs/plan.html",
+    part: PageText.make({
+      selector: "#limits > p",
+      heading: "Limits",
+      excerpt: "a refill of five per minute",
+    }),
+    text: "Make this ten",
+    ...fields,
+  })
+
+it("gives each Feedback note on a page the part of the page it was left on", () => {
+  assert.equal(
+    prompt("", [], null, [
+      pageNote({}),
+      pageNote({
+        id: "page-2",
+        part: PageElement.make({
+          label: "Box “Token bucket”",
+          selector: "#flow > div > div:nth-of-type(2)",
+          heading: null,
+          excerpt: "Token bucket",
+        }),
+        text: "Say where this lives",
+      }),
+    ]),
+    [
+      "<glass_feedback>",
+      "The user left these Feedback notes on pages in your files, each on the part of the page they pointed at; the page may have changed since.",
+      '<feedback_note path="docs/plan.html" selector="#limits > p" heading="Limits">',
+      "Selected text:",
+      "a refill of five per minute",
+      "Note:",
+      "Make this ten",
+      "</feedback_note>",
+      '<feedback_note path="docs/plan.html" selector="#flow > div > div:nth-of-type(2)">',
+      "Element: Box “Token bucket”",
+      "Its text:",
+      "Token bucket",
+      "Note:",
+      "Say where this lives",
+      "</feedback_note>",
+      "</glass_feedback>",
+    ].join("\n"),
+  )
+})
+
+it("tells the agent how to read notes on changes and on pages sent together", () => {
+  const text = prompt("", [], null, [note({}), pageNote({})])
+
+  assert.include(text, "on your changes and on pages in your files")
 })
 
 it("sends Feedback notes on their own when the message has no text", () => {
