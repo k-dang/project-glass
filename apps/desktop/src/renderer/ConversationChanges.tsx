@@ -3,7 +3,7 @@ import { type Conversation, ConversationChanges as Changes, type Turn } from "@g
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { FileDiff, MessageSquareText } from "lucide-react"
-import { useState } from "react"
+import { useMemo, useState } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import {
@@ -16,7 +16,7 @@ import { conversationChangesAtom, feedbackNotesAtom } from "./conversationsArea"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
 import type { Problem } from "./problems"
-import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
+import { type FeedbackNotesStore, lineNotesOf, useFeedbackNotes } from "./useFeedbackNotes"
 
 export function ConversationChanges(props: {
   conversation: Conversation
@@ -36,6 +36,7 @@ export function ConversationChanges(props: {
   )
 
   const store = useFeedbackNotes(conversation.id)
+  const lineNotes = useMemo(() => lineNotesOf(store), [store])
   const [sidebarTab, setSidebarTab] = useState<SidebarTab>("files")
 
   const showLatest = () => {
@@ -69,12 +70,16 @@ export function ConversationChanges(props: {
         <ChangesWithFeedback
           key={shown instanceof Changes ? shown.id : shown}
           changes={shown}
-          store={store}
+          store={lineNotes}
           sidebarTab={sidebarTab}
           setSidebarTab={setSidebarTab}
           footer={
-            store.notes.length > 0 && (
-              <ReviewFeedback store={store} onStaged={props.onReviewFeedback} />
+            lineNotes.notes.length > 0 && (
+              <ReviewFeedback
+                count={lineNotes.notes.length}
+                store={store}
+                onStaged={props.onReviewFeedback}
+              />
             )
           }
         />
@@ -83,7 +88,7 @@ export function ConversationChanges(props: {
   )
 }
 
-function ReviewFeedback(props: { store: FeedbackNotesStore; onStaged: () => void }) {
+function ReviewFeedback(props: { count: number; store: FeedbackNotesStore; onStaged: () => void }) {
   const { store } = props
   const editing = useNoteOpen()
   const [staging, setStaging] = useState(false)
@@ -104,7 +109,7 @@ function ReviewFeedback(props: { store: FeedbackNotesStore; onStaged: () => void
         <span className="min-w-0 flex-1 basis-48">
           {editing
             ? "Save or cancel the open note before you review your feedback."
-            : `${plural(store.notes.length, "Feedback note")} to send to the Conversation.`}
+            : `${plural(props.count, "Feedback note")} to send to the Conversation.`}
         </span>
         <Button size="sm" disabled={editing || staging} onClick={() => void stage()}>
           <MessageSquareText data-icon="inline-start" aria-hidden />

@@ -13,7 +13,7 @@ import {
   CheckInApprove,
   CheckInChanges,
   ChecksFailing,
-  FeedbackNote,
+  LineNote,
   Discussions,
   emptyTranscript,
   GitHubConnection,
@@ -432,7 +432,7 @@ it("opens a Check-in's changes on their own page and approves them, with the not
     since: ago({ minutes: 1 }),
   })
 
-  const note = new FeedbackNote({
+  const note = new LineNote({
     id: "note-1",
     path: "greet.ts",
     side: "new",

@@ -4,7 +4,7 @@ import {
   CheckInNoChanges,
   CheckInResult,
   CheckInSendFeedback,
-  FeedbackNote,
+  LineNote,
   type NeedsYou,
 } from "@glass/contracts"
 import { Effect, Fiber, Option, Predicate, Schema, Stream } from "effect"
@@ -60,7 +60,7 @@ const checkIn = (
 ) => mcp.request("tools/call", { name: "check_in", arguments: args }).response
 
 const noteOn = (changesId: string, text: string) =>
-  new FeedbackNote({
+  new LineNote({
     id: "note-1",
     path: "retry.ts",
     side: "new",

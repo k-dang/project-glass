@@ -1,4 +1,4 @@
-import { ConversationError, FeedbackNote, UnsentFeedback } from "@glass/contracts"
+import { ConversationError, FeedbackNote, isPageNote, UnsentFeedback } from "@glass/contracts"
 import { Context, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
@@ -9,22 +9,24 @@ export const conversationNotes = (conversationId: string): NotesOwner =>
 
 export const folderNotes = (folder: string): NotesOwner => `folder:${folder}`
 
-const decodeNotes = Schema.decodeUnknownEffect(Schema.Array(FeedbackNote))
+const decodeNotes = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ note: Schema.fromJsonString(FeedbackNote) })),
+)
+
+const notesOf = (rows: ReadonlyArray<unknown>) =>
+  decodeNotes(rows).pipe(Effect.map((decoded) => decoded.map(({ note }) => note)))
+
+const encodeNote = Schema.encodeSync(Schema.fromJsonString(FeedbackNote))
 
 const decodeStaged = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.String, staged: Schema.BooleanFromBit })),
 )
 
 const row = (owner: NotesOwner, note: FeedbackNote) => ({
-  id: note.id,
   owner,
-  path: note.path,
-  side: note.side,
-  start_line: note.start,
-  end_line: note.end,
-  code: note.code,
-  changes_id: note.changesId,
-  text: note.text,
+  id: note.id,
+  note: encodeNote(note),
+  staged: isPageNote(note) ? 1 : 0,
 })
 
 const guarded =
@@ -70,18 +72,14 @@ export class FeedbackNotes extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
 
-      const columns = sql`
-        id, path, side, start_line AS start, end_line AS end, code, changes_id AS changesId, text
-      `
-
       const list = Effect.fn("FeedbackNotes.list")((owner: NotesOwner) =>
         sql`
-            SELECT ${columns}, staged FROM feedback_note
+            SELECT id, note, staged FROM feedback_note
             WHERE owner = ${owner} ORDER BY rowid
           `.pipe(
           Effect.flatMap((rows) =>
             Effect.all({
-              notes: decodeNotes(rows),
+              notes: notesOf(rows),
               staged: decodeStaged(rows).pipe(
                 Effect.map((flags) => flags.flatMap(({ id, staged }) => (staged ? [id] : []))),
               ),
@@ -97,7 +95,7 @@ export class FeedbackNotes extends Context.Service<
         save: Effect.fn("FeedbackNotes.save")((owner, note) =>
           sql`
             INSERT INTO feedback_note ${sql.insert(row(owner, note))}
-            ON CONFLICT (owner, id) DO UPDATE SET text = excluded.text
+            ON CONFLICT (owner, id) DO UPDATE SET note = excluded.note
           `.pipe(guarded("save"), Effect.andThen(list(owner))),
         ),
         remove: Effect.fn("FeedbackNotes.remove")((owner, noteId) =>
@@ -119,9 +117,9 @@ export class FeedbackNotes extends Context.Service<
 
           const taken = yield* sql`
             DELETE FROM feedback_note WHERE owner = ${owner} AND staged = 1 AND ${sql.in("id", noteIds)}
-            RETURNING ${columns}
+            RETURNING id, note
           `.pipe(
-            Effect.flatMap(decodeNotes),
+            Effect.flatMap(notesOf),
             Effect.map((found) => ids.flatMap((id) => found.find((note) => note.id === id) ?? [])),
             guarded("send"),
           )
@@ -137,10 +135,10 @@ export class FeedbackNotes extends Context.Service<
         takeAll: Effect.fn("FeedbackNotes.takeAll")((owner) =>
           sql<{ readonly position: number }>`
             DELETE FROM feedback_note WHERE owner = ${owner}
-            RETURNING rowid AS position, ${columns}
+            RETURNING rowid AS position, note
           `.pipe(
             Effect.map((rows) => rows.toSorted((a, b) => a.position - b.position)),
-            Effect.flatMap(decodeNotes),
+            Effect.flatMap(notesOf),
             guarded("send"),
           ),
         ),

@@ -1,7 +1,9 @@
 import { assert, it } from "@effect/vitest"
 import {
   ConversationStarted,
-  FeedbackNote,
+  LineNote,
+  PageNote,
+  PageText,
   SandboxPlace,
   TextPatch,
   UnsentFeedback,
@@ -263,9 +265,9 @@ it.live(
         text: "Say three too",
       } as const
 
-      const note = new FeedbackNote(fields)
+      const note = new LineNote(fields)
 
-      const other = new FeedbackNote({
+      const other = new LineNote({
         ...fields,
         id: "note-2",
         start: 2,
@@ -273,7 +275,7 @@ it.live(
         text: "Drop",
       })
 
-      const edited = new FeedbackNote({ ...fields, text: "Say three and four" })
+      const edited = new LineNote({ ...fields, text: "Say three and four" })
 
       yield* f.client.SaveFeedbackNote({ conversationId: conversation.id, note })
       yield* f.client.SaveFeedbackNote({ conversationId: conversation.id, note: other })
@@ -303,6 +305,47 @@ it.live(
 )
 
 it.live(
+  "attaches a Feedback note on a page to the next message as soon as it's saved, beside unstaged notes on changes",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* conversationsFixture
+      const conversation = yield* f.start("Write a plan")
+      const conversationId = conversation.id
+      yield* f.transcript(conversationId, settled(1))
+
+      const onChanges = new LineNote({
+        id: "line-1",
+        path: "src/retry.ts",
+        side: "new",
+        start: 2,
+        end: 2,
+        code: "attempts++",
+        changesId: "changes-1",
+        text: "Cap the attempts",
+      })
+
+      const onPage = new PageNote({
+        id: "page-1",
+        path: "docs/plan.html",
+        part: PageText.make({
+          selector: "#limits > p",
+          heading: "Limits",
+          excerpt: "five per minute",
+        }),
+        text: "Make this ten",
+      })
+
+      yield* f.client.SaveFeedbackNote({ conversationId, note: onChanges })
+      yield* f.client.SaveFeedbackNote({ conversationId, note: onPage })
+
+      assert.deepStrictEqual(
+        yield* f.client.ListFeedbackNotes({ conversationId }),
+        new UnsentFeedback({ notes: [onChanges, onPage], staged: [onPage.id] }),
+      )
+    }),
+)
+
+it.live(
   "queues staged Feedback notes for the working Conversation as one message, taking only those notes",
   () =>
     Effect.gen(function* () {
@@ -320,9 +363,9 @@ it.live(
         changesId: "changes-1",
       } as const
 
-      const capAttempts = new FeedbackNote({ ...fields, id: "note-1", text: "Cap the attempts" })
-      const keepError = new FeedbackNote({ ...fields, id: "note-2", text: "Keep the last error" })
-      const later = new FeedbackNote({ ...fields, id: "note-3", text: "Not staged yet" })
+      const capAttempts = new LineNote({ ...fields, id: "note-1", text: "Cap the attempts" })
+      const keepError = new LineNote({ ...fields, id: "note-2", text: "Keep the last error" })
+      const later = new LineNote({ ...fields, id: "note-3", text: "Not staged yet" })
 
       for (const note of [capAttempts, keepError])
         yield* f.client.SaveFeedbackNote({ conversationId, note })
@@ -399,8 +442,8 @@ const queuedFeedback = Effect.gen(function* () {
   } as const
 
   const sent = [
-    new FeedbackNote({ ...fields, id: "note-1", text: "Cap the attempts" }),
-    new FeedbackNote({ ...fields, id: "note-2", changesId: "changes-0", text: "Keep the error" }),
+    new LineNote({ ...fields, id: "note-1", text: "Cap the attempts" }),
+    new LineNote({ ...fields, id: "note-2", changesId: "changes-0", text: "Keep the error" }),
   ]
 
   for (const note of sent) yield* f.client.SaveFeedbackNote({ conversationId, note })
@@ -415,7 +458,7 @@ const queuedFeedback = Effect.gen(function* () {
   const { queued } = yield* f.watch(conversationId, (transcript) => transcript.queued.length === 1)
   const queuedId = queued[0]!.id
 
-  const newer = new FeedbackNote({ ...fields, id: "note-3", text: "Newer" })
+  const newer = new LineNote({ ...fields, id: "note-3", text: "Newer" })
   yield* f.client.SaveFeedbackNote({ conversationId, note: newer })
   yield* f.client.StageFeedbackNotes({ conversationId })
 

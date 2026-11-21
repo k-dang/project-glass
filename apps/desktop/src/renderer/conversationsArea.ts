@@ -133,6 +133,10 @@ export const writtenFeedbackAtom = Atom.family((_conversationId: string) =>
   Atom.make<UnsentFeedback | null>(null),
 )
 
+export const pageNoteEditingAtom = Atom.family((_conversationId: string) =>
+  Atom.make<string | null>(null),
+)
+
 export const localCheckoutsAtom = backendRuntime
   .atom(Backend.use((backend) => backend.ListLocalCheckouts()))
   .pipe(Atom.keepAlive)
