@@ -1,9 +1,9 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
 import {
-  ConversationContext,
-  ConversationOutcome,
   LineNote,
+  ThreadContext,
+  ThreadOutcome,
   StartedWorkUpdate,
   SteerPart,
   TurnDone,
@@ -15,26 +15,13 @@ import { SqlClient } from "effect/sql"
 import { join } from "node:path"
 import { isolatedHome } from "../test/harness"
 import { FeedbackNotes } from "./FeedbackNotes"
-import baseline from "./migrations/0001_baseline"
-import agentReviewHotspots from "./migrations/0002_agent_review_hotspots"
-import agentReviewDone from "./migrations/0003_agent_review_done"
-import outsideAgent from "./migrations/0004_outside_agent"
-import conversationStartedWork from "./migrations/0005_conversation_started_work"
-import turnSeen from "./migrations/0006_turn_seen"
-import workReports from "./migrations/0007_work_reports"
-import pastGlobalConversations from "./migrations/0008_past_global_conversations"
-import globalConversationUpdates from "./migrations/0009_global_conversation_updates"
-import toDoImages from "./migrations/0010_to_do_images"
-import mermaidTourDiagrams from "./migrations/0011_mermaid_tour_diagrams"
-import conversations from "./migrations/0012_conversations"
-import journalHost from "./migrations/0013_journal_host"
-import conversationBranch from "./migrations/0014_conversation_branch"
-import feedbackNotes from "./migrations/0015_feedback_notes"
-import turnRetriesDelivery from "./migrations/0016_turn_retries_delivery"
-import startedWork from "./migrations/0017_started_work"
-import conversationKeptGoing from "./migrations/0018_conversation_kept_going"
-import { migrationLoader } from "./Migrations"
+import { migrationLoader, migrations } from "./Migrations"
 import { Transcripts } from "./Transcripts"
+
+const migrationsThrough = (last: keyof typeof migrations) =>
+  SqliteMigrator.fromRecord(
+    Object.fromEntries(Object.entries(migrations).filter(([id]) => id <= last)),
+  )
 
 const encodeEnd = Schema.encodeSync(Schema.fromJsonString(TurnEnd))
 
@@ -42,25 +29,14 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
   Effect.gen(function* () {
     const sql = yield* SqlClient.SqlClient
 
-    const previousMigrations = {
-      "0001_baseline": baseline,
-      "0002_agent_review_hotspots": agentReviewHotspots,
-      "0003_agent_review_done": agentReviewDone,
-      "0004_outside_agent": outsideAgent,
-      "0005_conversation_started_work": conversationStartedWork,
-      "0006_turn_seen": turnSeen,
-      "0007_work_reports": workReports,
-      "0008_past_global_conversations": pastGlobalConversations,
-    }
-
-    yield* SqliteMigrator.run({ loader: SqliteMigrator.fromRecord(previousMigrations) })
+    yield* SqliteMigrator.run({ loader: migrationsThrough("0008_past_global_conversations") })
 
     const at = "2026-11-14T12:00:00.000Z"
 
     const startedWorkUpdate = StartedWorkUpdate.make({
       work: [
-        ConversationOutcome.make({
-          conversationId: "started",
+        ThreadOutcome.make({
+          threadId: "started",
           name: "Started",
           askedWith: "Build it",
           outcome: "finished",
@@ -114,6 +90,8 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [19, "global_chat_sessions"],
       [20, "page_notes"],
       [21, "conversation_to_dos"],
+      [22, "review_thread_replies"],
+      [23, "threads"],
     ])
     const transcripts = yield* Transcripts
     const { turns } = yield* transcripts.read("global")
@@ -140,7 +118,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       ["pending"],
     )
     assert.deepStrictEqual(
-      yield* sql`SELECT started_work_update_outcome_at, started_work_update_turn_id FROM started_conversation`,
+      yield* sql`SELECT started_work_update_outcome_at, started_work_update_turn_id FROM started_thread`,
       [
         {
           started_work_update_outcome_at: at,
@@ -162,7 +140,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       [{ included_in_started_work_update: 1, done: 0 }],
     )
     assert.deepStrictEqual(
-      yield* (yield* FeedbackNotes).list("conversation:started"),
+      yield* (yield* FeedbackNotes).list("thread:started"),
       new UnsentFeedback({
         notes: [
           new LineNote({
@@ -180,7 +158,7 @@ it.live("upgrades main's schema directly, preserving completed and unfinished up
       }),
     )
     yield* sql`UPDATE started_agent_review SET started_work_update_turn_id = 'completed'`
-    yield* sql`DELETE FROM conversation_turn WHERE id = 'completed'`
+    yield* sql`DELETE FROM thread_turn WHERE id = 'completed'`
     assert.deepStrictEqual(
       yield* sql`SELECT started_work_update_turn_id FROM started_agent_review`,
       [{ started_work_update_turn_id: null }],
@@ -220,6 +198,8 @@ it.live("creates the schema once and reads Activity through its indexes after re
         [19, "global_chat_sessions"],
         [20, "page_notes"],
         [21, "conversation_to_dos"],
+        [22, "review_thread_replies"],
+        [23, "threads"],
       ],
       [],
     ] as const) {
@@ -278,7 +258,7 @@ it.live("keeps Agent reviews written before hotspots, with none", () =>
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({ "0001_baseline": baseline }),
+        loader: migrationsThrough("0001_baseline"),
       })
       yield* sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown)
         VALUES ('octo-org', 'hello-world', 1, 'b', 'h', '2026-11-11T00:00:00Z', 'Looks fine.')`
@@ -301,13 +281,7 @@ it.live("counts the Turns that ended before Turns could be seen as seen", () =>
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-        }),
+        loader: migrationsThrough("0005_conversation_started_work"),
       })
 
       for (const id of ["worked", "fresh"])
@@ -324,7 +298,7 @@ it.live("counts the Turns that ended before Turns could be seen as seen", () =>
 
       yield* SqliteMigrator.run({ loader: migrationLoader })
 
-      assert.deepStrictEqual(yield* sql`SELECT id, turn_seen_at FROM conversation ORDER BY id`, [
+      assert.deepStrictEqual(yield* sql`SELECT id, turn_seen_at FROM thread ORDER BY id`, [
         { id: "fresh", turn_seen_at: null },
         { id: "worked", turn_seen_at: "2026-11-11T02:00:00.000Z" },
       ])
@@ -342,14 +316,7 @@ it.live(
         const sql = yield* SqlClient.SqlClient
 
         yield* SqliteMigrator.run({
-          loader: SqliteMigrator.fromRecord({
-            "0001_baseline": baseline,
-            "0002_agent_review_hotspots": agentReviewHotspots,
-            "0003_agent_review_done": agentReviewDone,
-            "0004_outside_agent": outsideAgent,
-            "0005_conversation_started_work": conversationStartedWork,
-            "0006_turn_seen": turnSeen,
-          }),
+          loader: migrationsThrough("0006_turn_seen"),
         })
 
         yield* sql`INSERT INTO global_conversation (id) VALUES ('global')`
@@ -365,7 +332,7 @@ it.live(
 
         const [started] = yield* sql<{
           started_work_update_outcome_at: string
-        }>`SELECT started_work_update_outcome_at FROM started_conversation`
+        }>`SELECT started_work_update_outcome_at FROM started_thread`
 
         const [review] = yield* sql<{
           started_work_update_outcome_at: string
@@ -391,15 +358,7 @@ it.live("keeps the Global chat's pi session, started at its first Turn", () =>
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-        }),
+        loader: migrationsThrough("0007_work_reports"),
       })
 
       yield* sql`INSERT INTO global_conversation (id) VALUES ('global')`
@@ -428,16 +387,7 @@ it.live("adds to-do images without touching to-dos written before them", () =>
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-          "0008_past_global_conversations": pastGlobalConversations,
-        }),
+        loader: migrationsThrough("0008_past_global_conversations"),
       })
 
       yield* sql`INSERT INTO to_do (title, notes, created_at)
@@ -467,18 +417,7 @@ it.live("drops node-and-edge Tour diagrams, keeping the rest of each saved Tour"
       const sql = yield* SqlClient.SqlClient
 
       yield* SqliteMigrator.run({
-        loader: SqliteMigrator.fromRecord({
-          "0001_baseline": baseline,
-          "0002_agent_review_hotspots": agentReviewHotspots,
-          "0003_agent_review_done": agentReviewDone,
-          "0004_outside_agent": outsideAgent,
-          "0005_conversation_started_work": conversationStartedWork,
-          "0006_turn_seen": turnSeen,
-          "0007_work_reports": workReports,
-          "0008_past_global_conversations": pastGlobalConversations,
-          "0009_global_conversation_updates": globalConversationUpdates,
-          "0010_to_do_images": toDoImages,
-        }),
+        loader: migrationsThrough("0010_to_do_images"),
       })
 
       const diagram = { nodes: [{ id: "a" }], edges: [] }
@@ -499,147 +438,113 @@ it.live("drops node-and-edge Tour diagrams, keeping the rest of each saved Tour"
   }),
 )
 
-it.live(
-  "renames Agents to Conversations, keeping their context, Steers, Activity, and Saved place",
-  () =>
-    Effect.gen(function* () {
-      const home = yield* isolatedHome
+it.live("renames Agents to Threads, keeping their context, Steers, Activity, and Saved place", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
 
-      yield* Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient
-        const at = "2026-11-11T00:00:00.000Z"
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+      const at = "2026-11-11T00:00:00.000Z"
 
-        yield* SqliteMigrator.run({
-          loader: SqliteMigrator.fromRecord({
-            "0001_baseline": baseline,
-            "0002_agent_review_hotspots": agentReviewHotspots,
-            "0003_agent_review_done": agentReviewDone,
-            "0004_outside_agent": outsideAgent,
-            "0005_conversation_started_work": conversationStartedWork,
-            "0006_turn_seen": turnSeen,
-            "0007_work_reports": workReports,
-            "0008_past_global_conversations": pastGlobalConversations,
-            "0009_global_conversation_updates": globalConversationUpdates,
-            "0010_to_do_images": toDoImages,
-            "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
-          }),
-        })
+      yield* SqliteMigrator.run({
+        loader: migrationsThrough("0011_mermaid_tour_diagrams"),
+      })
 
-        const viewing = '{"_tag":"Agent","agentId":"otter","name":"agent/swift-otter"}'
+      const viewing = '{"_tag":"Agent","agentId":"otter","name":"agent/swift-otter"}'
 
-        yield* sql`INSERT INTO agent (id, name, owner, repo, base_branch, engine, folder, created_at)
+      yield* sql`INSERT INTO agent (id, name, owner, repo, base_branch, engine, folder, created_at)
         VALUES ('otter', 'agent/swift-otter', 'glass-demo', 'greeter', 'main', 'pi', 'otter', ${at})`
-        yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, context)
+      yield* sql`INSERT INTO agent_turn (id, agent_id, message, sent_at, context)
         VALUES ('asked', 'global', 'How is it going?', ${at}, ${viewing})`
-        yield* sql`INSERT INTO agent_turn_part (turn_id, position, part)
+      yield* sql`INSERT INTO agent_turn_part (turn_id, position, part)
         VALUES ('asked', 0, ${'{"_tag":"Steer","message":"Also this","images":[],"context":' + viewing + "}"})`
-        yield* sql`INSERT INTO agent_queued_message (id, agent_id, position, message, images, context)
+      yield* sql`INSERT INTO agent_queued_message (id, agent_id, position, message, images, context)
         VALUES ('next', 'global', 0, 'And now?', '[]', ${viewing})`
-        yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at)
+      yield* sql`INSERT INTO conversation_agent (conversation_id, agent_id, started_at)
         VALUES ('global', 'otter', ${at})`
-        yield* sql`INSERT INTO activity (kind, payload, occurred_at, login)
+      yield* sql`INSERT INTO activity (kind, payload, occurred_at, login)
         VALUES ('AgentStarted', '{"_tag":"AgentStarted","agentId":"otter","engine":"pi"}', ${at}, 'kevin')`
-        yield* sql`INSERT INTO saved_place (area, destination, saved_at)
+      yield* sql`INSERT INTO saved_place (area, destination, saved_at)
         VALUES ('agents', '{"area":"agents","agentId":"otter"}', ${at})`
 
-        yield* SqliteMigrator.run({ loader: migrationLoader })
+      yield* SqliteMigrator.run({ loader: migrationLoader })
 
-        const renamed = ConversationContext.make({
-          conversationId: "otter",
-          name: "agent/swift-otter",
-        })
+      const renamed = ThreadContext.make({
+        threadId: "otter",
+        name: "agent/swift-otter",
+      })
 
-        const { turns, queued } = yield* (yield* Transcripts).read("global")
+      const { turns, queued } = yield* (yield* Transcripts).read("global")
 
-        assert.deepStrictEqual(yield* sql`SELECT id, harness FROM conversation`, [
-          { id: "otter", harness: "pi" },
-        ])
-        assert.deepStrictEqual(
-          turns.map(({ context, parts }) => ({ context, parts })),
-          [
-            {
-              context: renamed,
-              parts: [SteerPart.make({ message: "Also this", images: [], context: renamed })],
-            },
-          ],
-        )
-        assert.deepStrictEqual(
-          queued.map(({ context }) => context),
-          [renamed],
-        )
-        assert.deepStrictEqual(
-          yield* sql`SELECT started_by, conversation_id FROM started_conversation`,
-          [{ started_by: "global", conversation_id: "otter" }],
-        )
-        assert.deepStrictEqual(yield* sql`SELECT kind, payload FROM activity`, [
+      assert.deepStrictEqual(yield* sql`SELECT id, harness FROM thread`, [
+        { id: "otter", harness: "pi" },
+      ])
+      assert.deepStrictEqual(
+        turns.map(({ context, parts }) => ({ context, parts })),
+        [
           {
-            kind: "ConversationStarted",
-            payload: '{"_tag":"ConversationStarted","conversationId":"otter","harness":"pi"}',
+            context: renamed,
+            parts: [SteerPart.make({ message: "Also this", images: [], context: renamed })],
           },
-        ])
-        assert.deepStrictEqual(yield* sql`SELECT area, destination FROM saved_place`, [
-          {
-            area: "conversations",
-            destination: '{"area":"conversations","conversationId":"otter"}',
-          },
-        ])
-      }).pipe(
-        Effect.provide(Transcripts.layer),
-        Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })),
-        Effect.scoped,
+        ],
       )
-    }),
+      assert.deepStrictEqual(
+        queued.map(({ context }) => context),
+        [renamed],
+      )
+      assert.deepStrictEqual(yield* sql`SELECT started_by, thread_id FROM started_thread`, [
+        { started_by: "global", thread_id: "otter" },
+      ])
+      assert.deepStrictEqual(yield* sql`SELECT kind, payload FROM activity`, [
+        {
+          kind: "ThreadStarted",
+          payload: '{"_tag":"ThreadStarted","harness":"pi","threadId":"otter"}',
+        },
+      ])
+      assert.deepStrictEqual(yield* sql`SELECT area, destination FROM saved_place`, [
+        {
+          area: "threads",
+          destination: '{"area":"threads","threadId":"otter"}',
+        },
+      ])
+    }).pipe(
+      Effect.provide(Transcripts.layer),
+      Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })),
+      Effect.scoped,
+    )
+  }),
 )
 
-it.live(
-  "records each work Conversation's branch as its name, leaving review checkouts detached",
-  () =>
-    Effect.gen(function* () {
-      const home = yield* isolatedHome
+it.live("records each work Thread's branch as its name, leaving review checkouts detached", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
 
-      yield* Effect.gen(function* () {
-        const sql = yield* SqlClient.SqlClient
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
 
-        yield* SqliteMigrator.run({
-          loader: SqliteMigrator.fromRecord({
-            "0001_baseline": baseline,
-            "0002_agent_review_hotspots": agentReviewHotspots,
-            "0003_agent_review_done": agentReviewDone,
-            "0004_outside_agent": outsideAgent,
-            "0005_conversation_started_work": conversationStartedWork,
-            "0006_turn_seen": turnSeen,
-            "0007_work_reports": workReports,
-            "0008_past_global_conversations": pastGlobalConversations,
-            "0009_global_conversation_updates": globalConversationUpdates,
-            "0010_to_do_images": toDoImages,
-            "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
-            "0012_conversations": conversations,
-            "0013_journal_host": journalHost,
-          }),
-        })
+      yield* SqliteMigrator.run({
+        loader: migrationsThrough("0013_journal_host"),
+      })
 
-        for (const [id, brief] of [
-          ["work", null],
-          ["review", "{}"],
-        ] as const)
-          yield* sql`INSERT INTO conversation (id, name, owner, repo, base_branch, harness, folder, created_at, review_brief)
+      for (const [id, brief] of [
+        ["work", null],
+        ["review", "{}"],
+      ] as const)
+        yield* sql`INSERT INTO conversation (id, name, owner, repo, base_branch, harness, folder, created_at, review_brief)
           VALUES (${id}, ${`agent/${id}`}, 'glass-demo', 'greeter', 'main', 'pi', ${id}, '2026-11-17T00:00:00.000Z', ${brief})`
 
-        yield* SqliteMigrator.run({ loader: migrationLoader })
+      yield* SqliteMigrator.run({ loader: migrationLoader })
 
-        assert.deepStrictEqual(yield* sql`SELECT id, branch FROM conversation ORDER BY id`, [
-          { id: "review", branch: null },
-          { id: "work", branch: "agent/work" },
-        ])
-      }).pipe(
-        Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })),
-        Effect.scoped,
-      )
-    }),
+      assert.deepStrictEqual(yield* sql`SELECT id, branch FROM thread ORDER BY id`, [
+        { id: "review", branch: null },
+        { id: "work", branch: "agent/work" },
+      ])
+    }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
+  }),
 )
 
 it.live(
-  "dates when each Conversation was last kept going from the user's Turns, ignoring Glass's own",
+  "dates when each Thread was last kept going from the user's Turns, ignoring Glass's own",
   () =>
     Effect.gen(function* () {
       const home = yield* isolatedHome
@@ -648,25 +553,7 @@ it.live(
         const sql = yield* SqlClient.SqlClient
 
         yield* SqliteMigrator.run({
-          loader: SqliteMigrator.fromRecord({
-            "0001_baseline": baseline,
-            "0002_agent_review_hotspots": agentReviewHotspots,
-            "0003_agent_review_done": agentReviewDone,
-            "0004_outside_agent": outsideAgent,
-            "0005_conversation_started_work": conversationStartedWork,
-            "0006_turn_seen": turnSeen,
-            "0007_work_reports": workReports,
-            "0008_past_global_conversations": pastGlobalConversations,
-            "0009_global_conversation_updates": globalConversationUpdates,
-            "0010_to_do_images": toDoImages,
-            "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
-            "0012_conversations": conversations,
-            "0013_journal_host": journalHost,
-            "0014_conversation_branch": conversationBranch,
-            "0015_feedback_notes": feedbackNotes,
-            "0016_turn_retries_delivery": turnRetriesDelivery,
-            "0017_started_work": startedWork,
-          }),
+          loader: migrationsThrough("0017_started_work"),
         })
 
         for (const id of ["written", "quiet"])
@@ -688,7 +575,7 @@ it.live(
         yield* SqliteMigrator.run({ loader: migrationLoader })
 
         assert.deepStrictEqual(
-          yield* sql`SELECT id, kept_going_at AS keptGoingAt FROM conversation ORDER BY id`,
+          yield* sql`SELECT id, kept_going_at AS keptGoingAt FROM thread ORDER BY id`,
           [
             { id: "quiet", keptGoingAt: "2026-11-17T00:00:00.000Z" },
             { id: "written", keptGoingAt: "2026-11-19T00:00:00.000Z" },
@@ -712,26 +599,7 @@ it.live(
         const at = "2026-11-19T00:00:00.000Z"
 
         yield* SqliteMigrator.run({
-          loader: SqliteMigrator.fromRecord({
-            "0001_baseline": baseline,
-            "0002_agent_review_hotspots": agentReviewHotspots,
-            "0003_agent_review_done": agentReviewDone,
-            "0004_outside_agent": outsideAgent,
-            "0005_conversation_started_work": conversationStartedWork,
-            "0006_turn_seen": turnSeen,
-            "0007_work_reports": workReports,
-            "0008_past_global_conversations": pastGlobalConversations,
-            "0009_global_conversation_updates": globalConversationUpdates,
-            "0010_to_do_images": toDoImages,
-            "0011_mermaid_tour_diagrams": mermaidTourDiagrams,
-            "0012_conversations": conversations,
-            "0013_journal_host": journalHost,
-            "0014_conversation_branch": conversationBranch,
-            "0015_feedback_notes": feedbackNotes,
-            "0016_turn_retries_delivery": turnRetriesDelivery,
-            "0017_started_work": startedWork,
-            "0018_conversation_kept_going": conversationKeptGoing,
-          }),
+          loader: migrationsThrough("0018_conversation_kept_going"),
         })
 
         const ended = "2026-11-19T01:00:00.000Z"
@@ -746,6 +614,8 @@ it.live(
           [19, "global_chat_sessions"],
           [20, "page_notes"],
           [21, "conversation_to_dos"],
+          [22, "review_thread_replies"],
+          [23, "threads"],
         ])
         assert.deepStrictEqual(yield* sql`SELECT * FROM global_chat`, [
           { id: "global", model: "gpt-test", effort: null, singleton: 1 },
@@ -766,4 +636,152 @@ it.live(
         Effect.scoped,
       )
     }),
+)
+
+it.live("moves each sent Reply's Activity onto its Review thread's id", () =>
+  Effect.gen(function* () {
+    const home = yield* isolatedHome
+
+    yield* Effect.gen(function* () {
+      const sql = yield* SqlClient.SqlClient
+
+      yield* SqliteMigrator.run({
+        loader: migrationsThrough("0021_conversation_to_dos"),
+      })
+
+      const at = "2026-11-20T00:00:00.000Z"
+
+      yield* sql`INSERT INTO activity (kind, payload, occurred_at, login) VALUES
+        ('ReplySent', '{"_tag":"ReplySent","discussionId":"PRRT_1","body":"Done."}', ${at}, 'kevin'),
+        ('ToDoDone', '{"_tag":"ToDoDone","toDo":{"id":1,"title":"Ship it"}}', ${at}, 'kevin')`
+
+      yield* SqliteMigrator.run({ loader: migrationLoader })
+
+      assert.deepStrictEqual(yield* sql`SELECT payload FROM activity ORDER BY id`, [
+        { payload: '{"_tag":"ReplySent","body":"Done.","reviewThreadId":"PRRT_1"}' },
+        { payload: '{"_tag":"ToDoDone","toDo":{"id":1,"title":"Ship it"}}' },
+      ])
+    }).pipe(Effect.provide(SqliteClient.layer({ filename: join(home, "glass.db") })), Effect.scoped)
+  }),
+)
+
+const contextOf = (column: string) =>
+  `json_extract(${column}, '$._tag') || ':' || json_extract(${column}, '$.threadId') || ':' || ` +
+  `json_extract(${column}, '$.name') || ':' || coalesce(json_extract(${column}, '$.conversationId'), '-')`
+
+it.live("moves every Conversation-era row onto Threads, keeping its data", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const at = "2026-11-20T00:00:00.000Z"
+    const viewing = '{"_tag":"Conversation","conversationId":"otter","name":"agent/otter"}'
+
+    const update =
+      '{"_tag":"StartedWorkUpdate","work":[' +
+      '{"_tag":"Conversation","conversationId":"otter","name":"agent/otter"},' +
+      '{"_tag":"AgentReview","outcome":"finished"}]}'
+
+    yield* SqliteMigrator.run({ loader: migrationsThrough("0022_review_thread_replies") })
+
+    yield* sql`INSERT INTO conversation (id, name, owner, repo, base_branch, harness, folder, created_at)
+      VALUES ('otter', 'agent/otter', 'glass-demo', 'greeter', 'main', 'pi', 'otter', ${at})`
+    yield* sql`INSERT INTO conversation_turn (id, conversation_id, message, sent_at, context) VALUES
+      ('asked', 'otter', 'How is it going?', ${at}, ${viewing}),
+      ('update', 'otter', '', ${at}, ${update})`
+    yield* sql`INSERT INTO conversation_turn_part (turn_id, position, part)
+      VALUES ('asked', 0, ${'{"_tag":"Steer","message":"Also","context":' + viewing + "}"})`
+    yield* sql`INSERT INTO conversation_queued_message (id, conversation_id, position, message, images, context)
+      VALUES ('next', 'otter', 0, 'And now?', '[]', ${viewing})`
+    yield* sql`INSERT INTO conversation_skill_pack (conversation_id, name, pin_id) VALUES ('otter', 'team', 1)`
+    yield* sql`INSERT INTO conversation_unsent_message (conversation_id, message, images)
+      VALUES ('otter', 'Half', '[]')`
+    yield* sql`INSERT INTO started_conversation (started_by, conversation_id, started_at)
+      VALUES ('global', 'otter', ${at})`
+    yield* sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, conversation_id)
+      VALUES ('glass-demo', 'greeter', 7, 'b', 'h', ${at}, 'Fine.', 'otter')`
+    yield* sql`INSERT INTO activity (kind, payload, occurred_at, login) VALUES ('ConversationStarted',
+      '{"_tag":"ConversationStarted","conversationId":"otter","name":"agent/otter","message":"Build it"}',
+      ${at}, 'kevin')`
+    yield* sql`INSERT INTO saved_place (area, destination, saved_at)
+      VALUES ('conversations', '{"area":"conversations","conversationId":"otter"}', ${at})`
+    yield* sql`INSERT INTO feedback_note (owner, id, note) VALUES ('conversation:otter', 'note', '{}')`
+    yield* sql`INSERT INTO conversation_to_do (conversation_id, to_do_id, linked_at)
+      VALUES ('otter', 1, ${at})`
+
+    yield* SqliteMigrator.run({ loader: migrationLoader })
+
+    assert.deepStrictEqual(yield* sql`SELECT id, name FROM thread`, [
+      { id: "otter", name: "agent/otter" },
+    ])
+    assert.deepStrictEqual(
+      yield* sql`SELECT id, thread_id, ${sql.literal(contextOf("context"))} AS context
+        FROM thread_turn WHERE id = 'asked'`,
+      [{ id: "asked", thread_id: "otter", context: "Thread:otter:agent/otter:-" }],
+    )
+    assert.deepStrictEqual(
+      yield* sql`SELECT ${sql.literal(contextOf("work.value"))} AS work
+        FROM thread_turn, json_each(context, '$.work') AS work WHERE thread_turn.id = 'update'`,
+      [{ work: "Thread:otter:agent/otter:-" }, { work: null }],
+    )
+    assert.deepStrictEqual(
+      yield* sql`SELECT json(work.value) AS review
+        FROM thread_turn, json_each(context, '$.work') AS work
+        WHERE thread_turn.id = 'update' AND json_extract(work.value, '$._tag') = 'AgentReview'`,
+      [{ review: '{"_tag":"AgentReview","outcome":"finished"}' }],
+    )
+    assert.deepStrictEqual(
+      yield* sql`SELECT ${sql.literal(contextOf("json_extract(part, '$.context')"))} AS context
+        FROM thread_turn_part`,
+      [{ context: "Thread:otter:agent/otter:-" }],
+    )
+    assert.deepStrictEqual(
+      yield* sql`SELECT thread_id, ${sql.literal(contextOf("context"))} AS context
+        FROM thread_queued_message`,
+      [{ thread_id: "otter", context: "Thread:otter:agent/otter:-" }],
+    )
+    assert.deepStrictEqual(yield* sql`SELECT thread_id, to_do_id FROM thread_to_do`, [
+      { thread_id: "otter", to_do_id: 1 },
+    ])
+    assert.deepStrictEqual(yield* sql`SELECT thread_id, name FROM thread_skill_pack`, [
+      { thread_id: "otter", name: "team" },
+    ])
+    assert.deepStrictEqual(yield* sql`SELECT thread_id, message FROM thread_unsent_message`, [
+      { thread_id: "otter", message: "Half" },
+    ])
+    assert.deepStrictEqual(yield* sql`SELECT started_by, thread_id FROM started_thread`, [
+      { started_by: "global", thread_id: "otter" },
+    ])
+    assert.deepStrictEqual(yield* sql`SELECT thread_id FROM agent_reviews`, [
+      { thread_id: "otter" },
+    ])
+    assert.deepStrictEqual(
+      yield* sql`SELECT kind, ${sql.literal(contextOf("payload"))} AS payload,
+        json_extract(payload, '$.message') AS message FROM activity`,
+      [
+        {
+          kind: "ThreadStarted",
+          payload: "ThreadStarted:otter:agent/otter:-",
+          message: "Build it",
+        },
+      ],
+    )
+    assert.deepStrictEqual(yield* sql`SELECT area, destination FROM saved_place`, [
+      { area: "threads", destination: '{"area":"threads","threadId":"otter"}' },
+    ])
+    assert.deepStrictEqual(yield* sql`SELECT owner, id FROM feedback_note`, [
+      { owner: "thread:otter", id: "note" },
+    ])
+  }).pipe(Effect.provide(SqliteClient.layer({ filename: ":memory:" }))),
+)
+
+it.live("leaves no table, column, or index named for Conversations", () =>
+  Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+
+    yield* SqliteMigrator.run({ loader: migrationLoader })
+
+    assert.deepStrictEqual(
+      yield* sql`SELECT name FROM sqlite_schema WHERE name LIKE '%conversation%' OR sql LIKE '%conversation%'`,
+      [],
+    )
+  }).pipe(Effect.provide(SqliteClient.layer({ filename: ":memory:" }))),
 )

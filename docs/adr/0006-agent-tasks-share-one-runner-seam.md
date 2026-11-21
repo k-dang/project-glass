@@ -21,4 +21,4 @@ and skips the user's settings and hooks, runs no task at all.
 ## Revisit when
 
 - A feature needs more from an agent than one answer to one prompt. Agent review Follow-ups are the
-  first such case, and use a Conversation instead of stretching this seam (ADR 0009).
+  first such case, and use a Thread instead of stretching this seam (ADR 0009).

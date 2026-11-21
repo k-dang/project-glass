@@ -2,15 +2,15 @@ import { assert, it } from "@effect/vitest"
 import { localPlace, type Turn } from "@glass/contracts"
 import { Effect, Predicate, Schema } from "effect"
 import {
-  conversationsFixture,
+  threadsFixture,
   glassCalls,
   globalTurns,
   lastSettled,
-  conversationOutcomesInStartedWorkUpdates,
+  threadOutcomesInStartedWorkUpdates,
   repository,
   sendGlobal,
   settled,
-} from "../test/conversationsFixture"
+} from "../test/threadsFixture"
 import { StartedItem } from "./StartedWork"
 
 const decodeListed = Schema.decodeUnknownSync(
@@ -31,16 +31,16 @@ const listedBy = (turn: Turn | undefined) => {
 }
 
 it.live(
-  "lists the Conversations the Global chat created or messaged, with the message that asked, after a restart",
+  "lists the Threads the Global chat created or messaged, with the message that asked, after a restart",
   () =>
     Effect.gen(function* () {
-      const f = yield* conversationsFixture
+      const f = yield* threadsFixture
       const fromUi = yield* f.start("Say hello")
       const messaged = yield* f.start("Say hi")
       yield* f.transcript(fromUi.id, settled(1))
       yield* f.transcript(messaged.id, settled(1))
 
-      const create = `call:create_conversation ${JSON.stringify({
+      const create = `call:create_thread ${JSON.stringify({
         repository: { owner: repository.owner, repo: repository.repo },
         baseBranch: "main",
         place: localPlace,
@@ -50,15 +50,13 @@ it.live(
         message: "Investigate",
       })}`
 
-      const message = `call:send_conversation_message ${JSON.stringify({ conversationId: messaged.id, message: "Again" })}`
+      const message = `call:send_thread_message ${JSON.stringify({ threadId: messaged.id, message: "Again" })}`
 
       yield* sendGlobal(f.client, create)
       yield* sendGlobal(f.client, message)
       yield* globalTurns(f.client, settled(2))
 
-      const created = (yield* f.conversations).find(
-        ({ id }) => id !== fromUi.id && id !== messaged.id,
-      )
+      const created = (yield* f.threads).find(({ id }) => id !== fromUi.id && id !== messaged.id)
 
       assert.isDefined(created)
       yield* f.transcript(created.id, settled(1))
@@ -66,9 +64,7 @@ it.live(
 
       yield* globalTurns(f.client, (turns) =>
         [created.id, messaged.id].every((id) =>
-          conversationOutcomesInStartedWorkUpdates(turns).some(
-            ([conversationId]) => conversationId === id,
-          ),
+          threadOutcomesInStartedWorkUpdates(turns).some(([threadId]) => threadId === id),
         ),
       )
 
@@ -78,7 +74,7 @@ it.live(
 
       assert.deepStrictEqual(
         listedBy(turns.at(-1)).map((item) => [
-          Predicate.isTagged(item, "Conversation") && item.conversation.id,
+          Predicate.isTagged(item, "Thread") && item.thread.id,
           item.state,
           item.askedWith,
         ]),

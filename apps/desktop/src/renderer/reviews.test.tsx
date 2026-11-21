@@ -1,14 +1,13 @@
 // @vitest-environment happy-dom
 import {
   type ConnectionError,
-  Discussions,
   Draft,
   FollowedRepository,
   GitHubConnection,
   GitHubUnavailable,
   LinePlace,
   NoCredentials,
-  OutdatedDiscussion,
+  OutdatedReviewThread,
   PublishedComment,
   type LoadPullRequestError,
   PullRequest,
@@ -168,7 +167,7 @@ const workspaceOf = (
   pr: PullRequestSummary,
   head: string,
   drafts: ReadonlyArray<Draft> = [],
-  discussions = new Discussions({ onLines: [], outdated: [], timeline: [] }),
+  outdatedReviewThreads: ReadonlyArray<OutdatedReviewThread> = [],
 ) =>
   new PullRequestWorkspace({
     viewer,
@@ -194,7 +193,9 @@ const workspaceOf = (
     updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
     files: [],
     viewedPaths: [],
-    discussions,
+    lineReviewThreads: [],
+    outdatedReviewThreads,
+    timeline: [],
     drafts,
   })
 
@@ -213,7 +214,7 @@ const mount = (handlers: Parameters<typeof testLayer>[0]) => {
     WatchPullRequests: () => showing(needing(...needsReview)),
     HasPullRequestChanged: () => Effect.succeed(false),
     SubmitReview: () => Effect.die("Navigation must not submit a Review"),
-    ReplyToDiscussion: () => Effect.die("Navigation must not publish a Reply"),
+    ReplyToReviewThread: () => Effect.die("Navigation must not publish a Reply"),
     ...handlers,
   })
 
@@ -789,34 +790,30 @@ it("monitors a visible workspace without overlapping reads or replacing its Revi
   expect(calls).toHaveLength(2)
 })
 
-const withDiscussion = (head: string, resolved = false) =>
+const withReviewThread = (head: string, resolved = false) =>
   workspaceOf(
     greet,
     head,
     [],
-    new Discussions({
-      onLines: [],
-      outdated: [
-        new OutdatedDiscussion({
-          id: "T1",
-          path: "greet.ts",
-          originalLine: 2,
-          diffHunk: "",
-          resolved,
-          comments: [
-            new PublishedComment({
-              id: "C1",
-              author: "hubot",
-              avatarUrl: null,
-              bodyHtml: "<p>Why there?</p>",
-              createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
-              reactions: [],
-            }),
-          ],
-        }),
-      ],
-      timeline: [],
-    }),
+    [
+      new OutdatedReviewThread({
+        id: "T1",
+        path: "greet.ts",
+        originalLine: 2,
+        diffHunk: "",
+        resolved,
+        comments: [
+          new PublishedComment({
+            id: "C1",
+            author: "hubot",
+            avatarUrl: null,
+            bodyHtml: "<p>Why there?</p>",
+            createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+            reactions: [],
+          }),
+        ],
+      }),
+    ],
   )
 
 it.each(["resolution", "Viewed-file"])(
@@ -833,11 +830,11 @@ it.each(["resolution", "Viewed-file"])(
 
         return Effect.succeed(
           referenceKey(pullRequest) === referenceKey(greet.ref)
-            ? withDiscussion("head001")
+            ? withReviewThread("head001")
             : workspaceOf(wave, "head002"),
         )
       },
-      SetDiscussionResolved: () => hold(writes)(undefined).pipe(Effect.as(true)),
+      SetReviewThreadResolved: () => hold(writes)(undefined).pipe(Effect.as(true)),
       SetFileViewed: () => hold(writes)(undefined),
     })
 
@@ -892,14 +889,14 @@ it.each(["success", "failure"])(
     > = []
 
     const resolves: Array<
-      Held<{ discussionId: string; resolved: boolean }, boolean, ConnectionError>
+      Held<{ reviewThreadId: string; resolved: boolean }, boolean, ConnectionError>
     > = []
 
-    const user = mount({ LoadPullRequest: hold(opens), SetDiscussionResolved: hold(resolves) })
+    const user = mount({ LoadPullRequest: hold(opens), SetReviewThreadResolved: hold(resolves) })
 
     await user.click(await rowFor("Greet the world"))
-    ;(await next(opens)).answer(Effect.succeed(withDiscussion("head001")))
-    await user.click(await screen.findByRole("button", { name: /^Resolve thread/ }))
+    ;(await next(opens)).answer(Effect.succeed(withReviewThread("head001")))
+    await user.click(await screen.findByRole("button", { name: /^Resolve Review thread/ }))
     const resolving = await next(resolves)
 
     await user.click(screen.getByRole("button", { name: "Reload" }))
@@ -913,18 +910,18 @@ it.each(["success", "failure"])(
     const reload = await next(opens)
 
     const control = await screen.findByRole<HTMLButtonElement>("button", {
-      name: outcome === "success" ? /^Unresolve thread/ : /^Retry resolving thread/,
+      name: outcome === "success" ? /^Unresolve Review thread/ : /^Retry resolving Review thread/,
     })
 
     expect(control.disabled).toBe(true)
     await user.click(control)
     expect(resolves).toHaveLength(0)
 
-    reload.answer(Effect.succeed(withDiscussion("head002", outcome === "success")))
+    reload.answer(Effect.succeed(withReviewThread("head002", outcome === "success")))
     await screen.findByText("head002")
-    const name = outcome === "success" ? /^Unresolve thread/ : /^Resolve thread/
+    const name = outcome === "success" ? /^Unresolve Review thread/ : /^Resolve Review thread/
     expect(screen.getByRole<HTMLButtonElement>("button", { name }).disabled).toBe(false)
-    expect(screen.queryByText(/Couldn't resolve this Discussion/)).toBeNull()
+    expect(screen.queryByText(/Couldn't resolve this Review thread/)).toBeNull()
 
     await user.click(screen.getByRole("button", { name: "Reload" }))
     ;(await next(opens)).answer(Effect.fail(new GitHubUnavailable({ message: "Offline." })))
@@ -952,12 +949,12 @@ it.each(["load failure", "target navigation"])(
       LoadPullRequest: (payload) =>
         hold(opens)(payload).pipe(Effect.onInterrupt(() => Effect.sync(interrupted))),
       SetFileViewed: () => Effect.void,
-      SetDiscussionResolved: () => Effect.succeed(true),
+      SetReviewThreadResolved: () => Effect.succeed(true),
     })
 
     try {
       openPullRequest(registry, greet.ref)
-      ;(await next(opens)).answer(Effect.succeed(withDiscussion("head001")))
+      ;(await next(opens)).answer(Effect.succeed(withReviewThread("head001")))
 
       const first = await Effect.runPromise(
         AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
@@ -977,7 +974,7 @@ it.each(["load failure", "target navigation"])(
         openPullRequest(registry, wave.ref)
         ;(await next(opens)).answer(Effect.succeed(workspaceOf(wave, "head002")))
         await reloading
-        replacement.answer(Effect.succeed(withDiscussion("stale")))
+        replacement.answer(Effect.succeed(withReviewThread("stale")))
 
         current = await Effect.runPromise(
           AtomRegistry.getResult(registry, openWorkspaceAtom, { suspendOnWaiting: true }),
@@ -1029,7 +1026,7 @@ it("dismisses Reload's discard prompt when the target changes, preserving the ol
 
       return Effect.succeed(
         referenceKey(pullRequest) === referenceKey(greet.ref)
-          ? withDiscussion("head001")
+          ? withReviewThread("head001")
           : workspaceOf(wave, "head002"),
       )
     },
@@ -1073,7 +1070,7 @@ it("declines Reload's discard prompt when leaving asks instead, so staying keeps
   const registry = testRegistry({
     GetConnection: () =>
       Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
-    LoadPullRequest: () => Effect.succeed(withDiscussion("head001")),
+    LoadPullRequest: () => Effect.succeed(withReviewThread("head001")),
     CreateDraft: () => Effect.fail(new GitHubUnavailable({ message: "Offline" })),
   })
 
@@ -1110,16 +1107,16 @@ it("declines Reload's discard prompt when leaving asks instead, so staying keeps
 
 it("leaves a PR while a resolution is in flight and shows its result when returning", async () => {
   const resolves: Array<
-    Held<{ discussionId: string; resolved: boolean }, boolean, ConnectionError>
+    Held<{ reviewThreadId: string; resolved: boolean }, boolean, ConnectionError>
   > = []
 
   const user = mount({
-    LoadPullRequest: () => Effect.succeed(withDiscussion("head001")),
-    SetDiscussionResolved: hold(resolves),
+    LoadPullRequest: () => Effect.succeed(withReviewThread("head001")),
+    SetReviewThreadResolved: hold(resolves),
   })
 
   await user.click(await rowFor("Greet the world"))
-  await user.click(await screen.findByRole("button", { name: /^Resolve thread/ }))
+  await user.click(await screen.findByRole("button", { name: /^Resolve Review thread/ }))
   const resolving = await next(resolves)
 
   await user.click(screen.getByRole("button", { name: "Back to PRs" }))
@@ -1128,7 +1125,7 @@ it("leaves a PR while a resolution is in flight and shows its result when return
   expect(await screen.findByText("Resolving…")).toBeTruthy()
 
   resolving.answer(Effect.succeed(true))
-  expect(await screen.findByRole("button", { name: /^Unresolve thread/ })).toBeTruthy()
+  expect(await screen.findByRole("button", { name: /^Unresolve Review thread/ })).toBeTruthy()
 })
 
 it("reopens a PR with the Drafts GitHub saved or deleted since it loaded", async () => {

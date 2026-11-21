@@ -1,11 +1,10 @@
-import { ConversationError, FeedbackNote, isPageNote, UnsentFeedback } from "@glass/contracts"
+import { ThreadError, FeedbackNote, isPageNote, UnsentFeedback } from "@glass/contracts"
 import { Context, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
-export type NotesOwner = `conversation:${string}` | `folder:${string}`
+export type NotesOwner = `thread:${string}` | `folder:${string}`
 
-export const conversationNotes = (conversationId: string): NotesOwner =>
-  `conversation:${conversationId}`
+export const threadNotes = (threadId: string): NotesOwner => `thread:${threadId}`
 
 export const folderNotes = (folder: string): NotesOwner => `folder:${folder}`
 
@@ -35,36 +34,33 @@ const guarded =
     effect.pipe(
       Effect.tapError((cause) => Effect.logWarning(`Couldn't ${doing} Feedback notes`, cause)),
       Effect.mapError(
-        () =>
-          new ConversationError({ message: `Couldn't ${doing} your Feedback notes. Try again.` }),
+        () => new ThreadError({ message: `Couldn't ${doing} your Feedback notes. Try again.` }),
       ),
     )
 
 export class FeedbackNotes extends Context.Service<
   FeedbackNotes,
   {
-    readonly list: (owner: NotesOwner) => Effect.Effect<UnsentFeedback, ConversationError>
+    readonly list: (owner: NotesOwner) => Effect.Effect<UnsentFeedback, ThreadError>
     readonly save: (
       owner: NotesOwner,
       note: FeedbackNote,
-    ) => Effect.Effect<UnsentFeedback, ConversationError>
+    ) => Effect.Effect<UnsentFeedback, ThreadError>
     readonly remove: (
       owner: NotesOwner,
       noteId: string,
-    ) => Effect.Effect<UnsentFeedback, ConversationError>
-    readonly stage: (owner: NotesOwner) => Effect.Effect<UnsentFeedback, ConversationError>
+    ) => Effect.Effect<UnsentFeedback, ThreadError>
+    readonly stage: (owner: NotesOwner) => Effect.Effect<UnsentFeedback, ThreadError>
     readonly take: (
       owner: NotesOwner,
       noteIds: ReadonlyArray<string>,
-    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ConversationError>
-    readonly takeAll: (
-      owner: NotesOwner,
-    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ConversationError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>
+    readonly takeAll: (owner: NotesOwner) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>
     readonly restore: (
       owner: NotesOwner,
       notes: ReadonlyArray<FeedbackNote>,
-    ) => Effect.Effect<void, ConversationError>
-    readonly removeAll: (owner: NotesOwner) => Effect.Effect<void, ConversationError>
+    ) => Effect.Effect<void, ThreadError>
+    readonly removeAll: (owner: NotesOwner) => Effect.Effect<void, ThreadError>
   }
 >()("@glass/server/FeedbackNotes") {
   static readonly layer = Layer.effect(
@@ -125,7 +121,7 @@ export class FeedbackNotes extends Context.Service<
           )
 
           if (taken.length !== ids.length)
-            return yield* new ConversationError({
+            return yield* new ThreadError({
               message:
                 "Some of these Feedback notes were already sent or removed. Review your feedback again.",
             })

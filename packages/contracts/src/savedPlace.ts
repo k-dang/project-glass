@@ -1,15 +1,15 @@
 import { Schema } from "effect"
-import { Conversation } from "./conversation"
+import { Thread } from "./thread"
 import { ReviewDestination } from "./reviewDestination"
 
-export const ConversationDestination = Schema.Struct({
-  area: Schema.Literal("conversations"),
-  conversationId: Conversation.fields.id,
+export const ThreadDestination = Schema.Struct({
+  area: Schema.Literal("threads"),
+  threadId: Thread.fields.id,
 })
 
-export type ConversationDestination = typeof ConversationDestination.Type
+export type ThreadDestination = typeof ThreadDestination.Type
 
-export const ResumableDestination = Schema.Union([ReviewDestination, ConversationDestination])
+export const ResumableDestination = Schema.Union([ReviewDestination, ThreadDestination])
 
 export type ResumableDestination = typeof ResumableDestination.Type
 

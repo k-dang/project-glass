@@ -52,10 +52,10 @@ const fileTab = async (window: Page, tab: string | RegExp) => {
   await window.getByRole("tablist", { name: "File panel" }).getByRole("tab", { name: tab }).click()
 }
 
-const conversationsList = async (window: Page) => {
-  await area(window, "Conversations")
+const threadsList = async (window: Page) => {
+  await area(window, "Threads")
 
-  return window.getByRole("navigation", { name: "Conversations list" })
+  return window.getByRole("navigation", { name: "Threads list" })
 }
 
 const demoRows = (list: Locator) => list.getByRole("link").filter({ hasNotText: REPLAYED_PREFIX })
@@ -64,23 +64,23 @@ const markers = /Finished|Working|Waiting on you|Failed|Interrupted/
 
 const listRow = (name: string, row: (list: Locator) => Locator): State => {
   const found = (window: Page) =>
-    row(window.getByRole("navigation", { name: "Conversations list" })).first()
+    row(window.getByRole("navigation", { name: "Threads list" })).first()
 
   return {
-    area: "Conversations list",
+    area: "Threads list",
     name,
     focus: found,
     focusPadding: 0,
     reach: async (window) => {
-      await conversationsList(window)
+      await threadsList(window)
       await found(window).scrollIntoViewIfNeeded()
     },
   }
 }
 
-const conversation = async (window: Page, status: RegExp) => {
+const thread = async (window: Page, status: RegExp) => {
   await (
-    await conversationsList(window)
+    await threadsList(window)
   )
     .getByRole("link", { description: status })
     .filter({ hasNotText: REPLAYED_PREFIX })
@@ -192,7 +192,7 @@ export const states: ReadonlyArray<State> = [
   },
   {
     area: "PR workspace",
-    name: "Agent review and Discussions",
+    name: "Agent review and Review threads",
     reach: async (window) => {
       await pullRequest(window, "Rate-limit the public API")
       await workspaceTab(window, "Overview")
@@ -278,20 +278,20 @@ export const states: ReadonlyArray<State> = [
     },
   },
   {
-    area: "Conversations",
-    name: "New Conversation",
+    area: "Threads",
+    name: "New Thread",
     reach: async (window) => {
-      await area(window, "Conversations")
-      await window.getByRole("link", { name: "New Conversation" }).click()
+      await area(window, "Threads")
+      await window.getByRole("link", { name: "New Thread" }).click()
       await visible(window, "heading", "What should we work on?")
     },
   },
   {
-    area: "Conversations list",
+    area: "Threads list",
     name: "Whole list",
-    focus: (window) => demoRows(window.getByRole("navigation", { name: "Conversations list" })),
+    focus: (window) => demoRows(window.getByRole("navigation", { name: "Threads list" })),
     reach: async (window) => {
-      const list = await conversationsList(window)
+      const list = await threadsList(window)
 
       for (const marker of [/Working/, /Waiting on you/, /Failed/, /PR #\d+/])
         await list.getByRole("link", { description: marker }).first().waitFor()
@@ -310,11 +310,11 @@ export const states: ReadonlyArray<State> = [
   listRow("Interrupted", (list) => list.getByRole("link", { description: /Interrupted/ })),
   listRow("Linked to a PR", (list) => list.getByRole("link", { description: /PR #\d+/ })),
   {
-    area: "Conversations",
-    name: "Remove a Conversation with uncommitted changes",
+    area: "Threads",
+    name: "Remove a Thread with uncommitted changes",
     focus: (window) => window.getByRole("alertdialog", { name: /^Remove / }),
     reach: async (window) => {
-      const list = await conversationsList(window)
+      const list = await threadsList(window)
 
       const finished = await demoRows(list)
         .filter({ has: window.getByText("Finished", { exact: true }) })
@@ -340,19 +340,17 @@ export const states: ReadonlyArray<State> = [
         return
       }
 
-      throw new Error("No Conversation wrote a note")
+      throw new Error("No Thread wrote a note")
     },
   },
   {
-    area: "Conversations list",
+    area: "Threads list",
     name: "Open",
     focus: (window) =>
-      window
-        .getByRole("navigation", { name: "Conversations list" })
-        .locator('a[aria-current="page"]'),
+      window.getByRole("navigation", { name: "Threads list" }).locator('a[aria-current="page"]'),
     focusPadding: 0,
     reach: async (window) => {
-      const list = await conversationsList(window)
+      const list = await threadsList(window)
       await demoRows(list).first().click()
       await list.locator('a[aria-current="page"]').waitFor()
       await window.mouse.move(0, 0)
@@ -364,17 +362,17 @@ export const states: ReadonlyArray<State> = [
       .filter({ hasNotText: markers }),
   ),
   {
-    area: "Conversations",
+    area: "Threads",
     name: "Finished",
     focus: turns,
-    reach: (window) => conversation(window, /Finished/),
+    reach: (window) => thread(window, /Finished/),
   },
   {
-    area: "Conversations",
+    area: "Threads",
     name: "Waiting on a Permission request",
     focus: turns,
     reach: async (window) => {
-      const waiting = (await conversationsList(window))
+      const waiting = (await threadsList(window))
         .getByRole("link", { description: /Waiting on you/ })
         .filter({ hasNotText: REPLAYED_PREFIX })
 
@@ -387,14 +385,14 @@ export const states: ReadonlyArray<State> = [
         if (await allow.isVisible()) return
       }
 
-      throw new Error("No Conversation is waiting on a Permission request")
+      throw new Error("No Thread is waiting on a Permission request")
     },
   },
   {
-    area: "Conversations",
+    area: "Threads",
     name: "Failed",
     focus: turns,
-    reach: (window) => conversation(window, /Failed/),
+    reach: (window) => thread(window, /Failed/),
   },
   {
     area: "Activity",
@@ -452,7 +450,7 @@ interface Replay {
 }
 
 const openReplayed = async (window: Page, { harness, scenario }: Replay) => {
-  const link = (await conversationsList(window)).getByRole("link", {
+  const link = (await threadsList(window)).getByRole("link", {
     name: `${REPLAYED_PREFIX}${harness}/${scenario}`,
     exact: true,
   })
@@ -485,7 +483,7 @@ const replayOf = (label: string): ReadonlyArray<Replay> => {
 }
 
 export const replays = async (window: Page) => {
-  const links = (await conversationsList(window)).getByRole("link", {
+  const links = (await threadsList(window)).getByRole("link", {
     name: new RegExp(`^${REPLAYED_PREFIX}`),
   })
 

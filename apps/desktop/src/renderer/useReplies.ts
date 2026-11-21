@@ -52,38 +52,38 @@ export class ReplyStore {
     registry.set(this.viewsAtom, new Map([...unsent].map(([id, body]) => [id, { ...empty, body }])))
   }
 
-  readonly view = (discussionId: string) =>
-    this.registry.get(this.viewsAtom).get(discussionId) ?? empty
+  readonly view = (reviewThreadId: string) =>
+    this.registry.get(this.viewsAtom).get(reviewThreadId) ?? empty
 
   readonly locked = () => this.registry.get(this.lockedAtom)
 
-  edit(discussionId: string, body: string) {
-    const view = this.view(discussionId)
+  edit(reviewThreadId: string, body: string) {
+    const view = this.view(reviewThreadId)
 
     if (this.locked() || view.feedback?.type === "sending") return
 
-    this.#set(discussionId, { ...view, body, feedback: null })
+    this.#set(reviewThreadId, { ...view, body, feedback: null })
   }
 
-  send(discussionId: string) {
-    const view = this.view(discussionId)
+  send(reviewThreadId: string) {
+    const view = this.view(reviewThreadId)
     const { body } = view
 
     if (this.locked() || view.feedback?.type === "sending" || body.trim() === "") return
 
-    this.#set(discussionId, { ...view, feedback: { type: "sending" } })
+    this.#set(reviewThreadId, { ...view, feedback: { type: "sending" } })
 
-    const reply = Backend.use((backend) => backend.ReplyToDiscussion({ discussionId, body }))
+    const reply = Backend.use((backend) => backend.ReplyToReviewThread({ reviewThreadId, body }))
 
     const done = this.#runtime.runPromiseExit(reply).then((exit) => {
       this.#calls.delete(done)
-      const { published } = this.view(discussionId)
+      const { published } = this.view(reviewThreadId)
 
       if (Exit.isSuccess(exit))
-        this.#record(ReplySent.make({ pullRequest: this.#pullRequest, discussionId, body }))
+        this.#record(ReplySent.make({ pullRequest: this.#pullRequest, reviewThreadId, body }))
 
       this.#set(
-        discussionId,
+        reviewThreadId,
         Exit.isSuccess(exit)
           ? { body: "", feedback: null, published: [...published, exit.value] }
           : { body, feedback: { type: "failed", problem: problemOf(exit.cause) }, published },
@@ -120,15 +120,15 @@ export class ReplyStore {
     this.registry.set(this.lockedAtom, this.#holds > 0)
   }
 
-  #set(discussionId: string, view: ReplyView) {
-    this.registry.update(this.viewsAtom, (views) => new Map(views).set(discussionId, view))
+  #set(reviewThreadId: string, view: ReplyView) {
+    this.registry.update(this.viewsAtom, (views) => new Map(views).set(reviewThreadId, view))
   }
 }
 
-export const useReply = (store: ReplyStore, discussionId: string) =>
-  useAtomValue(store.viewsAtom, (views) => views.get(discussionId) ?? empty)
+export const useReply = (store: ReplyStore, reviewThreadId: string) =>
+  useAtomValue(store.viewsAtom, (views) => views.get(reviewThreadId) ?? empty)
 
-export const usePublishedReplies = (store: ReplyStore, discussionId: string) =>
-  useAtomValue(store.viewsAtom, (views) => (views.get(discussionId) ?? empty).published)
+export const usePublishedReplies = (store: ReplyStore, reviewThreadId: string) =>
+  useAtomValue(store.viewsAtom, (views) => (views.get(reviewThreadId) ?? empty).published)
 
 export const useRepliesLocked = (store: ReplyStore) => useAtomValue(store.lockedAtom)

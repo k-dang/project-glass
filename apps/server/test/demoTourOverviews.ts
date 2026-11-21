@@ -24,7 +24,7 @@ const target = (path: string, startLine = 1, side: "old" | "new" = "new") => ({
   endLine: startLine,
 })
 
-const host = "HostConversations.ts"
+const host = "HostThreads.ts"
 
 const runtime = "openCodeRuntime.ts"
 
@@ -32,12 +32,12 @@ const turns = "openCodeTurn.ts"
 
 export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
   {
-    title: "Tour example: add OpenCode for ordinary Conversations",
+    title: "Tour example: add OpenCode for ordinary Threads",
     files: [
       {
         path: host,
         base: [
-          "export const startConversation = (harness, adapters) => {",
+          "export const startThread = (harness, adapters) => {",
           '  if (harness === "pi") return adapters.pi.start()',
           '  return adapters["claude-code"].start()',
           "}",
@@ -45,7 +45,7 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
         head: [
           'import { openCodeAdapter } from "./openCodeRuntime"',
           "",
-          "export const startConversation = (harness, adapters, openCode) => {",
+          "export const startThread = (harness, adapters, openCode) => {",
           "  const harnesses = { ...adapters, opencode: openCodeAdapter(openCode) }",
           "  return harnesses[harness].start()",
           "}",
@@ -79,10 +79,10 @@ export const tourOverviewExamples: ReadonlyArray<TourOverviewExample> = [
         "Add an OpenCode harness path alongside Claude Code and pi, translating native events and history into Glass Turns. This hand-authored synthetic example illustrates the supplied OpenCode Tour; its small source files are demonstration code.",
       diagram: [
         "flowchart LR",
-        "  start[Start a Conversation] -->|Claude Code| claude[Claude Code]",
+        "  start[Start a Thread] -->|Claude Code| claude[Claude Code]",
         "  start -->|pi| pi[pi]",
         "  start -->|OpenCode| opencode[OpenCode service]:::added",
-        "  claude --> turns[Glass Conversation Turns]",
+        "  claude --> turns[Glass Thread Turns]",
         "  pi --> turns",
         "  opencode -->|native events| translate[Translate events and history]:::added",
         "  translate --> turns",

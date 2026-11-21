@@ -29,7 +29,7 @@ import {
   lastTextOf,
   runningTool,
 } from "../../test/adapterSessions"
-import { settled } from "../../test/conversationsFixture"
+import { settled } from "../../test/threadsFixture"
 import {
   type FakeModelDelta,
   type FakeModelRequest,
@@ -40,13 +40,13 @@ import { PI_MODEL_ID } from "../../test/piLogin"
 import { Changes } from "../Changes"
 import { Git } from "../git"
 import { FolderFiles } from "./FolderFiles"
-import { HostConversations } from "./HostConversations"
+import { HostThreads } from "./HostThreads"
 import { HostGlassTools } from "./HostGlassTools"
 import { Journal } from "./Journal"
 import { newHostToken, ReviewRole, WorkRole } from "./protocol"
 import { hostServer } from "./server"
 
-const conversationId = "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"
+const threadId = "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d"
 
 const pixel: Image = {
   mediaType: "image/png",
@@ -85,7 +85,7 @@ const yes = AnswerQuestion.make({ answers: [{ chosen: ["Yes"], text: null }] })
 it.live("streams thinking, tool calls, and text into a Turn that ends done once pi settles", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-streams")
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
     yield* session.configure({ effort: "high" })
 
     yield* session.send(
@@ -129,7 +129,7 @@ it.live("ends a Turn when pi settles after retrying, not at the first agent_end"
       piSettings: { retry: { enabled: true, maxRetries: 1, baseDelayMs: 50 } },
     })
 
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     yield* session.send("Say hello")
     const [turn] = yield* f.until(settled(1))
@@ -157,7 +157,7 @@ export default (pi) => {
   })
 }`,
     )
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     yield* session.send("Start the background task")
     yield* f.until(settled(1))
@@ -180,7 +180,7 @@ it.live("reports a pi extension's statuses as plain text, outside any Turn", () 
   pi.registerCommand("leave", { handler: async (_args, ctx) => ctx.ui.setStatus("mode", undefined) })
 }`,
     )
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     yield* f.untilActivity(({ agentStatuses }) => agentStatuses.length > 0)
     assert.deepStrictEqual(yield* f.statuses, ["Plan mode"])
@@ -205,7 +205,7 @@ it.live("shows the subagents pi-subagents runs as a status until they finish", (
   })
 }`,
     )
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     yield* session.send("/spawn")
     yield* f.untilActivity(({ agentStatuses }) => agentStatuses.length > 0)
@@ -222,7 +222,7 @@ it.live("shows the subagents pi-subagents runs as a status until they finish", (
 it.live("fails a Turn with a reason that leaves out the provider's own words", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-rejected", { apiKey: "glass-rejected-key" })
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     yield* session.send("Say hello")
     const [turn] = yield* f.until(settled(1))
@@ -234,10 +234,10 @@ it.live("fails a Turn with a reason that leaves out the provider's own words", (
   }).pipe(Effect.scoped),
 )
 
-it.live("continues the same conversation in later Turns", () =>
+it.live("continues the same thread in later Turns", () =>
   Effect.gen(function* () {
-    const f = yield* piSession("pi-conversation")
-    const session = yield* f.open(conversationId)
+    const f = yield* piSession("pi-thread")
+    const session = yield* f.open(threadId)
 
     yield* session.send("Remember the word lantern. Reply with exactly: Noted.")
     yield* f.until(settled(1))
@@ -254,7 +254,7 @@ it.live("Steers a pi Turn, which takes the message in before it ends", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-steer")
     yield* f.extension("confirm.js", confirmExtension)
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
     const steer = "Change course: reply with exactly STEERED instead."
 
     yield* session.send(run("bash", "echo hi", "FIRST"))
@@ -272,7 +272,7 @@ it.live("stops a pi Turn, handing back a Steer pi hadn't taken in", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-stop")
     yield* f.extension("confirm.js", confirmExtension)
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     const turnId = yield* session.send(run("bash", "echo hi", "DONE"))
     yield* f.request
@@ -290,7 +290,7 @@ it.live("shows a Steer a pi extension handles itself", () =>
     const f = yield* piSession("pi-handled-steer")
     yield* f.extension("input.js", inputExtension)
     yield* f.extension("confirm.js", confirmExtension)
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     yield* session.send(run("bash", "echo hi", "DONE"))
     const request = yield* f.request
@@ -312,7 +312,7 @@ it.live("shows the notice a pi extension's command answers with", () =>
         handler: async (_args, ctx) => ctx.ui.notify("All systems go", "info"),
       })`,
     )
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     yield* session.send("/status")
 
@@ -327,7 +327,7 @@ it.live("hands back what pi held when the Turn stops: Steers as written, then pi
     const f = yield* piSession("pi-held-steers")
     yield* f.extension("input.js", inputExtension)
     yield* f.extension("confirm.js", confirmExtension)
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     const turnId = yield* session.send(run("bash", "echo hi", "DONE"))
     yield* f.request
@@ -345,7 +345,7 @@ it.live("hands back what pi held when the Turn stops: Steers as written, then pi
 it.live("sends a message's images to pi", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-image")
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     yield* session.send(
       "What's in this image? Answer in one short sentence without using any tools.",
@@ -439,11 +439,11 @@ it.live(
 )
 
 it.live(
-  "starts a pi Conversation on the chosen model and effort, and clears the effort for the next Turn",
+  "starts a pi Thread on the chosen model and effort, and clears the effort for the next Turn",
   () =>
     Effect.gen(function* () {
       const f = yield* piSession("pi-model-change")
-      const session = yield* f.open(conversationId)
+      const session = yield* f.open(threadId)
 
       yield* session.configure({ model: PI_MODEL_ID, effort: "high" })
       yield* session.send("Reply with exactly: FIRST")
@@ -459,25 +459,23 @@ it.live(
     }).pipe(Effect.scoped),
 )
 
-it.live(
-  "runs a pi Conversation's next Turn on pi's own thinking level once its effort is cleared",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* piSession("pi-thinking-level")
-      const session = yield* f.open(conversationId)
+it.live("runs a pi Thread's next Turn on pi's own thinking level once its effort is cleared", () =>
+  Effect.gen(function* () {
+    const f = yield* piSession("pi-thinking-level")
+    const session = yield* f.open(threadId)
 
-      yield* session.configure({ model: PI_MODEL_ID, effort: "high" })
-      yield* session.send("Reply with exactly: FIRST")
-      yield* f.until(settled(1))
-      yield* session.configure({ model: PI_MODEL_ID })
-      yield* session.send("Reply with exactly: SECOND")
-      const turns = yield* f.until(settled(2))
+    yield* session.configure({ model: PI_MODEL_ID, effort: "high" })
+    yield* session.send("Reply with exactly: FIRST")
+    yield* f.until(settled(1))
+    yield* session.configure({ model: PI_MODEL_ID })
+    yield* session.send("Reply with exactly: SECOND")
+    const turns = yield* f.until(settled(2))
 
-      assert.deepStrictEqual(
-        turns.map(({ ended }) => ended?.ending),
-        [TurnDone.make({}), TurnDone.make({})],
-      )
-    }).pipe(Effect.scoped),
+    assert.deepStrictEqual(
+      turns.map(({ ended }) => ended?.ending),
+      [TurnDone.make({}), TurnDone.make({})],
+    )
+  }).pipe(Effect.scoped),
 )
 
 const firstQuestion = (part: RequestPart) =>
@@ -496,7 +494,7 @@ it.live("asks pi's extension dialogs as Questions, answered with an option or te
         return { block: true, reason: greeting + " " + name + " " + sure }
       })`,
     )
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     const replies = new Map([
       ["Which greeting?", { chosen: ["Hello"], text: null }],
@@ -559,7 +557,7 @@ it.live("stops a pi Turn while its extension's dialog waits", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-stop-in-dialog")
     yield* f.extension("confirm.js", confirmExtension)
-    const session = yield* f.open(conversationId)
+    const session = yield* f.open(threadId)
 
     const turnId = yield* session.send(run("bash", "echo hi", "DONE"))
     const request = yield* f.request
@@ -586,7 +584,7 @@ const reviewReplies = [
 ]
 
 it.live(
-  "runs commands in its checkout and proposes Suggested drafts as an Agent review's Conversation",
+  "runs commands in its checkout and proposes Suggested drafts as an Agent review's Thread",
   () =>
     Effect.gen(function* () {
       const f = yield* piSession("pi-review", {
@@ -600,7 +598,7 @@ it.live(
       })
 
       yield* writeGreeter(f.folder)
-      const session = yield* f.open(conversationId, ReviewRole.make({ brief: reviewBrief }))
+      const session = yield* f.open(threadId, ReviewRole.make({ brief: reviewBrief }))
 
       yield* session.send("Draft comments on greet.ts.")
       const [turn] = yield* f.until(settled(1))
@@ -647,10 +645,10 @@ const globalReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => 
 
 it.live("asks a Question as the Global chat", () =>
   Effect.gen(function* () {
-    const glass = yield* glassToolsBackend(conversationId)
+    const glass = yield* glassToolsBackend(threadId)
     const f = yield* piSession("pi-global", { fake: { reply: globalReply }, places: glass.places })
 
-    const session = yield* f.open(conversationId, glass.role)
+    const session = yield* f.open(threadId, glass.role)
 
     yield* session.send("Ask me which greeting I prefer.")
     const question = yield* f.request
@@ -674,14 +672,14 @@ it.live("asks a Question as the Global chat", () =>
 
 it.live("reads Glass through its tools as the Global chat, explaining a failed read", () =>
   Effect.gen(function* () {
-    const glass = yield* glassToolsBackend(conversationId)
+    const glass = yield* glassToolsBackend(threadId)
 
     const f = yield* piSession("pi-global-tools", {
       fake: { reply: globalReply },
       places: glass.places,
     })
 
-    const session = yield* f.open(conversationId, glass.role)
+    const session = yield* f.open(threadId, glass.role)
 
     yield* session.send("What are my To-dos?")
     const [read] = yield* f.until(settled(1))
@@ -703,14 +701,14 @@ it.live("reads Glass through its tools as the Global chat, explaining a failed r
 
 it.live("stops the Global chat's Turn while a Glass tool runs, cancelling the call", () =>
   Effect.gen(function* () {
-    const glass = yield* glassToolsBackend(conversationId)
+    const glass = yield* glassToolsBackend(threadId)
 
     const f = yield* piSession("pi-global-tool-stop", {
       fake: { reply: globalReply },
       places: glass.places,
     })
 
-    const session = yield* f.open(conversationId, glass.role)
+    const session = yield* f.open(threadId, glass.role)
 
     const turnId = yield* session.send("Wait for release.")
 
@@ -726,7 +724,7 @@ it.live("stops the Global chat's Turn while a Glass tool runs, cancelling the ca
   }).pipe(Effect.scoped),
 )
 
-it.live("keeps pi's extensions when a stopped Conversation is started again straight away", () =>
+it.live("keeps pi's extensions when a stopped Thread is started again straight away", () =>
   Effect.gen(function* () {
     const f = yield* piSession("pi-restart", { fake: {} })
 
@@ -736,7 +734,7 @@ it.live("keeps pi's extensions when a stopped Conversation is started again stra
         shutDown: yield* Deferred.make<void>(),
       }).pipe(
         Layer.provideMerge(NodeHttpServer.layer(createServer, { port: 0, host: "127.0.0.1" })),
-        Layer.provideMerge(HostConversations.make({ "claude-code": f.adapter, pi: f.adapter })),
+        Layer.provideMerge(HostThreads.make({ "claude-code": f.adapter, pi: f.adapter })),
         Layer.provideMerge(HostGlassTools.layer),
         Layer.provideMerge(Journal.layer),
         Layer.provide(Changes.layer),
@@ -746,10 +744,10 @@ it.live("keeps pi's extensions when a stopped Conversation is started again stra
       ),
     )
 
-    const host = yield* HostConversations.pipe(Effect.provideContext(context))
+    const host = yield* HostThreads.pipe(Effect.provideContext(context))
 
     const start = host.start({
-      conversationId,
+      threadId,
       harness: "pi",
       folder: f.folder,
       role: WorkRole.make({}),
@@ -758,7 +756,7 @@ it.live("keeps pi's extensions when a stopped Conversation is started again stra
 
     assert.equal(yield* start, "started")
 
-    const stopping = yield* Effect.forkChild(host.stop(conversationId), { startImmediately: true })
+    const stopping = yield* Effect.forkChild(host.stop(threadId), { startImmediately: true })
 
     assert.equal(yield* start, "started")
     yield* Fiber.join(stopping)

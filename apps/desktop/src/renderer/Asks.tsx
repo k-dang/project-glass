@@ -1,6 +1,6 @@
 import { LoaderCircle, Sparkles, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { LineLocation, pathLineName } from "./Discussions"
+import { LineLocation, pathLineName } from "./ReviewThreads"
 import { runnerLabel } from "./harnesses"
 import { ProblemAlert } from "./ProblemAlert"
 import { TourText } from "./TourText"

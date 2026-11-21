@@ -1,7 +1,7 @@
 # The backend log is one line per unit of work
 
 The backend log used to hold Effect's default text output: about a hundred scattered warnings such
-as "Couldn't save a Conversation", mostly without saying which Conversation, Turn or PR. Answering
+as "Couldn't save a Thread", mostly without saying which Thread, Turn or PR. Answering
 "why did this Tour fail?" meant reading the log in order and guessing which lines belonged together.
 
 Now every line is JSON, and each unit of work (an RPC or HTTP route, a background job such as a

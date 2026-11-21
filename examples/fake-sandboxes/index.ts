@@ -56,7 +56,7 @@ const plugin: Plugin = (glass) => {
     harnesses: ["claude-code"],
     create: async (request, { progress, record, signal }) => {
       progress("Creating the Sandbox")
-      const folder = join(SANDBOXES, request.conversationId)
+      const folder = join(SANDBOXES, request.threadId)
       await mkdir(folder, { recursive: true })
       const port = await freePort()
       record({ folder, port })

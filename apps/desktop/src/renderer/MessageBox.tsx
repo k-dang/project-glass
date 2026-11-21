@@ -22,8 +22,8 @@ import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
 import { BorderBeam } from "@/components/border-beam"
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
 import { Suggestion, Suggestions } from "@/components/ui/suggestion"
-import { conversationColumn } from "./conversationColumn"
-import { noCommands, noFiles } from "./conversationsArea"
+import { threadColumn } from "./threadColumn"
+import { noCommands, noFiles } from "./threadsArea"
 import { CommandHighlight, useCommandPicker } from "./Commands"
 import { pastedSlice, toContent, Mention, toMessage } from "./composerDocument"
 import { createImageViewer, ImageViewer, type ImageViewerController } from "./ImageViewer"
@@ -298,7 +298,7 @@ export function MessageBox(props: {
     <>
       {props.attachment !== undefined && (
         <div className="px-6 pt-2">
-          <div className={cn(conversationColumn, "rounded-lg border bg-muted/30 px-3 py-2")}>
+          <div className={cn(threadColumn, "rounded-lg border bg-muted/30 px-3 py-2")}>
             {props.attachment}
           </div>
         </div>
@@ -310,7 +310,7 @@ export function MessageBox(props: {
           void submit(props.send)
         }}
       >
-        <div className={cn(conversationColumn, "flex flex-col gap-2")}>
+        <div className={cn(threadColumn, "flex flex-col gap-2")}>
           {props.problem !== null && <ProblemAlert problem={props.problem} />}
           {props.notice}
           {props.suggestions !== undefined && props.suggestions.length > 0 && (

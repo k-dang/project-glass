@@ -176,7 +176,9 @@ describe("Drafts", () => {
 
       assert.deepStrictEqual(error, new DraftNotFound({ id }))
       assert.deepStrictEqual(
-        pr.reviewThreads.flatMap((thread) => thread.comments.map((comment) => comment.bodyHtml)),
+        pr.reviewThreads.flatMap((reviewThread) =>
+          reviewThread.comments.map((comment) => comment.bodyHtml),
+        ),
         ["<p>Why?</p>"],
       )
     }),

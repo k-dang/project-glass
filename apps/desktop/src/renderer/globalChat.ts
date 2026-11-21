@@ -1,6 +1,6 @@
 import {
-  ConversationContext,
-  type ConversationMessageInput,
+  ThreadContext,
+  type ThreadMessageInput,
   type CapturedContext,
   type MessageInput,
   type ModelChoice,
@@ -10,15 +10,9 @@ import {
 } from "@glass/contracts"
 import { Data, type DateTime, Effect, Option, Stream } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import {
-  conversationsAtom,
-  noCommands,
-  noFiles,
-  TRANSCRIPT_IDLE_TTL,
-  transcriptOf,
-} from "./conversationsArea"
+import { threadsAtom, noCommands, noFiles, TRANSCRIPT_IDLE_TTL, transcriptOf } from "./threadsArea"
 import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
-import type { ConversationAtoms } from "./conversation"
+import type { ThreadAtoms } from "./thread"
 import { openWorkspaceAtom, sameRef } from "./reviewsArea"
 
 export const globalChatOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
@@ -67,7 +61,7 @@ export const startGlobalFreshAtom = backendRuntime.fn((_: void, get) =>
 
 export type Viewed = Data.TaggedEnum<{
   PullRequest: { readonly ref: PullRequestRef }
-  Conversation: { readonly conversationId: string }
+  Thread: { readonly threadId: string }
 }>
 
 export const Viewed = Data.taggedEnum<Viewed>()
@@ -90,14 +84,14 @@ export const capturedContextAtom = Atom.make((get): CapturedContext | null => {
             revision: workspace.revision,
           })
     },
-    Conversation: ({ conversationId }) => {
-      const conversation = Option.getOrNull(AsyncResult.value(get(conversationsAtom)))?.find(
-        ({ id }) => id === conversationId,
+    Thread: ({ threadId }) => {
+      const thread = Option.getOrNull(AsyncResult.value(get(threadsAtom)))?.find(
+        ({ id }) => id === threadId,
       )
 
-      return conversation === undefined
+      return thread === undefined
         ? null
-        : ConversationContext.make({ conversationId: conversation.id, name: conversation.name })
+        : ThreadContext.make({ threadId: thread.id, name: thread.name })
     },
   })
 })
@@ -108,7 +102,7 @@ const sending = ({ message, images }: MessageInput, get: Atom.FnContext) => ({
   context: get(capturedContextAtom),
 })
 
-export const globalChat: ConversationAtoms = {
+export const globalChat: ThreadAtoms = {
   composerKey: "global-chat",
   transcript: backendRuntime
     .atom(
@@ -118,7 +112,7 @@ export const globalChat: ConversationAtoms = {
   loadEarlier: backendRuntime.fn((before: string) =>
     Backend.use((backend) => backend.LoadEarlierGlobalTurns({ before })),
   ),
-  send: backendRuntime.fn((sent: ConversationMessageInput, get) =>
+  send: backendRuntime.fn((sent: ThreadMessageInput, get) =>
     Backend.use((backend) => backend.SendGlobalMessage(sending(sent, get))),
   ),
   steer: backendRuntime.fn((sent: MessageInput, get) =>

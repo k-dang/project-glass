@@ -20,7 +20,7 @@ import { createServer } from "node:http"
 import type { Socket } from "node:net"
 import type { Changes } from "../src/Changes"
 import type { FolderFiles } from "../src/agentHost/FolderFiles"
-import type { HostConversations } from "../src/agentHost/HostConversations"
+import type { HostThreads } from "../src/agentHost/HostThreads"
 import type { HostGlassTools } from "../src/agentHost/HostGlassTools"
 import type { Journal } from "../src/agentHost/Journal"
 import { Hello } from "../src/agentHost/protocol"
@@ -44,10 +44,9 @@ const TWO_DAYS = Duration.toMillis(Duration.days(2))
 
 export const steps = ["Creating the Sandbox", "Starting the agent"] as const
 
-const SandboxId = Schema.Struct({ conversationId: Schema.String })
+const SandboxId = Schema.Struct({ threadId: Schema.String })
 
-const conversationIdOf = (state: SandboxState) =>
-  Schema.decodeUnknownSync(SandboxId)(state).conversationId
+const threadIdOf = (state: SandboxState) => Schema.decodeUnknownSync(SandboxId)(state).threadId
 
 const VersionedHost = RpcGroup.make(Hello)
 
@@ -80,7 +79,7 @@ const otherHost = (kind: Exclude<HostKind, { readonly kind: "current" }>) =>
       )
 
 export const inProcessSandboxes = Effect.fnUntraced(function* (
-  host: () => Layer.Layer<HostConversations | HostGlassTools | Journal | Changes | FolderFiles>,
+  host: () => Layer.Layer<HostThreads | HostGlassTools | Journal | Changes | FolderFiles>,
 ) {
   const clock = yield* Clock.Clock
   const context = yield* Effect.context()
@@ -106,8 +105,8 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
   const shutDowns = new Map<string, Deferred.Deferred<void>>()
   const events: Array<string> = []
 
-  const noteEnded = (conversationId: string) => {
-    if (!events.includes(`ended ${conversationId}`)) events.push(`ended ${conversationId}`)
+  const noteEnded = (threadId: string) => {
+    if (!events.includes(`ended ${threadId}`)) events.push(`ended ${threadId}`)
   }
 
   const refuseLogin = () => {
@@ -147,10 +146,10 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       () => events.push(`abandoned ${call}`),
     )
 
-  const stop = (conversationId: string) =>
+  const stop = (threadId: string) =>
     Effect.suspend(() => {
-      const running = hosts.get(conversationId)
-      hosts.delete(conversationId)
+      const running = hosts.get(threadId)
+      hosts.delete(threadId)
 
       if (running === undefined) return Effect.void
 
@@ -159,7 +158,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       return Scope.close(running.scope, Exit.void)
     })
 
-  const startHost = async (conversationId: string, token: string, kind: HostKind) => {
+  const startHost = async (threadId: string, token: string, kind: HostKind) => {
     const scope = Scope.makeUnsafe()
     const shutDown = Deferred.makeUnsafe<void>()
     const server = createServer()
@@ -182,17 +181,17 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       ),
     )
 
-    hosts.set(conversationId, { scope, sockets, token })
-    shutDowns.set(conversationId, shutDown)
+    hosts.set(threadId, { scope, sockets, token })
+    shutDowns.set(threadId, shutDown)
     urls.set(
-      conversationId,
+      threadId,
       HttpServer.formatAddress(Context.get(services, HttpServer.HttpServer).address),
     )
 
     runFork(
       Deferred.await(shutDown).pipe(
-        Effect.andThen(Effect.sync(() => noteEnded(conversationId))),
-        Effect.andThen(stop(conversationId)),
+        Effect.andThen(Effect.sync(() => noteEnded(threadId))),
+        Effect.andThen(stop(threadId)),
       ),
     )
   }
@@ -207,8 +206,8 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
       if (settings.noCapacity !== undefined) throw new NoCapacity(settings.noCapacity)
 
-      record({ conversationId: request.conversationId })
-      createdAt.set(request.conversationId, clock.currentTimeMillisUnsafe())
+      record({ threadId: request.threadId })
+      createdAt.set(request.threadId, clock.currentTimeMillisUnsafe())
 
       for (const step of steps) {
         progress(step)
@@ -217,19 +216,15 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
         if (settings.failAt === step) throw new Error(`The fake Sandbox failed at ${step}`)
       }
 
-      await startHost(
-        request.conversationId,
-        request.host.environment["GLASS_HOST_TOKEN"] ?? "",
-        current,
-      )
+      await startHost(request.threadId, request.host.environment["GLASS_HOST_TOKEN"] ?? "", current)
     },
     target: async (state, signal) => {
       await answered("target", signal)
-      const conversationId = conversationIdOf(state)
+      const threadId = threadIdOf(state)
 
-      if (gone.has(conversationId)) throw new SandboxGone()
+      if (gone.has(threadId)) throw new SandboxGone()
 
-      const url = urls.get(conversationId)
+      const url = urls.get(threadId)
 
       if (url === undefined) throw new Error("No such fake Sandbox")
 
@@ -237,17 +232,17 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
     },
     extend: async (state, signal) => {
       await answered("extend", signal)
-      const conversationId = conversationIdOf(state)
+      const threadId = threadIdOf(state)
 
-      if (gone.has(conversationId)) throw new SandboxGone()
+      if (gone.has(threadId)) throw new SandboxGone()
 
       const expiresAt = Math.min(
         clock.currentTimeMillisUnsafe() + (settings.extensionMillis ?? TWO_DAYS),
-        (createdAt.get(conversationId) ?? clock.currentTimeMillisUnsafe()) +
+        (createdAt.get(threadId) ?? clock.currentTimeMillisUnsafe()) +
           (settings.maxLifetimeMillis ?? TWO_DAYS),
       )
 
-      reclaimAt(conversationId, expiresAt)
+      reclaimAt(threadId, expiresAt)
 
       return new Date(expiresAt)
     },
@@ -255,14 +250,14 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       await answered("remove", signal)
       refuseLogin()
 
-      const conversationId = conversationIdOf(state)
-      const shutDown = shutDowns.get(conversationId)
+      const threadId = threadIdOf(state)
+      const shutDown = shutDowns.get(threadId)
 
-      if (shutDown !== undefined && Deferred.isDoneUnsafe(shutDown)) noteEnded(conversationId)
+      if (shutDown !== undefined && Deferred.isDoneUnsafe(shutDown)) noteEnded(threadId)
 
-      await runPromise(stop(conversationId))
-      urls.delete(conversationId)
-      events.push(`removed ${conversationId}`)
+      await runPromise(stop(threadId))
+      urls.delete(threadId)
+      events.push(`removed ${threadId}`)
     },
     models: async (_harness, signal) => {
       await answered("models", signal)
@@ -271,27 +266,27 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
     },
   }
 
-  const reclaim = (conversationId: string) =>
-    stop(conversationId).pipe(
+  const reclaim = (threadId: string) =>
+    stop(threadId).pipe(
       Effect.andThen(
         Effect.sync(() => {
-          expiries.get(conversationId)?.interruptUnsafe()
-          expiries.delete(conversationId)
-          gone.add(conversationId)
+          expiries.get(threadId)?.interruptUnsafe()
+          expiries.delete(threadId)
+          gone.add(threadId)
         }),
       ),
     )
 
-  const reclaimAt = (conversationId: string, expiresAt: number) => {
-    expiries.get(conversationId)?.interruptUnsafe()
+  const reclaimAt = (threadId: string, expiresAt: number) => {
+    expiries.get(threadId)?.interruptUnsafe()
     expiries.set(
-      conversationId,
+      threadId,
       runFork(
         clock.sleep(Duration.millis(expiresAt - clock.currentTimeMillisUnsafe())).pipe(
           Effect.andThen(() => {
-            expiries.delete(conversationId)
+            expiries.delete(threadId)
 
-            return reclaim(conversationId)
+            return reclaim(threadId)
           }),
         ),
       ),
@@ -307,24 +302,24 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       for (const check of waiting.splice(0)) check()
     },
     stopHost: stop,
-    dropConnections: (conversationId: string) =>
+    dropConnections: (threadId: string) =>
       Effect.sync(() => {
-        for (const socket of hosts.get(conversationId)?.sockets ?? []) socket.destroy()
+        for (const socket of hosts.get(threadId)?.sockets ?? []) socket.destroy()
       }),
-    restartHost: (conversationId: string, kind: HostKind = current) =>
+    restartHost: (threadId: string, kind: HostKind = current) =>
       Effect.suspend(() => {
-        const running = hosts.get(conversationId)
+        const running = hosts.get(threadId)
 
-        if (running === undefined) return Effect.die(`No running host for ${conversationId}`)
+        if (running === undefined) return Effect.die(`No running host for ${threadId}`)
 
-        return stop(conversationId).pipe(
-          Effect.andThen(Effect.promise(() => startHost(conversationId, running.token, kind))),
+        return stop(threadId).pipe(
+          Effect.andThen(Effect.promise(() => startHost(threadId, running.token, kind))),
         )
       }),
     reclaim,
-    setGone: (conversationId: string, isGone: boolean) => {
-      if (isGone) gone.add(conversationId)
-      else gone.delete(conversationId)
+    setGone: (threadId: string, isGone: boolean) => {
+      if (isGone) gone.add(threadId)
+      else gone.delete(threadId)
     },
     closeAll: Effect.suspend(() => {
       return Effect.forEach(expiries.values(), Fiber.interrupt, { discard: true }).pipe(

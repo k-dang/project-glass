@@ -29,7 +29,7 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
     })
       .start({
         folder: "checkout",
-        conversation: "new",
+        thread: "new",
         role: WorkRole.make({}),
         glassTools: undefined,
         skills: [],
@@ -37,12 +37,12 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
       })
       .pipe(Effect.scoped, Effect.flip)
 
-    assert.equal(failed._tag, "HostConversationError")
+    assert.equal(failed._tag, "HostThreadError")
     assert.isTrue(closed)
   }),
 )
 
-it.live("gives a Work Conversation Glass's tools and how to use them only when it has tools", () =>
+it.live("gives a Work Thread Glass's tools and how to use them only when it has tools", () =>
   Effect.gen(function* () {
     const given: Array<Options> = []
 
@@ -71,7 +71,7 @@ it.live("gives a Work Conversation Glass's tools and how to use them only when i
       adapter
         .start({
           folder: "checkout",
-          conversation: "new",
+          thread: "new",
           role: WorkRole.make({}),
           glassTools,
           skills: [],

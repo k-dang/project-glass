@@ -14,7 +14,6 @@ import {
   ActivityPage,
   ActivityPullRequest,
   ActivityToDo,
-  Discussions,
   Draft,
   FollowedRepository,
   FileTooLarge,
@@ -72,7 +71,9 @@ const workspace = new PullRequestWorkspace({
   updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
   files: [],
   viewedPaths: [],
-  discussions: new Discussions({ onLines: [], outdated: [], timeline: [] }),
+  lineReviewThreads: [],
+  outdatedReviewThreads: [],
+  timeline: [],
   drafts: [
     new Draft({
       id: "D1",
@@ -132,8 +133,8 @@ it("breaks storage down by table in Settings, and retries a failed measurement",
         ? Effect.fail(new StorageError())
         : Effect.succeed([
             new StorageItem({
-              name: "conversation_turn",
-              group: "conversations",
+              name: "thread_turn",
+              group: "threads",
               bytes: 2.5 * 1024 ** 2,
             }),
             new StorageItem({ name: "tours", group: "reviews", bytes: 512 * 1024 }),
@@ -147,10 +148,8 @@ it("breaks storage down by table in Settings, and retries a failed measurement",
   const storage = within(await screen.findByRole("region", { name: "Storage" }))
   await user.click(await storage.findByRole("button", { name: "Try again" }))
 
-  expect((await storage.findByText("3.5 MB on disk")).textContent).toContain(
-    "largest is Conversations",
-  )
-  expect(storage.getByText("conversation_turn")).toBeTruthy()
+  expect((await storage.findByText("3.5 MB on disk")).textContent).toContain("largest is Threads")
+  expect(storage.getByText("thread_turn")).toBeTruthy()
   expect(storage.queryByText("tours")).toBeNull()
 
   await user.click(storage.getByRole("button", { name: /Reviews/ }))
@@ -311,7 +310,7 @@ it("opens the keyboard shortcuts from any area, not only a PR workspace", async 
   await user.click(await screen.findByRole("link", { name: "To-dos" }))
   await user.keyboard("?")
   const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
-  expect(within(dialog).getByRole("heading", { name: "Conversations" })).toBeTruthy()
+  expect(within(dialog).getByRole("heading", { name: "Threads" })).toBeTruthy()
 })
 
 it("preserves a pending follow and its failure when leaving and returning to Settings", async () => {
@@ -406,7 +405,7 @@ it("lists Activity by day, pages older Activity, and keeps the log on return", a
   const reply = logged(
     2,
     new Date(),
-    ReplySent.make({ pullRequest: recorded, discussionId: "PRRT_1", body: "Done." }),
+    ReplySent.make({ pullRequest: recorded, reviewThreadId: "PRRT_1", body: "Done." }),
   )
 
   const opened = logged(

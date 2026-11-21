@@ -454,7 +454,7 @@ test("keeps Replies, Drafts and full-file context in Tour order", async ({
   await expect(changes.getByText("Writes twenty in words.")).toBeVisible()
 
   await changes
-    .getByRole("textbox", { name: /^Reply to thread on greet\.ts/ })
+    .getByRole("textbox", { name: /^Reply to Review thread on greet\.ts/ })
     .fill("They read better.")
   await changes.getByRole("button", { name: "Reply", exact: true }).click()
   await expect

@@ -1,5 +1,5 @@
 import {
-  ConversationError,
+  ThreadError,
   Branches,
   FollowedRepository,
   InvalidLocalCheckout,
@@ -33,21 +33,21 @@ const parseGitHubRemote = (url: string) => {
 }
 
 const storageFailure = () =>
-  new ConversationError({ message: "Couldn't read or save your Local checkouts. Try again." })
+  new ThreadError({ message: "Couldn't read or save your Local checkouts. Try again." })
 
 export class LocalCheckouts extends Context.Service<
   LocalCheckouts,
   {
-    readonly list: () => Effect.Effect<ReadonlyArray<LocalCheckout>, ConversationError>
+    readonly list: () => Effect.Effect<ReadonlyArray<LocalCheckout>, ThreadError>
     readonly link: (
       path: string,
-    ) => Effect.Effect<LocalCheckout, InvalidLocalCheckout | ConversationError>
+    ) => Effect.Effect<LocalCheckout, InvalidLocalCheckout | ThreadError>
     readonly get: (
       repository: FollowedRepository,
-    ) => Effect.Effect<typeof LinkedCheckout.Type, InvalidLocalCheckout | ConversationError>
+    ) => Effect.Effect<typeof LinkedCheckout.Type, InvalidLocalCheckout | ThreadError>
     readonly branches: (
       repository: FollowedRepository,
-    ) => Effect.Effect<Branches, InvalidLocalCheckout | ConversationError>
+    ) => Effect.Effect<Branches, InvalidLocalCheckout | ThreadError>
   }
 >()("@glass/server/LocalCheckouts") {
   static readonly layer = Layer.effect(
@@ -121,7 +121,7 @@ export class LocalCheckouts extends Context.Service<
             Effect.tapError((cause) => Effect.logWarning("Couldn't list branches", cause)),
             Effect.mapError(
               () =>
-                new ConversationError({
+                new ThreadError({
                   message: `Couldn't list the branches in ${path}. Try again.`,
                 }),
             ),

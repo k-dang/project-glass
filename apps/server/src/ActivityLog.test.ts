@@ -96,7 +96,7 @@ describe("Activity log", () => {
             }),
           ],
         }),
-        ReplySent.make({ pullRequest, discussionId: "PRRT_1", body: "To greet them." }),
+        ReplySent.make({ pullRequest, reviewThreadId: "PRRT_1", body: "To greet them." }),
       ]
 
       for (const activity of activities) yield* client.RecordActivity(activity)

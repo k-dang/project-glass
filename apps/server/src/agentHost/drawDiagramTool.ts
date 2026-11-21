@@ -3,7 +3,7 @@ import { drawWithPele } from "../mermaid"
 import { replyTo, toolParameters } from "./hostTool"
 
 export const drawDiagramDescription =
-  "Draw a Diagram beside the conversation in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram."
+  "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram."
 
 export const drawDiagramParameters = toolParameters({
   title: [
@@ -20,7 +20,7 @@ export const drawDiagramParameters = toolParameters({
   ],
 })
 
-const DIAGRAM_DRAWN = "Glass shows this Diagram beside the conversation."
+const DIAGRAM_DRAWN = "Glass shows this Diagram beside the Thread."
 
 const refusal = (reason: string) =>
   `Glass couldn't draw this Diagram:\n${reason}\nFix it and call ${DRAW_DIAGRAM_TOOL} again.`

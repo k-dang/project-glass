@@ -11,7 +11,7 @@ import { wideEvents } from "../wideEvents"
 
 const named = (text: string) => new McpSchema.CallToolResult({ content: [{ type: "text", text }] })
 
-const conversation = (id: string, sandboxProvider: string | null, reviewBrief: string | null) => ({
+const thread = (id: string, sandboxProvider: string | null, reviewBrief: string | null) => ({
   id,
   name: id,
   owner: "glass-demo",
@@ -45,10 +45,10 @@ const relay = Effect.gen(function* () {
 
   const sql = Context.get(context, SqlClient.SqlClient)
 
-  yield* sql`INSERT INTO conversation ${sql.insert([
-    conversation("local", null, null),
-    conversation("sandboxed", "fake", null),
-    conversation("review", null, "{}"),
+  yield* sql`INSERT INTO thread ${sql.insert([
+    thread("local", null, null),
+    thread("sandboxed", "fake", null),
+    thread("review", null, "{}"),
   ])}`
 
   yield* Context.get(context, McpServer.McpServer).addTool({
@@ -57,7 +57,7 @@ const relay = Effect.gen(function* () {
     handle: () =>
       McpCaller.current.pipe(
         Effect.map((caller) =>
-          named(Predicate.isTagged(caller, "Conversation") ? caller.conversationId : caller._tag),
+          named(Predicate.isTagged(caller, "Thread") ? caller.threadId : caller._tag),
         ),
       ),
   })
@@ -71,24 +71,24 @@ const relay = Effect.gen(function* () {
 
   return (
     origin: ToolCallOrigin,
-    conversationId: string,
+    threadId: string,
     call: Pick<RelayedToolCall, "name" | "arguments"> = { name: "caller", arguments: {} },
-  ) => glassToolRelay.answer(origin, { callId: "call", conversationId, ...call })
+  ) => glassToolRelay.answer(origin, { callId: "call", threadId, ...call })
 })
 
-it.effect("refuses a Sandbox's call stamped with another Conversation", () =>
+it.effect("refuses a Sandbox's call stamped with another Thread", () =>
   Effect.gen(function* () {
     const answer = yield* relay
 
     assert.deepStrictEqual(
-      yield* answer(ToolCallOrigin.Sandbox({ conversationId: "sandboxed" }), "local"),
+      yield* answer(ToolCallOrigin.Sandbox({ threadId: "sandboxed" }), "local"),
       refused,
     )
   }),
 )
 
 it.effect(
-  "refuses this device's call for a Sandbox's, an Agent review's or an unknown Conversation",
+  "refuses this device's call for a Sandbox's, an Agent review's or an unknown Thread",
   () =>
     Effect.gen(function* () {
       const answer = yield* relay
@@ -102,13 +102,13 @@ it.effect(
     }),
 )
 
-it.effect("calls the tool as the Conversation each origin answers for", () =>
+it.effect("calls the tool as the Thread each origin answers for", () =>
   Effect.gen(function* () {
     const answer = yield* relay
 
     assert.deepStrictEqual(
       [
-        yield* answer(ToolCallOrigin.Sandbox({ conversationId: "sandboxed" }), "sandboxed"),
+        yield* answer(ToolCallOrigin.Sandbox({ threadId: "sandboxed" }), "sandboxed"),
         yield* answer(ToolCallOrigin.ThisDevice(), "local"),
       ],
       [named("sandboxed"), named("local")],

@@ -5,7 +5,7 @@ import { Option, Schema } from "effect"
 import { MousePointerClick } from "lucide-react"
 import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from "react"
 import { Toggle } from "@/components/ui/toggle"
-import { pageNoteEditingAtom } from "./conversationsArea"
+import { pageNoteEditingAtom } from "./threadsArea"
 import { FeedbackEditor, pagePartLabel, withText } from "./FeedbackNotes"
 import { FromPage, type PageRect, type PageState } from "./pageMessages"
 import { withPageNotes } from "./pageNotesScript"
@@ -53,8 +53,8 @@ function useHtmlPage(html: string) {
 }
 
 // WARNING: The page runs in its own sandboxed origin, so files beside it don't load.
-export function PageWithNotes(props: { conversationId: string; path: string; html: string }) {
-  const store = useFeedbackNotes(props.conversationId)
+export function PageWithNotes(props: { threadId: string; path: string; html: string }) {
+  const store = useFeedbackNotes(props.threadId)
   const src = useHtmlPage(props.html)
   const frame = useRef<HTMLIFrameElement>(null)
   const area = useRef<HTMLDivElement>(null)
@@ -75,7 +75,7 @@ export function PageWithNotes(props: { conversationId: string; path: string; htm
   const isEditing = editing !== null
   const editingNoteId = editing?.note?.id ?? null
 
-  const setEditingOnPage = useAtomSet(pageNoteEditingAtom(props.conversationId))
+  const setEditingOnPage = useAtomSet(pageNoteEditingAtom(props.threadId))
 
   useEffect(() => {
     setEditingOnPage(editingNoteId)

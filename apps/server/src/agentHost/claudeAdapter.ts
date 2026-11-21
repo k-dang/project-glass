@@ -55,7 +55,7 @@ import {
   type RepositoryRole,
   couldNotSwitch,
   type GlassToolsAccess,
-  HostConversationError,
+  HostThreadError,
   notRunning,
   type ReviewBrief,
 } from "./protocol"
@@ -107,7 +107,7 @@ export interface ClaudeSdk {
 const liveSdk: ClaudeSdk = { query, getSessionInfo }
 
 const startFailure = (cause: unknown) =>
-  new HostConversationError({
+  new HostThreadError({
     message: /ENOENT|not found/i.test(String(cause))
       ? "Claude Code isn't installed. Install it, or set claudeCommand in Glass's settings.json to its path and restart Glass."
       : "Claude Code could not start. Check its installation.",
@@ -205,7 +205,7 @@ const startClaude = (
     readonly session: ClaudeQuery
     readonly initialized: Pick<SDKControlInitializeResponse, "models" | "commands">
   },
-  HostConversationError,
+  HostThreadError,
   Scope.Scope
 > =>
   Effect.gen(function* () {
@@ -420,7 +420,7 @@ export const claudeAdapter = (
       Effect.scoped,
     ),
 
-  start: Effect.fnUntraced(function* ({ folder, conversation, role, glassTools, skills, report }) {
+  start: Effect.fnUntraced(function* ({ folder, thread, role, glassTools, skills, report }) {
     const prompts = yield* Queue.unbounded<SDKUserMessage>()
     const requests = yield* Queue.unbounded<Input>()
     const waiting = new Map<string, Asked>()
@@ -438,18 +438,15 @@ export const claudeAdapter = (
         Effect.ensuring(Effect.sync(() => waiting.delete(requestId))),
       )
 
-    // WARNING: Claude Code refuses to resume a conversation it hasn't saved, and to start one it has.
-    const saved = yield* Effect.tryPromise(() =>
-      sdk.getSessionInfo(conversation, { dir: folder }),
-    ).pipe(
+    // WARNING: Claude Code refuses to resume a session it hasn't saved, and to start one it has.
+    const saved = yield* Effect.tryPromise(() => sdk.getSessionInfo(thread, { dir: folder })).pipe(
       Effect.tapError((cause) =>
-        Effect.logWarning("Couldn't look up a Claude Code conversation", cause),
+        Effect.logWarning("Couldn't look up a Claude Code session", cause),
       ),
       Effect.mapError(
         () =>
-          new HostConversationError({
-            message:
-              "Glass couldn't look up this Conversation's Claude Code conversation. Try again.",
+          new HostThreadError({
+            message: "Glass couldn't look up this Thread's Claude Code session. Try again.",
           }),
       ),
     )
@@ -475,7 +472,7 @@ export const claudeAdapter = (
       Stream.toAsyncIterable(Stream.fromQueue(prompts)),
       canUseTool,
       {
-        ...(saved === undefined ? { sessionId: conversation } : { resume: conversation }),
+        ...(saved === undefined ? { sessionId: thread } : { resume: thread }),
         ...roleOptions(role, glassTools),
         ...pluginOptions(skills),
       },

@@ -57,10 +57,10 @@ import { globalInstructions, PI_QUESTION_TOOL, piQuestionExtension } from "./glo
 import { PI_GLASS_TOOLS, piGlassToolsExtension } from "./piGlassTools"
 import { workInstructions } from "./workRole"
 import {
-  type ConversationRole,
+  type ThreadRole,
   couldNotSwitch,
   type GlassToolsAccess,
-  HostConversationError,
+  HostThreadError,
   notRunning,
 } from "./protocol"
 import { settleWith } from "./requests"
@@ -212,7 +212,7 @@ const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
 
 const roleFlags = (
   folder: string,
-  role: ConversationRole,
+  role: ThreadRole,
   glassTools: GlassToolsAccess | undefined,
   skills: ReadonlyArray<WrittenSkills>,
 ) =>
@@ -270,12 +270,12 @@ export const piAdapter = (command: string) =>
 
     const startPi = (
       folder: string,
-      conversation?: string,
+      thread?: string,
       flags?: ReadonlyArray<string>,
       tools?: GlassToolsAccess,
       deliver?: (event: PiEvent) => Effect.Effect<void>,
     ) =>
-      startPiRpc(command, folder, conversation, flags, tools, deliver).pipe(
+      startPiRpc(command, folder, thread, flags, tools, deliver).pipe(
         Effect.provideService(ChildProcessSpawner.ChildProcessSpawner, spawner),
       )
 
@@ -292,7 +292,7 @@ export const piAdapter = (command: string) =>
         ).pipe(
           Effect.tapError((error) => Effect.logWarning("pi didn't list its models", error)),
           Effect.mapError(
-            () => new HostConversationError({ message: "pi didn't list its models. Try again." }),
+            () => new HostThreadError({ message: "pi didn't list its models. Try again." }),
           ),
         )
 
@@ -311,8 +311,7 @@ export const piAdapter = (command: string) =>
           const { commands } = yield* rpc.request({ type: "get_commands" }, AvailableCommands).pipe(
             Effect.tapError((error) => Effect.logWarning("pi didn't list its commands", error)),
             Effect.mapError(
-              () =>
-                new HostConversationError({ message: "pi didn't list its commands. Try again." }),
+              () => new HostThreadError({ message: "pi didn't list its commands. Try again." }),
             ),
           )
 
@@ -322,21 +321,14 @@ export const piAdapter = (command: string) =>
           }))
         }).pipe(Effect.scoped),
 
-      start: Effect.fnUntraced(function* ({
-        folder,
-        conversation,
-        role,
-        glassTools,
-        skills,
-        report,
-      }) {
+      start: Effect.fnUntraced(function* ({ folder, thread, role, glassTools, skills, report }) {
         const scope = yield* Scope.Scope
 
         const flags = yield* roleFlags(folder, role, glassTools, skills).pipe(
           Effect.provideService(FileSystem.FileSystem, fs),
           Effect.tapError((error) => Effect.logWarning("Couldn't prepare pi's tools", error)),
           Effect.mapError(
-            () => new HostConversationError({ message: "Couldn't prepare pi's tools. Try again." }),
+            () => new HostThreadError({ message: "Couldn't prepare pi's tools. Try again." }),
           ),
         )
 
@@ -385,7 +377,7 @@ export const piAdapter = (command: string) =>
           return showStatuses
         }
 
-        const rpc = yield* startPi(folder, conversation, flags, glassTools, (event) =>
+        const rpc = yield* startPi(folder, thread, flags, glassTools, (event) =>
           trackDialog(event).pipe(
             Effect.andThen(trackStatus(event)),
             Effect.andThen(logProviderError(event)),
@@ -409,7 +401,7 @@ export const piAdapter = (command: string) =>
 
         const startingModel = (yield* rpc.request({ type: "get_state" }, SessionState).pipe(
           Effect.tapError((error) => Effect.logWarning("pi didn't report its state", error)),
-          Effect.mapError(() => new HostConversationError({ message: stoppedReason })),
+          Effect.mapError(() => new HostThreadError({ message: stoppedReason })),
         )).model
 
         const turns = yield* runTurns({
@@ -478,7 +470,7 @@ export const piAdapter = (command: string) =>
             ),
             Effect.mapError(
               () =>
-                new HostConversationError({
+                new HostThreadError({
                   message: "Couldn't recover pi's Started work update. Restart Glass to try again.",
                 }),
             ),
@@ -503,7 +495,7 @@ export const piAdapter = (command: string) =>
               ),
               Effect.mapError(
                 () =>
-                  new HostConversationError({
+                  new HostThreadError({
                     message:
                       "Couldn't confirm pi's Started work update delivery. Restart Glass to try again.",
                   }),
@@ -579,7 +571,7 @@ export const piAdapter = (command: string) =>
             if (Option.isSome(accepted))
               return yield* Queue.offer(inbox, Input.SteerHandled({ steer }))
 
-            return yield* new HostConversationError({ message: "pi didn't take the message in." })
+            return yield* new HostThreadError({ message: "pi didn't take the message in." })
           }),
           stopTurn: (turnId, ending) =>
             Effect.gen(function* () {

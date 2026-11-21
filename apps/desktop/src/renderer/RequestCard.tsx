@@ -23,13 +23,13 @@ import {
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { useConversationAtoms } from "./conversation"
+import { useThreadAtoms } from "./thread"
 import { settledProblem } from "./problems"
 
 export const requestElementId = (requestId: string) => `request-${requestId}`
 
 const useAnswer = (requestId: string) => {
-  const answering = useConversationAtoms().answer(requestId)
+  const answering = useThreadAtoms().answer(requestId)
   const answered = useAtomValue(answering)
   const answer = useAtomSet(answering)
   const problem = settledProblem(answered)
@@ -177,9 +177,7 @@ function Questions(props: { question: Extract<RequestPart, { readonly _tag: "Que
     <Confirmation aria-labelledby={titleId}>
       <ConfirmationTitle id={titleId}>
         <CircleHelp aria-hidden />
-        {question.questions.length === 1
-          ? "The Conversation asks"
-          : "The Conversation asks you a few things"}
+        {question.questions.length === 1 ? "The Thread asks" : "The Thread asks you a few things"}
       </ConfirmationTitle>
       {question.questions.map((asked, index) => (
         <QuestionView

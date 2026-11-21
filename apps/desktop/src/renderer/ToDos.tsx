@@ -34,7 +34,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
 import { Backend, backendRuntime, useBackendRuntime } from "./backend"
-import { newConversationWrittenAtom, useStartConversation } from "./conversationsArea"
+import { newThreadWrittenAtom, useStartThread } from "./threadsArea"
 import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { imageFiles, imageSrc, maxToDoImageBytes, readToDoImages } from "./pastedImages"
 import { ProblemAlert } from "./ProblemAlert"
@@ -529,12 +529,12 @@ function ToDoRow(props: { toDo: ToDo }) {
   const toggle = useAtomValue(pendingToggleAtom)
   const checked = toggle?.id === toDo.id ? toggle.done : toDo.done
   const registry = useContext(RegistryContext)
-  const startConversation = useStartConversation()
+  const startThread = useStartThread()
 
   const startFromToDo = () => {
-    const written = registry.get(newConversationWrittenAtom)?.message ?? ""
+    const written = registry.get(newThreadWrittenAtom)?.message ?? ""
 
-    startConversation(mentionedToDoIds(written).includes(toDo.id) ? undefined : toDoMention(toDo))
+    startThread(mentionedToDoIds(written).includes(toDo.id) ? undefined : toDoMention(toDo))
   }
 
   const paste = (event: ClipboardEvent) => takePastedImages(event, sendImages)
@@ -578,8 +578,8 @@ function ToDoRow(props: { toDo: ToDo }) {
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label={`Start a Conversation from ${toDo.title}`}
-          title="Start a Conversation"
+          aria-label={`Start a Thread from ${toDo.title}`}
+          title="Start a Thread"
           onClick={startFromToDo}
         >
           <MessageSquarePlus aria-hidden />

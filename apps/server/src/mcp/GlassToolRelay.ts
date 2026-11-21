@@ -3,21 +3,21 @@ import { McpSchema, McpServer } from "effect/ai"
 import { SqlClient } from "effect/sql"
 import { failedToolCall, type RelayedToolCall } from "../agentHost/protocol"
 import { annotateUnit } from "../wideEvents"
-import { ConversationCaller, McpCaller } from "./McpCredentials"
+import { ThreadCaller, McpCaller } from "./McpCredentials"
 
 export type ToolCallOrigin = Data.TaggedEnum<{
-  Sandbox: { readonly conversationId: string }
+  Sandbox: { readonly threadId: string }
   ThisDevice: {}
 }>
 
 export const ToolCallOrigin = Data.taggedEnum<ToolCallOrigin>()
 
 export const refused = failedToolCall(
-  "Glass doesn't know this Conversation as the one calling, so it refused the call.",
+  "Glass doesn't know this Thread as the one calling, so it refused the call.",
 )
 
 const callerUnchecked = failedToolCall(
-  "Glass couldn't check which Conversation is calling, so it didn't run the tool. Try again.",
+  "Glass couldn't check which Thread is calling, so it didn't run the tool. Try again.",
 )
 
 const relayInitialize = {
@@ -33,7 +33,7 @@ const relayClient = McpSchema.McpServerClient.of({
   clientCapabilities: relayInitialize.capabilities,
   clientInfo: relayInitialize.clientInfo,
   initializePayload: relayInitialize,
-  getClient: Effect.die("A Conversation's Glass tool call can't reach back to its agent"),
+  getClient: Effect.die("A Thread's Glass tool call can't reach back to its agent"),
 })
 
 const decodeCallers = Schema.decodeUnknownEffect(
@@ -63,10 +63,10 @@ export class GlassToolRelay extends Context.Service<
       const sql = yield* SqlClient.SqlClient
       const registered = yield* Deferred.make<void>()
 
-      const isLocalWork = (conversationId: string) =>
+      const isLocalWork = (threadId: string) =>
         sql`
           SELECT sandbox_provider AS sandboxProvider, review_brief IS NOT NULL AS forReview
-          FROM conversation WHERE id = ${conversationId}
+          FROM thread WHERE id = ${threadId}
         `.pipe(
           Effect.flatMap(decodeCallers),
           Effect.map(
@@ -74,10 +74,10 @@ export class GlassToolRelay extends Context.Service<
           ),
         )
 
-      const accepts = (origin: ToolCallOrigin, conversationId: string) =>
+      const accepts = (origin: ToolCallOrigin, threadId: string) =>
         ToolCallOrigin.$match(origin, {
-          Sandbox: (sandbox) => Effect.succeed(sandbox.conversationId === conversationId),
-          ThisDevice: () => isLocalWork(conversationId),
+          Sandbox: (sandbox) => Effect.succeed(sandbox.threadId === threadId),
+          ThisDevice: () => isLocalWork(threadId),
         })
 
       const dispatch = (call: RelayedToolCall) =>
@@ -87,10 +87,7 @@ export class GlassToolRelay extends Context.Service<
             arguments: call.arguments,
           })
           .pipe(
-            Effect.provideService(
-              McpCaller,
-              ConversationCaller.make({ conversationId: call.conversationId }),
-            ),
+            Effect.provideService(McpCaller, ThreadCaller.make({ threadId: call.threadId })),
             Effect.provideService(McpSchema.McpServerClient, relayClient),
             Effect.catchTags({
               InvalidParams: ({ message }) => Effect.succeed(failedToolCall(message)),
@@ -106,9 +103,9 @@ export class GlassToolRelay extends Context.Service<
         toolsRegistered: Deferred.succeed(registered, undefined).pipe(Effect.asVoid),
         answer: (origin, call) =>
           Effect.gen(function* () {
-            yield* annotateUnit({ tool: call.name, caller_id: call.conversationId })
+            yield* annotateUnit({ tool: call.name, caller_id: call.threadId })
 
-            const result = yield* accepts(origin, call.conversationId).pipe(
+            const result = yield* accepts(origin, call.threadId).pipe(
               Effect.flatMap((accepted) => (accepted ? dispatch(call) : Effect.succeed(refused))),
               Effect.catch((cause) =>
                 Effect.logWarning("Couldn't look up a tool's caller", cause).pipe(

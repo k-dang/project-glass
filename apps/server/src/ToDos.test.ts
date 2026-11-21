@@ -310,12 +310,10 @@ const toDosIn = Effect.fnUntraced(function* (
   return Context.get(services, ToDos)
 })
 
-const mergedAt = (at: string) => [
-  { conversationId: "merged", completedAt: DateTime.makeUnsafe(at) },
-]
+const mergedAt = (at: string) => [{ threadId: "merged", completedAt: DateTime.makeUnsafe(at) }]
 
 it.live(
-  "marks a merged Conversation's to-dos done once, skipping ones the user finished first and merges from before the link",
+  "marks a merged Thread's to-dos done once, skipping ones the user finished first and merges from before the link",
   () =>
     Effect.gen(function* () {
       const toDos = yield* toDosIn(yield* isolatedHome, () => ({}))
@@ -325,7 +323,7 @@ it.live(
       yield* toDos.add("Fix spacing", "", [])
       yield* toDos.add("Rename the flag", "", [])
       yield* toDos.add("Tidy later", "", [])
-      yield* toDos.linkConversation("merged", [1, 2])
+      yield* toDos.linkThread("merged", [1, 2])
       yield* toDos.setDone(2, true)
       yield* toDos.setDone(2, false)
 

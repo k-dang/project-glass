@@ -10,15 +10,15 @@ import {
 } from "./agentReview"
 import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
 import {
-  Conversation,
-  ConversationBusy,
-  ConversationChanges,
+  Thread,
+  ThreadBusy,
+  ThreadChanges,
   AgentCommand,
   AgentHarness,
-  ConversationError,
+  ThreadError,
   AgentModels,
-  ConversationPlace,
-  ConversationNotFound,
+  ThreadPlace,
+  ThreadNotFound,
   EndedGlobalChatSession,
   GlobalChatSessionNotFound,
   Image,
@@ -27,7 +27,7 @@ import {
   MessageInput,
   MessageInputWithContext,
   ModelChoice,
-  NewConversation,
+  NewThread,
   NoPermissionModes,
   PermissionMode,
   QueuedMessageStarted,
@@ -36,24 +36,24 @@ import {
   RequestNotWaiting,
   RequestWaiting,
   SandboxProviderInfo,
-  SendConversationMessage,
+  SendThreadMessage,
   SentMessage,
   StartFreshRefused,
   TranscriptUpdate,
   TurnEnd,
-  ConversationFile,
+  ThreadFile,
   NamedPaths,
-} from "./conversation"
+} from "./thread"
 import { ConnectionError, GitHubConnection } from "./connection"
 import {
   DiffSide,
-  DiscussionResolutionError,
+  ReviewThreadResolutionError,
   PublishedComment,
   Reaction,
   ReactionError,
   ReactionGroup,
   ReplyError,
-} from "./discussion"
+} from "./comment"
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, LineNote, UnsentFeedback } from "./feedbackNote"
@@ -64,7 +64,7 @@ import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } 
 import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
 import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
 import {
-  ConversationPullRequest,
+  ThreadPullRequest,
   LatestPullRequestListings,
   PullRequestListings,
 } from "./pullRequestList"
@@ -319,15 +319,15 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { pullRequestId: Schema.String, revision: Revision, action: MergeAction },
     error: MergePullRequestError,
   }),
-  Rpc.make("ReplyToDiscussion", {
-    payload: { discussionId: Schema.String, body: Schema.NonEmptyString },
+  Rpc.make("ReplyToReviewThread", {
+    payload: { reviewThreadId: Schema.String, body: Schema.NonEmptyString },
     success: PublishedComment,
     error: ReplyError,
   }),
-  Rpc.make("SetDiscussionResolved", {
-    payload: { discussionId: Schema.String, resolved: Schema.Boolean },
+  Rpc.make("SetReviewThreadResolved", {
+    payload: { reviewThreadId: Schema.String, resolved: Schema.Boolean },
     success: Schema.Boolean,
-    error: DiscussionResolutionError,
+    error: ReviewThreadResolutionError,
   }),
   Rpc.make("SetReaction", {
     payload: { commentId: Schema.String, reaction: Reaction, reacted: Schema.Boolean },
@@ -367,26 +367,26 @@ export class GlassRpcs extends RpcGroup.make(
     success: Image,
     error: ToDoError,
   }),
-  Rpc.make("WatchConversations", {
-    success: Schema.Array(Conversation),
-    error: ConversationError,
+  Rpc.make("WatchThreads", {
+    success: Schema.Array(Thread),
+    error: ThreadError,
     stream: true,
   }),
-  Rpc.make("WatchWorkingConversations", { success: Schema.Array(Schema.String), stream: true }),
-  Rpc.make("WatchSettledConversations", { success: Schema.Array(Schema.String), stream: true }),
-  Rpc.make("BringBackConversation", {
-    payload: { conversationId: Schema.String },
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+  Rpc.make("WatchWorkingThreads", { success: Schema.Array(Schema.String), stream: true }),
+  Rpc.make("WatchSettledThreads", { success: Schema.Array(Schema.String), stream: true }),
+  Rpc.make("BringBackThread", {
+    payload: { threadId: Schema.String },
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
-  Rpc.make("WatchConversationPullRequests", {
-    success: Schema.Array(ConversationPullRequest),
-    error: ConversationError,
+  Rpc.make("WatchThreadPullRequests", {
+    success: Schema.Array(ThreadPullRequest),
+    error: ThreadError,
     stream: true,
   }),
   Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
   Rpc.make("MarkTurnSeen", {
     payload: TurnSeen,
-    error: ConversationError,
+    error: ThreadError,
   }),
   Rpc.make("AnswerOutsideQuestion", {
     payload: { id: Schema.String, answer: OutsideQuestionAnswer },
@@ -423,222 +423,222 @@ export class GlassRpcs extends RpcGroup.make(
     error: OutsideAgentNotFound,
   }),
   Rpc.make("WatchTranscript", {
-    payload: { conversationId: Schema.String },
+    payload: { threadId: Schema.String },
     success: TranscriptUpdate,
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    error: Schema.Union([ThreadNotFound, ThreadError]),
     stream: true,
   }),
   Rpc.make("LoadEarlierTurns", {
-    payload: { conversationId: Schema.String, before: Schema.String },
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    payload: { threadId: Schema.String, before: Schema.String },
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("ListLocalCheckouts", {
     success: Schema.Array(LocalCheckout),
-    error: ConversationError,
+    error: ThreadError,
   }),
   Rpc.make("LinkLocalCheckout", {
     payload: { path: Schema.String },
     success: LocalCheckout,
-    error: Schema.Union([InvalidLocalCheckout, ConversationError]),
+    error: Schema.Union([InvalidLocalCheckout, ThreadError]),
   }),
-  Rpc.make("GetNewConversationDefaultBranch", {
-    payload: { place: ConversationPlace, repository: FollowedRepository },
+  Rpc.make("GetNewThreadDefaultBranch", {
+    payload: { place: ThreadPlace, repository: FollowedRepository },
     success: Schema.NullOr(Schema.String),
-    error: Schema.Union([InvalidLocalCheckout, ConnectionError, ConversationError]),
+    error: Schema.Union([InvalidLocalCheckout, ConnectionError, ThreadError]),
   }),
-  Rpc.make("ListNewConversationBranches", {
-    payload: { place: ConversationPlace, repository: FollowedRepository },
+  Rpc.make("ListNewThreadBranches", {
+    payload: { place: ThreadPlace, repository: FollowedRepository },
     success: Schema.Array(Schema.String),
-    error: Schema.Union([InvalidLocalCheckout, ConnectionError, ConversationError]),
+    error: Schema.Union([InvalidLocalCheckout, ConnectionError, ThreadError]),
   }),
   Rpc.make("ListAgentModels", {
-    payload: { harness: AgentHarness, place: ConversationPlace },
+    payload: { harness: AgentHarness, place: ThreadPlace },
     success: AgentModels,
-    error: ConversationError,
+    error: ThreadError,
   }),
-  Rpc.make("ListNewConversationCommands", {
-    payload: { harness: AgentHarness, place: ConversationPlace, repository: FollowedRepository },
+  Rpc.make("ListNewThreadCommands", {
+    payload: { harness: AgentHarness, place: ThreadPlace, repository: FollowedRepository },
     success: Schema.Array(AgentCommand),
-    error: Schema.Union([InvalidLocalCheckout, ConversationError]),
+    error: Schema.Union([InvalidLocalCheckout, ThreadError]),
   }),
-  Rpc.make("ListConversationCommands", {
-    payload: { conversationId: Schema.String },
+  Rpc.make("ListThreadCommands", {
+    payload: { threadId: Schema.String },
     success: Schema.Array(AgentCommand),
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
-  Rpc.make("ListNewConversationFiles", {
+  Rpc.make("ListNewThreadFiles", {
     payload: {
-      place: ConversationPlace,
+      place: ThreadPlace,
       repository: FollowedRepository,
       baseBranch: Schema.String,
     },
     success: Schema.Array(Schema.String),
-    error: Schema.Union([InvalidLocalCheckout, ConversationError]),
+    error: Schema.Union([InvalidLocalCheckout, ThreadError]),
   }),
-  Rpc.make("ListConversationFiles", {
-    payload: { conversationId: Schema.String },
+  Rpc.make("ListThreadFiles", {
+    payload: { threadId: Schema.String },
     success: Schema.Array(Schema.String),
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
-  Rpc.make("FindConversationFiles", {
-    payload: { conversationId: Schema.String, paths: NamedPaths },
+  Rpc.make("FindThreadFiles", {
+    payload: { threadId: Schema.String, paths: NamedPaths },
     success: Schema.Array(Schema.String),
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
-  Rpc.make("GetConversationFile", {
-    payload: { conversationId: Schema.String, path: Schema.String },
-    success: ConversationFile,
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+  Rpc.make("GetThreadFile", {
+    payload: { threadId: Schema.String, path: Schema.String },
+    success: ThreadFile,
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("ListSandboxProviders", { success: Schema.Array(SandboxProviderInfo) }),
-  Rpc.make("CreateConversation", {
-    payload: NewConversation,
-    success: Conversation,
-    error: Schema.Union([InvalidLocalCheckout, ConversationError]),
+  Rpc.make("CreateThread", {
+    payload: NewThread,
+    success: Thread,
+    error: Schema.Union([InvalidLocalCheckout, ThreadError]),
   }),
   Rpc.make("SendMessage", {
-    payload: SendConversationMessage,
-    error: Schema.Union([ConversationNotFound, RequestWaiting, ConversationError]),
+    payload: SendThreadMessage,
+    error: Schema.Union([ThreadNotFound, RequestWaiting, ThreadError]),
   }),
   Rpc.make("Steer", {
-    payload: { conversationId: Schema.String, ...MessageInput.fields },
-    error: Schema.Union([ConversationNotFound, RequestWaiting, ConversationError]),
+    payload: { threadId: Schema.String, ...MessageInput.fields },
+    error: Schema.Union([ThreadNotFound, RequestWaiting, ThreadError]),
   }),
   Rpc.make("CancelQueuedMessage", {
-    payload: { conversationId: Schema.String, queuedMessageId: Schema.String },
+    payload: { threadId: Schema.String, queuedMessageId: Schema.String },
     success: UnsentFeedback,
-    error: Schema.Union([ConversationNotFound, QueuedMessageStarted, ConversationError]),
+    error: Schema.Union([ThreadNotFound, QueuedMessageStarted, ThreadError]),
   }),
   Rpc.make("SendQueuedMessage", {
-    payload: { conversationId: Schema.String, queuedMessageId: Schema.String },
-    error: Schema.Union([ConversationNotFound, ConversationBusy, ConversationError]),
+    payload: { threadId: Schema.String, queuedMessageId: Schema.String },
+    error: Schema.Union([ThreadNotFound, ThreadBusy, ThreadError]),
   }),
   Rpc.make("StopTurn", {
-    payload: { conversationId: Schema.String },
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    payload: { threadId: Schema.String },
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("ReachSandbox", {
-    payload: { conversationId: Schema.String },
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    payload: { threadId: Schema.String },
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("GetUnsentMessage", {
-    payload: { conversationId: Schema.String },
+    payload: { threadId: Schema.String },
     success: SentMessage,
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("SaveUnsentMessage", {
-    payload: { conversationId: Schema.String, ...SentMessage.fields },
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    payload: { threadId: Schema.String, ...SentMessage.fields },
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
-  Rpc.make("ChangeConversationModel", {
-    payload: { conversationId: Schema.String, ...ModelChoice.fields },
-    success: Conversation,
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+  Rpc.make("ChangeThreadModel", {
+    payload: { threadId: Schema.String, ...ModelChoice.fields },
+    success: Thread,
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("ChangePermissionMode", {
-    payload: { conversationId: Schema.String, permissionMode: PermissionMode },
-    success: Conversation,
-    error: Schema.Union([ConversationNotFound, NoPermissionModes, ConversationError]),
+    payload: { threadId: Schema.String, permissionMode: PermissionMode },
+    success: Thread,
+    error: Schema.Union([ThreadNotFound, NoPermissionModes, ThreadError]),
   }),
   Rpc.make("AnswerRequest", {
-    payload: { conversationId: Schema.String, requestId: Schema.String, answer: RequestAnswer },
-    error: Schema.Union([ConversationNotFound, RequestNotWaiting, ConversationError]),
+    payload: { threadId: Schema.String, requestId: Schema.String, answer: RequestAnswer },
+    error: Schema.Union([ThreadNotFound, RequestNotWaiting, ThreadError]),
   }),
   Rpc.make("GetRemovalWarnings", {
-    payload: { conversationId: Schema.String },
+    payload: { threadId: Schema.String },
     success: RemovalWarnings,
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
-  Rpc.make("GetConversationChanges", {
-    payload: { conversationId: Schema.String },
-    success: ConversationChanges,
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+  Rpc.make("GetThreadChanges", {
+    payload: { threadId: Schema.String },
+    success: ThreadChanges,
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("ListFeedbackNotes", {
-    payload: { conversationId: Schema.String },
+    payload: { threadId: Schema.String },
     success: UnsentFeedback,
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("StageFeedbackNotes", {
-    payload: { conversationId: Schema.String },
+    payload: { threadId: Schema.String },
     success: UnsentFeedback,
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("SaveFeedbackNote", {
-    payload: { conversationId: Schema.String, note: FeedbackNote },
+    payload: { threadId: Schema.String, note: FeedbackNote },
     success: UnsentFeedback,
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("RemoveFeedbackNote", {
-    payload: { conversationId: Schema.String, noteId: Schema.String },
+    payload: { threadId: Schema.String, noteId: Schema.String },
     success: UnsentFeedback,
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
-  Rpc.make("RemoveConversation", {
-    payload: { conversationId: Schema.String },
-    error: Schema.Union([ConversationNotFound, ConversationError]),
+  Rpc.make("RemoveThread", {
+    payload: { threadId: Schema.String },
+    error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("GetGlobalChatModel", {
     success: ModelChoice,
-    error: ConversationError,
+    error: ThreadError,
   }),
   Rpc.make("ChangeGlobalChatModel", {
     payload: ModelChoice.fields,
-    error: ConversationError,
+    error: ThreadError,
   }),
   Rpc.make("WatchGlobalTranscript", {
     success: TranscriptUpdate,
-    error: ConversationError,
+    error: ThreadError,
     stream: true,
   }),
   Rpc.make("LoadEarlierGlobalTurns", {
     payload: { before: Schema.String },
-    error: ConversationError,
+    error: ThreadError,
   }),
   Rpc.make("SendGlobalMessage", {
     payload: MessageInputWithContext,
-    error: Schema.Union([RequestWaiting, ConversationError]),
+    error: Schema.Union([RequestWaiting, ThreadError]),
   }),
   Rpc.make("SteerGlobal", {
     payload: MessageInputWithContext,
-    error: Schema.Union([RequestWaiting, ConversationError]),
+    error: Schema.Union([RequestWaiting, ThreadError]),
   }),
   Rpc.make("CancelGlobalQueuedMessage", {
     payload: { queuedMessageId: Schema.String },
-    error: Schema.Union([QueuedMessageStarted, ConversationError]),
+    error: Schema.Union([QueuedMessageStarted, ThreadError]),
   }),
   Rpc.make("SendGlobalQueuedMessage", {
     payload: { queuedMessageId: Schema.String },
-    error: Schema.Union([ConversationBusy, ConversationError]),
+    error: Schema.Union([ThreadBusy, ThreadError]),
   }),
-  Rpc.make("StopGlobalTurn", { error: ConversationError }),
+  Rpc.make("StopGlobalTurn", { error: ThreadError }),
   Rpc.make("AnswerGlobalRequest", {
     payload: { requestId: Schema.String, answer: RequestAnswer },
-    error: Schema.Union([RequestNotWaiting, ConversationError]),
+    error: Schema.Union([RequestNotWaiting, ThreadError]),
   }),
-  Rpc.make("GetGlobalUnsentMessage", { success: SentMessage, error: ConversationError }),
-  Rpc.make("SaveGlobalUnsentMessage", { payload: SentMessage, error: ConversationError }),
+  Rpc.make("GetGlobalUnsentMessage", { success: SentMessage, error: ThreadError }),
+  Rpc.make("SaveGlobalUnsentMessage", { payload: SentMessage, error: ThreadError }),
   Rpc.make("WatchGlobalUnseen", { success: Schema.NullOr(TurnEnd), stream: true }),
   Rpc.make("MarkGlobalTurnSeen", {
     payload: { endedAt: Schema.DateTimeUtcFromString },
-    error: ConversationError,
+    error: ThreadError,
   }),
   Rpc.make("StartGlobalChatFresh", {
-    error: Schema.Union([StartFreshRefused, ConversationError]),
+    error: Schema.Union([StartFreshRefused, ThreadError]),
   }),
   Rpc.make("ListEndedGlobalChatSessions", {
     success: Schema.Array(EndedGlobalChatSession),
-    error: ConversationError,
+    error: ThreadError,
   }),
   Rpc.make("WatchGlobalChatSession", {
     payload: { id: Schema.String },
     success: TranscriptUpdate,
-    error: Schema.Union([GlobalChatSessionNotFound, ConversationError]),
+    error: Schema.Union([GlobalChatSessionNotFound, ThreadError]),
     stream: true,
   }),
   Rpc.make("LoadEarlierGlobalChatSessionTurns", {
     payload: { id: Schema.String, before: Schema.String },
-    error: Schema.Union([GlobalChatSessionNotFound, ConversationError]),
+    error: Schema.Union([GlobalChatSessionNotFound, ThreadError]),
   }),
 ) {}
 

@@ -1,8 +1,8 @@
 // @vitest-environment happy-dom
 import { RegistryProvider } from "@effect/atom-react"
 import {
-  Conversation,
-  ConversationNeedsYou,
+  Thread,
+  ThreadNeedsYou,
   AgentReviewFinished,
   AllowRequest,
   AwaitingReply,
@@ -14,7 +14,6 @@ import {
   CheckInChanges,
   ChecksFailing,
   LineNote,
-  Discussions,
   emptyTranscript,
   GitHubConnection,
   type NeedsYou,
@@ -45,7 +44,7 @@ import { Cause, DateTime, Effect, Stream, SubscriptionRef } from "effect"
 import { afterEach, expect, it, vi } from "vite-plus/test"
 import { App } from "./App"
 import { reviewOf } from "../../test/agentReview"
-import { conversation, conversationFields } from "../../test/conversation"
+import { thread, threadFields } from "../../test/thread"
 import { changedFile, pullRequestFields, revision, viewer } from "../../test/workspace"
 import { backendLayerAtom } from "./backend"
 import { type Handlers, type Held, hold, next, testLayer } from "../../test/testBackend"
@@ -62,17 +61,17 @@ const bashRequest = PermissionRequestPart.make({
   reason: null,
 })
 
-const waitingConversation = ConversationNeedsYou.make({
-  conversation,
+const waitingThread = ThreadNeedsYou.make({
+  thread,
   reasons: [WaitingRequests.make({ requests: [bashRequest] })],
   since: ago({ days: 2 }),
 })
 
 const laterRequest = PermissionRequestPart.make({ ...bashRequest, requestId: "bash-2" })
 
-const laterConversation = ConversationNeedsYou.make({
-  conversation: new Conversation({
-    ...conversationFields,
+const laterThread = ThreadNeedsYou.make({
+  thread: new Thread({
+    ...threadFields,
     id: "agent-2",
     name: "agent/quiet-lynx",
   }),
@@ -97,7 +96,7 @@ const runningTranscript = (request: typeof PermissionRequestPart.Type): Transcri
 })
 
 const transcripts = new Map([
-  [conversation.id, runningTranscript(bashRequest)],
+  [thread.id, runningTranscript(bashRequest)],
   ["agent-2", runningTranscript(laterRequest)],
 ])
 
@@ -164,10 +163,8 @@ const mount = (
             GetConnection: () =>
               Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
             WatchNeedsYou: () => SubscriptionRef.changes(needsYou),
-            WatchTranscript: ({ conversationId }) =>
-              Stream.make(
-                TranscriptSnapshot.make(transcripts.get(conversationId) ?? emptyTranscript),
-              ),
+            WatchTranscript: ({ threadId }) =>
+              Stream.make(TranscriptSnapshot.make(transcripts.get(threadId) ?? emptyTranscript)),
             ...handlers,
           }),
         ],
@@ -264,8 +261,8 @@ it("advances the wait while the Inbox stays open", async () => {
   expect(waitLabels().some((text) => text.includes("now"))).toBe(false)
 })
 
-it("groups Conversations and finished reviews, and labels a draft", async () => {
-  mount(needsYouRef([waitingConversation, finishedReview, finishedDraft]))
+it("groups Threads and finished reviews, and labels a draft", async () => {
+  mount(needsYouRef([waitingThread, finishedReview, finishedDraft]))
 
   const stopped = await screen.findByRole("region", { name: "Stopped on you" })
   const reviews = screen.getByRole("region", { name: "Agent reviews to read" })
@@ -274,14 +271,14 @@ it("groups Conversations and finished reviews, and labels a draft", async () => 
   expect(within(reviews).getByRole("option", { name: /Retry flaky upload/ })).toBeTruthy()
   expect(within(reviews).getByText(/Draft/)).toBeTruthy()
   expect(within(reviews).getByRole("option", { name: /Sketch the empty state/ })).toBeTruthy()
-  expect(screen.getByRole("heading", { name: conversation.name })).toBeTruthy()
+  expect(screen.getByRole("heading", { name: thread.name })).toBeTruthy()
 })
 
-it("puts a Conversation whose Turn finished unseen under Conversations that finished, saying how it ended", async () => {
+it("puts a Thread whose Turn finished unseen under Threads that finished, saying how it ended", async () => {
   const user = mount(
     needsYouRef([
-      ConversationNeedsYou.make({
-        conversation,
+      ThreadNeedsYou.make({
+        thread,
         reasons: [
           TurnFinished.make({
             ended: {
@@ -295,11 +292,11 @@ it("puts a Conversation whose Turn finished unseen under Conversations that fini
     ]),
   )
 
-  const finishedConversations = await screen.findByRole("region", {
-    name: "Conversations that finished",
+  const finishedThreads = await screen.findByRole("region", {
+    name: "Threads that finished",
   })
 
-  const row = within(finishedConversations).getByRole("option", {
+  const row = within(finishedThreads).getByRole("option", {
     name: /agent\/swift-otter/,
   })
 
@@ -307,20 +304,18 @@ it("puts a Conversation whose Turn finished unseen under Conversations that fini
   expect(within(row).getByText("glass-demo/greeter")).toBeTruthy()
   expect(within(row).getByText("Failed")).toBeTruthy()
   expect(screen.queryByRole("region", { name: "Stopped on you" })).toBeNull()
-  expect(
-    within(articleOf(conversation.name)).getByRole("link", { name: "Open the Conversation" }),
-  ).toBeTruthy()
+  expect(within(articleOf(thread.name)).getByRole("link", { name: "Open the Thread" })).toBeTruthy()
 })
 
-it("works a finished Conversation from the Inbox: reads its latest reply, replies, or marks it done", async () => {
+it("works a finished Thread from the Inbox: reads its latest reply, replies, or marks it done", async () => {
   const endedAt = ago({ minutes: 2 })
   const sent: Array<string> = []
-  const seen: Array<{ conversationId: string; endedAt: DateTime.Utc }> = []
+  const seen: Array<{ threadId: string; endedAt: DateTime.Utc }> = []
 
   const user = mount(
     needsYouRef([
-      ConversationNeedsYou.make({
-        conversation,
+      ThreadNeedsYou.make({
+        thread,
         reasons: [TurnFinished.make({ ended: { at: endedAt, ending: TurnDone.make({}) } })],
         since: endedAt,
       }),
@@ -347,8 +342,8 @@ it("works a finished Conversation from the Inbox: reads its latest reply, replie
     },
   )
 
-  await screen.findByRole("heading", { name: conversation.name })
-  const detail = articleOf(conversation.name)
+  await screen.findByRole("heading", { name: thread.name })
+  const detail = articleOf(thread.name)
   expect(await within(detail).findByText("Fixed and tested.")).toBeTruthy()
   expect(within(detail).queryByText("It's in greet.ts.")).toBeNull()
 
@@ -361,29 +356,27 @@ it("works a finished Conversation from the Inbox: reads its latest reply, replie
   await user.click(within(detail).getByRole("button", { name: "Done" }))
   await user.keyboard("e")
   expect(seen).toEqual([
-    { conversationId: conversation.id, endedAt },
-    { conversationId: conversation.id, endedAt },
+    { threadId: thread.id, endedAt },
+    { threadId: thread.id, endedAt },
   ])
 })
 
 it("answers a permission in the detail pane and selects the next item when that one leaves", async () => {
-  const needsYou = needsYouRef([waitingConversation, laterConversation])
-  const answers: Array<{ conversationId: string; requestId: string; answer: RequestAnswer }> = []
+  const needsYou = needsYouRef([waitingThread, laterThread])
+  const answers: Array<{ threadId: string; requestId: string; answer: RequestAnswer }> = []
 
   const user = mount(needsYou, {
     AnswerRequest: (payload) => Effect.sync(() => void answers.push(payload)),
   })
 
-  await screen.findByRole("heading", { name: conversation.name })
-  await user.click(
-    await within(articleOf(conversation.name)).findByRole("button", { name: "Allow" }),
-  )
+  await screen.findByRole("heading", { name: thread.name })
+  await user.click(await within(articleOf(thread.name)).findByRole("button", { name: "Allow" }))
 
   expect(answers).toEqual([
-    { conversationId: conversation.id, requestId: "bash-1", answer: AllowRequest.make({}) },
+    { threadId: thread.id, requestId: "bash-1", answer: AllowRequest.make({}) },
   ])
 
-  await setNeedsYou(needsYou, [laterConversation])
+  await setNeedsYou(needsYou, [laterThread])
 
   expect(await screen.findByRole("heading", { name: "agent/quiet-lynx" })).toBeTruthy()
   expect(screen.queryByRole("option", { name: /agent\/swift-otter/ })).toBeNull()
@@ -547,25 +540,25 @@ it("starts the next outside question with an empty answer", async () => {
 })
 
 it("allows the selected permission with a", async () => {
-  const answers: Array<{ conversationId: string; requestId: string; answer: RequestAnswer }> = []
+  const answers: Array<{ threadId: string; requestId: string; answer: RequestAnswer }> = []
 
-  const user = mount(needsYouRef([waitingConversation, finishedReview]), {
+  const user = mount(needsYouRef([waitingThread, finishedReview]), {
     AnswerRequest: (payload) => Effect.sync(() => void answers.push(payload)),
   })
 
-  const conversationRow = await screen.findByRole("option", { name: /agent\/swift-otter/ })
-  expect(conversationRow.getAttribute("aria-selected")).toBe("true")
+  const threadRow = await screen.findByRole("option", { name: /agent\/swift-otter/ })
+  expect(threadRow.getAttribute("aria-selected")).toBe("true")
 
   await user.keyboard("a")
   expect(answers).toEqual([
-    { conversationId: conversation.id, requestId: "bash-1", answer: AllowRequest.make({}) },
+    { threadId: thread.id, requestId: "bash-1", answer: AllowRequest.make({}) },
   ])
 })
 
 it("goes Back from an opened item to the Inbox with that item still selected", async () => {
   const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
 
-  const user = mount(needsYouRef([waitingConversation, finishedReview]), {
+  const user = mount(needsYouRef([waitingThread, finishedReview]), {
     LoadPullRequest: hold(opened),
   })
 
@@ -619,7 +612,7 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
               (name) => new Check({ name, state: "failed", url: null }),
             ),
           }),
-          AwaitingReply.make({ threads: 2 }),
+          AwaitingReply.make({ reviewThreads: 2 }),
         ],
         since: ago({ hours: 2 }),
       }),
@@ -634,7 +627,7 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
   const mine = await screen.findByRole("region", { name: "Your pull requests" })
   const cache = within(mine).getByRole("option", { name: /Cache the diff/ })
 
-  for (const reason of ["Changes requested", "CI failing", "2 threads awaiting reply"]) {
+  for (const reason of ["Changes requested", "CI failing", "2 Review threads awaiting reply"]) {
     expect(within(cache).getByText(reason)).toBeTruthy()
   }
 
@@ -680,7 +673,7 @@ it("opens the pull request and offers its finished Agent review", async () => {
 })
 
 it("counts what needs you on the Inbox link from another area", async () => {
-  const needsYou = needsYouRef([waitingConversation, finishedReview])
+  const needsYou = needsYouRef([waitingThread, finishedReview])
 
   mount(needsYou, {}, "/to-dos")
 
@@ -695,25 +688,23 @@ it("counts what needs you on the Inbox link from another area", async () => {
   expect(screen.getByRole("link", { name: "Inbox" }).textContent).toBe("")
 })
 
-it("dots the Conversations link while a Conversation needs you", async () => {
+it("dots the Threads link while a Thread needs you", async () => {
   const needsYou = needsYouRef([finishedReview])
 
   mount(needsYou, {}, "/to-dos")
 
   await screen.findByRole("link", { name: "Inbox", description: "1 need you" })
-  expect(screen.getByRole("link", { name: "Conversations" }).textContent).toBe("")
+  expect(screen.getByRole("link", { name: "Threads" }).textContent).toBe("")
 
-  await setNeedsYou(needsYou, [waitingConversation, finishedReview])
+  await setNeedsYou(needsYou, [waitingThread, finishedReview])
 
   expect(
-    await screen.findByRole("link", { name: "Conversations", description: "Needs you" }),
+    await screen.findByRole("link", { name: "Threads", description: "Needs you" }),
   ).toBeTruthy()
 
   await setNeedsYou(needsYou, [finishedReview])
 
-  await waitFor(() =>
-    expect(screen.getByRole("link", { name: "Conversations" }).textContent).toBe(""),
-  )
+  await waitFor(() => expect(screen.getByRole("link", { name: "Threads" }).textContent).toBe(""))
 })
 
 const loadedWorkspace = () =>
@@ -729,7 +720,9 @@ const loadedWorkspace = () =>
       updatedAt: DateTime.makeUnsafe("2026-10-01T00:00:00Z"),
       files: [],
       viewedPaths: [],
-      discussions: new Discussions({ onLines: [], outdated: [], timeline: [] }),
+      lineReviewThreads: [],
+      outdatedReviewThreads: [],
+      timeline: [],
       drafts: [],
     }),
   )
@@ -802,7 +795,7 @@ it("runs e on the selected item even when another title starts with E", async ()
 
 it("keeps e from jumping to a title starting with E when the selected item has no done", async () => {
   const ensure = OutsideQuestion.make({ ...outsideQuestion, id: "ask-e", question: "Ensure it?" })
-  const user = mount(needsYouRef([waitingConversation, ensure]))
+  const user = mount(needsYouRef([waitingThread, ensure]))
 
   const waiting = await screen.findByRole("option", { name: /agent\/swift-otter/ })
   await user.click(waiting)

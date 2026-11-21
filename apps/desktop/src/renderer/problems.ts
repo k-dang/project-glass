@@ -135,11 +135,11 @@ export const describeError = (error: BackendError): Problem =>
       }),
       CommentNotFound: () => ({
         title: "This comment is gone from GitHub",
-        detail: "It was deleted. Reload to see the Discussion as it is now.",
+        detail: "It was deleted. Reload to see the Review thread as it is now.",
         fixedByReload: true,
       }),
-      DiscussionNotFound: () => ({
-        title: "This Discussion is gone from GitHub",
+      ReviewThreadNotFound: () => ({
+        title: "This Review thread is gone from GitHub",
         detail:
           "Its comments were deleted. Reloading drops this Reply, so copy its text first if you want it.",
       }),
@@ -148,16 +148,16 @@ export const describeError = (error: BackendError): Problem =>
         detail:
           "It would hold the Reply until your Review is submitted. Submit or delete your Drafts, then retry.",
       }),
-      ConversationError: ({ message }) => ({
-        title: "Couldn't reach your Conversations",
+      ThreadError: ({ message }) => ({
+        title: "Couldn't reach your Threads",
         detail: message,
       }),
-      ConversationNotFound: () => ({
-        title: "This Conversation is gone",
-        detail: "It was removed. Pick another Conversation or start a new one.",
+      ThreadNotFound: () => ({
+        title: "This Thread is gone",
+        detail: "It was removed. Pick another Thread or start a new one.",
       }),
-      ConversationBusy: () => ({
-        title: "The Conversation is still working",
+      ThreadBusy: () => ({
+        title: "The Thread is still working",
         detail: "Wait for its Turn to end, then send your message.",
       }),
       RequestWaiting: () => ({
@@ -166,7 +166,7 @@ export const describeError = (error: BackendError): Problem =>
       }),
       QueuedMessageStarted: () => ({
         title: "Too late to cancel",
-        detail: "That message already started a Turn, so it stays in the conversation.",
+        detail: "That message already started a Turn, so it stays in the transcript.",
       }),
       StartFreshRefused: ({ reason }) => ({
         title: "Can't start fresh yet",
@@ -199,7 +199,7 @@ export const describeError = (error: BackendError): Problem =>
       }),
       NoPermissionModes: () => ({
         title: "No Permission modes",
-        detail: "This Conversation's harness doesn't take a Permission mode.",
+        detail: "This Thread's harness doesn't take a Permission mode.",
       }),
       InvalidLocalCheckout: ({ message }) => ({
         title: "Glass can't use that folder",

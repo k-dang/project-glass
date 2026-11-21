@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import {
-  ConversationContext,
+  ThreadContext,
   LineNote,
   PageElement,
   PageNote,
@@ -99,8 +99,8 @@ it("follows a message with the PR and Revision the user was viewing", () => {
   )
 })
 
-it("follows a message with the Conversation the user was viewing", () => {
-  const context = ConversationContext.make({ conversationId: "agent-1", name: "agent/swift-otter" })
+it("follows a message with the Thread the user was viewing", () => {
+  const context = ThreadContext.make({ threadId: "agent-1", name: "agent/swift-otter" })
 
   assert.equal(
     prompt("What is it doing?", [], context),
@@ -108,7 +108,7 @@ it("follows a message with the Conversation the user was viewing", () => {
       "What is it doing?",
       "",
       "<glass_context>",
-      'The user sent this while viewing the Conversation "agent/swift-otter" (id agent-1).',
+      'The user sent this while viewing the Thread "agent/swift-otter" (id agent-1).',
       "</glass_context>",
     ].join("\n"),
   )

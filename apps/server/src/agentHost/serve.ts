@@ -16,25 +16,25 @@ import { createServer } from "node:http"
 import { Changes } from "../Changes"
 import { FolderFiles } from "./FolderFiles"
 import { forgottenByGlass } from "./forgotten"
-import { HostConversations, type Harnesses } from "./HostConversations"
+import { HostThreads, type Harnesses } from "./HostThreads"
 import { HostGlassTools } from "./HostGlassTools"
 import { Journal } from "./Journal"
 import { Git } from "../git"
 import { HostReady } from "./protocol"
 import { hostServer, portOf } from "./server"
 
-const unattended = (journal: Journal["Service"], conversations: HostConversations["Service"]) => {
+const unattended = (journal: Journal["Service"], threads: HostThreads["Service"]) => {
   const readAttendanceAndTurnsAtOnce = Effect.sync(
     () =>
       [
         SubscriptionRef.getUnsafe(journal.attendance),
-        SubscriptionRef.getUnsafe(conversations.runningTurns),
+        SubscriptionRef.getUnsafe(threads.runningTurns),
       ] as const,
   )
 
   return Stream.merge(
     SubscriptionRef.changes(journal.attendance),
-    SubscriptionRef.changes(conversations.runningTurns),
+    SubscriptionRef.changes(threads.runningTurns),
   ).pipe(
     Stream.mapEffect(() => readAttendanceAndTurnsAtOnce),
     Stream.dropWhile(([{ followers }]) => followers === 0),
@@ -77,7 +77,7 @@ export const serveAgentHost = <E, R>(harnesses: Effect.Effect<Harnesses, E, R>) 
             host: address,
           }),
         ),
-        Layer.provideMerge(HostConversations.make(adapters)),
+        Layer.provideMerge(HostThreads.make(adapters)),
         Layer.provideMerge(HostGlassTools.layer),
         Layer.provideMerge(Journal.layer),
         Layer.provide(Changes.layer),
@@ -93,7 +93,7 @@ export const serveAgentHost = <E, R>(harnesses: Effect.Effect<Harnesses, E, R>) 
 
     yield* Effect.raceAll([
       Deferred.await(shutDown),
-      standalone ? Effect.never : unattended(journal, Context.get(services, HostConversations)),
+      standalone ? Effect.never : unattended(journal, Context.get(services, HostThreads)),
       Option.match(record, {
         onNone: () => Effect.never,
         onSome: (path) => forgottenByGlass(path, token, journal.attendance),

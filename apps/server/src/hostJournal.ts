@@ -1,4 +1,4 @@
-import type { ConversationError } from "@glass/contracts"
+import type { ThreadError } from "@glass/contracts"
 import { Data, Effect, type Scope, Stream } from "effect"
 import { HOST_PROTOCOL, type HostEvent } from "./agentHost/protocol"
 import type { GlassToolRelay, ToolCallOrigin } from "./mcp/GlassToolRelay"
@@ -38,13 +38,13 @@ export interface SavedThrough {
 
 export const followJournal = (
   save: (
-    conversationId: string,
+    threadId: string,
     events: ReadonlyArray<HostEvent>,
     journal: SavedThrough,
-  ) => Effect.Effect<void, ConversationError>,
+  ) => Effect.Effect<void, ThreadError>,
   client: HostClient,
   position: JournalPosition,
-  alreadySaved: (conversationId: string) => number,
+  alreadySaved: (threadId: string) => number,
 ) =>
   Effect.gen(function* () {
     yield* acknowledge(client, position, position.saved)
@@ -54,15 +54,12 @@ export const followJournal = (
       Stream.runForEachArray((entries) =>
         Effect.gen(function* () {
           const unsaved = entries.filter(
-            ({ conversationId, sequence }) => sequence > alreadySaved(conversationId),
+            ({ threadId, sequence }) => sequence > alreadySaved(threadId),
           )
 
-          for (const [conversationId, saved] of Map.groupBy(
-            unsaved,
-            (entry) => entry.conversationId,
-          ))
+          for (const [threadId, saved] of Map.groupBy(unsaved, (entry) => entry.threadId))
             yield* save(
-              conversationId,
+              threadId,
               saved.map(({ event }) => event),
               { host: position.host, through: saved.at(-1)!.sequence },
             )
@@ -83,7 +80,7 @@ export const followHost = (
   position: JournalPosition,
   options: {
     readonly save: Parameters<typeof followJournal>[0]
-    readonly alreadySaved: (conversationId: string) => number
+    readonly alreadySaved: (threadId: string) => number
     readonly relay: GlassToolRelay["Service"]
     readonly origin: ToolCallOrigin
     readonly calls: Scope.Scope

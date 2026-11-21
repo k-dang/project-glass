@@ -10,7 +10,7 @@ import {
 import type { DeliveredMessage } from "./deliveredMessage"
 import { type Cause, DateTime, Deferred, Effect, Queue, Scope, Stream } from "effect"
 import { randomUUID } from "node:crypto"
-import { HostConversationError } from "./protocol"
+import { HostThreadError } from "./protocol"
 
 export interface Steer extends DeliveredMessage {
   readonly id: string
@@ -145,11 +145,11 @@ export const runTurns = Effect.fnUntraced(function* <
     begin: Effect.fnUntraced(function* (turnId: string, message: TurnMessage) {
       const at = yield* DateTime.now
 
-      if (exited) return yield* new HostConversationError({ message: machine.stoppedReason })
+      if (exited) return yield* new HostThreadError({ message: machine.stoppedReason })
 
       if (state !== null)
-        return yield* new HostConversationError({
-          message: "The Conversation is still working on a Turn.",
+        return yield* new HostThreadError({
+          message: "The Thread is still working on a Turn.",
         })
 
       state = machine.begin(turnId, message, at)

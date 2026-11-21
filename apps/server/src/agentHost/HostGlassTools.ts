@@ -22,11 +22,10 @@ import {
   type RelayedToolCall,
 } from "./protocol"
 
-export class RelayedConversation extends Context.Service<
-  RelayedConversation,
-  { readonly conversationId: string }
->()("@glass/server/agentHost/RelayedConversation") {
-  static readonly current = Effect.serviceOption(RelayedConversation).pipe(
+export class RelayedThread extends Context.Service<RelayedThread, { readonly threadId: string }>()(
+  "@glass/server/agentHost/RelayedThread",
+) {
+  static readonly current = Effect.serviceOption(RelayedThread).pipe(
     Effect.flatMap(
       Option.match({
         onNone: () => Effect.die("Glass tool called outside an authenticated request"),
@@ -37,7 +36,7 @@ export class RelayedConversation extends Context.Service<
 }
 
 export interface RelayCredential {
-  readonly conversationId: string
+  readonly threadId: string
   readonly ownedSessions: Set<string>
 }
 
@@ -45,16 +44,16 @@ type Watcher = Queue.Queue<RelayedToolCall, Cause.Done>
 
 interface Pending {
   readonly owner: Watcher
-  readonly conversationId: string
+  readonly threadId: string
   readonly answered: Deferred.Deferred<McpSchema.CallToolResult>
 }
 
 export const notConnected = failedToolCall(
-  "Glass isn't connected to this Conversation, so its tools can't answer now. Try again later.",
+  "Glass isn't connected to this Thread, so its tools can't answer now. Try again later.",
 )
 
 export const lostConnection = failedToolCall(
-  "Glass lost its connection during this call, so it may or may not have happened. Check list_conversations or list_started_work before trying again.",
+  "Glass lost its connection during this call, so it may or may not have happened. Check list_threads or list_started_work before trying again.",
 )
 
 const encodeTools = Schema.encodeSync(Schema.fromJsonString(Schema.Array(McpSchema.Tool)))
@@ -67,10 +66,10 @@ export class HostGlassTools extends Context.Service<
       host: string,
       tools: ReadonlyArray<McpSchema.Tool>,
     ) => Effect.Effect<void, HostReplaced>
-    readonly access: (conversationId: string) => Effect.Effect<GlassToolsAccess, never, Scope.Scope>
+    readonly access: (threadId: string) => Effect.Effect<GlassToolsAccess, never, Scope.Scope>
     readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<RelayCredential>
     readonly call: (
-      conversationId: string,
+      threadId: string,
       name: string,
       args: Schema.JsonObject,
     ) => Effect.Effect<McpSchema.CallToolResult>
@@ -104,7 +103,7 @@ export class HostGlassTools extends Context.Service<
           { discard: true },
         )
 
-      const call = (conversationId: string, name: string, args: Schema.JsonObject) =>
+      const call = (threadId: string, name: string, args: Schema.JsonObject) =>
         Effect.suspend(() => {
           const owner = watcher
 
@@ -113,8 +112,8 @@ export class HostGlassTools extends Context.Service<
           const callId = newHostToken()
           const answered = Deferred.makeUnsafe<McpSchema.CallToolResult>()
 
-          pending.set(callId, { owner, conversationId, answered })
-          Queue.offerUnsafe(owner, { callId, conversationId, name, arguments: args })
+          pending.set(callId, { owner, threadId, answered })
+          Queue.offerUnsafe(owner, { callId, threadId, name, arguments: args })
 
           return Deferred.await(answered).pipe(
             Effect.ensuring(Effect.sync(() => pending.delete(callId))),
@@ -122,8 +121,8 @@ export class HostGlassTools extends Context.Service<
         })
 
       const relayed = (name: string) => (args: Schema.JsonObject | undefined) =>
-        RelayedConversation.current.pipe(
-          Effect.flatMap(({ conversationId }) => call(conversationId, name, args ?? {})),
+        RelayedThread.current.pipe(
+          Effect.flatMap(({ threadId }) => call(threadId, name, args ?? {})),
         )
 
       const release = (ended: Watcher) =>
@@ -159,18 +158,18 @@ export class HostGlassTools extends Context.Service<
               ),
             )
           }),
-        access: (conversationId) =>
+        access: (threadId) =>
           Effect.acquireRelease(
             Effect.sync(() => {
               const bearer = newHostToken()
 
-              credentials.set(digest(bearer), { conversationId, ownedSessions: new Set() })
+              credentials.set(digest(bearer), { threadId, ownedSessions: new Set() })
 
               return bearer
             }),
             (bearer) =>
               Effect.sync(() => credentials.delete(digest(bearer))).pipe(
-                Effect.andThen(failPending((waiting) => waiting.conversationId === conversationId)),
+                Effect.andThen(failPending((waiting) => waiting.threadId === threadId)),
               ),
           ).pipe(
             Effect.flatMap((bearer) =>

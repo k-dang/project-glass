@@ -1,4 +1,4 @@
-/** What a Plugin adds to Glass: a kind of Sandbox to start Conversations in (ADR 0010). */
+/** What a Plugin adds to Glass: a kind of Sandbox to start Threads in (ADR 0010). */
 export interface SandboxProvider {
   /** What the user sees for this kind of Sandbox, a plural such as "Acme Sandboxes". */
   readonly name: string
@@ -8,7 +8,7 @@ export interface SandboxProvider {
    */
   readonly harnesses: readonly [AgentHarness, ...Array<AgentHarness>]
   /**
-   * Makes the Sandbox, sets up the user's logins, clones the repository onto the Conversation's branch,
+   * Makes the Sandbox, sets up the user's logins, clones the repository onto the Thread's branch,
    * and starts the agent host in it. Calls `record` as soon as the Sandbox exists, so Glass can
    * delete a half-built one, and `progress` for each step the user should see. Glass waits for
    * the host's health check once this resolves.
@@ -21,7 +21,7 @@ export interface SandboxProvider {
   readonly target: (state: SandboxState, signal: AbortSignal) => Promise<SandboxTarget>
   /**
    * Pushes the Sandbox's expiry as late as the platform allows, answering when it now expires.
-   * Glass calls it while the Conversation exists and Glass runs, again before each expiry it was given,
+   * Glass calls it while the Thread exists and Glass runs, again before each expiry it was given,
    * until the expiry stops moving. Throws `glass.sandboxGone()` once the Sandbox no longer exists.
    * A provider whose Sandboxes don't expire leaves it out.
    */
@@ -60,16 +60,16 @@ export interface JsonObject {
 }
 
 /**
- * Whatever a provider recorded about one Sandbox. Glass keeps it on the Conversation and hands it back;
+ * Whatever a provider recorded about one Sandbox. Glass keeps it on the Thread and hands it back;
  * providers must read state their earlier versions wrote.
  */
 export type SandboxState = Json
 
 export interface SandboxRequest {
-  readonly conversationId: string
+  readonly threadId: string
   readonly harness: AgentHarness
   readonly repository: { readonly owner: string; readonly repo: string }
-  /** The Conversation's own branch, made from `baseBranch`. */
+  /** The Thread's own branch, made from `baseBranch`. */
   readonly branch: string
   /** The clone's `origin` remote must have it, as Review changes diffs against it. */
   readonly baseBranch: string
@@ -107,7 +107,7 @@ export interface Glass {
   readonly missingLogin: (login: string, fix: string) => Error
   /** The platform has no room for another Sandbox right now; trying again later may work. */
   readonly noCapacity: (message: string) => Error
-  /** The Sandbox no longer exists, with everything in it, so its Conversation can only be removed. */
+  /** The Sandbox no longer exists, with everything in it, so its Thread can only be removed. */
   readonly sandboxGone: () => Error
 }
 

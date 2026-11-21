@@ -1,5 +1,5 @@
 import {
-  type ConversationSkillPack,
+  type ThreadSkillPack,
   type ConnectionError,
   InvalidSkillPackName,
   InvalidSkillPackUrl,
@@ -80,14 +80,14 @@ const decodeFiles = Schema.decodeUnknownEffect(
 
 const decodeId = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Schema.Int })))
 
-const decodeConversationPins = Schema.decodeUnknownEffect(
+const decodeThreadPins = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ name: Schema.String, pin_id: Schema.Int })),
 )
 
-const decodeConversationPacks = Schema.decodeUnknownEffect(
+const decodeThreadPacks = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      conversation_id: Schema.String,
+      thread_id: Schema.String,
       name: Schema.String,
       commit_sha: Schema.String,
     }),
@@ -168,17 +168,17 @@ export class SkillPacks extends Context.Service<
       commit: string,
     ) => Reading<ReadonlyArray<SkillPack>, SkillPackNotFound>
     readonly remove: (name: string) => SkillPackList
-    readonly pinForConversation: (
-      conversationId: string,
+    readonly pinForThread: (
+      threadId: string,
       names: ReadonlyArray<string>,
-    ) => Effect.Effect<ReadonlyArray<ConversationSkillPack>, SkillPackNotFound | SkillPackError>
-    readonly releaseConversation: (conversationId: string) => Effect.Effect<void, SkillPackError>
-    readonly conversationPacks: Effect.Effect<
-      ReadonlyMap<string, ReadonlyArray<ConversationSkillPack>>,
+    ) => Effect.Effect<ReadonlyArray<ThreadSkillPack>, SkillPackNotFound | SkillPackError>
+    readonly releaseThread: (threadId: string) => Effect.Effect<void, SkillPackError>
+    readonly threadPacks: Effect.Effect<
+      ReadonlyMap<string, ReadonlyArray<ThreadSkillPack>>,
       SkillPackError
     >
-    readonly conversationSkills: (
-      conversationId: string,
+    readonly threadSkills: (
+      threadId: string,
     ) => Effect.Effect<ReadonlyArray<SkillSource>, SkillPackError>
   }
 >()("@glass/server/SkillPacks") {
@@ -376,7 +376,7 @@ export class SkillPacks extends Context.Service<
       })
 
       const releaseUnusedPins = Effect.gen(function* () {
-        const used = sql`SELECT pin_id FROM skill_pack UNION SELECT pin_id FROM conversation_skill_pack`
+        const used = sql`SELECT pin_id FROM skill_pack UNION SELECT pin_id FROM thread_skill_pack`
 
         yield* sql`DELETE FROM skill_pack_skill WHERE pin_id NOT IN (${used})`
         yield* sql`DELETE FROM skill_pack_file WHERE pin_id NOT IN (${used})`
@@ -546,61 +546,57 @@ export class SkillPacks extends Context.Service<
           return yield* list
         }),
 
-        pinForConversation: Effect.fn("SkillPacks.pinForConversation")(
-          function* (conversationId, names) {
-            if (names.length === 0) return []
+        pinForThread: Effect.fn("SkillPacks.pinForThread")(function* (threadId, names) {
+          if (names.length === 0) return []
 
-            const rows = yield* packRows
-            const chosen = rows.filter(({ pack }) => names.includes(pack.name))
-            const missing = names.find((name) => !chosen.some(({ pack }) => pack.name === name))
+          const rows = yield* packRows
+          const chosen = rows.filter(({ pack }) => names.includes(pack.name))
+          const missing = names.find((name) => !chosen.some(({ pack }) => pack.name === name))
 
-            if (missing !== undefined) return yield* new SkillPackNotFound({ name: missing })
+          if (missing !== undefined) return yield* new SkillPackNotFound({ name: missing })
 
-            yield* sql`
-            INSERT INTO conversation_skill_pack ${sql.insert(
+          yield* sql`
+            INSERT INTO thread_skill_pack ${sql.insert(
               chosen.map(({ pack, pinId }) => ({
-                conversation_id: conversationId,
+                thread_id: threadId,
                 name: pack.name,
                 pin_id: pinId,
               })),
             )}
           `.pipe(Effect.catch(storageFailure))
 
-            return chosen.map(({ pack }) => ({ name: pack.name, commit: pack.commit }))
-          },
-        ),
+          return chosen.map(({ pack }) => ({ name: pack.name, commit: pack.commit }))
+        }),
 
-        releaseConversation: (conversationId) =>
+        releaseThread: (threadId) =>
           Effect.gen(function* () {
-            yield* sql`DELETE FROM conversation_skill_pack WHERE conversation_id = ${conversationId}`
+            yield* sql`DELETE FROM thread_skill_pack WHERE thread_id = ${threadId}`
             yield* releaseUnusedPins
           }).pipe(Effect.catch(storageFailure)),
 
-        conversationPacks: sql`
-            SELECT assigned.conversation_id, assigned.name, pin.commit_sha
-            FROM conversation_skill_pack AS assigned JOIN skill_pack_pin AS pin ON pin.id = assigned.pin_id
+        threadPacks: sql`
+            SELECT assigned.thread_id, assigned.name, pin.commit_sha
+            FROM thread_skill_pack AS assigned JOIN skill_pack_pin AS pin ON pin.id = assigned.pin_id
             ORDER BY assigned.name
           `.pipe(
-          Effect.flatMap(decodeConversationPacks),
+          Effect.flatMap(decodeThreadPacks),
           Effect.map(
             (rows) =>
               new Map(
-                [...Map.groupBy(rows, ({ conversation_id }) => conversation_id)].map(
-                  ([conversationId, packs]) => [
-                    conversationId,
-                    packs.map(({ name, commit_sha }) => ({ name, commit: commit_sha })),
-                  ],
-                ),
+                [...Map.groupBy(rows, ({ thread_id }) => thread_id)].map(([threadId, packs]) => [
+                  threadId,
+                  packs.map(({ name, commit_sha }) => ({ name, commit: commit_sha })),
+                ]),
               ),
           ),
           Effect.catch(storageFailure),
         ),
 
-        conversationSkills: Effect.fn("SkillPacks.conversationSkills")(function* (conversationId) {
+        threadSkills: Effect.fn("SkillPacks.threadSkills")(function* (threadId) {
           return yield* sql`
-            SELECT name, pin_id FROM conversation_skill_pack WHERE conversation_id = ${conversationId} ORDER BY name
+            SELECT name, pin_id FROM thread_skill_pack WHERE thread_id = ${threadId} ORDER BY name
           `.pipe(
-            Effect.flatMap(decodeConversationPins),
+            Effect.flatMap(decodeThreadPins),
             Effect.flatMap((pins) =>
               Effect.forEach(pins, ({ name, pin_id }) => sentSkills(name, pin_id)),
             ),

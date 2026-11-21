@@ -6,7 +6,7 @@ import { AsyncResult } from "effect/reactivity"
 import { Circle } from "lucide-react"
 import { type ReactNode, useId } from "react"
 import { ActivityChart } from "./ActivityChart"
-import { ConversationContinueCard } from "./ConversationContinueCard"
+import { ThreadContinueCard } from "./ThreadContinueCard"
 import { ContinueCardLoading } from "./ContinueCard"
 import type { BackendError } from "./backend"
 import { Count, SectionLink } from "./Lists"
@@ -53,7 +53,7 @@ function Continue() {
         .onSuccess((destinations) => (
           <div className={continueGrid}>
             <ReviewContinueCard destination={savedIn(destinations, "reviews")} />
-            <ConversationContinueCard destination={savedIn(destinations, "conversations")} />
+            <ThreadContinueCard destination={savedIn(destinations, "threads")} />
           </div>
         ))
         .onFailure((cause) => (
@@ -62,7 +62,7 @@ function Continue() {
         .orElse(() => (
           <div className={continueGrid}>
             <ContinueCardLoading label="Loading your last pull request…" />
-            <ContinueCardLoading label="Loading your last Conversation…" />
+            <ContinueCardLoading label="Loading your last Thread…" />
           </div>
         ))}
     </section>

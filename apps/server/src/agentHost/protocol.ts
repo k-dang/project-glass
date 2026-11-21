@@ -1,10 +1,10 @@
 import {
-  Conversation,
+  Thread,
   AgentCommand,
   AgentHarness,
   AgentModels,
   ChangedFile,
-  ConversationFile,
+  ThreadFile,
   AgentStatusesChanged,
   MessageWithContext,
   ModelChoice,
@@ -47,14 +47,14 @@ export type HostEvent = typeof HostEvent.Type
 
 export const JournalEntry = Schema.Struct({
   sequence: Schema.Int,
-  conversationId: Schema.String,
+  threadId: Schema.String,
   event: HostEvent,
 })
 
 export type JournalEntry = typeof JournalEntry.Type
 
 // WARNING: Raise HOST_PROTOCOL when an AgentHostRpcs change breaks talking to a previous host; Sandboxes keep hosts running across upgrades.
-export const HOST_PROTOCOL = 2
+export const HOST_PROTOCOL = 3
 
 // WARNING: Glass asks hosts of every version for Hello, so its shape must never change.
 export const Hello = Rpc.make("Hello", {
@@ -86,7 +86,7 @@ export const hostPort = async (host: ChildProcess) => {
 }
 
 export const UnacknowledgedTurn = Schema.Struct({
-  conversationId: Schema.String,
+  threadId: Schema.String,
   turnId: Schema.String,
 })
 
@@ -94,7 +94,7 @@ export type UnacknowledgedTurn = typeof UnacknowledgedTurn.Type
 
 export const TurnSettings = Schema.Struct({
   ...ModelChoice.fields,
-  permissionMode: Conversation.fields.permissionMode,
+  permissionMode: Thread.fields.permissionMode,
 })
 
 export type TurnSettings = typeof TurnSettings.Type
@@ -141,22 +141,22 @@ export const RepositoryRole = Schema.Union([WorkRole, ReviewRole])
 
 export type RepositoryRole = typeof RepositoryRole.Type
 
-export type ConversationRole = RepositoryRole | typeof GlobalRole.Type
+export type ThreadRole = RepositoryRole | typeof GlobalRole.Type
 
 export const StartOutcome = Schema.Literals(["started", "alreadyRunning"])
 
 export type StartOutcome = typeof StartOutcome.Type
 
-export const ConversationStart = Schema.Union([
+export const ThreadStart = Schema.Union([
   Schema.Struct({
-    conversationId: Schema.String,
+    threadId: Schema.String,
     harness: AgentHarness,
     folder: HostFolder,
     role: RepositoryRole,
     skills: Schema.Array(SkillSource),
   }),
   Schema.Struct({
-    conversationId: Schema.String,
+    threadId: Schema.String,
     harness: Schema.Literal("pi"),
     folder: HostFolder,
     role: GlobalRole,
@@ -164,11 +164,11 @@ export const ConversationStart = Schema.Union([
   }),
 ])
 
-export type ConversationStart = typeof ConversationStart.Type
+export type ThreadStart = typeof ThreadStart.Type
 
 export const RelayedToolCall = Schema.Struct({
   callId: Schema.String,
-  conversationId: Schema.String,
+  threadId: Schema.String,
   name: Schema.String,
   arguments: Schema.JsonObject,
 })
@@ -178,81 +178,78 @@ export type RelayedToolCall = typeof RelayedToolCall.Type
 export const failedToolCall = (reason: string) =>
   new McpSchema.CallToolResult({ isError: true, content: [{ type: "text", text: reason }] })
 
-export class HostConversationError extends Schema.TaggedError<HostConversationError>()(
-  "HostConversationError",
-  {
-    message: Schema.String,
-  },
-) {}
+export class HostThreadError extends Schema.TaggedError<HostThreadError>()("HostThreadError", {
+  message: Schema.String,
+}) {}
 
 export class AgentHostRpcs extends RpcGroup.make(
   Hello,
   Rpc.make("ListModels", {
     payload: { harness: AgentHarness },
     success: AgentModels,
-    error: HostConversationError,
+    error: HostThreadError,
   }),
   Rpc.make("ListCommands", {
     payload: { harness: AgentHarness, folder: HostFolder, skills: Schema.Array(SkillSource) },
     success: Schema.Array(AgentCommand),
-    error: HostConversationError,
+    error: HostThreadError,
   }),
-  Rpc.make("StartConversation", {
-    payload: ConversationStart,
+  Rpc.make("StartThread", {
+    payload: ThreadStart,
     success: StartOutcome,
-    error: HostConversationError,
+    error: HostThreadError,
   }),
   Rpc.make("StartTurn", {
     payload: {
-      conversationId: Schema.String,
+      threadId: Schema.String,
       turnId: Schema.String,
       ...DeliveredTurn.fields,
       ...TurnSettings.fields,
     },
-    error: HostConversationError,
+    error: HostThreadError,
   }),
   Rpc.make("AnswerRequest", {
-    payload: { conversationId: Schema.String, requestId: Schema.String, answer: RequestAnswer },
-    error: Schema.Union([RequestNotWaiting, HostConversationError]),
+    payload: { threadId: Schema.String, requestId: Schema.String, answer: RequestAnswer },
+    error: Schema.Union([RequestNotWaiting, HostThreadError]),
   }),
   Rpc.make("Steer", {
-    payload: { conversationId: Schema.String, ...DeliveredMessage.fields },
-    error: HostConversationError,
+    payload: { threadId: Schema.String, ...DeliveredMessage.fields },
+    error: HostThreadError,
   }),
   Rpc.make("StopTurn", {
-    payload: { conversationId: Schema.String, turnId: Schema.String },
+    payload: { threadId: Schema.String, turnId: Schema.String },
     success: Schema.NullOr(SteersNotTakenIn),
   }),
-  Rpc.make("StopConversation", { payload: { conversationId: Schema.String } }),
+  Rpc.make("StopThread", { payload: { threadId: Schema.String } }),
   Rpc.make("GetChanges", {
     payload: { folder: HostFolder, baseRef: Schema.String },
     success: Schema.Array(ChangedFile),
-    error: HostConversationError,
+    error: HostThreadError,
   }),
   Rpc.make("ListFiles", {
     payload: { folder: HostFolder },
     success: Schema.Array(Schema.String),
-    error: HostConversationError,
+    error: HostThreadError,
   }),
   Rpc.make("ExistingFiles", {
     payload: { folder: HostFolder, paths: NamedPaths },
     success: Schema.Array(Schema.String),
-    error: HostConversationError,
+    error: HostThreadError,
   }),
   Rpc.make("ReadFile", {
     payload: { folder: HostFolder, path: Schema.String },
-    success: ConversationFile,
-    error: HostConversationError,
+    success: ThreadFile,
+    error: HostThreadError,
   }),
   Rpc.make("HasUncommittedChanges", {
     payload: { folder: HostFolder },
     success: Schema.Boolean,
-    error: HostConversationError,
+    error: HostThreadError,
   }),
   Rpc.make("CurrentBranch", {
     payload: { folder: HostFolder },
     success: Schema.NullOr(Schema.String),
-    error: HostConversationError,
+    error: HostThreadError,
   }),
   Rpc.make("WatchJournal", {
     payload: { host: Schema.String, after: Schema.Int },
@@ -280,12 +277,12 @@ export class AgentHostRpcs extends RpcGroup.make(
 ) {}
 
 export const couldNotSwitch = (harness: string, what: "model" | "effort" | "Permission mode") =>
-  new HostConversationError({
+  new HostThreadError({
     message: `${harness} couldn't switch to that ${what}. Pick another, then send your message again.`,
   })
 
-export const notRunning = new HostConversationError({
-  message: "The Conversation isn't working on a Turn.",
+export const notRunning = new HostThreadError({
+  message: "The Thread isn't working on a Turn.",
 })
 
 export const failure =
@@ -293,5 +290,5 @@ export const failure =
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.tapError((cause) => Effect.logWarning(message, cause)),
-      Effect.mapError(() => new HostConversationError({ message })),
+      Effect.mapError(() => new HostThreadError({ message })),
     )

@@ -121,7 +121,7 @@ export function SkillPacksSettings() {
   return (
     <SettingsSection
       title="Skill packs"
-      description="Skills from a GitHub folder that you can give Conversations. A pack stays on the commit you added it at until you update it."
+      description="Skills from a GitHub folder that you can give Threads. A pack stays on the commit you added it at until you update it."
     >
       {AsyncResult.builder(packs)
         .onInitialOrWaiting(() => <output>Loading Skill packs…</output>)
@@ -209,7 +209,7 @@ function PreviewCard(props: {
   const hint = taken
     ? `You already have a pack named ${name}.`
     : valid
-      ? `Conversations run its skills as /${name}:skill. The name can't change later.`
+      ? `Threads run its skills as /${name}:skill. The name can't change later.`
       : name === LOCAL_SKILLS_NAMESPACE
         ? `${name} is kept for your Local skills.`
         : "Use lowercase letters, digits, and single hyphens."
@@ -337,7 +337,7 @@ function PackList(props: { packs: ReadonlyArray<SkillPack>; change: Change }) {
       <ConfirmationDialog
         open={removing !== null}
         title={`Remove ${removing}?`}
-        description="New Conversations can't get its skills. You can add it again from its URL."
+        description="New Threads can't get its skills. You can add it again from its URL."
         confirmLabel="Remove"
         onCancel={() => setRemoving(null)}
         onConfirm={() => {

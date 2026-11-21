@@ -192,7 +192,7 @@ function Summary(props: { jobs: ReadonlyArray<AgentJob> }) {
   return (
     <>
       <Sparkles aria-hidden className="size-3.5" />
-      Conversations
+      Threads
       {props.jobs.some((job) => job.saved?.outdatedHead != null) && (
         <span aria-hidden className="size-1.5 rounded-full bg-amber-500" />
       )}

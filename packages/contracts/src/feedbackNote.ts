@@ -1,5 +1,5 @@
 import { Effect, Schema } from "effect"
-import { DiffSide } from "./discussion"
+import { DiffSide } from "./comment"
 
 const LineNumber = Schema.Int.check(Schema.isGreaterThan(0))
 

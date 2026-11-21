@@ -14,7 +14,7 @@ import { mkdirSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { vi } from "vite-plus/test"
-import { conversationsFixture, holding, settled } from "../test/conversationsFixture"
+import { threadsFixture, holding, settled } from "../test/threadsFixture"
 import { watchDeadlines } from "../test/deadlines"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, type FakePullRequestSeed, VIEWER } from "../test/fakePullRequest"
@@ -32,14 +32,14 @@ const needsYou = (client: Client, until: (items: NeedsYou) => boolean) =>
 
 const current = (client: Client) => needsYou(client, () => true)
 
-const conversationItems = (items: NeedsYou) =>
-  items.flatMap((item) => (Predicate.isTagged(item, "Conversation") ? [item] : []))
+const threadItems = (items: NeedsYou) =>
+  items.flatMap((item) => (Predicate.isTagged(item, "Thread") ? [item] : []))
 
 const pullRequestItems = (items: NeedsYou) =>
   items.flatMap((item) => (Predicate.isTagged(item, "PullRequest") ? [item] : []))
 
-const conversationItem = (items: NeedsYou, conversationId: string) =>
-  conversationItems(items).find(({ conversation }) => conversation.id === conversationId)
+const threadItem = (items: NeedsYou, threadId: string) =>
+  threadItems(items).find(({ thread }) => thread.id === threadId)
 
 const titles = (items: NeedsYou) =>
   pullRequestItems(items).map(({ pullRequest }) => pullRequest.title)
@@ -49,7 +49,9 @@ const itemOf = (items: NeedsYou, pr: FakePullRequest) =>
 
 const reasonsOf = (items: NeedsYou, pr: FakePullRequest) =>
   itemOf(items, pr)?.reasons.map((reason) =>
-    Predicate.isTagged(reason, "AwaitingReply") ? `AwaitingReply:${reason.threads}` : reason._tag,
+    Predicate.isTagged(reason, "AwaitingReply")
+      ? `AwaitingReply:${reason.reviewThreads}`
+      : reason._tag,
   )
 
 const sinceOf = (items: NeedsYou, pr: FakePullRequest) => {
@@ -58,18 +60,18 @@ const sinceOf = (items: NeedsYou, pr: FakePullRequest) => {
   return found === undefined ? undefined : DateTime.formatIso(found.since)
 }
 
-const requestsOf = (items: NeedsYou, conversationId: string) =>
-  conversationItem(items, conversationId)?.reasons.flatMap((reason) =>
+const requestsOf = (items: NeedsYou, threadId: string) =>
+  threadItem(items, threadId)?.reasons.flatMap((reason) =>
     Predicate.isTagged(reason, "WaitingRequests") ? reason.requests : [],
   ) ?? []
 
-const finishedOf = (items: NeedsYou, conversationId: string) =>
-  conversationItem(items, conversationId)?.reasons.flatMap((reason) =>
+const finishedOf = (items: NeedsYou, threadId: string) =>
+  threadItem(items, threadId)?.reasons.flatMap((reason) =>
     Predicate.isTagged(reason, "TurnFinished") ? [reason] : [],
   )[0]
 
-const onlyFinished = (conversationId: string) => (items: NeedsYou) =>
-  conversationItem(items, conversationId)
+const onlyFinished = (threadId: string) => (items: NeedsYou) =>
+  threadItem(items, threadId)
     ?.reasons.map(({ _tag }) => _tag)
     .join() === "TurnFinished"
 
@@ -135,154 +137,146 @@ const reviewsFixture = Effect.fnUntraced(function* (
 })
 
 it.live(
-  "lists a Conversation while its Permission request waits, until the user answers it and it finishes",
+  "lists a Thread while its Permission request waits, until the user answers it and it finishes",
   () =>
     Effect.gen(function* () {
-      const f = yield* conversationsFixture
-      const conversation = yield* f.start("Please ask permission")
+      const f = yield* threadsFixture
+      const thread = yield* f.start("Please ask permission")
 
-      const [turn] = yield* f.transcript(conversation.id, (turns) =>
+      const [turn] = yield* f.transcript(thread.id, (turns) =>
         turns.some(({ parts }) => parts.some(isWaiting)),
       )
 
       const listed = yield* needsYou(
         f.client,
-        (items) => conversationItem(items, conversation.id) !== undefined,
+        (items) => threadItem(items, thread.id) !== undefined,
       )
 
-      assert.strictEqual(
-        conversationItem(listed, conversation.id)?.conversation.name,
-        conversation.name,
-      )
-      assert.deepStrictEqual(requestsOf(listed, conversation.id), turn?.parts.filter(isWaiting))
-      const [request] = requestsOf(listed, conversation.id)
+      assert.strictEqual(threadItem(listed, thread.id)?.thread.name, thread.name)
+      assert.deepStrictEqual(requestsOf(listed, thread.id), turn?.parts.filter(isWaiting))
+      const [request] = requestsOf(listed, thread.id)
       assert.strictEqual(request?._tag, "PermissionRequest")
 
       yield* f.client.AnswerRequest({
-        conversationId: conversation.id,
+        threadId: thread.id,
         requestId: request?.requestId ?? "",
         answer: AllowRequest.make({}),
       })
 
-      yield* needsYou(f.client, onlyFinished(conversation.id))
+      yield* needsYou(f.client, onlyFinished(thread.id))
     }),
 )
 
-it.live(
-  "lists a Conversation while its Question waits, until the user answers it and it finishes",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* conversationsFixture
-      const conversation = yield* f.start("Please ask a question")
-
-      const listed = yield* needsYou(
-        f.client,
-        (items) => conversationItem(items, conversation.id) !== undefined,
-      )
-
-      const [question] = requestsOf(listed, conversation.id)
-      assert.strictEqual(question?._tag, "Question")
-
-      yield* f.client.AnswerRequest({
-        conversationId: conversation.id,
-        requestId: question?.requestId ?? "",
-        answer: AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
-      })
-
-      yield* needsYou(f.client, onlyFinished(conversation.id))
-    }),
-)
-
-it.live("drops a waiting Conversation once it is removed", () =>
+it.live("lists a Thread while its Question waits, until the user answers it and it finishes", () =>
   Effect.gen(function* () {
-    const f = yield* conversationsFixture
-    const conversation = yield* f.start("Please ask permission")
-    yield* needsYou(f.client, (items) => conversationItem(items, conversation.id) !== undefined)
+    const f = yield* threadsFixture
+    const thread = yield* f.start("Please ask a question")
 
-    yield* f.client.RemoveConversation({ conversationId: conversation.id })
+    const listed = yield* needsYou(f.client, (items) => threadItem(items, thread.id) !== undefined)
 
-    yield* needsYou(f.client, (items) => conversationItem(items, conversation.id) === undefined)
+    const [question] = requestsOf(listed, thread.id)
+    assert.strictEqual(question?._tag, "Question")
+
+    yield* f.client.AnswerRequest({
+      threadId: thread.id,
+      requestId: question?.requestId ?? "",
+      answer: AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
+    })
+
+    yield* needsYou(f.client, onlyFinished(thread.id))
   }),
 )
 
-it.live("lists a Conversation whose Turn finished unseen, until the user sees that Turn", () =>
+it.live("drops a waiting Thread once it is removed", () =>
   Effect.gen(function* () {
-    const f = yield* conversationsFixture
-    const conversation = yield* f.start()
-    const [turn] = yield* f.transcript(conversation.id, settled(1))
+    const f = yield* threadsFixture
+    const thread = yield* f.start("Please ask permission")
+    yield* needsYou(f.client, (items) => threadItem(items, thread.id) !== undefined)
+
+    yield* f.client.RemoveThread({ threadId: thread.id })
+
+    yield* needsYou(f.client, (items) => threadItem(items, thread.id) === undefined)
+  }),
+)
+
+it.live("lists a Thread whose Turn finished unseen, until the user sees that Turn", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    const thread = yield* f.start()
+    const [turn] = yield* f.transcript(thread.id, settled(1))
     const ended = turn!.ended!
 
-    const listed = yield* needsYou(f.client, onlyFinished(conversation.id))
+    const listed = yield* needsYou(f.client, onlyFinished(thread.id))
 
-    assert.deepStrictEqual(finishedOf(listed, conversation.id)?.ended, ended)
-    assert.isTrue(DateTime.Equivalence(conversationItem(listed, conversation.id)!.since, ended.at))
+    assert.deepStrictEqual(finishedOf(listed, thread.id)?.ended, ended)
+    assert.isTrue(DateTime.Equivalence(threadItem(listed, thread.id)!.since, ended.at))
 
-    yield* f.client.MarkTurnSeen({ conversationId: conversation.id, endedAt: ended.at })
+    yield* f.client.MarkTurnSeen({ threadId: thread.id, endedAt: ended.at })
 
-    yield* needsYou(f.client, (items) => conversationItem(items, conversation.id) === undefined)
+    yield* needsYou(f.client, (items) => threadItem(items, thread.id) === undefined)
   }),
 )
 
 it.live(
-  "lists the Conversation again when a later Turn finishes, even if the earlier one is seen after it",
+  "lists the Thread again when a later Turn finishes, even if the earlier one is seen after it",
   () =>
     Effect.gen(function* () {
-      const f = yield* conversationsFixture
-      const conversation = yield* f.start()
-      const [first] = yield* f.transcript(conversation.id, settled(1))
-      yield* f.client.MarkTurnSeen({ conversationId: conversation.id, endedAt: first!.ended!.at })
-      yield* needsYou(f.client, (items) => conversationItem(items, conversation.id) === undefined)
+      const f = yield* threadsFixture
+      const thread = yield* f.start()
+      const [first] = yield* f.transcript(thread.id, settled(1))
+      yield* f.client.MarkTurnSeen({ threadId: thread.id, endedAt: first!.ended!.at })
+      yield* needsYou(f.client, (items) => threadItem(items, thread.id) === undefined)
 
-      yield* f.send(conversation.id, "Say hello again")
-      const turns = yield* f.transcript(conversation.id, settled(2))
-      yield* f.client.MarkTurnSeen({ conversationId: conversation.id, endedAt: first!.ended!.at })
+      yield* f.send(thread.id, "Say hello again")
+      const turns = yield* f.transcript(thread.id, settled(2))
+      yield* f.client.MarkTurnSeen({ threadId: thread.id, endedAt: first!.ended!.at })
 
-      const listed = yield* needsYou(f.client, onlyFinished(conversation.id))
-      assert.deepStrictEqual(finishedOf(listed, conversation.id)?.ended, turns[1]?.ended)
+      const listed = yield* needsYou(f.client, onlyFinished(thread.id))
+      assert.deepStrictEqual(finishedOf(listed, thread.id)?.ended, turns[1]?.ended)
     }),
 )
 
 it.live("leaves out a Turn the user stopped", () =>
   Effect.gen(function* () {
-    const f = yield* conversationsFixture
-    const conversation = yield* f.start("hold:never")
-    yield* f.transcript(conversation.id, holding)
+    const f = yield* threadsFixture
+    const thread = yield* f.start("hold:never")
+    yield* f.transcript(thread.id, holding)
 
-    yield* f.client.StopTurn({ conversationId: conversation.id })
-    yield* f.transcript(conversation.id, settled(1))
+    yield* f.client.StopTurn({ threadId: thread.id })
+    yield* f.transcript(thread.id, settled(1))
 
-    assert.isUndefined(conversationItem(yield* current(f.client), conversation.id))
+    assert.isUndefined(threadItem(yield* current(f.client), thread.id))
   }),
 )
 
 it.live("keeps which finished Turns the user has seen when Glass opens again", () =>
   Effect.gen(function* () {
-    const f = yield* conversationsFixture
+    const f = yield* threadsFixture
     const seen = yield* f.start()
     const unseen = yield* f.start("Say goodbye")
     const [turn] = yield* f.transcript(seen.id, settled(1))
     yield* f.transcript(unseen.id, settled(1))
-    yield* f.client.MarkTurnSeen({ conversationId: seen.id, endedAt: turn!.ended!.at })
-    yield* needsYou(f.client, (items) => conversationItem(items, seen.id) === undefined)
+    yield* f.client.MarkTurnSeen({ threadId: seen.id, endedAt: turn!.ended!.at })
+    yield* needsYou(f.client, (items) => threadItem(items, seen.id) === undefined)
 
     yield* f.quit
     const relaunched = yield* f.launch
 
     const listed = yield* needsYou(relaunched, onlyFinished(unseen.id))
-    assert.isUndefined(conversationItem(listed, seen.id))
+    assert.isUndefined(threadItem(listed, seen.id))
   }),
 )
 
-it.live("lists a Sandbox Conversation still waiting when Glass opens again", () =>
+it.live("lists a Sandbox Thread still waiting when Glass opens again", () =>
   Effect.gen(function* () {
-    const f = yield* conversationsFixture
-    const conversation = yield* f.startSandbox("Please ask permission")
-    yield* needsYou(f.client, (items) => conversationItem(items, conversation.id) !== undefined)
+    const f = yield* threadsFixture
+    const thread = yield* f.startSandbox("Please ask permission")
+    yield* needsYou(f.client, (items) => threadItem(items, thread.id) !== undefined)
 
     yield* f.quit
     const relaunched = yield* f.launch
 
-    assert.strictEqual(requestsOf(yield* current(relaunched), conversation.id).length, 1)
+    assert.strictEqual(requestsOf(yield* current(relaunched), thread.id).length, 1)
   }),
 )
 
@@ -386,7 +380,7 @@ it.live("lists a queued draft with a finished Agent review, but not a closed or 
   }),
 )
 
-it.live("lists a waiting Conversation before a PR that has waited longer", () =>
+it.live("lists a waiting Thread before a PR that has waited longer", () =>
   Effect.gen(function* () {
     const f = yield* reviewsFixture()
     const pr = f.seed("Greet")
@@ -403,7 +397,7 @@ it.live("lists a waiting Conversation before a PR that has waited longer", () =>
 
     assert.deepStrictEqual(
       listed.map(({ _tag }) => _tag),
-      ["Conversation", "PullRequest"],
+      ["Thread", "PullRequest"],
     )
     assert.isTrue(DateTime.isLessThan(listed[1]!.since, listed[0]!.since))
   }),
@@ -577,7 +571,7 @@ it.effect("refreshes the user's PRs once two minutes pass without a sync", () =>
 
 it.live("lists the Global chat while its own Question waits, until the user answers it", () =>
   Effect.gen(function* () {
-    const f = yield* conversationsFixture
+    const f = yield* threadsFixture
     yield* f.client.SendGlobalMessage({
       message: "Please ask a question",
       images: [],

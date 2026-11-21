@@ -1,10 +1,9 @@
 import {
   type ConnectionError,
-  Discussions,
   Draft,
   GitHubUnavailable,
   LinePlace,
-  OutdatedDiscussion,
+  OutdatedReviewThread,
   PullRequestWorkspace,
   PublishedComment,
 } from "@glass/contracts"
@@ -24,7 +23,7 @@ const savedDraft = new Draft({
   body: "Saved",
 })
 
-const withDiscussion = () => {
+const withReviewThread = () => {
   const original = workspace([savedDraft])
 
   return new PullRequestWorkspace({
@@ -35,29 +34,27 @@ const withDiscussion = () => {
     files: original.files,
     viewedPaths: original.viewedPaths,
     drafts: original.drafts,
-    discussions: new Discussions({
-      onLines: [],
-      outdated: [
-        new OutdatedDiscussion({
-          id: "T1",
-          path: "greet.ts",
-          originalLine: 2,
-          diffHunk: "",
-          resolved: false,
-          comments: [
-            new PublishedComment({
-              id: "C1",
-              author: "hubot",
-              avatarUrl: null,
-              bodyHtml: "Why?",
-              createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
-              reactions: [],
-            }),
-          ],
-        }),
-      ],
-      timeline: [],
-    }),
+    lineReviewThreads: [],
+    outdatedReviewThreads: [
+      new OutdatedReviewThread({
+        id: "T1",
+        path: "greet.ts",
+        originalLine: 2,
+        diffHunk: "",
+        resolved: false,
+        comments: [
+          new PublishedComment({
+            id: "C1",
+            author: "hubot",
+            avatarUrl: null,
+            bodyHtml: "Why?",
+            createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+            reactions: [],
+          }),
+        ],
+      }),
+    ],
+    timeline: [],
   })
 }
 
@@ -74,11 +71,11 @@ it("drains pending and newer Draft saves and other writes before replacing, carr
   const registry = testRegistry({
     UpdateDraft: hold(updates),
     SetFileViewed: () => hold(viewed)(undefined),
-    SetDiscussionResolved: () => hold(resolves)(undefined),
+    SetReviewThreadResolved: () => hold(resolves)(undefined),
   })
 
   try {
-    const feedback = new WorkspaceFeedback(withDiscussion(), registry, () => {})
+    const feedback = new WorkspaceFeedback(withReviewThread(), registry, () => {})
 
     feedback.drafts.edit("D1", "First save")
     feedback.drafts.save("D1")
@@ -87,7 +84,7 @@ it("drains pending and newer Draft saves and other writes before replacing, carr
     feedback.drafts.edit("D1", "Latest text")
     feedback.drafts.setSummary("Looks")
     feedback.replies.edit("T1", "Keep this Reply")
-    feedback.replies.edit("gone", "Discussion removed by GitHub")
+    feedback.replies.edit("gone", "Review thread removed by GitHub")
     feedback.viewedFiles.set("greet.ts", true)
     feedback.resolutions.set("T1", true)
     const viewing = await next(viewed)
@@ -110,7 +107,7 @@ it("drains pending and newer Draft saves and other writes before replacing, carr
     feedback.drafts.setSummary("Looks close")
 
     const nextFeedback = new WorkspaceFeedback(
-      withDiscussion(),
+      withReviewThread(),
       registry,
       () => {},
       replacement.payload,
@@ -137,7 +134,7 @@ it.each(["reload", "leave"])(
     const registry = testRegistry({ UpdateDraft: hold(updates) })
 
     try {
-      const feedback = new WorkspaceFeedback(withDiscussion(), registry, () => {})
+      const feedback = new WorkspaceFeedback(withReviewThread(), registry, () => {})
 
       feedback.drafts.edit("D1", "Unsent Draft")
       feedback.drafts.setSummary("Unsent summary")
@@ -186,7 +183,7 @@ it("releases a cancelled Reload without releasing the overlapping leave hold", a
   const registry = testRegistry({ SetFileViewed: () => hold(viewed)(undefined) })
 
   try {
-    const feedback = new WorkspaceFeedback(withDiscussion(), registry, () => {})
+    const feedback = new WorkspaceFeedback(withReviewThread(), registry, () => {})
 
     feedback.replies.edit("T1", "Unsent")
     feedback.viewedFiles.set("greet.ts", true)
@@ -228,7 +225,7 @@ it("releases holds when confirmation defects or is interrupted", async () => {
   const registry = testRegistry({})
 
   try {
-    const feedback = new WorkspaceFeedback(withDiscussion(), registry, () => {})
+    const feedback = new WorkspaceFeedback(withReviewThread(), registry, () => {})
 
     const failure = await Effect.runPromiseExit(
       feedback.prepareLeave(() => Effect.die("Prompt failed")),
@@ -271,7 +268,7 @@ it("disposes its stores, cancelling an Ask and releasing workspace atoms", async
     await Effect.runPromise(AtomRegistry.getResult(registry, backendRuntime))
     const baseline = registry.getNodes().size
     const askAnswersKeptPerRevision = 1
-    const feedback = new WorkspaceFeedback(withDiscussion(), registry, () => {})
+    const feedback = new WorkspaceFeedback(withReviewThread(), registry, () => {})
 
     feedback.asks.ask({ path: "greet.ts", side: "new", line: 2 }, "Why?")
     await asking.promise

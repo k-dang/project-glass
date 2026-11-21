@@ -28,7 +28,7 @@ export const reviewOf = (revision: Revision): AgentReview => ({
     "**The greeting changes a letter callers match on.** One line changes.\n\n## Callers expect the old letter\n\n`main.ts` matches on `b`.",
   hotspots: [],
   lowAttention: [],
-  conversationId: null,
+  threadId: null,
   done: false,
   includedInStartedWorkUpdate: false,
 })

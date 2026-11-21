@@ -95,7 +95,7 @@ const decodeUploads = (images: ReadonlyArray<ToDoImageUpload>) =>
 type ToDoList = Effect.Effect<ReadonlyArray<ToDo>, ToDoError>
 
 export const LinkedCompletion = Schema.Struct({
-  conversationId: Schema.String,
+  threadId: Schema.String,
   completedAt: Schema.DateTimeUtc,
 })
 
@@ -113,11 +113,11 @@ export class ToDos extends Context.Service<
     readonly attach: (id: number, images: ReadonlyArray<ToDoImageUpload>) => ToDoList
     readonly removeImage: (id: number) => ToDoList
     readonly readImage: (id: number, size: ToDoImageSize) => Effect.Effect<Image, ToDoError>
-    readonly linkConversation: (
-      conversationId: string,
+    readonly linkThread: (
+      threadId: string,
       toDoIds: ReadonlyArray<number>,
     ) => Effect.Effect<void, SqlError.SqlError>
-    readonly unlinkConversation: (conversationId: string) => Effect.Effect<void, SqlError.SqlError>
+    readonly unlinkThread: (threadId: string) => Effect.Effect<void, SqlError.SqlError>
     readonly completeLinked: (
       completions: ReadonlyArray<LinkedCompletion>,
     ) => Effect.Effect<void, ToDoError>
@@ -344,7 +344,7 @@ export class ToDos extends Context.Service<
                   RETURNING id, title
                 `
 
-                yield* sql`DELETE FROM conversation_to_do WHERE to_do_id = ${id}`
+                yield* sql`DELETE FROM thread_to_do WHERE to_do_id = ${id}`
 
                 return finished
               }),
@@ -362,7 +362,7 @@ export class ToDos extends Context.Service<
                   )
 
                   yield* sql`DELETE FROM to_do_image WHERE to_do_id = ${id}`
-                  yield* sql`DELETE FROM conversation_to_do WHERE to_do_id = ${id}`
+                  yield* sql`DELETE FROM thread_to_do WHERE to_do_id = ${id}`
                   yield* sql`DELETE FROM to_do WHERE id = ${id}`
 
                   return rows
@@ -441,36 +441,36 @@ export class ToDos extends Context.Service<
 
           return { mediaType, data: Base64.encode(bytes) }
         }),
-        linkConversation: Effect.fn("ToDos.linkConversation")(function* (conversationId, toDoIds) {
+        linkThread: Effect.fn("ToDos.linkThread")(function* (threadId, toDoIds) {
           const linkedAt = yield* now
 
           yield* sql`
-            INSERT INTO conversation_to_do (conversation_id, to_do_id, linked_at)
-            SELECT ${conversationId}, id, ${linkedAt} FROM to_do
+            INSERT INTO thread_to_do (thread_id, to_do_id, linked_at)
+            SELECT ${threadId}, id, ${linkedAt} FROM to_do
             WHERE completed_at IS NULL AND ${sql.in("id", toDoIds)}
           `
         }),
-        unlinkConversation: Effect.fn("ToDos.unlinkConversation")(function* (conversationId) {
-          yield* sql`DELETE FROM conversation_to_do WHERE conversation_id = ${conversationId}`
+        unlinkThread: Effect.fn("ToDos.unlinkThread")(function* (threadId) {
+          yield* sql`DELETE FROM thread_to_do WHERE thread_id = ${threadId}`
         }),
         completeLinked: Effect.fn("ToDos.completeLinked")(function* (completions) {
           const done = yield* record(
             sql.withTransaction(
-              Effect.forEach(completions, ({ conversationId, completedAt }) => {
+              Effect.forEach(completions, ({ threadId, completedAt }) => {
                 const at = DateTime.formatIso(completedAt)
 
                 return sql`
                   UPDATE to_do SET completed_at = ${at}
                   WHERE completed_at IS NULL AND id IN (
-                    SELECT to_do_id FROM conversation_to_do
-                    WHERE conversation_id = ${conversationId} AND linked_at < ${at}
+                    SELECT to_do_id FROM thread_to_do
+                    WHERE thread_id = ${threadId} AND linked_at < ${at}
                   )
                   RETURNING id, title
                 `.pipe(
                   Effect.tap(
                     () => sql`
-                      DELETE FROM conversation_to_do
-                      WHERE conversation_id = ${conversationId} AND linked_at < ${at}
+                      DELETE FROM thread_to_do
+                      WHERE thread_id = ${threadId} AND linked_at < ${at}
                     `,
                   ),
                 )

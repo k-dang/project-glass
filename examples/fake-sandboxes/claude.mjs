@@ -47,7 +47,7 @@ const state = { model: "default", effort: null }
 
 const initialized = {
   commands: [],
-  conversations: [],
+  threads: [],
   models,
   account: {},
   pid: process.pid,
