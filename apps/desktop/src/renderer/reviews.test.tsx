@@ -504,6 +504,7 @@ it("shows the last rows at once on return to Reviews", async () => {
 
   await rowFor("Wave at the world")
   await user.click(screen.getByRole("link", { name: "Settings" }))
+  await screen.findByRole("main", { name: "Settings" })
   await user.click(screen.getByRole("link", { name: "Reviews" }))
   await rowFor("Wave at the world")
   expect(screen.queryByText("Loading PRs…")).toBeNull()
@@ -672,7 +673,7 @@ it("names the PR while it opens, and Back to PRs leaves before it arrives", asyn
 
   await user.click(await rowFor("Greet the world"))
   await next(opens)
-  const loading = screen.getByRole("status", { name: "Loading pull request" })
+  const loading = await screen.findByRole("status", { name: "Loading pull request" })
   expect(loading.textContent).toContain("octo-org/glass")
   expect(loading.textContent).toContain("#42")
 

@@ -428,7 +428,7 @@ export interface FakeGitHub {
     ref: string,
     files: FakeFiles,
   ): string
-  failNext(failure: FakeFailure): void
+  failNext(path: string, failure: FakeFailure): void
   failNextGraphQL(error: FakeGraphQLError): void
   beforeNext(path: string, action: () => void): void
   readonly gitTraffic: TrafficMeter
@@ -453,7 +453,7 @@ interface FakeGitHubOptions {
 }
 
 export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubOptions = {}) {
-  const failures: Array<FakeFailure> = []
+  const failures: Array<{ readonly path: string; readonly failure: FakeFailure }> = []
   const graphQLFailures: Array<FakeGraphQLError> = []
   const gitTraffic = trafficMeter()
   const pullRequests: Array<FakePullRequest> = []
@@ -515,7 +515,11 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
           fake,
         )
 
-        const failure = (Effect.isEffect(decided) ? yield* decided : decided) ?? failures.shift()
+        const failing = failures.findIndex(({ path }) => pathname.startsWith(path))
+
+        const failure =
+          (Effect.isEffect(decided) ? yield* decided : decided) ??
+          (failing === -1 ? undefined : failures.splice(failing, 1)[0]?.failure)
 
         if (failure === "disconnect") {
           NodeHttpServerRequest.toIncomingMessage(request).socket.destroy()
@@ -1202,8 +1206,8 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     },
     seedBranches: repositories.seedBranches,
     pushRepository: repositories.push,
-    failNext: (failure) => {
-      failures.push(failure)
+    failNext: (path, failure) => {
+      failures.push({ path, failure })
     },
     failNextGraphQL: (error) => {
       graphQLFailures.push(error)
