@@ -40,6 +40,7 @@ export default defineConfig({
     },
     rules: {
       "glass/architecture": "error",
+      "glass/effect-runners": "error",
       "glass/module-casing": "error",
       "glass/test-waits": "error",
       "react/react-in-jsx-scope": "off",

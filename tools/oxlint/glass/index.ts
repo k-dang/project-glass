@@ -1,9 +1,15 @@
 import { definePlugin } from "vite-plus/lint/plugins"
 import { architecture } from "./architecture.ts"
+import { effectRunners } from "./effect-runners.ts"
 import { moduleCasing } from "./module-casing.ts"
 import { testWaits } from "./test-waits.ts"
 
 export default definePlugin({
   meta: { name: "glass" },
-  rules: { architecture, "module-casing": moduleCasing, "test-waits": testWaits },
+  rules: {
+    architecture,
+    "effect-runners": effectRunners,
+    "module-casing": moduleCasing,
+    "test-waits": testWaits,
+  },
 })
