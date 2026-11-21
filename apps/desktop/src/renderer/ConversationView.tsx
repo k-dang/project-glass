@@ -826,21 +826,23 @@ const groupSteps = (
 const counted = (count: number, noun: string) =>
   count === 0 ? null : `${count} ${noun}${count === 1 ? "" : "s"}`
 
-const isRunning = (call: typeof ToolCallPart.Type, inBackground: ReadonlySet<string>) =>
-  call.status === "running" || inBackground.has(call.toolCallId)
-
-const runningCall = (parts: ReadonlyArray<TurnPart>, inBackground: ReadonlySet<string>) =>
-  parts.find((part) => Predicate.isTagged(part, "ToolCall") && isRunning(part, inBackground))
+const runningCall = (parts: ReadonlyArray<TurnPart>) =>
+  parts.find((part) => Predicate.isTagged(part, "ToolCall") && part.status === "running")
 
 const stepsTitle = (parts: ReadonlyArray<TurnPart>, inBackground: ReadonlySet<string>) => {
   const calls = parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
-  const running = calls.find((call) => isRunning(call, inBackground))
+  const running = calls.find((call) => call.status === "running")
   const failed = calls.filter((call) => call.status === "failed").length
+
+  const background = calls.filter(
+    (call) => call.status === "done" && inBackground.has(call.toolCallId),
+  ).length
 
   const summary = [
     counted(calls.length, "tool call"),
     counted(parts.length - calls.length, "thought"),
     failed === 0 ? null : `${failed} failed`,
+    background === 0 ? null : `${background} in the background`,
   ]
     .filter(Predicate.isString)
     .join(", ")
@@ -876,9 +878,7 @@ function Steps(props: { steps: ReadonlyArray<NestedPart> }) {
     <Trace>
       <TraceCollapsible>
         <TraceCollapsibleTrigger>
-          <TraceLine
-            status={runningCall(parts, inBackground) === undefined ? undefined : "running"}
-          >
+          <TraceLine status={runningCall(parts) === undefined ? undefined : "running"}>
             <TraceIcon>
               <Layers />
             </TraceIcon>

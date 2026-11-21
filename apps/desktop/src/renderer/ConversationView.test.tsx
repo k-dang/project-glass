@@ -863,6 +863,39 @@ it("folds a run of steps into one line naming the tool call still running", asyn
   expect(within(transcript).queryByRole("button", { name: "Done: Read read-1" })).toBeNull()
 })
 
+it("counts a run of steps' background work without calling it running once the Turn is done", async () => {
+  mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          queued: [],
+          status: null,
+          agentStatuses: ["Running a command: Run the tests"],
+          backgroundToolCalls: ["bash-1"],
+          turns: [
+            {
+              id: "turn-1",
+              message: "Test it",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+              parts: [ThinkingPart.make({ text: "Run them." }), call("bash-1", "Bash", null)],
+            },
+          ],
+        }),
+      ),
+  })
+
+  const transcript = await screen.findByRole("region", { name: "Transcript" })
+  expect(
+    await within(transcript).findByRole("button", {
+      name: "Worked · 1 tool call, 1 thought, 1 in the background",
+    }),
+  ).toBeTruthy()
+})
+
 it("marks a tool call running in the background until its work ends, then says why the next Turn started", async () => {
   const ended = Deferred.makeUnsafe<void>()
 
