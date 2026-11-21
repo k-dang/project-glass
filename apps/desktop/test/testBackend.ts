@@ -101,7 +101,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         GetQueueWork: () => Effect.succeed(false),
         SetQueueWork: unused,
         GetStorageBreakdown: () => Effect.succeed([]),
-        ListFollowedRepositories: unused,
+        ListFollowedRepositories: () => Effect.succeed([]),
         FollowRepository: unused,
         UnfollowRepository: unused,
         ListSkillPacks: () => Effect.succeed([]),
