@@ -13,11 +13,12 @@ import {
 } from "@glass/contracts"
 import { Context, DateTime, Effect, FileSystem, Layer, Result, Schema } from "effect"
 import { Base64 } from "effect/encoding"
-import { SqlClient } from "effect/sql"
+import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { ActivityLog } from "./ActivityLog"
 import { ServerConfig } from "./ServerConfig"
+import { annotateUnit } from "./wideEvents"
 
 const decodeRows = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -82,6 +83,13 @@ const decodeUploads = (images: ReadonlyArray<ToDoImageUpload>) =>
 
 type ToDoList = Effect.Effect<ReadonlyArray<ToDo>, ToDoError>
 
+export const LinkedCompletion = Schema.Struct({
+  conversationId: Schema.String,
+  completedAt: Schema.DateTimeUtc,
+})
+
+export type LinkedCompletion = typeof LinkedCompletion.Type
+
 export class ToDos extends Context.Service<
   ToDos,
   {
@@ -93,6 +101,14 @@ export class ToDos extends Context.Service<
     readonly attach: (id: number, images: ReadonlyArray<ToDoImageUpload>) => ToDoList
     readonly removeImage: (id: number) => ToDoList
     readonly readImage: (id: number, size: ToDoImageSize) => Effect.Effect<Image, ToDoError>
+    readonly linkConversation: (
+      conversationId: string,
+      toDoIds: ReadonlyArray<number>,
+    ) => Effect.Effect<void, SqlError.SqlError>
+    readonly unlinkConversation: (conversationId: string) => Effect.Effect<void, SqlError.SqlError>
+    readonly completeLinked: (
+      completions: ReadonlyArray<LinkedCompletion>,
+    ) => Effect.Effect<void, ToDoError>
   }
 >()("@glass/server/ToDos") {
   static readonly layer = Layer.effect(
@@ -147,7 +163,7 @@ export class ToDos extends Context.Service<
       const change = <E, R>(statement: Effect.Effect<unknown, E, R>) =>
         statement.pipe(logSaveFailure, Effect.mapError(saveFailed), Effect.andThen(list))
 
-      const changeAndRecord = <E, R>(
+      const record = <E, R>(
         statement: Effect.Effect<ReadonlyArray<unknown>, E, R>,
         activity: (toDo: ActivityToDo) => Activity,
       ) =>
@@ -158,8 +174,12 @@ export class ToDos extends Context.Service<
           Effect.tap(
             Effect.forEach((changed) => activityLog.record(activity(new ActivityToDo(changed)))),
           ),
-          Effect.andThen(list),
         )
+
+      const changeAndRecord = <E, R>(
+        statement: Effect.Effect<ReadonlyArray<unknown>, E, R>,
+        activity: (toDo: ActivityToDo) => Activity,
+      ) => record(statement, activity).pipe(Effect.andThen(list))
 
       const deletePaths = (paths: ReadonlyArray<string>) =>
         Effect.forEach(paths, (path) => fs.remove(path, { force: true }).pipe(Effect.ignore), {
@@ -294,11 +314,19 @@ export class ToDos extends Context.Service<
           const completedAt = yield* now
 
           return yield* changeAndRecord(
-            sql`
-              UPDATE to_do SET completed_at = ${completedAt}
-              WHERE id = ${id} AND completed_at IS NULL
-              RETURNING id, title
-            `,
+            sql.withTransaction(
+              Effect.gen(function* () {
+                const finished = yield* sql`
+                  UPDATE to_do SET completed_at = ${completedAt}
+                  WHERE id = ${id} AND completed_at IS NULL
+                  RETURNING id, title
+                `
+
+                yield* sql`DELETE FROM conversation_to_do WHERE to_do_id = ${id}`
+
+                return finished
+              }),
+            ),
             (toDo) => ToDoDone.make({ toDo }),
           )
         }),
@@ -312,6 +340,7 @@ export class ToDos extends Context.Service<
                   )
 
                   yield* sql`DELETE FROM to_do_image WHERE to_do_id = ${id}`
+                  yield* sql`DELETE FROM conversation_to_do WHERE to_do_id = ${id}`
                   yield* sql`DELETE FROM to_do WHERE id = ${id}`
 
                   return rows
@@ -389,6 +418,46 @@ export class ToDos extends Context.Service<
           ).pipe(Effect.mapError(openFailed))
 
           return { mediaType, data: Base64.encode(bytes) }
+        }),
+        linkConversation: Effect.fn("ToDos.linkConversation")(function* (conversationId, toDoIds) {
+          const linkedAt = yield* now
+
+          yield* sql`
+            INSERT INTO conversation_to_do (conversation_id, to_do_id, linked_at)
+            SELECT ${conversationId}, id, ${linkedAt} FROM to_do
+            WHERE completed_at IS NULL AND ${sql.in("id", toDoIds)}
+          `
+        }),
+        unlinkConversation: Effect.fn("ToDos.unlinkConversation")(function* (conversationId) {
+          yield* sql`DELETE FROM conversation_to_do WHERE conversation_id = ${conversationId}`
+        }),
+        completeLinked: Effect.fn("ToDos.completeLinked")(function* (completions) {
+          const done = yield* record(
+            sql.withTransaction(
+              Effect.forEach(completions, ({ conversationId, completedAt }) => {
+                const at = DateTime.formatIso(completedAt)
+
+                return sql`
+                  UPDATE to_do SET completed_at = ${at}
+                  WHERE completed_at IS NULL AND id IN (
+                    SELECT to_do_id FROM conversation_to_do
+                    WHERE conversation_id = ${conversationId} AND linked_at < ${at}
+                  )
+                  RETURNING id, title
+                `.pipe(
+                  Effect.tap(
+                    () => sql`
+                      DELETE FROM conversation_to_do
+                      WHERE conversation_id = ${conversationId} AND linked_at < ${at}
+                    `,
+                  ),
+                )
+              }).pipe(Effect.map((rows) => rows.flat())),
+            ),
+            (toDo) => ToDoDone.make({ toDo }),
+          )
+
+          yield* annotateUnit({ to_dos_done: done.length })
         }),
       })
     }),
