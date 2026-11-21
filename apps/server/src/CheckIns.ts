@@ -11,7 +11,7 @@ import {
   CheckInTimedOut,
   type CheckInAnswer,
   type CheckInResult,
-  type ConversationError,
+  type ThreadError,
   type FeedbackNote,
 } from "@glass/contracts"
 import {
@@ -58,9 +58,7 @@ interface Waiting {
 
 const refused = (message: string) => () => new CheckInRefused({ message })
 
-const asCheckInError = Effect.mapError(
-  ({ message }: ConversationError) => new CheckInError({ message }),
-)
+const asCheckInError = Effect.mapError(({ message }: ThreadError) => new CheckInError({ message }))
 
 const forAgent = (changes: CheckInChanges) => (note: FeedbackNote) => ({
   ...Struct.pick(note, checkInNoteKeys),
@@ -115,7 +113,7 @@ export class CheckIns extends Context.Service<
         checkInId: string,
         write: (
           owner: NotesOwner,
-        ) => Effect.Effect<{ readonly notes: ReadonlyArray<FeedbackNote> }, ConversationError>,
+        ) => Effect.Effect<{ readonly notes: ReadonlyArray<FeedbackNote> }, ThreadError>,
       ) =>
         waiting(checkInId).pipe(
           Effect.flatMap(({ checkIn }) => write(folderNotes(checkIn.folder)).pipe(asCheckInError)),

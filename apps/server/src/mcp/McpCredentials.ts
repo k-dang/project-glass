@@ -14,11 +14,11 @@ export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()
   session: Schema.String,
 }) {}
 
-export class ConversationCaller extends Schema.TaggedClass<ConversationCaller>()("Conversation", {
-  conversationId: Schema.String,
+export class ThreadCaller extends Schema.TaggedClass<ThreadCaller>()("Thread", {
+  threadId: Schema.String,
 }) {}
 
-export type McpCallerIdentity = GlobalChatCaller | ConversationCaller | OutsideAgentCaller
+export type McpCallerIdentity = GlobalChatCaller | ThreadCaller | OutsideAgentCaller
 
 export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
   "@glass/server/McpCaller",

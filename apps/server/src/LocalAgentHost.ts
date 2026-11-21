@@ -1,4 +1,4 @@
-import { ConversationError, RPC_PATH } from "@glass/contracts"
+import { ThreadError, RPC_PATH } from "@glass/contracts"
 import {
   Context,
   Data,
@@ -35,7 +35,7 @@ import { AgentHostRpcs, hostPort, type HostReplaced, newHostToken } from "./agen
 import { writeDataFile } from "./dataFiles"
 import { followHost, greet } from "./hostJournal"
 import { GlassToolRelay, ToolCallOrigin } from "./mcp/GlassToolRelay"
-import type { ConversationHost } from "./ConversationTurns"
+import type { ThreadHost } from "./ThreadTurns"
 import type { HostClient } from "./Placement"
 import { nodeEntry } from "./processes"
 import { connectRpcClient } from "./rpcSocket"
@@ -52,13 +52,13 @@ class HostGone extends Data.TaggedError("HostGone") {}
 class ReattachTimedOut extends Data.TaggedError("ReattachTimedOut") {}
 
 const lostConnection = (
-  error: RpcClientError.RpcClientError | ConversationError | HostReplaced | HostGone,
+  error: RpcClientError.RpcClientError | ThreadError | HostReplaced | HostGone,
 ) => Predicate.isTagged(error, "RpcClientError")
 
 const unavailable = () =>
-  new ConversationError({
+  new ThreadError({
     message:
-      "Glass couldn't start the process that runs Conversations. Try again; Glass's backend log has the details.",
+      "Glass couldn't start the process that runs Threads. Try again; Glass's backend log has the details.",
   })
 
 const hostUrl = (port: number, path: string) => `http://127.0.0.1:${port}${path}`
@@ -104,11 +104,11 @@ interface Attached {
 export class LocalAgentHost extends Context.Service<
   LocalAgentHost,
   {
-    readonly client: Effect.Effect<HostClient, ConversationError>
+    readonly client: Effect.Effect<HostClient, ThreadError>
     readonly running: Effect.Effect<Option.Option<HostClient>>
     readonly resume: Effect.Effect<Resumed>
     readonly followReattached: Effect.Effect<void>
-    readonly lifetimeOf: (client: ConversationHost) => Effect.Effect<Option.Option<Scope.Scope>>
+    readonly lifetimeOf: (client: ThreadHost) => Effect.Effect<Option.Option<Scope.Scope>>
     readonly subscribeStopped: Effect.Effect<Stream.Stream<void>, never, Scope.Scope>
   }
 >()("@glass/server/LocalAgentHost") {
@@ -181,7 +181,7 @@ export class LocalAgentHost extends Context.Service<
             const host = yield* greet(client)
 
             const savedRows = yield* sql<{ readonly id: string; readonly saved: number }>`
-              SELECT id, journal_saved AS saved FROM conversation WHERE journal_host = ${host}
+              SELECT id, journal_saved AS saved FROM thread WHERE journal_host = ${host}
             `.pipe(Effect.orDie)
 
             const fromOldestKept = { host, saved: 0 }
@@ -191,7 +191,7 @@ export class LocalAgentHost extends Context.Service<
 
             const follow = followHost(client, fromOldestKept, {
               save: transcripts.save,
-              alreadySaved: (conversationId) => alreadySaved.get(conversationId) ?? 0,
+              alreadySaved: (threadId) => alreadySaved.get(threadId) ?? 0,
               relay,
               origin: ToolCallOrigin.ThisDevice(),
               calls: backendScope,
@@ -232,16 +232,14 @@ export class LocalAgentHost extends Context.Service<
       const carriedOn = (client: HostClient) =>
         client.UnacknowledgedTurns().pipe(
           Effect.flatMap((unacknowledged) =>
-            Effect.filter(unacknowledged, ({ conversationId, turnId }) =>
-              transcripts.runningTurn(conversationId).pipe(
+            Effect.filter(unacknowledged, ({ threadId, turnId }) =>
+              transcripts.runningTurn(threadId).pipe(
                 Effect.map((running) => glassStartedNoOtherTurn(running, turnId)),
                 Effect.orElseSucceed(() => false),
               ),
             ),
           ),
-          Effect.map(
-            (kept): CarriedOn => new Set(kept.map(({ conversationId }) => conversationId)),
-          ),
+          Effect.map((kept): CarriedOn => new Set(kept.map(({ threadId }) => threadId))),
         )
 
       const reattach = Effect.gen(function* () {

@@ -3,12 +3,12 @@ import { AgentHostRpcs, failure, HOST_PROTOCOL } from "./protocol"
 import { Changes } from "../Changes"
 import { FolderFiles } from "./FolderFiles"
 import { HostGlassTools } from "./HostGlassTools"
-import { HostConversations } from "./HostConversations"
+import { HostThreads } from "./HostThreads"
 import { Journal } from "./Journal"
 
 export const AgentHostHandlers = AgentHostRpcs.toLayer(
   Effect.gen(function* () {
-    const conversations = yield* HostConversations
+    const threads = yield* HostThreads
     const journal = yield* Journal
     const changes = yield* Changes
     const folderFiles = yield* FolderFiles
@@ -16,34 +16,31 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
 
     return AgentHostRpcs.of({
       Hello: () => Effect.succeed({ host: journal.host, protocol: HOST_PROTOCOL }),
-      ListModels: ({ harness }) => conversations.models(harness),
-      ListCommands: ({ harness, folder, skills }) =>
-        conversations.commands(harness, folder, skills),
-      StartConversation: (start) => conversations.start(start),
-      StartTurn: ({ conversationId, turnId, model, effort, permissionMode, ...message }) =>
-        conversations.startTurn(conversationId, turnId, message, { model, effort, permissionMode }),
-      Steer: ({ conversationId, ...message }) => conversations.steer(conversationId, message),
-      StopTurn: ({ conversationId, turnId }) => conversations.stopTurn(conversationId, turnId),
-      AnswerRequest: ({ conversationId, requestId, answer }) =>
-        conversations.answer(conversationId, requestId, answer),
-      StopConversation: ({ conversationId }) => conversations.stop(conversationId),
+      ListModels: ({ harness }) => threads.models(harness),
+      ListCommands: ({ harness, folder, skills }) => threads.commands(harness, folder, skills),
+      StartThread: (start) => threads.start(start),
+      StartTurn: ({ threadId, turnId, model, effort, permissionMode, ...message }) =>
+        threads.startTurn(threadId, turnId, message, { model, effort, permissionMode }),
+      Steer: ({ threadId, ...message }) => threads.steer(threadId, message),
+      StopTurn: ({ threadId, turnId }) => threads.stopTurn(threadId, turnId),
+      AnswerRequest: ({ threadId, requestId, answer }) =>
+        threads.answer(threadId, requestId, answer),
+      StopThread: ({ threadId }) => threads.stop(threadId),
       GetChanges: ({ folder, baseRef }) =>
-        changes.since(folder, baseRef).pipe(failure("Couldn't read the Conversation's changes.")),
+        changes.since(folder, baseRef).pipe(failure("Couldn't read the Thread's changes.")),
       HasUncommittedChanges: ({ folder }) =>
         changes
           .uncommitted(folder)
-          .pipe(failure("Couldn't check the Conversation's folder for changes.")),
+          .pipe(failure("Couldn't check the Thread's folder for changes.")),
       CurrentBranch: ({ folder }) =>
-        changes.branch(folder).pipe(failure("Couldn't read the Conversation's branch.")),
+        changes.branch(folder).pipe(failure("Couldn't read the Thread's branch.")),
       ListFiles: ({ folder }) =>
-        changes
-          .files(folder)
-          .pipe(failure("Couldn't list the files in the Conversation's folder.")),
+        changes.files(folder).pipe(failure("Couldn't list the files in the Thread's folder.")),
       ExistingFiles: ({ folder, paths }) => folderFiles.existing(folder, paths),
       ReadFile: ({ folder, path }) => folderFiles.read(folder, path),
       WatchJournal: ({ host, after }) => journal.watch(host, after),
       Acknowledge: ({ host, through }) => journal.acknowledge(host, through),
-      UnacknowledgedTurns: () => conversations.unacknowledgedTurns,
+      UnacknowledgedTurns: () => threads.unacknowledgedTurns,
       OfferGlassTools: ({ host, tools }) => glassTools.offer(host, tools),
       WatchToolCalls: ({ host }) => glassTools.watch(host),
       AnswerToolCall: ({ host, callId, result }) => glassTools.answer(host, callId, result),

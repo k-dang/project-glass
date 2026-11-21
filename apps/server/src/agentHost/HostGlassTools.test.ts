@@ -30,7 +30,7 @@ const relay = Effect.gen(function* () {
     }
   })
 
-  const calling = tools.call("conversation", "list_queue", {}).pipe(Effect.forkChild)
+  const calling = tools.call("thread", "list_queue", {}).pipe(Effect.forkChild)
 
   return { tools, host, server: Context.get(context, McpServer.McpServer), watching, calling }
 })
@@ -39,7 +39,7 @@ it.effect("answers a call no backend watches for as not connected", () =>
   Effect.gen(function* () {
     const { tools } = yield* relay
 
-    assert.deepStrictEqual(yield* tools.call("conversation", "list_queue", {}), notConnected)
+    assert.deepStrictEqual(yield* tools.call("thread", "list_queue", {}), notConnected)
   }),
 )
 

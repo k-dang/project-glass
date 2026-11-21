@@ -24,7 +24,7 @@ Three constraints of these CLIs shape the runners and aren't obvious from their 
 
 - **Pi's SDK in a disposable worker process**: needs no installed `pi` and controls the model
   request directly, but it knows only upstream pi's providers, can't read a checkout without tools
-  of Glass's own, and needs its own build entry and process protocol. pi Conversations already need
+  of Glass's own, and needs its own build entry and process protocol. pi Threads already need
   the installed `pi` (ADR 0007), so Glass dropped it for the pi CLI.
 
 ## Revisit when

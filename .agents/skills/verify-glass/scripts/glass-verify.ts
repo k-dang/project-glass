@@ -39,8 +39,8 @@ const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <
                                          Claude Code and pi are off unless --real-agents, which may
                                          incur model charges
                                          --backend fake runs pnpm dev:fake's backend and its demo
-                                         Conversations; it brings its own fake GitHub and providers, and
-                                         runs Claude Code Conversations on the pinned claude against a
+                                         Threads; it brings its own fake GitHub and providers, and
+                                         runs Claude Code Threads on the pinned claude against a
                                          fake Anthropic API
   doctor                                 read-only health check of the run
   text                                   print the window's visible text
@@ -398,7 +398,7 @@ const launch = async (options: {
   delete env["VITE_DEV_SERVER_URL"]
   if (fakeBackend) {
     env["GLASS_FAKE_BACKEND"] = "1"
-    console.log("Backend: fake, with demo PRs and Conversations. Ask a demo pi Conversation to work slowly to keep its Turn running.")
+    console.log("Backend: fake, with demo PRs and Threads. Ask a demo pi Thread to work slowly to keep its Turn running.")
   }
 
   let fake: RunState["fake"]
@@ -787,7 +787,7 @@ const main = async () => {
         }
         try {
           if (values.sweep) {
-            const areas = ["Dashboard", "Reviews", "To-dos", "Conversations", "Activity", "Settings"]
+            const areas = ["Dashboard", "Reviews", "To-dos", "Threads", "Activity", "Settings"]
             for (const [index, area] of [...areas, "Dashboard"].entries()) {
               const label = index === areas.length ? "Dashboard again" : area
               await clickElement(page, "link", area)

@@ -18,13 +18,13 @@ Read at pi commit `3e23dd9` (2026-11-13), pi-durable 1.5.2 on npm; Glass at `587
   Cloudflare Durable Objects, or a custom `Storage` (`src/types.ts`). One writer per storage, no
   cross-process locking.
 - Busy conversations queue input in `pi.inbox`: follow-up, `whenBusy: "steer"`, reject, withdraw
-  with `submission.abort()`. `conversation.abort()` stops the current work.
+  with `submission.abort()`. `thread.abort()` stops the current work.
 - No `ctx.ui.*`. Asking the person is a durable signal (`defineSignal`, `harness.signal(...)`;
   examples 39, 44), still under Unreleased in the CHANGELOG and not in 1.5.2.
 - No MCP integration; MCP tools are a bridge the host writes (README).
-- Consumers read committed state through `conversation.watch()`; a reconnecting client gets the
-  current view plus pagination via `ConversationTranscript`, not a replay (examples 18, 20).
-- Model is per-conversation `configure({ model, thinkingLevel })`, applied from the next request.
+- Consumers read committed state through `thread.watch()`; a reconnecting client gets the
+  current view plus pagination via `ThreadTranscript`, not a replay (examples 18, 20).
+- Model is per-thread `configure({ model, thinkingLevel })`, applied from the next request.
 - Example 22 (subagent-background) is the closest shape to the Global chat: one tool spawns
   and messages persistent child conversations and posts their answers back, surviving a restart.
 - Coding-agent extensions can't run under the Harness ([#10386](https://github.com/earendil-works/pi/issues/10386)).
@@ -44,9 +44,9 @@ Read at pi commit `3e23dd9` (2026-11-13), pi-durable 1.5.2 on npm; Glass at `587
 - Glass's tools reach pi through the backend MCP endpoint and a per-start credential (ADR 0013,
   `apps/server/src/agentHost/piGlassTools.ts`, `apps/server/src/mcp/McpCredentials.ts`).
 - Global-specific code is about 700 lines; about 4,900 lines are shared with Agents
-  (`ConversationTurns`, `Transcripts`, `HostAgents`, `piAdapter`/`piRpc`/`piTurn`).
+  (`ThreadTurns`, `Transcripts`, `HostAgents`, `piAdapter`/`piRpc`/`piTurn`).
 - On quit or host crash the Turn ends Interrupted or CutOff, a waiting Question is lost, and
-  queued messages wait for the user (`ConversationTurns.ts`, `conversationState.ts`).
+  queued messages wait for the user (`ThreadTurns.ts`, `threadState.ts`).
 
 ## Why not now
 

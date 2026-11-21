@@ -32,11 +32,11 @@ test("keeps one Global chat over every area, answered by pi without a Local chec
   await expect(chat).toBeHidden()
   await expect(heading).toBeVisible()
 
-  await window.getByRole("link", { name: "Conversations" }).click()
+  await window.getByRole("link", { name: "Threads" }).click()
   await window.keyboard.press("ControlOrMeta+j")
   await expect(chat.getByText("Fake reply to: Hello there")).toBeVisible()
   await expect(
-    window.getByRole("navigation", { name: "Conversations list" }).getByRole("link"),
+    window.getByRole("navigation", { name: "Threads list" }).getByRole("link"),
   ).toHaveCount(0)
   expect(existsSync(join(home, ".project-glass", "worktrees"))).toBe(false)
 
@@ -103,14 +103,14 @@ test("reads the PR in view through Glass's tools, keeping that PR after navigati
   await window.getByRole("link", { name: "To-dos" }).click()
   await window.getByRole("button", { name: "Global chat" }).click()
 
-  await expect(chat.getByText("No PR or Conversation in view")).toBeVisible()
+  await expect(chat.getByText("No PR or Thread in view")).toBeVisible()
   await expect(chat.getByText(`From ${reference} at h1`)).toBeVisible()
   await expect(chat.getByText("read_pull_request")).toBeVisible()
   await expect(chat.getByText(/The fake model saw: .*"title":"Greet by name"/)).toBeVisible()
   await expect(chat).toContainText(/Done in/)
 })
 
-test("starts a Conversation through Glass's tools, which appears in Conversations and runs its first Turn", async ({
+test("starts a Thread through Glass's tools, which appears in Threads and runs its first Turn", async ({
   app,
   home,
   window,
@@ -121,27 +121,27 @@ test("starts a Conversation through Glass's tools, which appears in Conversation
     dialog.showOpenDialog = () => Promise.resolve({ canceled: false, filePaths: [folder] })
   }, checkout)
 
-  await window.getByRole("link", { name: "Conversations" }).click()
+  await window.getByRole("link", { name: "Threads" }).click()
   await window.getByRole("combobox", { name: "Repository" }).click()
   await window.getByRole("option", { name: "Choose folder…" }).click()
   await expect(
     window
-      .getByRole("region", { name: "New Conversation" })
+      .getByRole("region", { name: "New Thread" })
       .getByRole("combobox", { name: "Base branch" }),
   ).toContainText("main")
 
   await window.getByRole("button", { name: "Global chat" }).click()
   const chat = window.getByRole("dialog", { name: "Global chat" })
   const message = chat.getByRole("textbox", { name: "Message" })
-  await message.fill("Start a Conversation in glass-demo/greeter from main: Say hello")
+  await message.fill("Start a Thread in glass-demo/greeter from main: Say hello")
   await message.press("Enter")
 
-  await expect(chat.getByText("create_conversation")).toBeVisible()
+  await expect(chat.getByText("create_thread")).toBeVisible()
   await expect(chat.getByText(/The fake model saw: .*"baseBranch":"main"/)).toBeVisible()
   await expect(chat).toContainText(/Done in/)
   await chat.getByRole("button", { name: "Close the Global chat" }).click()
 
-  const created = window.getByRole("navigation", { name: "Conversations list" }).getByRole("link")
+  const created = window.getByRole("navigation", { name: "Threads list" }).getByRole("link")
   await expect(created).toHaveCount(1)
   await created.click()
   await expect(

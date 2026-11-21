@@ -10,7 +10,7 @@ import {
   type Turn,
 } from "@glass/contracts"
 import { Effect } from "effect"
-import { HostConversationError } from "./protocol"
+import { HostThreadError } from "./protocol"
 
 const settledEvent = (
   turn: Turn,
@@ -35,6 +35,6 @@ export const settleWith = (part: RequestPart, answer: RequestAnswer) =>
     const settled = answerRequest(part, answer)
 
     return settled === undefined
-      ? Effect.fail(new HostConversationError({ message: "That answer doesn't fit the request." }))
+      ? Effect.fail(new HostThreadError({ message: "That answer doesn't fit the request." }))
       : Effect.succeed(settled)
   })

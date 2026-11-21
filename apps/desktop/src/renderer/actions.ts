@@ -2,7 +2,7 @@ import type { LucideIcon } from "lucide-react"
 import { useEffect, useLayoutEffect, useRef } from "react"
 import { type Shortcut, useShortcuts } from "./useShortcuts"
 
-export const actionGroups = ["Pull request", "Conversation", "Go to", "Glass"] as const
+export const actionGroups = ["Pull request", "Thread", "Go to", "Glass"] as const
 
 export type ActionGroup = (typeof actionGroups)[number]
 

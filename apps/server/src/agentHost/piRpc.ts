@@ -2,7 +2,7 @@ import { Deferred, Duration, Effect, Option, Predicate, Queue, Schema, Scope, St
 import { ChildProcessSpawner } from "effect/process"
 import { launchCommand } from "../processes"
 import { piGlassToolsEnvironment } from "./piGlassTools"
-import { type GlassToolsAccess, HostConversationError } from "./protocol"
+import { type GlassToolsAccess, HostThreadError } from "./protocol"
 import { ToolInput } from "./toolCalls"
 
 const PI_STALE_LOCK_WAIT = Duration.seconds(30)
@@ -178,7 +178,7 @@ export const lineFramer = () => {
 export const startPiRpc = Effect.fnUntraced(function* (
   piCommand: string,
   folder: string,
-  conversation?: string,
+  thread?: string,
   flags: ReadonlyArray<string> = [],
   tools?: GlassToolsAccess,
   deliver: (event: PiEvent) => Effect.Effect<void> = () => Effect.void,
@@ -190,12 +190,7 @@ export const startPiRpc = Effect.fnUntraced(function* (
     .spawn(
       launchCommand(
         piCommand,
-        [
-          "--mode",
-          "rpc",
-          ...(conversation === undefined ? [] : ["--session-id", conversation]),
-          ...flags,
-        ],
+        ["--mode", "rpc", ...(thread === undefined ? [] : ["--session-id", thread]), ...flags],
         {
           cwd: folder,
           env: piGlassToolsEnvironment(tools),
@@ -208,11 +203,11 @@ export const startPiRpc = Effect.fnUntraced(function* (
       Effect.tapError((cause) => Effect.logWarning("pi could not start", cause)),
       Effect.mapError((error) =>
         Predicate.isTagged(error.reason, "NotFound")
-          ? new HostConversationError({
+          ? new HostThreadError({
               message:
                 "pi isn't installed. Install it, or set piCommand in Glass's settings.json to its path and restart Glass.",
             })
-          : new HostConversationError({ message: "pi could not start. Check its installation." }),
+          : new HostThreadError({ message: "pi could not start. Check its installation." }),
       ),
     )
 

@@ -258,12 +258,12 @@ describe("ask_user", () => {
 
       yield* needsYou(backend.client, (items) => outside(items).length === 1)
 
-      const [conversation] = yield* backend.client
+      const [thread] = yield* backend.client
         .WatchOutsideAgents()
         .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
-      assert.ok(conversation !== undefined)
-      yield* backend.client.RevokeOutsideAgent({ id: conversation.id })
+      assert.ok(thread !== undefined)
+      yield* backend.client.RevokeOutsideAgent({ id: thread.id })
 
       yield* needsYou(backend.client, (items) => outside(items).length === 0)
 
@@ -326,7 +326,7 @@ describe("ask_user", () => {
     }),
   )
 
-  it.live("refuses a conversation Glass launched", () =>
+  it.live("refuses a Thread Glass launched", () =>
     Effect.gen(function* () {
       const { baseUrl, client, mcpCredentials } = yield* startBackend({})
 

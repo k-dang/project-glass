@@ -1,6 +1,6 @@
 import {
-  Conversation,
-  ConversationError,
+  Thread,
+  ThreadError,
   type AgentEvent,
   endTurnEvents,
   AgentStatusesChanged,
@@ -10,7 +10,7 @@ import {
   Image,
   type MessageDelivery,
   PartAppended,
-  ConversationBusy,
+  ThreadBusy,
   QueuedMessagesChanged,
   QueuedMessage,
   QueuedMessageStarted,
@@ -54,12 +54,12 @@ import {
 import { SqlClient, type SqlError, type Statement } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import {
-  type ConversationEvent,
-  type ConversationState,
-  type ConversationWrite,
+  type ThreadEvent,
+  type ThreadState,
+  type ThreadWrite,
   type StartingTurn,
-  stepConversation,
-} from "./conversationState"
+  stepThread,
+} from "./threadState"
 import type { HostEvent } from "./agentHost/protocol"
 import type { SavedThrough } from "./hostJournal"
 import { recordUnit } from "./wideEvents"
@@ -103,7 +103,7 @@ const decodeParts = Schema.decodeUnknownEffect(
 const decodeRunning = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      conversationId: Schema.String,
+      threadId: Schema.String,
       turnId: Schema.String,
       part: Schema.NullOr(Schema.fromJsonString(TurnPart)),
     }),
@@ -113,7 +113,7 @@ const decodeRunning = Schema.decodeUnknownEffect(
 const decodeWaiting = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
-      conversationId: Schema.String,
+      threadId: Schema.String,
       sentAt: Turn.fields.sentAt,
       part: Schema.fromJsonString(TurnPart),
     }),
@@ -121,9 +121,7 @@ const decodeWaiting = Schema.decodeUnknownEffect(
 )
 
 const decodeEnds = Schema.decodeUnknownEffect(
-  Schema.Array(
-    Schema.Struct({ conversationId: Schema.String, ended: Schema.fromJsonString(TurnEnd) }),
-  ),
+  Schema.Array(Schema.Struct({ threadId: Schema.String, ended: Schema.fromJsonString(TurnEnd) })),
 )
 
 export const StoredMessage = Schema.Struct({ ...SentMessage.fields, images: ImagesJson })
@@ -143,9 +141,9 @@ const decodeEndedTurn = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({
       sentAt: Turn.fields.sentAt,
-      harness: Schema.NullOr(Conversation.fields.harness),
-      model: Schema.NullOr(Conversation.fields.model),
-      effort: Schema.NullOr(Conversation.fields.effort),
+      harness: Schema.NullOr(Thread.fields.harness),
+      model: Schema.NullOr(Thread.fields.model),
+      effort: Schema.NullOr(Thread.fields.effort),
       sandboxProvider: Schema.NullOr(Schema.String),
       toolCalls: Schema.Int,
       failedToolCalls: Schema.Int,
@@ -170,7 +168,7 @@ const decodePositions = Schema.decodeUnknownEffect(
 export const RECENT_TURNS = 20
 
 interface Published {
-  readonly conversationId: string
+  readonly threadId: string
   readonly update: TranscriptUpdate
   readonly reported?: boolean
 }
@@ -180,11 +178,11 @@ export interface WaitingRequest {
   readonly since: DateTime.Utc
 }
 
-export type WaitingByConversation = ReadonlyMap<string, Arr.NonEmptyReadonlyArray<WaitingRequest>>
+export type WaitingByThread = ReadonlyMap<string, Arr.NonEmptyReadonlyArray<WaitingRequest>>
 
-export type UnseenByConversation = ReadonlyMap<string, TurnEnd>
+export type UnseenByThread = ReadonlyMap<string, TurnEnd>
 
-export type StartedTurn = typeof TurnStarted.Type & { readonly conversationId: string }
+export type StartedTurn = typeof TurnStarted.Type & { readonly threadId: string }
 
 export type IdleTurn = Omit<StartingTurn, "id" | "feedback">
 
@@ -233,8 +231,8 @@ const isStorageError = <E>(cause: E): cause is Extract<E, StorageError> =>
   Predicate.isTagged(cause, "SqlError") || Predicate.isTagged(cause, "SchemaError")
 
 const storageFailure = () =>
-  new ConversationError({
-    message: "Couldn't read or save the Conversation's transcript. Try again.",
+  new ThreadError({
+    message: "Couldn't read or save the Thread's transcript. Try again.",
   })
 
 const queuedAgain = (inputs: ReadonlyArray<MessageWithContext>): ReadonlyArray<QueuedMessage> =>
@@ -246,84 +244,71 @@ export class Transcripts extends Context.Service<
   Transcripts,
   {
     readonly save: (
-      conversationId: string,
+      threadId: string,
       events: ReadonlyArray<HostEvent>,
       journal?: SavedThrough,
-    ) => Effect.Effect<void, ConversationError>
-    readonly watch: (conversationId: string) => Stream.Stream<TranscriptUpdate, ConversationError>
-    readonly read: (
-      conversationId: string,
-      turns?: number,
-    ) => Effect.Effect<Transcript, ConversationError>
-    readonly loadEarlier: (
-      conversationId: string,
-      before: string,
-    ) => Effect.Effect<void, ConversationError>
+    ) => Effect.Effect<void, ThreadError>
+    readonly watch: (threadId: string) => Stream.Stream<TranscriptUpdate, ThreadError>
+    readonly read: (threadId: string, turns?: number) => Effect.Effect<Transcript, ThreadError>
+    readonly loadEarlier: (threadId: string, before: string) => Effect.Effect<void, ThreadError>
     readonly endRunning: (
       ending: TurnEnding,
-      conversationIds: ReadonlyArray<string>,
-    ) => Effect.Effect<void, ConversationError>
+      threadIds: ReadonlyArray<string>,
+    ) => Effect.Effect<void, ThreadError>
     readonly endTurn: (
       ending: TurnEnding,
-      conversationId: string,
+      threadId: string,
       turnId: string,
-    ) => Effect.Effect<void, ConversationError>
+    ) => Effect.Effect<void, ThreadError>
     readonly askedToStop: (turnId: string) => Effect.Effect<void>
-    readonly runningTurn: (
-      conversationId: string,
-    ) => Effect.Effect<string | null, ConversationError>
-    readonly idle: (conversationId: string) => Effect.Effect<boolean, ConversationError>
+    readonly runningTurn: (threadId: string) => Effect.Effect<string | null, ThreadError>
+    readonly idle: (threadId: string) => Effect.Effect<boolean, ThreadError>
     readonly startIfIdle: (
-      conversationId: string,
+      threadId: string,
       turn: IdleTurn,
-      record: (turnId: string) => Effect.Effect<void, ConversationError>,
-    ) => Effect.Effect<void, ConversationError>
+      record: (turnId: string) => Effect.Effect<void, ThreadError>,
+    ) => Effect.Effect<void, ThreadError>
     readonly settleUndelivered: (
-      conversationId: string,
+      threadId: string,
       turnId: string,
       reason: string,
-    ) => Effect.Effect<"failed" | "pending", ConversationError>
+    ) => Effect.Effect<"failed" | "pending", ThreadError>
     readonly retryDeliveries: (
-      conversationIds: ReadonlyArray<string>,
-    ) => Effect.Effect<ReadonlyArray<StartedTurn>, ConversationError>
-    readonly runningMessage: (
-      conversationId: string,
-    ) => Effect.Effect<string | null, ConversationError>
+      threadIds: ReadonlyArray<string>,
+    ) => Effect.Effect<ReadonlyArray<StartedTurn>, ThreadError>
+    readonly runningMessage: (threadId: string) => Effect.Effect<string | null, ThreadError>
     readonly startOrQueue: (
-      conversationId: string,
+      threadId: string,
       input: MessageWithContext,
-      feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, ConversationError>,
-    ) => Effect.Effect<MessageDelivery, ConversationError>
+      feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>,
+    ) => Effect.Effect<MessageDelivery, ThreadError>
     readonly prependQueued: (
-      conversationId: string,
+      threadId: string,
       inputs: ReadonlyArray<MessageWithContext>,
-    ) => Effect.Effect<void, ConversationError>
+    ) => Effect.Effect<void, ThreadError>
     readonly cancelQueued: (
-      conversationId: string,
+      threadId: string,
       queuedId: string,
-      restore?: (feedback: ReadonlyArray<FeedbackNote>) => Effect.Effect<void, ConversationError>,
-    ) => Effect.Effect<void, QueuedMessageStarted | ConversationError>
+      restore?: (feedback: ReadonlyArray<FeedbackNote>) => Effect.Effect<void, ThreadError>,
+    ) => Effect.Effect<void, QueuedMessageStarted | ThreadError>
     readonly startQueued: (
-      conversationId: string,
+      threadId: string,
       queuedId: string,
-    ) => Effect.Effect<void, ConversationBusy | ConversationError>
+    ) => Effect.Effect<void, ThreadBusy | ThreadError>
     readonly subscribeStarted: Effect.Effect<Stream.Stream<StartedTurn>, never, Scope.Scope>
     readonly subscribeEnded: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>
     readonly subscribeMaybeIdle: Effect.Effect<Stream.Stream<string>, never, Scope.Scope>
     readonly lastEnds: (
-      conversationIds: ReadonlyArray<string>,
-    ) => Effect.Effect<ReadonlyMap<string, TurnEnd>, ConversationError>
-    readonly waiting: Stream.Stream<WaitingByConversation>
-    readonly waitingNow: Effect.Effect<WaitingByConversation>
-    readonly isWaiting: (conversationId: string) => Effect.Effect<boolean>
-    readonly unseen: Stream.Stream<UnseenByConversation>
+      threadIds: ReadonlyArray<string>,
+    ) => Effect.Effect<ReadonlyMap<string, TurnEnd>, ThreadError>
+    readonly waiting: Stream.Stream<WaitingByThread>
+    readonly waitingNow: Effect.Effect<WaitingByThread>
+    readonly isWaiting: (threadId: string) => Effect.Effect<boolean>
+    readonly unseen: Stream.Stream<UnseenByThread>
     readonly running: Stream.Stream<ReadonlySet<string>>
-    readonly markSeen: (
-      conversationId: string,
-      endedAt: DateTime.Utc,
-    ) => Effect.Effect<void, ConversationError>
-    readonly setStatus: (conversationId: string, status: string | null) => Effect.Effect<void>
-    readonly remove: (conversationId: string) => Effect.Effect<void, ConversationError>
+    readonly markSeen: (threadId: string, endedAt: DateTime.Utc) => Effect.Effect<void, ThreadError>
+    readonly setStatus: (threadId: string, status: string | null) => Effect.Effect<void>
+    readonly remove: (threadId: string) => Effect.Effect<void, ThreadError>
   }
 >()("@glass/server/Transcripts") {
   static readonly layer = Layer.effect(
@@ -335,27 +320,27 @@ export class Transcripts extends Context.Service<
       const statuses = new Map<string, string>()
       const agentStatuses = new Map<string, AgentStatusesChanged>()
 
-      const setAgentStatuses = (conversationId: string, shown: AgentStatusesChanged) =>
-        lockFor(conversationId).withPermits(1)(
+      const setAgentStatuses = (threadId: string, shown: AgentStatusesChanged) =>
+        lockFor(threadId).withPermits(1)(
           Effect.suspend(() => {
             const cleared =
               shown.agentStatuses.length === 0 && shown.backgroundToolCalls.length === 0
 
-            if (cleared && !agentStatuses.has(conversationId)) return Effect.void
+            if (cleared && !agentStatuses.has(threadId)) return Effect.void
 
-            if (cleared) agentStatuses.delete(conversationId)
-            else agentStatuses.set(conversationId, shown)
+            if (cleared) agentStatuses.delete(threadId)
+            else agentStatuses.set(threadId, shown)
 
-            return PubSub.publish(published, { conversationId, update: shown })
+            return PubSub.publish(published, { threadId, update: shown })
           }),
         )
 
-      const waitingParts = (conversationId?: string) =>
+      const waitingParts = (threadId?: string) =>
         sql`
-          SELECT t.conversation_id AS conversationId, t.sent_at AS sentAt, p.part AS part
-          FROM conversation_turn_part p JOIN conversation_turn t ON t.id = p.turn_id
+          SELECT t.thread_id AS threadId, t.sent_at AS sentAt, p.part AS part
+          FROM thread_turn_part p JOIN thread_turn t ON t.id = p.turn_id
           WHERE ${sql.and([
-            ...(conversationId === undefined ? [] : [sql`t.conversation_id = ${conversationId}`]),
+            ...(threadId === undefined ? [] : [sql`t.thread_id = ${threadId}`]),
             sql`json_extract(p.part, '$._tag') IN ${sql.in(requestPartTags)}`,
             "json_extract(p.part, '$.status') = 'waiting'",
           ])}
@@ -363,8 +348,8 @@ export class Transcripts extends Context.Service<
         `.pipe(
           Effect.flatMap(decodeWaiting),
           Effect.map((rows) =>
-            rows.flatMap(({ conversationId: owner, sentAt, part }) =>
-              isWaiting(part) ? [{ conversationId: owner, sentAt, part }] : [],
+            rows.flatMap(({ threadId: owner, sentAt, part }) =>
+              isWaiting(part) ? [{ threadId: owner, sentAt, part }] : [],
             ),
           ),
         )
@@ -375,26 +360,23 @@ export class Transcripts extends Context.Service<
         ),
       )
 
-      const waiting = yield* SubscriptionRef.make<WaitingByConversation>(
+      const waiting = yield* SubscriptionRef.make<WaitingByThread>(
         new Map(
-          Object.entries(Arr.groupBy(seeded, ({ conversationId }) => conversationId)).map(
-            ([conversationId, rows]) =>
-              [
-                conversationId,
-                Arr.map(rows, ({ part, sentAt }) => ({ part, since: sentAt })),
-              ] as const,
+          Object.entries(Arr.groupBy(seeded, ({ threadId }) => threadId)).map(
+            ([threadId, rows]) =>
+              [threadId, Arr.map(rows, ({ part, sentAt }) => ({ part, since: sentAt }))] as const,
           ),
         ),
       )
 
       const markWaiting = Effect.fnUntraced(function* (
-        conversationId: string,
+        threadId: string,
         parts: ReadonlyArray<RequestPart>,
       ) {
         const now = yield* DateTime.now
 
         yield* SubscriptionRef.update(waiting, (current) => {
-          const before = current.get(conversationId) ?? []
+          const before = current.get(threadId) ?? []
 
           const requests = parts.map((part) => ({
             part,
@@ -404,8 +386,8 @@ export class Transcripts extends Context.Service<
 
           const next = new Map(current)
 
-          if (Arr.isReadonlyArrayNonEmpty(requests)) next.set(conversationId, requests)
-          else next.delete(conversationId)
+          if (Arr.isReadonlyArrayNonEmpty(requests)) next.set(threadId, requests)
+          else next.delete(threadId)
 
           return next
         })
@@ -413,34 +395,34 @@ export class Transcripts extends Context.Service<
 
       const lastEnds = (conditions: ReadonlyArray<string | Statement.Fragment>) =>
         sql`
-          SELECT a.id AS conversationId, t.ended AS ended
+          SELECT a.id AS threadId, t.ended AS ended
           FROM (
-            SELECT id, turn_seen_at FROM conversation
+            SELECT id, turn_seen_at FROM thread
             UNION ALL SELECT id, turn_seen_at FROM global_chat_session WHERE ended_at IS NULL
           ) a
-          JOIN conversation_turn t ON t.rowid = (SELECT MAX(rowid) FROM conversation_turn WHERE conversation_id = a.id)
+          JOIN thread_turn t ON t.rowid = (SELECT MAX(rowid) FROM thread_turn WHERE thread_id = a.id)
           WHERE ${sql.and(["t.ended IS NOT NULL", ...conditions])}
         `.pipe(Effect.flatMap(decodeEnds))
 
-      const unseenEnds = (conversationId?: string) =>
+      const unseenEnds = (threadId?: string) =>
         lastEnds([
-          ...(conversationId === undefined ? [] : [sql`a.id = ${conversationId}`]),
+          ...(threadId === undefined ? [] : [sql`a.id = ${threadId}`]),
           "(a.turn_seen_at IS NULL OR json_extract(t.ended, '$.at') > a.turn_seen_at)",
         ])
 
-      const unseen = yield* SubscriptionRef.make<UnseenByConversation>(
+      const unseen = yield* SubscriptionRef.make<UnseenByThread>(
         new Map(
           (yield* unseenEnds().pipe(
             Effect.catch((cause) =>
               Effect.logWarning("Couldn't read the unseen Turns", cause).pipe(Effect.as([])),
             ),
-          )).map(({ conversationId, ended }) => [conversationId, ended] as const),
+          )).map(({ threadId, ended }) => [threadId, ended] as const),
         ),
       )
 
-      const setUnseen = (conversationId: string, ended: TurnEnd | undefined) =>
+      const setUnseen = (threadId: string, ended: TurnEnd | undefined) =>
         SubscriptionRef.updateSome(unseen, (current) => {
-          const before = current.get(conversationId)
+          const before = current.get(threadId)
 
           if (
             before === undefined
@@ -451,20 +433,18 @@ export class Transcripts extends Context.Service<
 
           const next = new Map(current)
 
-          if (ended === undefined) next.delete(conversationId)
-          else next.set(conversationId, ended)
+          if (ended === undefined) next.delete(threadId)
+          else next.set(threadId, ended)
 
           return Option.some(next)
         })
 
-      const refreshUnseen = (conversationId: string) =>
-        unseenEnds(conversationId).pipe(
-          Effect.flatMap(([row]) => setUnseen(conversationId, row?.ended)),
-        )
+      const refreshUnseen = (threadId: string) =>
+        unseenEnds(threadId).pipe(Effect.flatMap(([row]) => setUnseen(threadId, row?.ended)))
 
-      const runningConversations = yield* SubscriptionRef.make<ReadonlySet<string>>(
+      const runningThreads = yield* SubscriptionRef.make<ReadonlySet<string>>(
         new Set(
-          (yield* sql`SELECT DISTINCT conversation_id AS id FROM conversation_turn WHERE ended IS NULL`.pipe(
+          (yield* sql`SELECT DISTINCT thread_id AS id FROM thread_turn WHERE ended IS NULL`.pipe(
             Effect.flatMap(decodeTurnIds),
             Effect.catch((cause) =>
               Effect.logWarning("Couldn't read the running Turns", cause).pipe(Effect.as([])),
@@ -473,21 +453,21 @@ export class Transcripts extends Context.Service<
         ),
       )
 
-      const setRunning = (conversationId: string, isRunning: boolean) =>
-        SubscriptionRef.updateSome(runningConversations, (current) => {
-          if (current.has(conversationId) === isRunning) return Option.none()
+      const setRunning = (threadId: string, isRunning: boolean) =>
+        SubscriptionRef.updateSome(runningThreads, (current) => {
+          if (current.has(threadId) === isRunning) return Option.none()
 
           const next = new Set(current)
 
-          if (isRunning) next.add(conversationId)
-          else next.delete(conversationId)
+          if (isRunning) next.add(threadId)
+          else next.delete(threadId)
 
           return Option.some(next)
         })
 
-      const lockFor = (conversationId: string) => {
-        const lock = locks.get(conversationId) ?? Semaphore.makeUnsafe(1)
-        locks.set(conversationId, lock)
+      const lockFor = (threadId: string) => {
+        const lock = locks.get(threadId) ?? Semaphore.makeUnsafe(1)
+        locks.set(threadId, lock)
 
         return lock
       }
@@ -501,7 +481,7 @@ export class Transcripts extends Context.Service<
 
       const failedAlready = (turnId: string) =>
         sql`
-          SELECT id FROM conversation_turn
+          SELECT id FROM thread_turn
           WHERE id = ${turnId} AND json_extract(ended, '$.ending._tag') = 'Failed'
         `.pipe(Effect.map((rows) => rows.length > 0))
 
@@ -511,13 +491,13 @@ export class Transcripts extends Context.Service<
         )
 
       const insertTurn = (
-        conversationId: string,
+        threadId: string,
         { turnId, message, images, context, feedback, sentAt }: typeof TurnStarted.Type,
         retriesDelivery: boolean,
       ) =>
-        sql`INSERT INTO conversation_turn ${sql.insert({
+        sql`INSERT INTO thread_turn ${sql.insert({
           id: turnId,
-          conversation_id: conversationId,
+          thread_id: threadId,
           message,
           images: encodeImages(images),
           context: encodeContext(context),
@@ -526,15 +506,15 @@ export class Transcripts extends Context.Service<
           retries_delivery: retriesDelivery ? 1 : 0,
         })}`.pipe(Effect.as(true))
 
-      const writeApplied = (conversationId: string, event: AgentEvent) =>
+      const writeApplied = (threadId: string, event: AgentEvent) =>
         Match.value(event).pipe(
           Match.tagsExhaustive({
-            TurnStarted: (started) => insertTurn(conversationId, started, false),
+            TurnStarted: (started) => insertTurn(threadId, started, false),
             PartSet: ({ turnId, index, part }) =>
               unlessFailed(
                 turnId,
                 sql`
-                  INSERT INTO conversation_turn_part ${sql.insert({ turn_id: turnId, position: index, part: encodePart(part) })}
+                  INSERT INTO thread_turn_part ${sql.insert({ turn_id: turnId, position: index, part: encodePart(part) })}
                   ON CONFLICT (turn_id, position) DO UPDATE SET part = excluded.part
                 `.pipe(Effect.as(true)),
               ),
@@ -542,7 +522,7 @@ export class Transcripts extends Context.Service<
               unlessFailed(
                 turnId,
                 sql`
-                  UPDATE conversation_turn_part
+                  UPDATE thread_turn_part
                   SET part = json_set(part, '$.text', json_extract(part, '$.text') || ${text})
                   WHERE turn_id = ${turnId} AND position = ${index}
                 `.pipe(Effect.as(true)),
@@ -557,7 +537,7 @@ export class Transcripts extends Context.Service<
                 conditions.push(sql`retries_delivery = 0`)
 
               return sql`
-                UPDATE conversation_turn SET ended = ${encodeEnd(ended)}
+                UPDATE thread_turn SET ended = ${encodeEnd(ended)}
                 WHERE ${sql.and(conditions)}
                 RETURNING id
               `.pipe(Effect.map((rows) => rows.length > 0))
@@ -565,27 +545,27 @@ export class Transcripts extends Context.Service<
           }),
         )
 
-      const runningTurn = (conversationId: string) =>
-        sql`SELECT id FROM conversation_turn WHERE conversation_id = ${conversationId} AND ended IS NULL`.pipe(
+      const runningTurn = (threadId: string) =>
+        sql`SELECT id FROM thread_turn WHERE thread_id = ${threadId} AND ended IS NULL`.pipe(
           Effect.flatMap(decodeTurnIds),
           Effect.map(([turn]) => turn?.id ?? null),
         )
 
-      const queued = (conversationId: string) =>
+      const queued = (threadId: string) =>
         sql`
-          SELECT id, message, images, context, feedback FROM conversation_queued_message
-          WHERE conversation_id = ${conversationId} ORDER BY position
+          SELECT id, message, images, context, feedback FROM thread_queued_message
+          WHERE thread_id = ${threadId} ORDER BY position
         `.pipe(Effect.flatMap(decodeQueued))
 
-      const queuedChanged = (conversationId: string) =>
-        queued(conversationId).pipe(
+      const queuedChanged = (threadId: string) =>
+        queued(threadId).pipe(
           Effect.map((current) => QueuedMessagesChanged.make({ queued: current })),
         )
 
-      const insertQueued = (conversationId: string, position: number, input: QueuedMessage) =>
-        sql`INSERT INTO conversation_queued_message ${sql.insert({
+      const insertQueued = (threadId: string, position: number, input: QueuedMessage) =>
+        sql`INSERT INTO thread_queued_message ${sql.insert({
           id: input.id,
-          conversation_id: conversationId,
+          thread_id: threadId,
           position,
           message: input.message,
           images: encodeImages(input.images),
@@ -593,18 +573,18 @@ export class Transcripts extends Context.Service<
           feedback: encodeFeedback(input.feedback),
         })}`
 
-      const queuedPositions = (conversationId: string) =>
+      const queuedPositions = (threadId: string) =>
         sql`
           SELECT MIN(position) AS first, MAX(position) AS last
-          FROM conversation_queued_message WHERE conversation_id = ${conversationId}
+          FROM thread_queued_message WHERE thread_id = ${threadId}
         `.pipe(
           Effect.flatMap(decodePositions),
           Effect.map(([found]) => ({ first: found?.first ?? 0, last: found?.last ?? 0 })),
         )
 
       const execute = Effect.fnUntraced(function* (
-        conversationId: string,
-        writes: ReadonlyArray<ConversationWrite>,
+        threadId: string,
+        writes: ReadonlyArray<ThreadWrite>,
       ) {
         const started: Array<TranscriptUpdate> = []
 
@@ -620,80 +600,80 @@ export class Transcripts extends Context.Service<
                 sentAt: yield* DateTime.now,
               })
 
-              yield* insertTurn(conversationId, event, write.message.retriesDelivery)
+              yield* insertTurn(threadId, event, write.message.retriesDelivery)
               started.push(event)
               break
             }
 
             case "enqueue":
               yield* insertQueued(
-                conversationId,
-                (yield* queuedPositions(conversationId)).last + 1,
+                threadId,
+                (yield* queuedPositions(threadId)).last + 1,
                 write.message,
               )
               break
             case "prepend": {
-              const start = (yield* queuedPositions(conversationId)).first - write.messages.length
+              const start = (yield* queuedPositions(threadId)).first - write.messages.length
 
               yield* Effect.forEach(
                 write.messages,
-                (message, index) => insertQueued(conversationId, start + index, message),
+                (message, index) => insertQueued(threadId, start + index, message),
                 { discard: true },
               )
               break
             }
 
             case "dequeue":
-              yield* sql`DELETE FROM conversation_queued_message WHERE id = ${write.queuedId}`
+              yield* sql`DELETE FROM thread_queued_message WHERE id = ${write.queuedId}`
               break
           }
 
         return writes.some(({ type }) => type !== "startTurn")
-          ? [yield* queuedChanged(conversationId), ...started]
+          ? [yield* queuedChanged(threadId), ...started]
           : started
       })
 
-      const conversation = Effect.fnUntraced(function* (conversationId: string) {
+      const thread = Effect.fnUntraced(function* (threadId: string) {
         return {
-          running: yield* runningTurn(conversationId),
-          queued: yield* queued(conversationId),
-        } satisfies ConversationState
+          running: yield* runningTurn(threadId),
+          queued: yield* queued(threadId),
+        } satisfies ThreadState
       })
 
-      const step = Effect.fnUntraced(function* (conversationId: string, event: ConversationEvent) {
-        const { outcome, writes } = stepConversation(yield* conversation(conversationId), event)
+      const step = Effect.fnUntraced(function* (threadId: string, event: ThreadEvent) {
+        const { outcome, writes } = stepThread(yield* thread(threadId), event)
 
-        return { outcome, updates: yield* execute(conversationId, writes) }
+        return { outcome, updates: yield* execute(threadId, writes) }
       })
 
       const changeWith = <A, E, R>(
-        conversationId: string,
+        threadId: string,
         effect: Effect.Effect<
           readonly [A, ReadonlyArray<TranscriptUpdate>, ReadonlyArray<AgentEvent>?],
           E,
           R
         >,
       ) =>
-        lockFor(conversationId).withPermits(1)(
+        lockFor(threadId).withPermits(1)(
           Effect.gen(function* () {
             const [decided, decidedUpdates, reported = []] = yield* sql.withTransaction(effect)
             const updates: ReadonlyArray<TranscriptUpdate> = [...reported, ...decidedUpdates]
 
             if (updates.some(changesRequest))
               yield* markWaiting(
-                conversationId,
-                (yield* waitingParts(conversationId)).map(({ part }) => part),
+                threadId,
+                (yield* waitingParts(threadId)).map(({ part }) => part),
               )
 
             if (updates.some(startsOrEndsTurn)) {
-              yield* refreshUnseen(conversationId)
-              yield* setRunning(conversationId, (yield* runningTurn(conversationId)) !== null)
+              yield* refreshUnseen(threadId)
+              yield* setRunning(threadId, (yield* runningTurn(threadId)) !== null)
             }
 
             yield* PubSub.publishAll(
               published,
               updates.map((update, index) => ({
-                conversationId,
+                threadId,
                 update,
                 reported: index < reported.length,
               })),
@@ -704,16 +684,16 @@ export class Transcripts extends Context.Service<
         )
 
       const change = <E, R>(
-        conversationId: string,
+        threadId: string,
         effect: Effect.Effect<ReadonlyArray<TranscriptUpdate>, E, R>,
       ) =>
         changeWith(
-          conversationId,
+          threadId,
           Effect.map(effect, (updates) => [undefined, updates] as const),
         )
 
       const recordTurn = Effect.fnUntraced(function* (
-        conversationId: string,
+        threadId: string,
         { turnId, ended: { at, ending } }: typeof TurnEnded.Type,
       ) {
         const [turn] = yield* sql`
@@ -721,9 +701,9 @@ export class Transcripts extends Context.Service<
             t.sent_at AS sentAt, a.harness, a.model, a.effort, a.sandbox_provider AS sandboxProvider,
             COUNT(p.turn_id) AS toolCalls,
             COUNT(CASE json_extract(p.part, '$.status') WHEN 'failed' THEN 1 END) AS failedToolCalls
-          FROM conversation_turn t
-          LEFT JOIN conversation a ON a.id = t.conversation_id
-          LEFT JOIN conversation_turn_part p
+          FROM thread_turn t
+          LEFT JOIN thread a ON a.id = t.thread_id
+          LEFT JOIN thread_turn_part p
             ON p.turn_id = t.id AND json_extract(p.part, '$._tag') = 'ToolCall'
           WHERE t.id = ${turnId}
           GROUP BY t.id
@@ -736,7 +716,7 @@ export class Transcripts extends Context.Service<
           endedAt: at,
           exit: turnExit(ending),
           fields: {
-            conversation_id: conversationId,
+            thread_id: threadId,
             turn_id: turnId,
             ending: ending._tag,
             harness: turn.harness,
@@ -750,7 +730,7 @@ export class Transcripts extends Context.Service<
       })
 
       const save = (
-        conversationId: string,
+        threadId: string,
         hostEvents: ReadonlyArray<HostEvent>,
         journal?: SavedThrough,
       ) => {
@@ -763,16 +743,16 @@ export class Transcripts extends Context.Service<
         )
 
         return changeWith(
-          conversationId,
+          threadId,
           Effect.gen(function* () {
             if (journal !== undefined)
               yield* sql`
-                UPDATE conversation SET journal_host = ${journal.host}, journal_saved = ${journal.through}
-                WHERE id = ${conversationId}
+                UPDATE thread SET journal_host = ${journal.host}, journal_saved = ${journal.through}
+                WHERE id = ${threadId}
               `
 
             const written = yield* Effect.filter(joinConsecutiveAppends(events), (event) =>
-              writeApplied(conversationId, event),
+              writeApplied(threadId, event),
             )
 
             const ended = written.filter((event) => Predicate.isTagged(event, "TurnEnded"))
@@ -780,7 +760,7 @@ export class Transcripts extends Context.Service<
             const next = yield* Effect.forEach(
               ended,
               ({ ended: { ending }, steersNotTakenIn = [] }) =>
-                step(conversationId, {
+                step(threadId, {
                   type: "turnEnded",
                   ending,
                   requeued: queuedAgain(steersNotTakenIn),
@@ -799,33 +779,31 @@ export class Transcripts extends Context.Service<
           Effect.tapError((cause) => Effect.logWarning("Couldn't save a transcript", cause)),
           Effect.mapError(storageFailure),
           Effect.flatMap((ended) =>
-            Effect.forEach(ended, (event) => recordTurn(conversationId, event), {
+            Effect.forEach(ended, (event) => recordTurn(threadId, event), {
               discard: true,
             }).pipe(
               Effect.catch((cause) => Effect.logWarning("Couldn't describe an ended Turn", cause)),
             ),
           ),
-          Effect.andThen(
-            shown === undefined ? Effect.void : setAgentStatuses(conversationId, shown),
-          ),
+          Effect.andThen(shown === undefined ? Effect.void : setAgentStatuses(threadId, shown)),
         )
       }
 
       const turnPage = Effect.fnUntraced(function* (
-        conversationId: string,
+        threadId: string,
         limit: number,
         before?: string,
       ) {
         const latestFirst = yield* decodePagedTurns(
           yield* sql`
             SELECT rowid AS position, id, message, images, context, feedback, sent_at AS sentAt, ended
-            FROM conversation_turn
+            FROM thread_turn
             WHERE ${sql.and([
-              sql`conversation_id = ${conversationId}`,
+              sql`thread_id = ${threadId}`,
               ...(before === undefined
                 ? []
                 : [
-                    sql`rowid < (SELECT rowid FROM conversation_turn WHERE id = ${before} AND conversation_id = ${conversationId})`,
+                    sql`rowid < (SELECT rowid FROM thread_turn WHERE id = ${before} AND thread_id = ${threadId})`,
                   ]),
             ])}
             ORDER BY rowid DESC LIMIT ${limit}
@@ -839,7 +817,7 @@ export class Transcripts extends Context.Service<
 
         const parts = yield* decodeParts(
           yield* sql`
-            SELECT turn_id AS turnId, part FROM conversation_turn_part
+            SELECT turn_id AS turnId, part FROM thread_turn_part
             WHERE ${sql.in(
               "turn_id",
               turns.map(({ id }) => id),
@@ -850,8 +828,8 @@ export class Transcripts extends Context.Service<
 
         const [earlier] = yield* decodeCount(
           yield* sql`
-            SELECT COUNT(*) AS count FROM conversation_turn
-            WHERE conversation_id = ${conversationId} AND rowid < ${first.position}
+            SELECT COUNT(*) AS count FROM thread_turn
+            WHERE thread_id = ${threadId} AND rowid < ${first.position}
           `,
         )
 
@@ -872,24 +850,24 @@ export class Transcripts extends Context.Service<
         }
       })
 
-      const snapshot = Effect.fnUntraced(function* (conversationId: string, turns = RECENT_TURNS) {
+      const snapshot = Effect.fnUntraced(function* (threadId: string, turns = RECENT_TURNS) {
         return TranscriptSnapshot.make({
-          ...(yield* turnPage(conversationId, turns)),
-          queued: yield* queued(conversationId),
-          status: statuses.get(conversationId) ?? null,
-          agentStatuses: agentStatuses.get(conversationId)?.agentStatuses ?? [],
-          backgroundToolCalls: agentStatuses.get(conversationId)?.backgroundToolCalls ?? [],
+          ...(yield* turnPage(threadId, turns)),
+          queued: yield* queued(threadId),
+          status: statuses.get(threadId) ?? null,
+          agentStatuses: agentStatuses.get(threadId)?.agentStatuses ?? [],
+          backgroundToolCalls: agentStatuses.get(threadId)?.backgroundToolCalls ?? [],
         })
       })
 
       const endUnfinished = Effect.fnUntraced(function* (
         ending: TurnEnding,
-        conversationIds: ReadonlyArray<string>,
+        threadIds: ReadonlyArray<string>,
         onlyTurnId: string | null,
       ) {
-        if (conversationIds.length === 0) return
+        if (threadIds.length === 0) return
 
-        const conditions = [sql`t.ended IS NULL`, sql.in("t.conversation_id", conversationIds)]
+        const conditions = [sql`t.ended IS NULL`, sql.in("t.thread_id", threadIds)]
 
         if (onlyTurnId !== null) conditions.push(sql`t.id = ${onlyTurnId}`)
 
@@ -897,18 +875,15 @@ export class Transcripts extends Context.Service<
           conditions.push(sql`t.retries_delivery = 0`)
 
         const running = yield* sql`
-          SELECT t.conversation_id AS conversationId, t.id AS turnId, p.part AS part
-          FROM conversation_turn t LEFT JOIN conversation_turn_part p ON p.turn_id = t.id
+          SELECT t.thread_id AS threadId, t.id AS turnId, p.part AS part
+          FROM thread_turn t LEFT JOIN thread_turn_part p ON p.turn_id = t.id
           WHERE ${sql.and(conditions)}
           ORDER BY t.rowid, p.position
         `.pipe(Effect.flatMap(decodeRunning), Effect.mapError(storageFailure))
 
         const ended = { at: yield* DateTime.now, ending }
 
-        for (const [runningConversation, rows] of Map.groupBy(
-          running,
-          (row) => row.conversationId,
-        )) {
+        for (const [runningThread, rows] of Map.groupBy(running, (row) => row.threadId)) {
           const events = Array.from(
             Map.groupBy(rows, ({ turnId }) => turnId),
             ([turnId, found]) =>
@@ -919,13 +894,13 @@ export class Transcripts extends Context.Service<
               ),
           )
 
-          yield* save(runningConversation, events.flat())
+          yield* save(runningThread, events.flat())
         }
 
         yield* Effect.forEach(
-          conversationIds,
-          (conversationId) =>
-            setAgentStatuses(conversationId, AgentStatusesChanged.make({ agentStatuses: [] })),
+          threadIds,
+          (threadId) =>
+            setAgentStatuses(threadId, AgentStatusesChanged.make({ agentStatuses: [] })),
           {
             discard: true,
           },
@@ -933,23 +908,23 @@ export class Transcripts extends Context.Service<
       })
 
       const endRunning = Effect.fn("Transcripts.endRunning")(
-        (ending: TurnEnding, conversationIds: ReadonlyArray<string>) =>
-          endUnfinished(ending, conversationIds, null),
+        (ending: TurnEnding, threadIds: ReadonlyArray<string>) =>
+          endUnfinished(ending, threadIds, null),
       )
 
       const endTurn = Effect.fn("Transcripts.endTurn")(
-        (ending: TurnEnding, conversationId: string, endedTurnId: string) =>
-          endUnfinished(ending, [conversationId], endedTurnId),
+        (ending: TurnEnding, threadId: string, endedTurnId: string) =>
+          endUnfinished(ending, [threadId], endedTurnId),
       )
 
-      const setStatus = (conversationId: string, status: string | null) =>
-        lockFor(conversationId).withPermits(1)(
+      const setStatus = (threadId: string, status: string | null) =>
+        lockFor(threadId).withPermits(1)(
           Effect.suspend(() => {
-            if (status === null) statuses.delete(conversationId)
-            else statuses.set(conversationId, status)
+            if (status === null) statuses.delete(threadId)
+            else statuses.set(threadId, status)
 
             return PubSub.publish(published, {
-              conversationId,
+              threadId,
               update: StatusChanged.make({ status }),
             })
           }),
@@ -965,17 +940,17 @@ export class Transcripts extends Context.Service<
         endRunning,
         endTurn,
         askedToStop,
-        watch: (conversationId) =>
+        watch: (threadId) =>
           Stream.unwrap(
-            lockFor(conversationId).withPermits(1)(
+            lockFor(threadId).withPermits(1)(
               Effect.gen(function* () {
                 const live = yield* PubSub.subscribe(published)
-                const first = yield* snapshot(conversationId)
+                const first = yield* snapshot(threadId)
 
                 return Stream.succeed<TranscriptUpdate>(first).pipe(
                   Stream.concat(
                     Stream.fromSubscription(live).pipe(
-                      Stream.filter((entry) => entry.conversationId === conversationId),
+                      Stream.filter((entry) => entry.threadId === threadId),
                       Stream.map(({ update }) => update),
                     ),
                   ),
@@ -986,79 +961,78 @@ export class Transcripts extends Context.Service<
             Stream.tapError((cause) => Effect.logWarning("Couldn't read a transcript", cause)),
             Stream.mapError(storageFailure),
           ),
-        read: (conversationId, turns) =>
+        read: (threadId, turns) =>
           withStorageFailure(
             "read a transcript",
-            lockFor(conversationId).withPermits(1)(snapshot(conversationId, turns)),
+            lockFor(threadId).withPermits(1)(snapshot(threadId, turns)),
           ),
-        loadEarlier: (conversationId, before) =>
+        loadEarlier: (threadId, before) =>
           withStorageFailure(
             "read earlier Turns",
-            lockFor(conversationId).withPermits(1)(
-              turnPage(conversationId, RECENT_TURNS, before).pipe(
+            lockFor(threadId).withPermits(1)(
+              turnPage(threadId, RECENT_TURNS, before).pipe(
                 Effect.flatMap((page) =>
                   PubSub.publish(published, {
-                    conversationId,
+                    threadId,
                     update: EarlierTurns.make({ before, ...page }),
                   }),
                 ),
               ),
             ),
           ),
-        runningTurn: (conversationId) =>
-          withStorageFailure("read a running Turn", runningTurn(conversationId)),
-        idle: (conversationId) =>
+        runningTurn: (threadId) => withStorageFailure("read a running Turn", runningTurn(threadId)),
+        idle: (threadId) =>
           withStorageFailure(
-            "read whether a conversation is idle",
-            conversation(conversationId).pipe(
+            "read whether a Thread is idle",
+            thread(threadId).pipe(
               Effect.map((state) => state.running === null && state.queued.length === 0),
             ),
           ),
-        runningMessage: (conversationId) =>
+        runningMessage: (threadId) =>
           withStorageFailure(
             "read a running Turn",
-            sql`SELECT message FROM conversation_turn WHERE conversation_id = ${conversationId} AND ended IS NULL`.pipe(
+            sql`SELECT message FROM thread_turn WHERE thread_id = ${threadId} AND ended IS NULL`.pipe(
               Effect.flatMap(decodeMessages),
               Effect.map(([turn]) => turn?.message ?? null),
             ),
           ),
-        settleUndelivered: Effect.fnUntraced(function* (conversationId, turnId, reason) {
+        settleUndelivered: Effect.fnUntraced(function* (threadId, turnId, reason) {
           const retried = yield* withStorageFailure(
             "read whether a Turn retries delivery",
-            sql`SELECT id FROM conversation_turn WHERE id = ${turnId} AND retries_delivery = 1`,
+            sql`SELECT id FROM thread_turn WHERE id = ${turnId} AND retries_delivery = 1`,
           )
 
           if (retried.length > 0) {
-            yield* setStatus(conversationId, reason)
+            yield* setStatus(threadId, reason)
 
             return "pending" as const
           }
 
           const ended = { at: yield* DateTime.now, ending: TurnFailed.make({ reason }) }
 
-          yield* save(conversationId, [TurnEnded.make({ turnId, ended })])
+          yield* save(threadId, [TurnEnded.make({ turnId, ended })])
 
           return "failed" as const
         }),
-        retryDeliveries: (conversationIds) =>
+        retryDeliveries: (threadIds) =>
           withStorageFailure(
             "retry undelivered Turns",
-            Effect.forEach(conversationIds, (conversationId) =>
-              lockFor(conversationId).withPermits(1)(
+            Effect.forEach(threadIds, (threadId) =>
+              lockFor(threadId).withPermits(1)(
                 Effect.gen(function* () {
                   const retried = yield* sql`
                     SELECT id, message, images, context, feedback, sent_at AS sentAt, ended
-                    FROM conversation_turn
-                    WHERE conversation_id = ${conversationId} AND ended IS NULL AND retries_delivery = 1
+                    FROM thread_turn
+                    WHERE thread_id = ${threadId} AND ended IS NULL AND retries_delivery = 1
                   `.pipe(Effect.flatMap(decodeTurns))
 
                   for (const turn of retried)
-                    yield* sql`DELETE FROM conversation_turn_part WHERE turn_id = ${turn.id}`
+                    yield* sql`DELETE FROM thread_turn_part WHERE turn_id = ${turn.id}`
 
                   if (retried.length > 0)
                     yield* markWaiting(
-                      conversationId,
-                      (yield* waitingParts(conversationId)).map(({ part }) => part),
+                      threadId,
+                      (yield* waitingParts(threadId)).map(({ part }) => part),
                     )
 
                   return retried.map((turn) => ({
@@ -1070,21 +1044,21 @@ export class Transcripts extends Context.Service<
                       feedback: turn.feedback,
                       sentAt: turn.sentAt,
                     }),
-                    conversationId,
+                    threadId,
                   }))
                 }),
               ),
             ).pipe(Effect.map((retried) => retried.flat())),
           ),
-        startIfIdle: (conversationId, turn, record) =>
+        startIfIdle: (threadId, turn, record) =>
           withStorageFailure(
             "start a Turn",
             changeWith(
-              conversationId,
+              threadId,
               Effect.gen(function* () {
                 const message = { ...turn, feedback: [], id: randomUUID() }
 
-                const { outcome, updates } = yield* step(conversationId, {
+                const { outcome, updates } = yield* step(threadId, {
                   type: "startIfIdle",
                   message,
                 })
@@ -1095,34 +1069,34 @@ export class Transcripts extends Context.Service<
               }),
             ),
           ),
-        startOrQueue: (conversationId, sent, feedback = Effect.succeed([])) =>
+        startOrQueue: (threadId, sent, feedback = Effect.succeed([])) =>
           withStorageFailure(
             "send a message",
             changeWith(
-              conversationId,
+              threadId,
               Effect.gen(function* () {
                 const message = { ...sent, feedback: yield* feedback, id: randomUUID() }
-                const { outcome, updates } = yield* step(conversationId, { type: "send", message })
+                const { outcome, updates } = yield* step(threadId, { type: "send", message })
 
                 return [outcome.type === "started" ? "started" : "queued", updates] as const
               }),
             ),
           ),
-        prependQueued: (conversationId, inputs) =>
+        prependQueued: (threadId, inputs) =>
           withStorageFailure(
             "put messages back in front of the Queued ones",
             change(
-              conversationId,
-              execute(conversationId, [{ type: "prepend", messages: queuedAgain(inputs) }]),
+              threadId,
+              execute(threadId, [{ type: "prepend", messages: queuedAgain(inputs) }]),
             ),
           ),
-        cancelQueued: (conversationId, queuedId, restore = () => Effect.void) =>
+        cancelQueued: (threadId, queuedId, restore = () => Effect.void) =>
           withStorageFailure(
             "cancel a Queued message",
             change(
-              conversationId,
+              threadId,
               Effect.gen(function* () {
-                const { outcome, updates } = yield* step(conversationId, {
+                const { outcome, updates } = yield* step(threadId, {
                   type: "cancelQueued",
                   queuedId,
                 })
@@ -1134,33 +1108,31 @@ export class Transcripts extends Context.Service<
                 }
 
                 const [started] = yield* sql`
-                  SELECT id FROM conversation_turn WHERE id = ${queuedId} AND conversation_id = ${conversationId}
+                  SELECT id FROM thread_turn WHERE id = ${queuedId} AND thread_id = ${threadId}
                 `.pipe(Effect.flatMap(decodeTurnIds))
 
                 return started === undefined ? [] : yield* new QueuedMessageStarted()
               }),
             ),
           ),
-        startQueued: (conversationId, queuedId) =>
+        startQueued: (threadId, queuedId) =>
           withStorageFailure(
             "start a Queued message",
             change(
-              conversationId,
+              threadId,
               Effect.flatMap(
-                step(conversationId, { type: "sendQueued", queuedId }),
+                step(threadId, { type: "sendQueued", queuedId }),
                 ({ outcome, updates }) =>
-                  outcome.type === "busy"
-                    ? Effect.fail(new ConversationBusy())
-                    : Effect.succeed(updates),
+                  outcome.type === "busy" ? Effect.fail(new ThreadBusy()) : Effect.succeed(updates),
               ),
             ),
           ),
         subscribeStarted: PubSub.subscribe(published).pipe(
           Effect.map((live) =>
             Stream.fromSubscription(live).pipe(
-              Stream.flatMap(({ conversationId, update, reported }) =>
+              Stream.flatMap(({ threadId, update, reported }) =>
                 Predicate.isTagged(update, "TurnStarted") && !reported
-                  ? Stream.succeed({ ...update, conversationId })
+                  ? Stream.succeed({ ...update, threadId })
                   : Stream.empty,
               ),
             ),
@@ -1170,7 +1142,7 @@ export class Transcripts extends Context.Service<
           Effect.map((live) =>
             Stream.fromSubscription(live).pipe(
               Stream.filter(({ update }) => Predicate.isTagged(update, "TurnEnded")),
-              Stream.map(({ conversationId }) => conversationId),
+              Stream.map(({ threadId }) => threadId),
             ),
           ),
         ),
@@ -1182,68 +1154,67 @@ export class Transcripts extends Context.Service<
                   Predicate.isTagged(update, "TurnEnded") ||
                   Predicate.isTagged(update, "QueuedMessagesChanged"),
               ),
-              Stream.map(({ conversationId }) => conversationId),
+              Stream.map(({ threadId }) => threadId),
             ),
           ),
         ),
-        lastEnds: (conversationIds) =>
+        lastEnds: (threadIds) =>
           withStorageFailure(
             "read how Turns ended",
-            conversationIds.length === 0
+            threadIds.length === 0
               ? Effect.succeed(new Map())
-              : lastEnds([sql.in("a.id", conversationIds)]).pipe(
+              : lastEnds([sql.in("a.id", threadIds)]).pipe(
                   Effect.map(
-                    (rows) =>
-                      new Map(rows.map(({ conversationId, ended }) => [conversationId, ended])),
+                    (rows) => new Map(rows.map(({ threadId, ended }) => [threadId, ended])),
                   ),
                 ),
           ),
         waiting: SubscriptionRef.changes(waiting),
         waitingNow: SubscriptionRef.get(waiting),
-        isWaiting: (conversationId) =>
-          SubscriptionRef.get(waiting).pipe(Effect.map((current) => current.has(conversationId))),
+        isWaiting: (threadId) =>
+          SubscriptionRef.get(waiting).pipe(Effect.map((current) => current.has(threadId))),
         unseen: SubscriptionRef.changes(unseen),
-        running: SubscriptionRef.changes(runningConversations),
-        markSeen: (conversationId, endedAt) => {
+        running: SubscriptionRef.changes(runningThreads),
+        markSeen: (threadId, endedAt) => {
           const at = DateTime.formatIso(endedAt)
 
           return withStorageFailure(
             "mark a Turn seen",
-            lockFor(conversationId).withPermits(1)(
+            lockFor(threadId).withPermits(1)(
               Effect.all(
                 [
                   sql`
-                    UPDATE conversation SET turn_seen_at = ${at}
-                    WHERE id = ${conversationId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
+                    UPDATE thread SET turn_seen_at = ${at}
+                    WHERE id = ${threadId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
                   `,
                   sql`
                     UPDATE global_chat_session SET turn_seen_at = ${at}
-                    WHERE id = ${conversationId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
+                    WHERE id = ${threadId} AND (turn_seen_at IS NULL OR turn_seen_at < ${at})
                   `,
                 ],
                 { discard: true },
-              ).pipe(Effect.andThen(refreshUnseen(conversationId))),
+              ).pipe(Effect.andThen(refreshUnseen(threadId))),
             ),
           )
         },
         setStatus,
-        remove: Effect.fn("Transcripts.remove")(function* (conversationId: string) {
-          yield* lockFor(conversationId).withPermits(1)(
+        remove: Effect.fn("Transcripts.remove")(function* (threadId: string) {
+          yield* lockFor(threadId).withPermits(1)(
             Effect.gen(function* () {
               yield* sql`
-                DELETE FROM conversation_turn_part
-                WHERE turn_id IN (SELECT id FROM conversation_turn WHERE conversation_id = ${conversationId})
+                DELETE FROM thread_turn_part
+                WHERE turn_id IN (SELECT id FROM thread_turn WHERE thread_id = ${threadId})
               `
-              yield* sql`DELETE FROM conversation_turn WHERE conversation_id = ${conversationId}`
-              yield* sql`DELETE FROM conversation_queued_message WHERE conversation_id = ${conversationId}`
+              yield* sql`DELETE FROM thread_turn WHERE thread_id = ${threadId}`
+              yield* sql`DELETE FROM thread_queued_message WHERE thread_id = ${threadId}`
             }).pipe(sql.withTransaction),
           )
-          locks.delete(conversationId)
-          statuses.delete(conversationId)
-          agentStatuses.delete(conversationId)
-          yield* markWaiting(conversationId, [])
-          yield* setUnseen(conversationId, undefined)
-          yield* setRunning(conversationId, false)
+          locks.delete(threadId)
+          statuses.delete(threadId)
+          agentStatuses.delete(threadId)
+          yield* markWaiting(threadId, [])
+          yield* setUnseen(threadId, undefined)
+          yield* setRunning(threadId, false)
         }, Effect.mapError(storageFailure)),
       })
     }),

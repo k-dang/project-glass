@@ -1,11 +1,11 @@
-import type { ConversationMessageInput, MessageInput } from "@glass/contracts"
+import type { ThreadMessageInput, MessageInput } from "@glass/contracts"
 import { useState } from "react"
 import { type StagedEdit, StagedFeedback } from "./FeedbackNotes"
 import type { FeedbackNotesStore } from "./useFeedbackNotes"
 
 export function useStagedFeedback(
   store: FeedbackNotesStore | undefined,
-  send: (message: ConversationMessageInput) => Promise<boolean>,
+  send: (message: ThreadMessageInput) => Promise<boolean>,
   steer: (message: MessageInput) => Promise<boolean>,
 ) {
   const [editing, setEditing] = useState<StagedEdit | null>(null)

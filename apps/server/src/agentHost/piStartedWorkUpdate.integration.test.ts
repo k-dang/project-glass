@@ -1,13 +1,13 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent"
 import { NodeServices } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import { ConversationOutcome, TextPart, StartedWorkUpdate } from "@glass/contracts"
+import { ThreadOutcome, TextPart, StartedWorkUpdate } from "@glass/contracts"
 import { Deferred, Effect, Exit, Predicate, Schema, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
-import { bundledPi } from "../../test/demoConversation"
+import { bundledPi } from "../../test/demoThread"
 import { fakeModelProvider, lastUserText } from "../../test/fakeModelProvider"
 import { isolatedHome, stubHome } from "../../test/harness"
 import { piAdapter } from "./piAdapter"
@@ -20,8 +20,8 @@ const sent = {
   prompt: "Started work update the completed work.",
   context: StartedWorkUpdate.make({
     work: [
-      ConversationOutcome.make({
-        conversationId: "started",
+      ThreadOutcome.make({
+        threadId: "started",
         name: "Started",
         outcome: "finished",
         reason: null,
@@ -38,7 +38,7 @@ const fixture = Effect.gen(function* () {
   vi.stubEnv("PI_OFFLINE", "1")
   const adapter = yield* piAdapter(bundledPi)
 
-  const open = (conversation: string) =>
+  const open = (thread: string) =>
     Effect.gen(function* () {
       const scope = yield* Scope.make()
       yield* Effect.addFinalizer(() => Scope.close(scope, Exit.void))
@@ -48,7 +48,7 @@ const fixture = Effect.gen(function* () {
       const session = yield* adapter
         .start({
           folder: home,
-          conversation,
+          thread,
           role: WorkRole.make({}),
           glassTools: undefined,
           skills: [],
@@ -157,13 +157,13 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* fixture
-      const conversation = randomUUID()
-      const first = yield* f.open(conversation)
+      const thread = randomUUID()
+      const first = yield* f.open(thread)
       yield* first.session.startTurn("started-work-update-1", sent)
       yield* first.ended
       yield* first.close
 
-      const restored = yield* f.open(conversation)
+      const restored = yield* f.open(thread)
       yield* restored.session.startTurn("started-work-update-1", {
         ...sent,
         prompt: "The instructions changed after an upgrade.",
@@ -244,7 +244,7 @@ it.live(
 
       const session = yield* adapter.start({
         folder: home,
-        conversation: randomUUID(),
+        thread: randomUUID(),
         role: WorkRole.make({}),
         glassTools: undefined,
         skills: [],

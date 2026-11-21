@@ -32,11 +32,7 @@ import { ConnectionAvatar } from "./ConnectionAvatar"
 import { globalChatOpenAtom, globalUnseenAtom } from "./globalChat"
 import { HistoryNav } from "./HistoryNav"
 import { NeedsYouBadge } from "./NeedsYouCount"
-import {
-  conversationsNeedingYouAtom,
-  needsYouCount as countOf,
-  watchedNeedsYouAtom,
-} from "./needsYou"
+import { threadsNeedingYouAtom, needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
 import {
   confirmLeave,
   discardPromptAtom,
@@ -64,7 +60,7 @@ function useAreas(): ReadonlyArray<Area> {
     { label: "Inbox", icon: Inbox, link: { to: "/inbox" } },
     { label: "Reviews", icon: GitPullRequest, link: reviewsLink },
     { label: "To-dos", icon: ListTodo, link: { to: "/to-dos" } },
-    { label: "Conversations", icon: Sparkles, link: { to: "/conversations" } },
+    { label: "Threads", icon: Sparkles, link: { to: "/threads" } },
     { label: "Activity", icon: History, link: { to: "/activity" } },
     { label: "Settings", icon: Settings, link: { to: "/settings" } },
   ]
@@ -96,8 +92,8 @@ export function AppShell() {
   const [GlobalChatDialog, setGlobalChatDialog] = useState<ComponentType>()
   const needsYouBadgeId = useId()
   const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
-  const conversationsNeedYouId = useId()
-  const conversationsNeedYou = useAtomValue(conversationsNeedingYouAtom).size > 0
+  const threadsNeedYouId = useId()
+  const threadsNeedYou = useAtomValue(threadsNeedingYouAtom).size > 0
   const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
   const unread = unseen !== null && !chatting
 
@@ -166,8 +162,8 @@ export function AppShell() {
                   aria-describedby={
                     label === "Inbox" && Option.isSome(needsYouCount) && needsYouCount.value > 0
                       ? needsYouBadgeId
-                      : label === "Conversations" && conversationsNeedYou
-                        ? conversationsNeedYouId
+                      : label === "Threads" && threadsNeedYou
+                        ? threadsNeedYouId
                         : undefined
                   }
                   aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
@@ -175,9 +171,9 @@ export function AppShell() {
                 >
                   <Icon className="size-4" aria-hidden />
                   {label === "Inbox" && <NeedsYouBadge id={needsYouBadgeId} />}
-                  {label === "Conversations" && conversationsNeedYou && (
+                  {label === "Threads" && threadsNeedYou && (
                     <span
-                      id={conversationsNeedYouId}
+                      id={threadsNeedYouId}
                       className="absolute top-1 right-1 size-2 rounded-full bg-primary"
                     >
                       <span className="sr-only">Needs you</span>
@@ -221,8 +217,8 @@ export function AppShell() {
       <CommandMenu
         current={current}
         onOpen={(ref) => void navigate({ to: "/reviews/$owner/$repo/$number", params: ref })}
-        onOpenConversation={(conversationId) =>
-          void navigate({ to: "/conversations/$conversationId", params: { conversationId } })
+        onOpenThread={(threadId) =>
+          void navigate({ to: "/threads/$threadId", params: { threadId } })
         }
         onViewQueue={() =>
           void navigate({

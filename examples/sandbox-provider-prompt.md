@@ -15,6 +15,6 @@ Glass is at https://github.com/k-dang/project-glass. Read these before writing c
 Then ask me what you need to know about my platform, such as how it creates, reaches, and deletes
 a machine, which Agent harnesses to offer, and which logins a Sandbox needs.
 
-When done, tell me how to install the Plugin and how to check it: start a Conversation in the new kind of
-Sandbox, send it a message, then remove the Conversation and confirm the machine is gone.
+When done, tell me how to install the Plugin and how to check it: start a Thread in the new kind of
+Sandbox, send it a message, then remove the Thread and confirm the machine is gone.
 ```

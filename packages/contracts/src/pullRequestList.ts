@@ -35,22 +35,20 @@ export const PullRequestEnded = Schema.Union([PullRequestMerged, PullRequestClos
 
 export type PullRequestEnded = typeof PullRequestEnded.Type
 
-export const ConversationPullRequestState = Schema.Union([
+export const ThreadPullRequestState = Schema.Union([
   PullRequestOpen,
   PullRequestMerged,
   PullRequestClosed,
 ])
 
-export type ConversationPullRequestState = typeof ConversationPullRequestState.Type
+export type ThreadPullRequestState = typeof ThreadPullRequestState.Type
 
-export class ConversationPullRequest extends Schema.Class<ConversationPullRequest>(
-  "ConversationPullRequest",
-)({
-  conversationId: Schema.String,
+export class ThreadPullRequest extends Schema.Class<ThreadPullRequest>("ThreadPullRequest")({
+  threadId: Schema.String,
   ref: PullRequestRef,
   url: Schema.String,
   title: Schema.String,
-  state: ConversationPullRequestState,
+  state: ThreadPullRequestState,
 }) {}
 
 export class RepositoryPullRequests extends Schema.TaggedClass<RepositoryPullRequests>()(

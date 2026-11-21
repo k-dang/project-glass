@@ -1,5 +1,5 @@
 import { Option, Schema } from "effect"
-import type { ToolCallPart } from "./conversation"
+import type { ToolCallPart } from "./thread"
 
 export const DiagramKind = Schema.Literals(["existing", "proposed", "uncertain"])
 

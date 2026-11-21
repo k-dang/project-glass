@@ -1,6 +1,6 @@
 import { assert, it } from "@effect/vitest"
 import {
-  type ConversationDestination,
+  type ThreadDestination,
   PullRequestRef,
   Revision,
   type ReviewDestination,
@@ -38,9 +38,9 @@ it.live(
         position: { tab: "changes", file: "server.ts", order: "tour" },
       }
 
-      const conversation: ConversationDestination = {
-        area: "conversations",
-        conversationId: "agent-1",
+      const thread: ThreadDestination = {
+        area: "threads",
+        threadId: "agent-1",
       }
 
       yield* Effect.scoped(
@@ -51,7 +51,7 @@ it.live(
           const saved = yield* client.SavePlace({ destination })
           assert.deepStrictEqual(saved.destination, destination)
           assert.isTrue(DateTime.toEpochMillis(saved.savedAt) <= Date.now())
-          yield* client.SavePlace({ destination: conversation })
+          yield* client.SavePlace({ destination: thread })
         }),
       )
 
@@ -61,7 +61,7 @@ it.live(
           const places = yield* client.GetSavedPlaces()
           assert.sameDeepMembers(
             places.map((place) => place.destination),
-            [conversation, destination],
+            [thread, destination],
           )
 
           yield* client.SavePlace({
@@ -82,7 +82,7 @@ it.live(
       })
       assert.deepStrictEqual(
         rest.map((place) => place.destination),
-        [conversation],
+        [thread],
       )
       assert.deepStrictEqual(requests, [])
     }),

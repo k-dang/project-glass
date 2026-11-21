@@ -84,7 +84,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
       }),
     ),
     commands: (_folder, skills) => Effect.succeed(skillCommands(skills)),
-    start: ({ folder, conversation, role, glassTools, skills, report }) =>
+    start: ({ folder, thread, role, glassTools, skills, report }) =>
       Effect.gen(function* () {
         const review = Predicate.isTagged(role, "Review") ? role.brief : null
         const glass = glassTools ?? null
@@ -194,8 +194,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
               yield* part(turnId, TextPart.make({ text: written.join(",") }))
             }
 
-            if (message === "show the session")
-              yield* part(turnId, TextPart.make({ text: conversation }))
+            if (message === "show the session") yield* part(turnId, TextPart.make({ text: thread }))
 
             if (message === "show the review" && review !== null) {
               yield* part(turnId, TextPart.make({ text: review.instructions }))

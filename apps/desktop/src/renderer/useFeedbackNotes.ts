@@ -3,7 +3,7 @@ import { type FeedbackNote, UnsentFeedback } from "@glass/contracts"
 import { type Effect, Exit } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { useMemo } from "react"
-import { feedbackNotesAtom, writtenFeedbackAtom } from "./conversationsArea"
+import { feedbackNotesAtom, writtenFeedbackAtom } from "./threadsArea"
 import { Backend, type BackendError, useBackendRuntime } from "./backend"
 import { type Problem, problemOf } from "./problems"
 
@@ -46,11 +46,11 @@ const without = (unsent: UnsentFeedback, noteIds: ReadonlyArray<string>) =>
     staged: unsent.staged.filter((id) => !noteIds.includes(id)),
   })
 
-export function useFeedbackNotes(conversationId: string): FeedbackNotesStore {
+export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
   const runtime = useBackendRuntime()
-  const listed = useAtomValue(feedbackNotesAtom(conversationId))
-  const refetch = useAtomRefresh(feedbackNotesAtom(conversationId))
-  const [written, setWritten] = useAtom(writtenFeedbackAtom(conversationId))
+  const listed = useAtomValue(feedbackNotesAtom(threadId))
+  const refetch = useAtomRefresh(feedbackNotesAtom(threadId))
+  const [written, setWritten] = useAtom(writtenFeedbackAtom(threadId))
   const saved = AsyncResult.isSuccess(listed) ? listed.value : null
   const unsent = written ?? saved ?? noFeedback
 
@@ -64,17 +64,17 @@ export function useFeedbackNotes(conversationId: string): FeedbackNotesStore {
       save: (note) =>
         write(
           noteWriteTitles.save,
-          Backend.use((backend) => backend.SaveFeedbackNote({ conversationId, note })),
+          Backend.use((backend) => backend.SaveFeedbackNote({ threadId, note })),
         ),
       remove: (noteId) =>
         write(
           noteWriteTitles.remove,
-          Backend.use((backend) => backend.RemoveFeedbackNote({ conversationId, noteId })),
+          Backend.use((backend) => backend.RemoveFeedbackNote({ threadId, noteId })),
         ),
       stage: () =>
         write(
           "Couldn't add your feedback to the message",
-          Backend.use((backend) => backend.StageFeedbackNotes({ conversationId })),
+          Backend.use((backend) => backend.StageFeedbackNotes({ threadId })),
         ),
       sent: (noteIds) => setWritten((current) => without(current ?? saved ?? noFeedback, noteIds)),
       refresh: () => {
@@ -82,5 +82,5 @@ export function useFeedbackNotes(conversationId: string): FeedbackNotesStore {
         refetch()
       },
     }
-  }, [conversationId, runtime, unsent, saved, written, setWritten, refetch])
+  }, [threadId, runtime, unsent, saved, written, setWritten, refetch])
 }

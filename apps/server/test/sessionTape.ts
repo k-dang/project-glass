@@ -497,11 +497,11 @@ export const sessionTape = (
   )
 
   const sessionInfo = (
-    conversation: string,
+    thread: string,
     dir: string | undefined,
     live: () => Promise<SDKSessionInfo | undefined>,
   ): Promise<SDKSessionInfo | undefined> => {
-    const args = normalize({ conversation, dir: dir ?? "" })
+    const args = normalize({ thread, dir: dir ?? "" })
 
     if (recordingSessions)
       return live().then((info) => {
@@ -516,7 +516,7 @@ export const sessionTape = (
     const call = recorded.calls[nextCall++]
 
     if (call === undefined || show(call.args) !== show(args)) {
-      problem(`Glass looked up a conversation the recording doesn't have: ${show(args)}`)
+      problem(`Glass looked up a thread the recording doesn't have: ${show(args)}`)
 
       return Promise.resolve(undefined)
     }

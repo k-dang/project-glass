@@ -39,8 +39,8 @@ Each feature file has an H1 title, one paragraph of user-visible behavior, then 
 - [Merge](./merge.md): merging a PR from its header, auto-merge, and the merge queue, against the fake GitHub.
 - [Tours](./tours.md): generating and reading a Tour with synthetic runners, without model charges.
 - [Full context and repository files](./full-context.md): expanding a diff's collapsed context up to the whole file, and the Repository tab for reading any file at the pinned head.
-- [Conversation composer](./conversation-composer.md): Queueing, Steering, and stopping a running Conversation Turn from its composer, on the fake backend's demo Conversation.
-- [Permission requests and Questions](./conversation-requests.md): a Claude Code Conversation's Permission mode, answering its Permission requests and Questions from the transcript, and stopping while one waits, on the real pinned `claude` against a fake Anthropic API.
+- [Thread composer](./thread-composer.md): Queueing, Steering, and stopping a running Thread Turn from its composer, on the fake backend's demo Thread.
+- [Permission requests and Questions](./thread-requests.md): a Claude Code Thread's Permission mode, answering its Permission requests and Questions from the transcript, and stopping while one waits, on the real pinned `claude` against a fake Anthropic API.
 - [Existing Review threads](./review-threads.md): line Review threads in the diff with their resolved state and Resolve, comments and Reviews on Overview, and the outdated list.
 - [Drafts](./drafts.md): starting a Draft from a diff line's gutter, saving to the pending review on Enter with its Feedback state, delete, the Drafts list and count, and Flagged drafts after Reload.
 - [Replies](./replies.md): replying to a Review thread, published at once with its Feedback state, refused while the user has Drafts, Retry, and Reload keeping unsent text.
@@ -49,4 +49,4 @@ Each feature file has an H1 title, one paragraph of user-visible behavior, then 
 - [App lifecycle](./app-lifecycle.md): opening the window, the backend starting with it, logs, the error screen when the backend fails to start or crashes, relaunching, and quitting stopping the backend.
 - [Backend access](./backend-access.md): the standalone backend's secret and origin checks, for when it is promoted to a server.
 - [Agent reviews](./agent-reviews.md): private criticism beside the PR diff and its opening on Overview.
-- [Conversation changes](./conversation-changes.md): local worktree changes pinned until Show latest.
+- [Thread changes](./thread-changes.md): local worktree changes pinned until Show latest.

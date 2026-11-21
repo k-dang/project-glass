@@ -1,6 +1,6 @@
 import {
   type AgentEvent,
-  applyConversationEvent,
+  applyThreadEvent,
   endTurnEvents,
   PartAppended,
   PartSet,
@@ -124,7 +124,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
     events.push(event)
 
     if (state !== null)
-      state = { ...state, turn: applyConversationEvent([state.turn], event)[0] ?? state.turn }
+      state = { ...state, turn: applyThreadEvent([state.turn], event)[0] ?? state.turn }
   }
 
   const setPart = (turn: TurnState, index: number, part: TurnPart) =>

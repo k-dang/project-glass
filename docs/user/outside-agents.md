@@ -8,7 +8,7 @@ you, under the app's name.
 
 The sign-in is an OAuth authorization code with PKCE. Glass listens on this computer only, so the
 approval page opens here and names the app and what it will be able to do. A token from that
-approval works on the MCP endpoint for 30 days. It does not work as a conversation Glass launched,
+approval works on the MCP endpoint for 30 days. It does not work as a Thread Glass launched,
 and it does not work on any other Glass route. Disconnect it in Settings → Outside agents.
 
 ## Connect Claude Code

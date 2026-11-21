@@ -7,8 +7,8 @@ import { connectMcp, initialize, listedTools, mcpPost, toolResult } from "../../
 import { McpCaller, GlobalChatCaller } from "./McpCredentials"
 
 const DescribeTarget = Tool.make("describe_target", {
-  description: "Names the caller and the conversation it asked about.",
-  parameters: Schema.Struct({ conversationId: Schema.String }),
+  description: "Names the caller and the Thread it asked about.",
+  parameters: Schema.Struct({ threadId: Schema.String }),
   success: Schema.Struct({ caller: Schema.String, target: Schema.String }),
 })
 
@@ -27,14 +27,14 @@ const startMcpBackend = Effect.gen(function* () {
   const tools = McpServer.toolkit(TestTools).pipe(
     Layer.provide(
       TestTools.toLayer({
-        describe_target: ({ conversationId }) =>
+        describe_target: ({ threadId }) =>
           Effect.map(McpCaller.current, (caller) => ({
             caller: Match.valueTags(caller, {
               GlobalChat: (global) => global.globalChatId,
-              Conversation: ({ conversationId: calling }) => calling,
+              Thread: ({ threadId: calling }) => calling,
               OutsideAgent: ({ agentId }) => agentId,
             }),
-            target: conversationId,
+            target: threadId,
           })),
         await_release: () =>
           Deferred.succeed(started, undefined).pipe(
@@ -69,16 +69,16 @@ describe("MCP endpoint", () => {
         listedTools(listed).map((tool) => tool.name),
         ["describe_target", "await_release"],
       )
-      assert.deepStrictEqual(listedTools(listed)[0]?.inputSchema.required, ["conversationId"])
+      assert.deepStrictEqual(listedTools(listed)[0]?.inputSchema.required, ["threadId"])
 
       const called = yield* mcp.request("tools/call", {
         name: "describe_target",
-        arguments: { conversationId: "another-conversation" },
+        arguments: { threadId: "another-thread" },
       }).response
 
       assert.deepStrictEqual(toolResult(called).structuredContent, {
         caller: "global-chat",
-        target: "another-conversation",
+        target: "another-thread",
       })
     }),
   )
@@ -103,12 +103,12 @@ describe("MCP endpoint", () => {
 
       const calledAsOther = yield* otherMcp.request("tools/call", {
         name: "describe_target",
-        arguments: { conversationId: "another-conversation" },
+        arguments: { threadId: "another-thread" },
       }).response
 
       assert.deepStrictEqual(toolResult(calledAsOther).structuredContent, {
         caller: "other-runtime",
-        target: "another-conversation",
+        target: "another-thread",
       })
     }),
   )
@@ -195,13 +195,13 @@ describe("MCP endpoint", () => {
 
       const called = yield* mcp.request("tools/call", {
         name: "describe_target",
-        arguments: { conversationId: 7 },
+        arguments: { threadId: 7 },
       }).response
 
       const result = toolResult(called)
 
       assert.strictEqual(result.isError, true)
-      assert.include(JSON.stringify(result.content), "conversationId")
+      assert.include(JSON.stringify(result.content), "threadId")
     }),
   )
 

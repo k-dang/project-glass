@@ -1,5 +1,5 @@
 import { Schema } from "effect"
-import { AgentHarness, PlaceTag } from "./conversation"
+import { AgentHarness, PlaceTag } from "./thread"
 import { Draft } from "./draft"
 import { FollowedRepository } from "./followedRepository"
 import { PullRequestRef } from "./pullRequest"
@@ -47,8 +47,8 @@ export const ToDoAdded = Schema.TaggedStruct("ToDoAdded", { toDo: ActivityToDo }
 
 export const ToDoDone = Schema.TaggedStruct("ToDoDone", { toDo: ActivityToDo })
 
-export const ConversationStarted = Schema.TaggedStruct("ConversationStarted", {
-  conversationId: Schema.String,
+export const ThreadStarted = Schema.TaggedStruct("ThreadStarted", {
+  threadId: Schema.String,
   name: Schema.String,
   repository: FollowedRepository,
   machine: PlaceTag,
@@ -63,7 +63,7 @@ export const Activity = Schema.Union([
   ReplySent,
   ToDoAdded,
   ToDoDone,
-  ConversationStarted,
+  ThreadStarted,
 ])
 
 export type Activity = typeof Activity.Type

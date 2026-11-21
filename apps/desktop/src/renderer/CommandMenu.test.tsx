@@ -30,7 +30,7 @@ function mount(props: { actions?: ReadonlyArray<Action>; extra?: ReadonlyArray<A
       <CommandMenu
         current={undefined}
         onOpen={onOpen}
-        onOpenConversation={() => {}}
+        onOpenThread={() => {}}
         onViewQueue={() => {}}
       />
     </RegistryProvider>,
@@ -85,7 +85,7 @@ it("lists only mounted actions, in group order", async () => {
       <CommandMenu
         current={undefined}
         onOpen={() => {}}
-        onOpenConversation={() => {}}
+        onOpenThread={() => {}}
         onViewQueue={() => {}}
       />
     </RegistryProvider>,

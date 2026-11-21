@@ -26,7 +26,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog"
 import { Kbd } from "@/components/ui/kbd"
 import { type Action, actionGroups, mountedActions, shortcutKeys } from "./actions"
-import { conversationsAtom } from "./conversationsArea"
+import { threadsAtom } from "./threadsArea"
 import { knownPullRequestsAtom } from "./pullRequestLists"
 import { addToQueue, referenceText } from "./queue"
 import { refusedEscape } from "./refusedEscape"
@@ -67,7 +67,7 @@ export function OpenPullRequestButton() {
 interface Destinations {
   readonly current: PullRequestRef | undefined
   readonly onOpen: (pullRequest: PullRequestRef) => void
-  readonly onOpenConversation: (conversationId: string) => void
+  readonly onOpenThread: (threadId: string) => void
   readonly onViewQueue: () => void
 }
 
@@ -212,7 +212,7 @@ function MenuBody({
   const mounted = mountedActions()
 
   const byId = new Map(
-    [...mounted, ...jumps.pullRequests, ...jumps.conversations].map((row) => [row.id, row]),
+    [...mounted, ...jumps.pullRequests, ...jumps.threads].map((row) => [row.id, row]),
   )
 
   const recentRows = searching
@@ -235,7 +235,7 @@ function MenuBody({
             ),
           ),
           section("PRs", searching ? jumps.pullRequests : []),
-          section("Conversations", searching ? jumps.conversations : []),
+          section("Threads", searching ? jumps.threads : []),
         ]
   ).filter(({ entries }) => entries.length > 0)
 
@@ -267,7 +267,7 @@ function MenuBody({
         <CommandInput
           ref={inputRef}
           aria-label="Search actions, or paste a PR"
-          placeholder="Search actions, PRs, and Conversations, or paste a PR URL"
+          placeholder="Search actions, PRs, and Threads, or paste a PR URL"
           spellCheck={false}
           onKeyDown={(event) => {
             if (event.key !== "Enter" || !(event.metaKey || event.ctrlKey) || !pasted.queue) return
@@ -295,13 +295,10 @@ const section = (label: string, rows: ReadonlyArray<Row>, prefix = ""): Section 
   entries: rows.map((row) => ({ value: prefix + row.id, row })),
 })
 
-function useJumps({ onOpen, onOpenConversation }: Destinations) {
+function useJumps({ onOpen, onOpenThread }: Destinations) {
   const pullRequests = useAtomValue(knownPullRequestsAtom)
 
-  const conversations = Option.getOrElse(
-    AsyncResult.value(useAtomValue(conversationsAtom)),
-    () => [],
-  )
+  const threads = Option.getOrElse(AsyncResult.value(useAtomValue(threadsAtom)), () => [])
 
   return {
     pullRequests: pullRequests.map(({ ref, title }): Row => ({
@@ -312,13 +309,13 @@ function useJumps({ onOpen, onOpenConversation }: Destinations) {
       keywords: [referenceText(ref)],
       run: () => onOpen(ref),
     })),
-    conversations: conversations.map(({ id, name, repository }): Row => ({
-      id: `conversation:${id}`,
+    threads: threads.map(({ id, name, repository }): Row => ({
+      id: `thread:${id}`,
       title: name,
       detail: repositoryKey(repository),
       icon: Sparkles,
       keywords: [repositoryKey(repository)],
-      run: () => onOpenConversation(id),
+      run: () => onOpenThread(id),
     })),
   }
 }

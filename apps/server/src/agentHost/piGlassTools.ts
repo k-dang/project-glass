@@ -33,7 +33,7 @@ async function post(message, signal) {
   if (!response.ok)
     throw new Error(
       response.status === 401
-        ? "Glass no longer accepts this conversation's tool calls."
+        ? "Glass no longer accepts this agent's tool calls."
         : "Glass's tools answered " + response.status + ".",
     )
   session ??= response.headers.get("mcp-session-id") ?? undefined
@@ -69,7 +69,7 @@ async function request(method, params, signal) {
 }
 
 export default async function (pi) {
-  if (!url || !bearer) throw new Error("Glass gave this conversation no tools.")
+  if (!url || !bearer) throw new Error("Glass gave this agent no tools.")
   await request("initialize", {
     protocolVersion: "2025-11-25",
     capabilities: {},

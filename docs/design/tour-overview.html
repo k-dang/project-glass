@@ -591,10 +591,10 @@
     <script>
       const examples = {
         opencode: {
-          title: "Add native OpenCode support for ordinary Conversations",
+          title: "Add native OpenCode support for ordinary Threads",
           counts: "3 preview Chapters · 59 changed files",
           intent:
-            "Run ordinary Glass Conversations with OpenCode as well as Claude Code or pi. OpenCode runs as an authenticated service, and its native events and history become Glass Conversation Turns.",
+            "Run ordinary Glass Threads with OpenCode as well as Claude Code or pi. OpenCode runs as an authenticated service, and its native events and history become Glass Thread Turns.",
           mapTitle: "A new harness path, the same Glass Turns",
           caption:
             "The two existing paths stay in place. The new OpenCode path translates native events and history into the Turns Glass displays. Select a node to read its Chapter.",
@@ -604,10 +604,10 @@
           chapters: [
             {
               title: "Start the selected harness",
-              file: "HostConversations.ts",
-              copy: "The Agent host starts the adapter for the selected harness. Claude Code and pi keep their existing paths; OpenCode becomes another choice for ordinary Conversations.",
+              file: "HostThreads.ts",
+              copy: "The Agent host starts the adapter for the selected harness. Claude Code and pi keep their existing paths; OpenCode becomes another choice for ordinary Threads.",
               lines: [
-                "start an ordinary Glass Conversation",
+                "start an ordinary Glass Thread",
                 "read its selected harness",
                 "start that program’s adapter",
               ],
@@ -616,7 +616,7 @@
             {
               title: "Run the OpenCode service",
               file: "openCodeRuntime.ts",
-              copy: "The OpenCode path runs a local authenticated service. It joins the existing Agent host and session interface rather than changing how the reader follows a conversation in Glass.",
+              copy: "The OpenCode path runs a local authenticated service. It joins the existing Agent host and session interface rather than changing how the reader follows a Thread in Glass.",
               lines: [
                 "start OpenCode as an authenticated service",
                 "connect through the existing session interface",
@@ -626,11 +626,11 @@
             {
               title: "Turn native history into Glass Turns",
               file: "openCodeTurn.ts",
-              copy: "OpenCode’s native events and history become Glass Conversation Turns. This is where the new harness path meets the conversation model that Glass already displays.",
+              copy: "OpenCode’s native events and history become Glass Thread Turns. This is where the new harness path meets the Thread model that Glass already displays.",
               lines: [
                 "read OpenCode’s native events and history",
-                "translate them into Glass Conversation Turns",
-                "display the conversation in Glass",
+                "translate them into Glass Thread Turns",
+                "display the Thread in Glass",
               ],
               first: "translate",
             },
@@ -638,7 +638,7 @@
           nodes: [
             {
               id: "start",
-              label: "Start a Conversation",
+              label: "Start a Thread",
               kind: "Existing entry",
               chapter: 0,
               line: 0,
@@ -695,7 +695,7 @@
             },
             {
               id: "turns",
-              label: "Glass Conversation Turns",
+              label: "Glass Thread Turns",
               kind: "Existing interface",
               chapter: 2,
               line: 2,

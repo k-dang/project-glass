@@ -1,4 +1,4 @@
-import { ConversationError, RPC_PATH } from "@glass/contracts"
+import { ThreadError, RPC_PATH } from "@glass/contracts"
 import type {
   AgentHarness,
   SandboxCreation,
@@ -60,20 +60,20 @@ const providerFailure =
   ({ rejected }: { readonly rejected: unknown }) => {
     if (rejected instanceof MissingLogin)
       return Effect.fail(
-        new ConversationError({
+        new ThreadError({
           message: `${provider.name} needs your ${rejected.login} login. Run ${rejected.fix}, then try again.`,
         }),
       )
 
     if (rejected instanceof NoCapacity)
       return Effect.fail(
-        new ConversationError({ message: `${rejected.message} Try again in a little while.` }),
+        new ThreadError({ message: `${rejected.message} Try again in a little while.` }),
       )
 
     return Effect.logWarning(`${provider.name} couldn't ${action}`, rejected).pipe(
       Effect.andThen(
         Effect.fail(
-          new ConversationError({
+          new ThreadError({
             message: `Couldn't ${action}. Try again; Glass's backend log has the details.`,
           }),
         ),
@@ -91,7 +91,7 @@ const boundSandboxCall =
           Effect.logWarning(`${provider.name} didn't answer in time to ${action}`).pipe(
             Effect.andThen(
               Effect.fail(
-                new ConversationError({
+                new ThreadError({
                   message: `${provider.name} didn't answer in time, so Glass couldn't ${action}. Try again.`,
                 }),
               ),
@@ -131,7 +131,7 @@ const callAbout = <A>(
   run: (signal: AbortSignal) => Promise<A>,
 ) =>
   fromProvider(run).pipe(
-    Effect.catch(({ rejected }): Effect.Effect<never, ConversationError | SandboxGone> =>
+    Effect.catch(({ rejected }): Effect.Effect<never, ThreadError | SandboxGone> =>
       rejected instanceof SandboxGone
         ? Effect.fail(rejected)
         : providerFailure(provider, action)({ rejected }),
@@ -154,7 +154,7 @@ export const extendSandbox = (
       Effect.fromOption(DateTime.make(date)).pipe(
         Effect.mapError(
           () =>
-            new ConversationError({
+            new ThreadError({
               message: `${provider.name} answered an expiry Glass can't read.`,
             }),
         ),
@@ -164,7 +164,7 @@ export const extendSandbox = (
 }
 
 const didntStart = () =>
-  new ConversationError({ message: "The agent in the Sandbox didn't start. Try again." })
+  new ThreadError({ message: "The agent in the Sandbox didn't start. Try again." })
 
 export const waitForHost = (provider: SandboxProvider, state: SandboxState) =>
   targetOf(provider, state).pipe(
@@ -198,7 +198,7 @@ export const connectToHost = (provider: SandboxProvider, state: SandboxState, to
       duration: SANDBOX_DEADLINES.connect,
       orElse: () =>
         Effect.fail(
-          new ConversationError({
+          new ThreadError({
             message: "Glass couldn't reach the Sandbox in time. Try again.",
           }),
         ),

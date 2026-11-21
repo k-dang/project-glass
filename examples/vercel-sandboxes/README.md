@@ -1,7 +1,7 @@
 # Vercel Sandboxes
 
-A Sandbox provider Plugin (ADR 0010) that runs pi Conversations in
-[Vercel Sandboxes](https://vercel.com/docs/sandbox). Each Conversation gets its own persistent Sandbox
+A Sandbox provider Plugin (ADR 0010) that runs pi Threads in
+[Vercel Sandboxes](https://vercel.com/docs/sandbox). Each Thread gets its own persistent Sandbox
 in a Vercel project named `glass-sandboxes`, which the Plugin creates on first use.
 
 ## Logins
@@ -44,14 +44,14 @@ image and the pi Glass pins; update all three together.
 - A Sandbox session lasts at most 45 minutes, the Hobby plan's limit. When a session ends, Vercel
   stops the Sandbox and keeps its files; the next time Glass connects, the Plugin resumes it and
   restarts the agent host, and a Turn that was running is cut off.
-- Removing the Conversation deletes the Sandbox and its snapshots.
+- Removing the Thread deletes the Sandbox and its snapshots.
 
 ## Check it
 
-1. Start a pi Conversation in Vercel Sandboxes, pick Claude Haiku 5.5, and send
+1. Start a pi Thread in Vercel Sandboxes, pick Claude Haiku 5.5, and send
    `Use bash to run: echo TOOL_OK && git status -sb && gh api user --jq .login`. The reply shows
-   `TOOL_OK`, the Conversation's branch, and your GitHub login.
+   `TOOL_OK`, the Thread's branch, and your GitHub login.
 2. Stop its Sandbox from the `glass-sandboxes` project's Sandboxes page in the Vercel dashboard
    (names start with `glass-`), restart Glass, and send another message: it answers from the
    resumed Sandbox.
-3. Remove the Conversation and confirm the Sandboxes page no longer lists its Sandbox.
+3. Remove the Thread and confirm the Sandboxes page no longer lists its Sandbox.

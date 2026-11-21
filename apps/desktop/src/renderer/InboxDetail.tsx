@@ -1,7 +1,7 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   type CheckIn,
-  type ConversationNeedsYou,
+  type ThreadNeedsYou,
   type GlobalChatNeedsYou,
   type NeedsYouItem,
   OutsideChoice,
@@ -21,11 +21,11 @@ import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
-import { conversationColumn } from "./conversationColumn"
+import { threadColumn } from "./threadColumn"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
-import { conversationAtoms, ConversationAtomsContext } from "./conversation"
-import { ConversationChat, TranscriptProblem } from "./ConversationView"
+import { threadAtoms, ThreadAtomsContext } from "./thread"
+import { ThreadChat, TranscriptProblem } from "./ThreadView"
 import { globalChat, globalChatOpenAtom } from "./globalChat"
 import {
   contextOf,
@@ -55,7 +55,7 @@ export function InboxDetail(
   const { now, actions } = props
 
   return Match.valueTags(props.item, {
-    Conversation: (item) => <ConversationDetail item={item} now={now} actions={actions} />,
+    Thread: (item) => <ThreadDetail item={item} now={now} actions={actions} />,
     OutsideQuestion: (item) => (
       <OutsideQuestionDetail key={item.id} item={item} now={now} actions={actions} />
     ),
@@ -72,7 +72,7 @@ export function InboxDetail(
   })
 }
 
-const detailWidth = cn(conversationColumn, "w-full px-6")
+const detailWidth = cn(threadColumn, "w-full px-6")
 
 function DetailShell(props: {
   children: ReactNode
@@ -236,29 +236,29 @@ function CheckInDetail(props: DetailProps<CheckIn>) {
   )
 }
 
-function ConversationDetail(props: DetailProps<ConversationNeedsYou>) {
-  const { conversation } = props.item
-  const atoms = useMemo(() => conversationAtoms(conversation.id), [conversation.id])
+function ThreadDetail(props: DetailProps<ThreadNeedsYou>) {
+  const { thread } = props.item
+  const atoms = useMemo(() => threadAtoms(thread.id), [thread.id])
   const done = props.actions.find(({ key }) => key === "E")
 
   return (
-    <ConversationAtomsContext value={atoms}>
+    <ThreadAtomsContext value={atoms}>
       <article className="flex min-h-0 flex-1 flex-col">
         <div className={cn(detailWidth, "pt-6 pb-2")}>
           <DetailHeader item={props.item} now={props.now} />
         </div>
         <TranscriptProblem />
-        <ConversationChat conversation={conversation} place="inbox" />
+        <ThreadChat thread={thread} place="inbox" />
         <DetailFooter
           actions={props.actions}
           buttons={
             <>
               <Link
-                to="/conversations/$conversationId"
-                params={{ conversationId: conversation.id }}
+                to="/threads/$threadId"
+                params={{ threadId: thread.id }}
                 className={buttonVariants({ variant: "outline" })}
               >
-                Open the Conversation
+                Open the Thread
               </Link>
               {done === undefined ? null : (
                 <Button variant="outline" onClick={done.run}>
@@ -269,7 +269,7 @@ function ConversationDetail(props: DetailProps<ConversationNeedsYou>) {
           }
         />
       </article>
-    </ConversationAtomsContext>
+    </ThreadAtomsContext>
   )
 }
 
@@ -282,11 +282,11 @@ function GlobalChatDetail(props: DetailProps<GlobalChatNeedsYou>) {
       buttons={<Button onClick={() => open(true)}>Open the Global chat</Button>}
     >
       <DetailHeader item={props.item} now={props.now} />
-      <ConversationAtomsContext value={globalChat}>
+      <ThreadAtomsContext value={globalChat}>
         {props.item.requests.map((part) => (
           <RequestCard key={part.requestId} part={part} />
         ))}
-      </ConversationAtomsContext>
+      </ThreadAtomsContext>
     </DetailShell>
   )
 }

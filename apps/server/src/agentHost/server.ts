@@ -7,7 +7,7 @@ import { isToken } from "../access"
 import { AgentHostHandlers } from "./handlers"
 import { claimOpenedSession, glassMcpHttp, ownsSession } from "../mcp/mcpHttp"
 import { HEALTH_PATH, HOST_TOKEN_HEADER, SHUTDOWN_PATH } from "./hostAddress"
-import { HostGlassTools, RelayedConversation } from "./HostGlassTools"
+import { HostGlassTools, RelayedThread } from "./HostGlassTools"
 import { AgentHostRpcs } from "./protocol"
 
 const LOOPBACK = new Set(["127.0.0.1", "::1", "::ffff:127.0.0.1"])
@@ -47,12 +47,12 @@ const RelayAccess = HttpRouter.middleware(
 
         if (Option.isNone(credential)) return HttpServerResponse.empty({ status: 401 })
 
-        const { conversationId, ownedSessions } = credential.value
+        const { threadId, ownedSessions } = credential.value
 
         if (!ownsSession(request, ownedSessions)) return HttpServerResponse.empty({ status: 404 })
 
-        const response = yield* Effect.provideService(httpEffect, RelayedConversation, {
-          conversationId,
+        const response = yield* Effect.provideService(httpEffect, RelayedThread, {
+          threadId,
         })
 
         yield* claimOpenedSession(ownedSessions)

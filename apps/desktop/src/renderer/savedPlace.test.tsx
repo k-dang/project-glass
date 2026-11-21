@@ -25,7 +25,7 @@ import { App } from "./App"
 import { backendLayerAtom } from "./backend"
 import { openPullRequest, openWorkspaceAtom, workspaceViewAtom } from "./reviewsArea"
 import { rememberPlace, savedDestinationsAtom } from "./savedPlace"
-import { conversation } from "../../test/conversation"
+import { thread } from "../../test/thread"
 import {
   type Handlers,
   type Held,
@@ -151,14 +151,11 @@ it("continues from Dashboard after visiting Settings and Activity, without savin
   expect(writes).toHaveLength(count)
 })
 
-it("continues the last PR alongside the last Conversation opened after it", async () => {
+it("continues the last PR alongside the last Thread opened after it", async () => {
   mount({
     GetSavedPlaces: () =>
-      Effect.succeed([
-        savedPlace({ area: "conversations", conversationId: conversation.id }),
-        savedPlace(),
-      ]),
-    WatchConversations: () => Stream.make([conversation]),
+      Effect.succeed([savedPlace({ area: "threads", threadId: thread.id }), savedPlace()]),
+    WatchThreads: () => Stream.make([thread]),
   })
 
   await screen.findByRole("link", { name: "Continue agent/swift-otter" })
@@ -177,8 +174,8 @@ it("invites the user into each area without a Saved place, without creating one"
   const user = mount({ GetSavedPlaces: () => Effect.succeed([]), SavePlace: save })
 
   await screen.findByRole("link", {
-    name: "Start a Conversation",
-    description: "No Conversation yet",
+    name: "Start a Thread",
+    description: "No Thread yet",
   })
   await user.click(
     screen.getByRole("link", { name: "Browse pull requests", description: "No pull request yet" }),
@@ -539,7 +536,7 @@ it("serializes saves and skips intermediate positions while an earlier save is i
 it("keeps one destination per area, newest first", async () => {
   const registry = testRegistry({})
   const release = registry.mount(savedDestinationsAtom)
-  const opened: ResumableDestination = { area: "conversations", conversationId: conversation.id }
+  const opened: ResumableDestination = { area: "threads", threadId: thread.id }
 
   const later: ResumableDestination = {
     ...destination,

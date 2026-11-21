@@ -1,7 +1,7 @@
 import {
-  type ConversationBusy,
+  type ThreadBusy,
   type QueuedMessageStarted,
-  ConversationError,
+  ThreadError,
   type MessageInputWithContext,
   EndedGlobalChatSession,
   GlobalChatSessionNotFound,
@@ -32,12 +32,7 @@ import { join } from "node:path"
 import { GlobalRole } from "./agentHost/protocol"
 import { LocalAgentHost } from "./LocalAgentHost"
 import { GlobalChatCaller, McpCredentials } from "./mcp/McpCredentials"
-import {
-  type ClaimedConversation,
-  type ConversationHost,
-  ConversationTurns,
-  type StartIdle,
-} from "./ConversationTurns"
+import { type ClaimedThread, type ThreadHost, ThreadTurns, type StartIdle } from "./ThreadTurns"
 import { boundHostCall } from "./hostControl"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
@@ -54,12 +49,12 @@ const decodeIds = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ id: Sc
 
 const decodeEnded = Schema.decodeUnknownEffect(Schema.Array(EndedGlobalChatSession))
 
-const hostGone = new ConversationError({
-  message: "Glass lost the process that runs Conversations. Try again.",
+const hostGone = new ThreadError({
+  message: "Glass lost the process that runs Threads. Try again.",
 })
 
 const storageFailure = () =>
-  new ConversationError({ message: "Couldn't read or save the Global chat. Try again." })
+  new ThreadError({ message: "Couldn't read or save the Global chat. Try again." })
 
 const stored = <A, E, R>(what: string, effect: Effect.Effect<A, E, R>) =>
   effect.pipe(
@@ -71,44 +66,42 @@ export class GlobalChat extends Context.Service<
   GlobalChat,
   {
     readonly model: Effect.Effect<ModelChoice>
-    readonly changeModel: (choice: ModelChoice) => Effect.Effect<void, ConversationError>
-    readonly transcript: Stream.Stream<TranscriptUpdate, ConversationError>
+    readonly changeModel: (choice: ModelChoice) => Effect.Effect<void, ThreadError>
+    readonly transcript: Stream.Stream<TranscriptUpdate, ThreadError>
     readonly send: (
       input: MessageInputWithContext,
-    ) => Effect.Effect<void, RequestWaiting | ConversationError>
+    ) => Effect.Effect<void, RequestWaiting | ThreadError>
     readonly steer: (
       input: MessageInputWithContext,
-    ) => Effect.Effect<void, RequestWaiting | ConversationError>
+    ) => Effect.Effect<void, RequestWaiting | ThreadError>
     readonly cancelQueued: (
       queuedId: string,
-    ) => Effect.Effect<void, QueuedMessageStarted | ConversationError>
-    readonly sendQueued: (
-      queuedId: string,
-    ) => Effect.Effect<void, ConversationBusy | ConversationError>
-    readonly stop: Effect.Effect<void, ConversationError>
+    ) => Effect.Effect<void, QueuedMessageStarted | ThreadError>
+    readonly sendQueued: (queuedId: string) => Effect.Effect<void, ThreadBusy | ThreadError>
+    readonly stop: Effect.Effect<void, ThreadError>
     readonly answer: (
       requestId: string,
       answer: RequestAnswer,
-    ) => Effect.Effect<void, RequestNotWaiting | ConversationError>
-    readonly unsent: Effect.Effect<SentMessage, ConversationError>
-    readonly saveUnsent: (unsent: SentMessage) => Effect.Effect<void, ConversationError>
+    ) => Effect.Effect<void, RequestNotWaiting | ThreadError>
+    readonly unsent: Effect.Effect<SentMessage, ThreadError>
+    readonly saveUnsent: (unsent: SentMessage) => Effect.Effect<void, ThreadError>
     readonly id: string
-    readonly startFresh: Effect.Effect<void, StartFreshRefused | ConversationError>
-    readonly endedSessions: Effect.Effect<ReadonlyArray<EndedGlobalChatSession>, ConversationError>
-    readonly loadEarlier: (before: string) => Effect.Effect<void, ConversationError>
+    readonly startFresh: Effect.Effect<void, StartFreshRefused | ThreadError>
+    readonly endedSessions: Effect.Effect<ReadonlyArray<EndedGlobalChatSession>, ThreadError>
+    readonly loadEarlier: (before: string) => Effect.Effect<void, ThreadError>
     readonly watchSession: (
       sessionId: string,
-    ) => Stream.Stream<TranscriptUpdate, GlobalChatSessionNotFound | ConversationError>
+    ) => Stream.Stream<TranscriptUpdate, GlobalChatSessionNotFound | ThreadError>
     readonly loadEarlierInSession: (
       sessionId: string,
       before: string,
-    ) => Effect.Effect<void, GlobalChatSessionNotFound | ConversationError>
+    ) => Effect.Effect<void, GlobalChatSessionNotFound | ThreadError>
     readonly waiting: Stream.Stream<ReadonlyArray<WaitingRequest>>
     readonly unseen: Stream.Stream<TurnEnd | null>
-    readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, ConversationError>
+    readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, ThreadError>
     readonly whenIdle: <E>(
       effect: (start: StartIdle) => Effect.Effect<void, E>,
-    ) => Effect.Effect<void, E | ConversationError>
+    ) => Effect.Effect<void, E | ThreadError>
   }
 >()("@glass/server/GlobalChat") {
   static readonly layer = Layer.effect(
@@ -118,7 +111,7 @@ export class GlobalChat extends Context.Service<
       const config = yield* ServerConfig
       const fs = yield* FileSystem.FileSystem
       const transcripts = yield* Transcripts
-      const turns = yield* ConversationTurns
+      const turns = yield* ThreadTurns
       const host = yield* LocalAgentHost
       const credentials = yield* McpCredentials
       // WARNING: pi keys its session files by working directory; renaming this folder loses the live session.
@@ -162,7 +155,7 @@ export class GlobalChat extends Context.Service<
 
       const callerOf = (sessionId: string) => GlobalChatCaller.make({ globalChatId: id, sessionId })
 
-      const start = (sessionId: string) => (client: ConversationHost) =>
+      const start = (sessionId: string) => (client: ThreadHost) =>
         starting.withPermits(1)(
           Effect.gen(function* () {
             const lifetime = yield* host.lifetimeOf(client).pipe(
@@ -171,8 +164,8 @@ export class GlobalChat extends Context.Service<
             )
 
             yield* credentials.startWith(lifetime, callerOf(sessionId), (tools) =>
-              client.StartConversation({
-                conversationId: sessionId,
+              client.StartThread({
+                threadId: sessionId,
                 harness: "pi",
                 folder,
                 role: GlobalRole.make({ tools }),
@@ -188,9 +181,7 @@ export class GlobalChat extends Context.Service<
             const running = yield* host.running
 
             if (Option.isSome(running))
-              yield* boundHostCall(
-                running.value.StopConversation({ conversationId: sessionId }),
-              ).pipe(
+              yield* boundHostCall(running.value.StopThread({ threadId: sessionId })).pipe(
                 Effect.catch((cause) =>
                   Effect.logWarning("Couldn't stop pi for the ended Global chat", cause),
                 ),
@@ -200,9 +191,9 @@ export class GlobalChat extends Context.Service<
           }),
         )
 
-      const conversationOf = (sessionId: string) =>
+      const threadOf = (sessionId: string) =>
         SubscriptionRef.get(model).pipe(
-          Effect.map((choice): ClaimedConversation => ({
+          Effect.map((choice): ClaimedThread => ({
             id: sessionId,
             ensureStarted: start(sessionId),
             settings: { ...choice, permissionMode: null },
@@ -213,16 +204,15 @@ export class GlobalChat extends Context.Service<
 
       const currentSession = SubscriptionRef.get(session)
 
-      const conversation = currentSession.pipe(Effect.flatMap(conversationOf))
+      const thread = currentSession.pipe(Effect.flatMap(threadOf))
 
       const currentSessions = currentSession.pipe(Effect.map((sessionId) => [sessionId]))
 
       const inSession = <A, E>(effect: (sessionId: string) => Effect.Effect<A, E>) =>
         sessionLock.withPermits(1)(currentSession.pipe(Effect.flatMap(effect)))
 
-      const inConversation = <A, E>(
-        effect: (current: ClaimedConversation) => Effect.Effect<A, E>,
-      ) => inSession((sessionId) => conversationOf(sessionId).pipe(Effect.flatMap(effect)))
+      const inThread = <A, E>(effect: (current: ClaimedThread) => Effect.Effect<A, E>) =>
+        inSession((sessionId) => threadOf(sessionId).pipe(Effect.flatMap(effect)))
 
       const followSession = <A, E>(stream: (sessionId: string) => Stream.Stream<A, E>) =>
         SubscriptionRef.changes(session).pipe(Stream.switchMap(stream))
@@ -234,10 +224,10 @@ export class GlobalChat extends Context.Service<
       )
 
       yield* turns.serve({
-        claim: (conversationId) =>
-          conversation.pipe(
+        claim: (threadId) =>
+          thread.pipe(
             Effect.map((current) =>
-              current.id === conversationId ? Option.some(current) : Option.none(),
+              current.id === threadId ? Option.some(current) : Option.none(),
             ),
           ),
         lost: (yield* host.subscribeStopped).pipe(Stream.mapEffect(() => currentSessions)),
@@ -290,7 +280,7 @@ export class GlobalChat extends Context.Service<
             ),
           )
           yield* SubscriptionRef.set(session, next)
-          yield* annotateUnit({ conversation_id: next })
+          yield* annotateUnit({ thread_id: next })
         }),
       ).pipe(Effect.withSpan("GlobalChat.startFresh"))
 
@@ -320,13 +310,13 @@ export class GlobalChat extends Context.Service<
         loadEarlier: (before) =>
           inSession((sessionId) => transcripts.loadEarlier(sessionId, before)),
         send: (input) => inSession((sessionId) => turns.send(sessionId, input)).pipe(Effect.asVoid),
-        steer: (input) => inConversation((current) => turns.steer(current, input)),
+        steer: (input) => inThread((current) => turns.steer(current, input)),
         cancelQueued: (queuedId) =>
           inSession((sessionId) => transcripts.cancelQueued(sessionId, queuedId)),
         sendQueued: (queuedId) => inSession((sessionId) => turns.sendQueued(sessionId, queuedId)),
-        stop: inConversation(turns.stop),
+        stop: inThread(turns.stop),
         answer: (requestId, answer) =>
-          inConversation((current) => turns.answer(current, requestId, answer)),
+          inThread((current) => turns.answer(current, requestId, answer)),
         unsent: turns.unsent(id),
         saveUnsent: (unsent) => turns.saveUnsent(id, unsent),
         id,

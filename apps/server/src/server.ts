@@ -11,9 +11,9 @@ import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
 import { CheckoutRuns } from "./CheckoutRuns"
 import { Checkouts } from "./Checkouts"
-import { ConversationPullRequests } from "./ConversationPullRequests"
-import { Conversations } from "./Conversations"
-import { ConversationTurns } from "./ConversationTurns"
+import { ThreadPullRequests } from "./ThreadPullRequests"
+import { Threads } from "./Threads"
+import { ThreadTurns } from "./ThreadTurns"
 import { FeedbackNotes } from "./FeedbackNotes"
 import { DatabaseLive } from "./Database"
 import { Changes } from "./Changes"
@@ -44,7 +44,7 @@ import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
 import { AgentCommands, SettingsStore } from "./SettingsStore"
 import { SavedPlaces } from "./SavedPlaces"
-import { SettledConversations } from "./SettledConversations"
+import { SettledThreads } from "./SettledThreads"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { StartedWork } from "./StartedWork"
@@ -76,17 +76,17 @@ type AgentRunnersLayer = Layer.Layer<
 
 const followReattachedHost = Layer.effectDiscard(
   Effect.gen(function* () {
-    yield* Conversations
+    yield* Threads
     yield* GlobalChat
     yield* (yield* LocalAgentHost).followReattached
   }),
 )
 
-const ConversationsLive = followReattachedHost.pipe(
-  Layer.provideMerge(Layer.merge(Conversations.layer, GlobalChat.layer)),
+const ThreadsLive = followReattachedHost.pipe(
+  Layer.provideMerge(Layer.merge(Threads.layer, GlobalChat.layer)),
   Layer.provide(LocalPlacement.layer),
   Layer.provideMerge(Sandboxes.layer),
-  Layer.provide(ConversationTurns.layer),
+  Layer.provide(ThreadTurns.layer),
   Layer.provide(FeedbackNotes.layer),
   Layer.provide(LocalAgentHost.layer),
   Layer.provideMerge(Transcripts.layer),
@@ -106,9 +106,7 @@ const services = (
   Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates)
     .pipe(
       Layer.provide(NeedsYou.layer),
-      Layer.provide(
-        SettledConversations.layer.pipe(Layer.provideMerge(ConversationPullRequests.layer)),
-      ),
+      Layer.provide(SettledThreads.layer.pipe(Layer.provideMerge(ThreadPullRequests.layer))),
       Layer.provide(StartedWork.layer),
       Layer.provide(PullRequestLists.layer),
       Layer.provide(PullRequestMirror.layer),
@@ -119,7 +117,7 @@ const services = (
       Layer.provide(Tours.layer),
       Layer.provide(AgentReviews.layer),
       Layer.provide(Asks.layer),
-      Layer.provide(ConversationsLive),
+      Layer.provide(ThreadsLive),
       Layer.provideMerge(SkillPacks.layer),
       Layer.provideMerge(LocalSkills.layer),
       Layer.provide(Plugins.layer),

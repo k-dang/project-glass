@@ -3,8 +3,8 @@ import { Effect, Predicate } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
-import { ConversationPullRequests } from "./ConversationPullRequests"
-import { Conversations } from "./Conversations"
+import { ThreadPullRequests } from "./ThreadPullRequests"
+import { Threads } from "./Threads"
 import { GitHubClient } from "./github/GitHubClient"
 import { GlobalChat } from "./GlobalChat"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
@@ -21,7 +21,7 @@ import { Queue } from "./Queue"
 import { engineSettingsOf, SettingsStore, withEngineSettings } from "./SettingsStore"
 import { Sandboxes } from "./Sandboxes"
 import { SavedPlaces } from "./SavedPlaces"
-import { SettledConversations } from "./SettledConversations"
+import { SettledThreads } from "./SettledThreads"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { Storage } from "./Storage"
@@ -42,7 +42,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const workspaces = yield* PullRequestWorkspaces
     const settings = yield* SettingsStore
     const savedPlaces = yield* SavedPlaces
-    const conversations = yield* Conversations
+    const threads = yield* Threads
     const globalChat = yield* GlobalChat
     const sandboxes = yield* Sandboxes
     const checkouts = yield* LocalCheckouts
@@ -50,8 +50,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const skillPacks = yield* SkillPacks
     const localSkills = yield* LocalSkills
     const needsYou = yield* NeedsYou
-    const conversationPullRequests = yield* ConversationPullRequests
-    const settledConversations = yield* SettledConversations
+    const threadPullRequests = yield* ThreadPullRequests
+    const settledThreads = yield* SettledThreads
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const outsideAgents = yield* OutsideAgents
@@ -154,35 +154,32 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       AttachToDoImages: ({ id, images = [] }) => toDos.attach(id, images),
       RemoveToDoImage: ({ id }) => toDos.removeImage(id),
       ReadToDoImage: ({ id, size }) => toDos.readImage(id, size),
-      WatchConversations: () => conversations.watch(),
-      WatchTranscript: ({ conversationId }) => conversations.transcript(conversationId),
-      LoadEarlierTurns: ({ conversationId, before }) =>
-        conversations.loadEarlierTurns(conversationId, before),
+      WatchThreads: () => threads.watch(),
+      WatchTranscript: ({ threadId }) => threads.transcript(threadId),
+      LoadEarlierTurns: ({ threadId, before }) => threads.loadEarlierTurns(threadId, before),
       ListLocalCheckouts: () => checkouts.list(),
       LinkLocalCheckout: ({ path }) => checkouts.link(path),
-      GetNewConversationDefaultBranch: ({ place, repository }) =>
-        conversations.newConversationDefaultBranch(place, repository),
-      ListNewConversationBranches: ({ place, repository }) =>
-        conversations.newConversationBranches(place, repository),
-      ListAgentModels: ({ harness, place }) => conversations.models(harness, place),
-      ListNewConversationCommands: ({ harness, place, repository }) =>
-        conversations.newConversationCommands(harness, place, repository),
-      ListConversationCommands: ({ conversationId }) => conversations.commands(conversationId),
-      ListNewConversationFiles: ({ place, repository, baseBranch }) =>
-        conversations.newConversationFiles(place, repository, baseBranch),
-      ListConversationFiles: ({ conversationId }) => conversations.files(conversationId),
-      FindConversationFiles: ({ conversationId, paths }) =>
-        conversations.existingFiles(conversationId, paths),
-      GetConversationFile: ({ conversationId, path }) => conversations.file(conversationId, path),
+      GetNewThreadDefaultBranch: ({ place, repository }) =>
+        threads.newThreadDefaultBranch(place, repository),
+      ListNewThreadBranches: ({ place, repository }) =>
+        threads.newThreadBranches(place, repository),
+      ListAgentModels: ({ harness, place }) => threads.models(harness, place),
+      ListNewThreadCommands: ({ harness, place, repository }) =>
+        threads.newThreadCommands(harness, place, repository),
+      ListThreadCommands: ({ threadId }) => threads.commands(threadId),
+      ListNewThreadFiles: ({ place, repository, baseBranch }) =>
+        threads.newThreadFiles(place, repository, baseBranch),
+      ListThreadFiles: ({ threadId }) => threads.files(threadId),
+      FindThreadFiles: ({ threadId, paths }) => threads.existingFiles(threadId, paths),
+      GetThreadFile: ({ threadId, path }) => threads.file(threadId, path),
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
-      CreateConversation: (input) => conversations.create(input),
-      WatchWorkingConversations: () => conversations.watchWorking(),
-      WatchConversationPullRequests: () => conversationPullRequests.watch(),
-      WatchSettledConversations: () => settledConversations.watch(),
-      BringBackConversation: ({ conversationId }) => conversations.bringBack(conversationId),
+      CreateThread: (input) => threads.create(input),
+      WatchWorkingThreads: () => threads.watchWorking(),
+      WatchThreadPullRequests: () => threadPullRequests.watch(),
+      WatchSettledThreads: () => settledThreads.watch(),
+      BringBackThread: ({ threadId }) => threads.bringBack(threadId),
       WatchNeedsYou: () => needsYou.watch(),
-      MarkTurnSeen: ({ conversationId, endedAt }) =>
-        conversations.markTurnSeen(conversationId, endedAt),
+      MarkTurnSeen: ({ threadId, endedAt }) => threads.markTurnSeen(threadId, endedAt),
       AnswerOutsideQuestion: ({ id, answer }) => outsideQuestions.answer(id, answer),
       GetCheckInChanges: ({ checkInId }) => checkIns.changes(checkInId),
       ListCheckInNotes: ({ checkInId }) => checkIns.notes(checkInId),
@@ -192,34 +189,31 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       GetMcpEndpoint: () => mcpCredentials.endpoint.pipe(Effect.map((url) => ({ url }))),
       WatchOutsideAgents: () => outsideAgents.watch(),
       RevokeOutsideAgent: ({ id }) => outsideAgents.revoke(id),
-      ChangeConversationModel: ({ conversationId, model, effort }) =>
-        conversations.changeModel(conversationId, { model, effort }),
-      ChangePermissionMode: ({ conversationId, permissionMode }) =>
-        conversations.changePermissionMode(conversationId, permissionMode),
-      AnswerRequest: ({ conversationId, requestId, answer }) =>
-        conversations.answer(conversationId, requestId, answer),
-      SendMessage: ({ conversationId, message, images, feedback }) =>
-        conversations.send(conversationId, { message, images }, feedback).pipe(Effect.asVoid),
-      Steer: ({ conversationId, message, images }) =>
-        conversations.steer(conversationId, { message, images }),
-      CancelQueuedMessage: ({ conversationId, queuedMessageId }) =>
-        conversations.cancelQueued(conversationId, queuedMessageId),
-      SendQueuedMessage: ({ conversationId, queuedMessageId }) =>
-        conversations.sendQueued(conversationId, queuedMessageId),
-      StopTurn: ({ conversationId }) => conversations.stop(conversationId),
-      ReachSandbox: ({ conversationId }) => conversations.reachSandbox(conversationId),
-      GetUnsentMessage: ({ conversationId }) => conversations.unsent(conversationId),
-      SaveUnsentMessage: ({ conversationId, message, images }) =>
-        conversations.saveUnsent(conversationId, { message, images }),
-      GetConversationChanges: ({ conversationId }) => conversations.changes(conversationId),
-      ListFeedbackNotes: ({ conversationId }) => conversations.feedbackNotes(conversationId),
-      StageFeedbackNotes: ({ conversationId }) => conversations.stageFeedbackNotes(conversationId),
-      SaveFeedbackNote: ({ conversationId, note }) =>
-        conversations.saveFeedbackNote(conversationId, note),
-      RemoveFeedbackNote: ({ conversationId, noteId }) =>
-        conversations.removeFeedbackNote(conversationId, noteId),
-      GetRemovalWarnings: ({ conversationId }) => conversations.removalWarnings(conversationId),
-      RemoveConversation: ({ conversationId }) => conversations.remove(conversationId),
+      ChangeThreadModel: ({ threadId, model, effort }) =>
+        threads.changeModel(threadId, { model, effort }),
+      ChangePermissionMode: ({ threadId, permissionMode }) =>
+        threads.changePermissionMode(threadId, permissionMode),
+      AnswerRequest: ({ threadId, requestId, answer }) =>
+        threads.answer(threadId, requestId, answer),
+      SendMessage: ({ threadId, message, images, feedback }) =>
+        threads.send(threadId, { message, images }, feedback).pipe(Effect.asVoid),
+      Steer: ({ threadId, message, images }) => threads.steer(threadId, { message, images }),
+      CancelQueuedMessage: ({ threadId, queuedMessageId }) =>
+        threads.cancelQueued(threadId, queuedMessageId),
+      SendQueuedMessage: ({ threadId, queuedMessageId }) =>
+        threads.sendQueued(threadId, queuedMessageId),
+      StopTurn: ({ threadId }) => threads.stop(threadId),
+      ReachSandbox: ({ threadId }) => threads.reachSandbox(threadId),
+      GetUnsentMessage: ({ threadId }) => threads.unsent(threadId),
+      SaveUnsentMessage: ({ threadId, message, images }) =>
+        threads.saveUnsent(threadId, { message, images }),
+      GetThreadChanges: ({ threadId }) => threads.changes(threadId),
+      ListFeedbackNotes: ({ threadId }) => threads.feedbackNotes(threadId),
+      StageFeedbackNotes: ({ threadId }) => threads.stageFeedbackNotes(threadId),
+      SaveFeedbackNote: ({ threadId, note }) => threads.saveFeedbackNote(threadId, note),
+      RemoveFeedbackNote: ({ threadId, noteId }) => threads.removeFeedbackNote(threadId, noteId),
+      GetRemovalWarnings: ({ threadId }) => threads.removalWarnings(threadId),
+      RemoveThread: ({ threadId }) => threads.remove(threadId),
       GetGlobalChatModel: () => globalChat.model,
       ChangeGlobalChatModel: (choice) => globalChat.changeModel(choice),
       WatchGlobalTranscript: () => globalChat.transcript,

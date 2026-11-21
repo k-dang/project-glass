@@ -12,7 +12,7 @@ import { AsyncResult, Atom } from "effect/reactivity"
 import { Listbox, ListboxItem, ListboxItemIcon } from "@ui-sdk/react/listbox"
 import { ChevronDown, Inbox as InboxIcon } from "lucide-react"
 import { type ReactNode, useEffect, useState } from "react"
-import { ConversationRequest, answerRequestAtom } from "./conversationsArea"
+import { ThreadRequest, answerRequestAtom } from "./threadsArea"
 import { InboxDetail } from "./InboxDetail"
 import {
   contextOf,
@@ -235,8 +235,8 @@ function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxActi
 
   const allow = useAtomSet(
     answerRequestAtom(
-      new ConversationRequest({
-        conversationId: permission?.conversationId ?? "",
+      new ThreadRequest({
+        threadId: permission?.threadId ?? "",
         requestId: permission?.requestId ?? "",
       }),
     ),
@@ -250,7 +250,7 @@ function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxActi
 
       return review === null ? null : () => markDone(review)
     },
-    Conversation: (item) => {
+    Thread: (item) => {
       const seen = turnSeenOf(item)
 
       return seen === null ? null : () => markTurnSeen(seen)

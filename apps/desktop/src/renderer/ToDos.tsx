@@ -29,7 +29,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { toast } from "@/components/ui/toast"
 import { Backend, backendRuntime, useBackendRuntime } from "./backend"
-import { newConversationWrittenAtom } from "./conversationsArea"
+import { newThreadWrittenAtom } from "./threadsArea"
 import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { imageFiles, imageSrc, maxToDoImageBytes, readToDoImages } from "./pastedImages"
 import { ProblemAlert } from "./ProblemAlert"
@@ -516,9 +516,9 @@ function CompactNotes(props: { readonly notes: string }) {
   )
 }
 
-function useStartConversation(toDo: ToDo) {
+function useStartThread(toDo: ToDo) {
   const navigate = useNavigate()
-  const setWritten = useAtomSet(newConversationWrittenAtom)
+  const setWritten = useAtomSet(newThreadWrittenAtom)
 
   return () => {
     setWritten((written) => {
@@ -531,7 +531,7 @@ function useStartConversation(toDo: ToDo) {
 
       return { ...composed, message: before === "" ? link : `${before} ${link}` }
     })
-    void navigate({ to: "/conversations/new" })
+    void navigate({ to: "/threads/new" })
   }
 }
 
@@ -542,7 +542,7 @@ function ToDoRow(props: { toDo: ToDo }) {
   const sendImages = useAtomSet(sendImagesAtom(toDo.id))
   const toggle = useAtomValue(pendingToggleAtom)
   const checked = toggle?.id === toDo.id ? toggle.done : toDo.done
-  const startConversation = useStartConversation(toDo)
+  const startThread = useStartThread(toDo)
 
   const paste = (event: ClipboardEvent) => takePastedImages(event, sendImages)
 
@@ -585,9 +585,9 @@ function ToDoRow(props: { toDo: ToDo }) {
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label={`Start a Conversation from ${toDo.title}`}
-          title="Start a Conversation"
-          onClick={startConversation}
+          aria-label={`Start a Thread from ${toDo.title}`}
+          title="Start a Thread"
+          onClick={startThread}
         >
           <MessageSquarePlus aria-hidden />
         </Button>

@@ -10,7 +10,7 @@ export * from "./checkIn"
 
 export * from "./checkoutRun"
 
-export * from "./conversation"
+export * from "./thread"
 
 export * from "./connection"
 

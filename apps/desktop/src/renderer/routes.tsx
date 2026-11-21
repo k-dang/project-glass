@@ -14,7 +14,7 @@ import {
 import { Option, Schema } from "effect"
 import { AsyncResult, type AtomRegistry } from "effect/reactivity"
 import type { ReactNode } from "react"
-import { ConversationSearch } from "./conversationsArea"
+import { ThreadSearch } from "./threadsArea"
 import { AppShell } from "./AppShell"
 import { Dashboard } from "./Dashboard"
 import { Connecting, ConnectionProblem } from "./ConnectionProblem"
@@ -34,16 +34,13 @@ const ActivityLogPage = lazyRouteComponent(() => import("./ActivityLogPage"), "A
 
 const CheckInPage = lazyRouteComponent(() => import("./CheckInPage"), "CheckInPage")
 
-const ConversationsLayout = lazyRouteComponent(
-  () => import("./Conversations"),
-  "ConversationsLayout",
-)
+const ThreadsLayout = lazyRouteComponent(() => import("./Threads"), "ThreadsLayout")
 
-const ConversationView = lazyRouteComponent(() => import("./ConversationView"), "ConversationView")
+const ThreadView = lazyRouteComponent(() => import("./ThreadView"), "ThreadView")
 
 const Inbox = lazyRouteComponent(() => import("./Inbox"), "Inbox")
 
-const NewConversation = lazyRouteComponent(() => import("./NewConversation"), "NewConversation")
+const NewThread = lazyRouteComponent(() => import("./NewThread"), "NewThread")
 
 const PullRequestListPage = lazyRouteComponent(
   () => import("./PullRequestListPage"),
@@ -162,36 +159,36 @@ const dashboardRoute = createRoute({
   ),
 })
 
-const conversationsRoute = createRoute({
+const threadsRoute = createRoute({
   getParentRoute: () => rootRoute,
-  path: "conversations",
-  component: ConversationsLayout,
+  path: "threads",
+  component: ThreadsLayout,
 })
 
-const noConversationRoute = createRoute({
-  getParentRoute: () => conversationsRoute,
+const noThreadRoute = createRoute({
+  getParentRoute: () => threadsRoute,
   path: "/",
   beforeLoad: () => {
-    throw redirect({ to: "/conversations/new", replace: true })
+    throw redirect({ to: "/threads/new", replace: true })
   },
 })
 
-const newConversationRoute = createRoute({
-  getParentRoute: () => conversationsRoute,
+const newThreadRoute = createRoute({
+  getParentRoute: () => threadsRoute,
   path: "new",
   validateSearch: Schema.toStandardSchemaV1(
     Schema.Struct({ repository: Schema.optional(Schema.String) }),
   ),
-  loader: preloadLazyPage(NewConversation),
-  component: NewConversationPage,
+  loader: preloadLazyPage(NewThread),
+  component: NewThreadPage,
 })
 
-const conversationRoute = createRoute({
-  getParentRoute: () => conversationsRoute,
-  path: "$conversationId",
-  validateSearch: Schema.toStandardSchemaV1(ConversationSearch),
-  loader: preloadLazyPage(ConversationView),
-  component: ConversationPage,
+const threadRoute = createRoute({
+  getParentRoute: () => threadsRoute,
+  path: "$threadId",
+  validateSearch: Schema.toStandardSchemaV1(ThreadSearch),
+  loader: preloadLazyPage(ThreadView),
+  component: ThreadPage,
 })
 
 const settingsRoute = createRoute({
@@ -209,7 +206,7 @@ const routeTree = rootRoute.addChildren([
   inboxRoute,
   checkInRoute,
   dashboardRoute,
-  conversationsRoute.addChildren([noConversationRoute, newConversationRoute, conversationRoute]),
+  threadsRoute.addChildren([noThreadRoute, newThreadRoute, threadRoute]),
   settingsRoute,
 ])
 
@@ -217,8 +214,7 @@ const viewedIn = (router: ReturnType<typeof makeRouter>): Viewed | null => {
   for (const match of router.state.matches) {
     if (match.routeId === pullRequestRoute.id) return Viewed.PullRequest({ ref: match.params })
 
-    if (match.routeId === conversationRoute.id)
-      return Viewed.Conversation({ conversationId: match.params.conversationId })
+    if (match.routeId === threadRoute.id) return Viewed.Thread({ threadId: match.params.threadId })
   }
 
   return null
@@ -281,20 +277,20 @@ function ListPage() {
   )
 }
 
-function NewConversationPage() {
-  const { repository } = newConversationRoute.useSearch()
+function NewThreadPage() {
+  const { repository } = newThreadRoute.useSearch()
 
-  return <NewConversation repository={repository} />
+  return <NewThread repository={repository} />
 }
 
-function ConversationPage() {
-  const { conversationId } = conversationRoute.useParams()
-  const { view } = conversationRoute.useSearch()
-  const navigate = conversationRoute.useNavigate()
+function ThreadPage() {
+  const { threadId } = threadRoute.useParams()
+  const { view } = threadRoute.useSearch()
+  const navigate = threadRoute.useNavigate()
 
   return (
-    <ConversationView
-      conversationId={conversationId}
+    <ThreadView
+      threadId={threadId}
       tab={view ?? "chat"}
       onTabChange={(tab) => void navigate({ search: tab === "changes" ? { view: tab } : {} })}
     />

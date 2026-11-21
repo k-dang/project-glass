@@ -1,6 +1,6 @@
 import {
   type CheckIn,
-  ConversationNeedsYou,
+  ThreadNeedsYou,
   AgentReviewFinished,
   AwaitingReply,
   ChangesRequested,
@@ -36,7 +36,7 @@ import {
 } from "effect"
 import { AgentReviews } from "./AgentReviews"
 import { CheckIns } from "./CheckIns"
-import { Conversations, type FinishedConversation, type WaitingConversation } from "./Conversations"
+import { Threads, type FinishedThread, type WaitingThread } from "./Threads"
 import { GlobalChat } from "./GlobalChat"
 import { OutsideQuestions } from "./OutsideQuestions"
 import {
@@ -69,11 +69,11 @@ const waitingOn = (requests: Arr.NonEmptyReadonlyArray<WaitingRequest>) => ({
   ),
 })
 
-const waitingItem = ({ conversation, requests }: WaitingConversation) => {
+const waitingItem = ({ thread, requests }: WaitingThread) => {
   const { requests: parts, since } = waitingOn(requests)
 
-  return ConversationNeedsYou.make({
-    conversation,
+  return ThreadNeedsYou.make({
+    thread,
     reasons: [WaitingRequests.make({ requests: parts })],
     since,
   })
@@ -82,9 +82,9 @@ const waitingItem = ({ conversation, requests }: WaitingConversation) => {
 const globalItem = (requests: ReadonlyArray<WaitingRequest>) =>
   Arr.isReadonlyArrayNonEmpty(requests) ? [GlobalChatNeedsYou.make(waitingOn(requests))] : []
 
-const finishedItem = ({ conversation, ended }: FinishedConversation) =>
-  ConversationNeedsYou.make({
-    conversation,
+const finishedItem = ({ thread, ended }: FinishedThread) =>
+  ThreadNeedsYou.make({
+    thread,
     reasons: [TurnFinished.make({ ended })],
     since: ended.at,
   })
@@ -103,8 +103,8 @@ const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
   )
 
 interface Waiting {
-  readonly conversations: ReadonlyArray<WaitingConversation>
-  readonly finished: ReadonlyArray<FinishedConversation>
+  readonly threads: ReadonlyArray<WaitingThread>
+  readonly finished: ReadonlyArray<FinishedThread>
   readonly pullRequests: ReadonlyArray<WaitingPullRequest>
   readonly questions: ReadonlyArray<OutsideQuestion>
   readonly checkIns: ReadonlyArray<CheckIn>
@@ -114,7 +114,7 @@ interface Waiting {
 const needsYouOf = (waiting: Waiting): ReadonlyArray<NeedsYouItem> =>
   Arr.sort(
     [
-      ...waiting.conversations.map(waitingItem),
+      ...waiting.threads.map(waitingItem),
       ...waiting.finished.map(finishedItem),
       ...waiting.questions,
       ...waiting.checkIns,
@@ -185,7 +185,7 @@ export class NeedsYou extends Context.Service<
   static readonly layer = Layer.effect(
     NeedsYou,
     Effect.gen(function* () {
-      const conversations = yield* Conversations
+      const threads = yield* Threads
       const queue = yield* Queue
       const agentReviews = yield* AgentReviews
       const questions = yield* OutsideQuestions
@@ -249,8 +249,8 @@ export class NeedsYou extends Context.Service<
       return NeedsYou.of({
         watch: () =>
           Stream.zipLatestAll(
-            conversations.watchWaiting(),
-            conversations.watchFinished(),
+            threads.watchWaiting(),
+            threads.watchFinished(),
             waitingPullRequests,
             questions.watch(),
             checkIns.watch(),
@@ -258,7 +258,7 @@ export class NeedsYou extends Context.Service<
           ).pipe(
             Stream.map(([waiting, finished, pullRequests, asked, checkingIn, global]) =>
               needsYouOf({
-                conversations: waiting,
+                threads: waiting,
                 finished,
                 pullRequests,
                 questions: asked,
