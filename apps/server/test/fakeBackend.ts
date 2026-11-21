@@ -18,6 +18,7 @@ import { writeAgentCommands } from "./agentCommands"
 import {
   bundledPi,
   demoCheckout,
+  demoThreadNames,
   seedDemoThreads,
   startDemoClaude,
   startDemoPi,
@@ -124,8 +125,11 @@ const main = Effect.gen(function* () {
 
   writeAgentCommands(config.dataDirectory, { claudeCommand, piCommand: bundledPi })
 
+  const threadNames = demoThreadNames()
+
   const running = yield* Layer.build(
     serve(fakeAgentRunners, GlassMcpTools).pipe(
+      Layer.provide(threadNames.layer),
       Layer.provide(ServerConfig.layer),
       Layer.provide(configured),
     ),
@@ -158,7 +162,13 @@ const main = Effect.gen(function* () {
   )
 
   if (fresh)
-    yield* seedDemoThreads(config.port, Redacted.value(config.token), checkout, reviewed).pipe(
+    yield* seedDemoThreads(
+      config.port,
+      Redacted.value(config.token),
+      checkout,
+      reviewed,
+      threadNames.named,
+    ).pipe(
       Effect.catchCause((cause) => Effect.logWarning("Couldn't start the demo Threads", cause)),
     )
 

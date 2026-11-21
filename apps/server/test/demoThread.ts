@@ -1,20 +1,22 @@
 import {
-  type Diagram,
-  DRAW_DIAGRAM_TOOL,
   GlassRpcs,
+  type Image,
   type NewThread,
   type PullRequestRef,
   RPC_PATH,
   localPlace,
   TOKEN_PARAM,
 } from "@glass/contracts"
-import { Effect, Schema } from "effect"
+import { Effect, Layer, Schema } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { GLASS_MCP_PREFIX } from "../src/agentHost/toolCalls"
 import { connectRpcClient } from "../src/rpcSocket"
-import { LONG_THREAD_FOLLOW_UPS, LONG_THREAD_OPENING, longThreadReply } from "./demoLongThread"
+import { shortThreadNames, ThreadNames } from "../src/threadNames"
+import { artifactsThread } from "./demoArtifacts"
+import { longThread } from "./demoLongThread"
+import type { ScriptedThread } from "./demoScript"
 import { DEMO_REPOSITORY } from "./demoPullRequests"
 import { lastUserWords, replyTo, startFakeAnthropic } from "./fakeAnthropic"
 import { globalChatReply, isGlobalChat } from "./fakeGlobalChat"
@@ -57,42 +59,6 @@ const slowReply = `Working through it one step at a time. ${Array.from(
   (_, step) => `Step ${step + 1} looks fine.`,
 ).join(" ")} All done.`
 
-const diagramReply = [
-  "Here's how a message reaches the Thread:",
-  "",
-  "```mermaid",
-  "flowchart LR",
-  "  A[Message box] --> B[Backend]",
-  "  B --> C[Thread]",
-  "  C -->|streams reply| A",
-  "```",
-].join("\n")
-
-const messageFlow = [
-  "flowchart LR",
-  "  A[Message box] --> B[Backend]",
-  "  B --> C[Thread]",
-  "  C -->|streams reply| A",
-]
-
-const diagramDrawings = {
-  "Diagram the message flow": {
-    title: "Message flow",
-    kind: "existing",
-    mermaid: messageFlow.join("\n"),
-  },
-  "Add a queue to it": {
-    title: "Message flow",
-    kind: "proposed",
-    mermaid: [...messageFlow, "  B --> Q[[Queue]]", "  Q --> C"].join("\n"),
-  },
-  "Break the diagram": {
-    title: "Message flow",
-    kind: "existing",
-    mermaid: "flowchart LR\n  A -->> [[",
-  },
-} satisfies Record<string, Diagram>
-
 const decodeToolArguments = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))
 
 const glassToolReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> | undefined => {
@@ -115,15 +81,7 @@ const glassToolReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> 
   ]
 }
 
-const demoPage = [
-  "<!doctype html><html><body>",
-  "<h1>Rate-limit the poller</h1>",
-  '<section id="limits"><h2>Limits</h2>',
-  "<p>Each Connection gets a burst of 20 requests and a refill of five per minute.</p></section>",
-  "<table><thead><tr><th>Option</th><th>Refill / min</th></tr></thead>",
-  "<tbody><tr><td>Token bucket</td><td>5</td></tr></tbody></table>",
-  "</body></html>",
-].join("")
+const scriptedThreads = [longThread, artifactsThread]
 
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   if (isGlobalChat(input)) return globalChatReply(input)
@@ -132,14 +90,11 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
 
   if (glassTool !== undefined) return glassTool
 
-  const scripted = longThreadReply(input)
+  for (const thread of scriptedThreads) {
+    const scripted = thread.reply(input)
 
-  if (scripted !== undefined) return scripted
-
-  if (lastUserText(input) === "Write a page")
-    return input.messages.at(-1)?.role === "tool"
-      ? [{ text: "I wrote the plan to `plan.html`." }]
-      : runCommands({ "Write a page": `printf '%s' '${demoPage}' > plan.html` })(input)
+    if (scripted !== undefined) return scripted
+  }
 
   const changes = {
     "Write a note": "printf 'hello from the agent\\n' > notes.txt",
@@ -152,23 +107,6 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   const { messages } = input
   const last = messages.at(-1)
 
-  const drawing = Object.entries(diagramDrawings).find(
-    ([words]) => words === lastUserText(input),
-  )?.[1]
-
-  if (drawing !== undefined)
-    return last?.role === "tool"
-      ? [{ text: "It's beside the Thread." }]
-      : [
-          {
-            toolCall: {
-              id: `demo-diagram-${messages.length}`,
-              name: DRAW_DIAGRAM_TOOL,
-              arguments: drawing,
-            },
-          },
-        ]
-
   if (last?.role === "tool")
     return [
       {
@@ -177,8 +115,6 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
     ]
 
   if (workingSlowly(input)) return slowReply.split(/(?<= )/).map((text) => ({ text }))
-
-  if (lastUserText(input) === "Draw a diagram") return [{ text: diagramReply }]
 
   if (answersFollowUp(input))
     return [
@@ -224,11 +160,38 @@ export const demoCheckout = (repositories: string) => {
   return checkout
 }
 
+export const demoThreadNames = () => {
+  let pending: string | undefined
+
+  return {
+    layer: Layer.succeed(ThreadNames)({
+      candidates: () => {
+        const name = pending
+        pending = undefined
+
+        return name === undefined ? shortThreadNames() : [name]
+      },
+    }),
+    named: <A, E, R>(name: string, create: Effect.Effect<A, E, R>) =>
+      Effect.sync(() => {
+        pending = name
+      }).pipe(
+        Effect.andThen(create),
+        Effect.ensuring(
+          Effect.sync(() => {
+            pending = undefined
+          }),
+        ),
+      ),
+  }
+}
+
 export const seedDemoThreads = Effect.fnUntraced(function* (
   port: number,
   token: string,
   checkout: string,
   reviewed: PullRequestRef,
+  named: ReturnType<typeof demoThreadNames>["named"],
 ) {
   const client = yield* connectRpcClient(
     GlassRpcs,
@@ -237,34 +200,52 @@ export const seedDemoThreads = Effect.fnUntraced(function* (
 
   const linked = yield* client.LinkLocalCheckout({ path: checkout })
 
-  const thread = (harness: NewThread["harness"], message: string) =>
-    client.CreateThread({
-      repository: linked.repository,
-      baseBranch: "main",
-      harness,
-      model: null,
-      effort: null,
-      permissionMode: harness === "claude-code" ? "default" : null,
-      place: localPlace,
-      message,
-      images: [],
-      skillPacks: [],
-      localSkills: false,
-    })
+  const thread = (
+    name: string,
+    harness: NewThread["harness"],
+    message: string,
+    images: ReadonlyArray<Image> = [],
+  ) =>
+    named(
+      name,
+      client.CreateThread({
+        repository: linked.repository,
+        baseBranch: "main",
+        harness,
+        model: null,
+        effort: null,
+        permissionMode: harness === "claude-code" ? "default" : null,
+        place: localPlace,
+        message,
+        images,
+        skillPacks: [],
+        localSkills: false,
+      }),
+    )
 
-  yield* thread("pi", "Show me around this repository.")
-  const long = yield* thread("pi", LONG_THREAD_OPENING)
-  yield* Effect.forEach(
-    LONG_THREAD_FOLLOW_UPS,
-    (message) => client.SendMessage({ threadId: long.id, message, images: [], feedback: [] }),
-    { discard: true },
+  const scripted = ({ name, images, opening, followUps }: ScriptedThread) =>
+    thread(name, "pi", opening, images()).pipe(
+      Effect.flatMap(({ id }) =>
+        Effect.forEach(
+          followUps,
+          (message) => client.SendMessage({ threadId: id, message, images: [], feedback: [] }),
+          { discard: true },
+        ),
+      ),
+    )
+
+  yield* thread("demo/look-around", "pi", "Show me around this repository.")
+  yield* Effect.forEach(scriptedThreads, scripted, { discard: true })
+  yield* thread("demo/uncommitted-note", "pi", "Write a note")
+  yield* thread("demo/linked-pr", "pi", "Pick up the README typo PR")
+  yield* thread("demo/keeps-working", "pi", keepWorkingPrompt)
+  yield* thread("demo/claude-permission", "claude-code", "Run `pnpm test` and tell me what fails.")
+  yield* thread(
+    "demo/claude-question",
+    "claude-code",
+    "Ask me which part of the code to look at first.",
   )
-  yield* thread("pi", "Write a note")
-  yield* thread("pi", "Pick up the README typo PR")
-  yield* thread("pi", keepWorkingPrompt)
-  yield* thread("claude-code", "Run `pnpm test` and tell me what fails.")
-  yield* thread("claude-code", "Ask me which part of the code to look at first.")
-  yield* thread("claude-code", `${failingPrompt} to its latest major version.`)
+  yield* thread("demo/claude-fails", "claude-code", `${failingPrompt} to its latest major version.`)
 
   yield* client.SendGlobalMessage({
     message: "Ask me which PR to start with.",
