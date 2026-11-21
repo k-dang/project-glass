@@ -90,6 +90,31 @@ const newThreadHandlers = (created: Array<NewThread>, threads: ReadonlyArray<Thr
 
 const newThreadDraft = () => screen.getByRole("region", { name: "New Thread" })
 
+const findDraft = () => screen.findByRole("region", { name: "New Thread" })
+
+const send = async (user: ReturnType<typeof mount>, message?: string) => {
+  const composer = within(newThreadDraft()).getByRole("textbox", { name: "Message" })
+
+  if (message !== undefined) await user.type(composer, message)
+
+  await waitFor(() =>
+    expect(within(newThreadDraft()).getByRole("button", { name: "Send" })).toHaveProperty(
+      "disabled",
+      false,
+    ),
+  )
+  await user.type(composer, "{Enter}")
+}
+
+const baseBranchShows = (branch: string) =>
+  waitFor(() =>
+    expect(
+      within(within(newThreadDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
+        branch,
+      ),
+    ).toBeTruthy(),
+  )
+
 it("starts a Thread from its first message, on the repository's default branch", async () => {
   const created: Array<NewThread> = []
 
@@ -107,30 +132,32 @@ it("starts a Thread from its first message, on the repository's default branch",
     "/threads/new",
   )
 
-  const draft = await screen.findByRole("region", { name: "New Thread" })
+  const draft = await findDraft()
   const base = await within(draft).findByRole("combobox", { name: "Base branch" })
-  expect(within(base).getByText("main")).toBeTruthy()
+  expect(await within(base).findByText("main")).toBeTruthy()
   const mode = await within(draft).findByRole("combobox", { name: "Permission mode" })
   expect(within(mode).getByText("Auto")).toBeTruthy()
   expect(within(draft).queryByRole("combobox", { name: "Where the Thread runs" })).toBeNull()
 
-  await user.type(within(draft).getByRole("textbox", { name: "Message" }), "Fix the bug{Enter}")
+  await send(user, "Fix the bug")
 
-  expect(created).toEqual([
-    {
-      repository: thread.repository,
-      baseBranch: "main",
-      harness: "claude-code",
-      model: null,
-      effort: null,
-      permissionMode: null,
-      place: localPlace,
-      skillPacks: [],
-      localSkills: false,
-      message: "Fix the bug",
-      images: [],
-    },
-  ])
+  await waitFor(() =>
+    expect(created).toEqual([
+      {
+        repository: thread.repository,
+        baseBranch: "main",
+        harness: "claude-code",
+        model: null,
+        effort: null,
+        permissionMode: null,
+        place: localPlace,
+        skillPacks: [],
+        localSkills: false,
+        message: "Fix the bug",
+        images: [],
+      },
+    ]),
+  )
   await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
 })
 
@@ -153,18 +180,17 @@ it("starts a Thread from a to-do by mentioning it", async () => {
   )
 
   await user.click(await screen.findByRole("button", { name: "Start a Thread from Fix spacing" }))
-  const draft = await screen.findByRole("region", { name: "New Thread" })
-  await within(draft).findByRole("combobox", { name: "Base branch" })
-  await user.type(within(draft).getByRole("textbox", { name: "Message" }), "{Enter}")
+  await findDraft()
+  await send(user)
 
-  expect(created.map(({ message, images }) => ({ message, images }))).toEqual([
-    { message: "[Fix spacing](glass://to-do/7)", images: [] },
-  ])
+  await waitFor(() =>
+    expect(created.map(({ message, images }) => ({ message, images }))).toEqual([
+      { message: "[Fix spacing](glass://to-do/7)", images: [] },
+    ]),
+  )
 })
 
-// Flaky: failed once in a full desktop test run, then passed alone on rerun.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("starts a Thread with the Skill packs picked, and picks the same ones next time", async () => {
+it("starts a Thread with the Skill packs picked, and picks the same ones next time", async () => {
   const created: Array<NewThread> = []
 
   const handlers = {
@@ -175,30 +201,27 @@ it.skip("starts a Thread with the Skill packs picked, and picks the same ones ne
 
   const user = mount(handlers, "/threads/new")
 
-  const packs = await within(await screen.findByRole("region", { name: "New Thread" })).findByRole(
-    "combobox",
-    { name: "Skill packs" },
-  )
+  const packs = await within(await findDraft()).findByRole("combobox", { name: "Skill packs" })
 
   expect(within(packs).getByText("No Skill packs")).toBeTruthy()
   await user.click(packs)
   await user.click(await screen.findByRole("option", { name: "team" }))
   await user.keyboard("{Escape}")
   expect(within(packs).getByText("team")).toBeTruthy()
-  await user.type(within(newThreadDraft()).getByRole("textbox", { name: "Message" }), "One{Enter}")
+  await send(user, "One")
   await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
 
   cleanup()
   const again = mount(handlers, "/threads/new")
 
-  const remembered = await within(
-    await screen.findByRole("region", { name: "New Thread" }),
-  ).findByRole("combobox", { name: "Skill packs" })
+  const remembered = await within(await findDraft()).findByRole("combobox", { name: "Skill packs" })
 
   expect(within(remembered).getByText("team")).toBeTruthy()
-  await again.type(within(newThreadDraft()).getByRole("textbox", { name: "Message" }), "Two{Enter}")
+  await send(again, "Two")
 
-  expect(created.map(({ skillPacks }) => skillPacks)).toEqual([["team"], ["team"]])
+  await waitFor(() =>
+    expect(created.map(({ skillPacks }) => skillPacks)).toEqual([["team"], ["team"]]),
+  )
 })
 
 it("waits for the Skill packs to load before starting a Thread with the remembered ones", async () => {
@@ -214,14 +237,11 @@ it("waits for the Skill packs to load before starting a Thread with the remember
     "/threads/new",
   )
 
-  const message = await within(
-    await screen.findByRole("region", { name: "New Thread" }),
-  ).findByRole("textbox", { name: "Message" })
+  const message = await within(await findDraft()).findByRole("textbox", { name: "Message" })
 
   await user.type(message, "Go{Enter}")
   Deferred.doneUnsafe(listed, Exit.void)
-  await within(newThreadDraft()).findByRole("combobox", { name: "Skill packs" })
-  await user.type(message, "{Enter}")
+  await send(user)
 
   await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
   expect(created.map(({ skillPacks }) => skillPacks)).toEqual([["team"]])
@@ -244,14 +264,14 @@ it("gives a Sandbox Thread the Local skills when picked, warning which skill nam
   }
 
   const user = mount(handlers, "/threads/new")
-  const draft = await screen.findByRole("region", { name: "New Thread" })
+  const draft = await findDraft()
   await within(draft).findByRole("combobox", { name: "Skill packs" })
   expect(within(draft).queryByRole("checkbox", { name: "Local skills" })).toBeNull()
 
-  await user.click(within(draft).getByRole("combobox", { name: "Where the Thread runs" }))
+  await user.click(await within(draft).findByRole("combobox", { name: "Where the Thread runs" }))
   await user.click(await screen.findByRole("option", { name: "Fake Sandboxes" }))
 
-  const localSkills = await within(newThreadDraft()).findByRole("checkbox", {
+  const localSkills = await within(await findDraft()).findByRole("checkbox", {
     name: "Local skills",
   })
 
@@ -259,7 +279,7 @@ it("gives a Sandbox Thread the Local skills when picked, warning which skill nam
 
   await user.click(localSkills)
 
-  const shared = await within(newThreadDraft()).findByRole("list", {
+  const shared = await within(await findDraft()).findByRole("list", {
     name: "Shared skill names",
   })
 
@@ -272,20 +292,17 @@ it("gives a Sandbox Thread the Local skills when picked, warning which skill nam
     "tdd is in Local skills and team. The Thread has each, as /local:tdd and /team:tdd.",
   ])
 
-  await user.type(
-    within(newThreadDraft()).getByRole("textbox", { name: "Message" }),
-    "Fix the bug{Enter}",
-  )
+  await send(user, "Fix the bug")
   await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
   expect(created).toMatchObject([{ skillPacks: ["team"], localSkills: true }])
 
   cleanup()
   mount(handlers, "/threads/new")
-  const again = await screen.findByRole("region", { name: "New Thread" })
+  const again = await findDraft()
   await user.click(await within(again).findByRole("combobox", { name: "Where the Thread runs" }))
   await user.click(await screen.findByRole("option", { name: "Fake Sandboxes" }))
   expect(
-    (await within(newThreadDraft()).findByRole("checkbox", { name: "Local skills" })).getAttribute(
+    (await within(await findDraft()).findByRole("checkbox", { name: "Local skills" })).getAttribute(
       "aria-checked",
     ),
   ).toBe("true")
@@ -304,10 +321,7 @@ it("warns a local Thread which skill names its Skill packs share with the Local 
     "/threads/new",
   )
 
-  const shared = await within(await screen.findByRole("region", { name: "New Thread" })).findByRole(
-    "list",
-    { name: "Shared skill names" },
-  )
+  const shared = await within(await findDraft()).findByRole("list", { name: "Shared skill names" })
 
   expect(within(newThreadDraft()).queryByRole("checkbox", { name: "Local skills" })).toBeNull()
   expect(within(shared).getByRole("listitem").textContent).toBe(
@@ -339,15 +353,12 @@ it("shows when the Local skills can't be read, and still starts the Sandbox Thre
     "/threads/new",
   )
 
-  const draft = await screen.findByRole("region", { name: "New Thread" })
+  const draft = await findDraft()
   await user.click(await within(draft).findByRole("combobox", { name: "Where the Thread runs" }))
   await user.click(await screen.findByRole("option", { name: "Fake Sandboxes" }))
-  expect(await within(newThreadDraft()).findByText("Couldn't read your Local skills")).toBeTruthy()
+  expect(await within(await findDraft()).findByText("Couldn't read your Local skills")).toBeTruthy()
 
-  await user.type(
-    within(newThreadDraft()).getByRole("textbox", { name: "Message" }),
-    "Fix the bug{Enter}",
-  )
+  await send(user, "Fix the bug")
   await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
   expect(created).toMatchObject([{ skillPacks: ["team"], localSkills: true }])
 })
@@ -369,10 +380,9 @@ it("shows the first message at once while the Thread starts", async () => {
     "/threads/new",
   )
 
-  const draft = await screen.findByRole("region", { name: "New Thread" })
-  await within(draft).findByRole("combobox", { name: "Base branch" })
+  const draft = await findDraft()
   const composer = within(draft).getByRole("textbox", { name: "Message" })
-  await user.type(composer, "Fix the bug{Enter}")
+  await send(user, "Fix the bug")
 
   expect(within(draft).getByText("Fix the bug")).toBeTruthy()
   expect(
@@ -417,21 +427,17 @@ it("keeps local branch, harness, model, effort, and unsent work when exploring a
   )
 
   const select = async (name: string, option: string) => {
-    await user.click(
-      await within(await screen.findByRole("region", { name: "New Thread" })).findByRole(
-        "combobox",
-        { name },
-      ),
-    )
+    await user.click(await within(await findDraft()).findByRole("combobox", { name }))
     await user.click(await screen.findByRole("option", { name: option }))
   }
 
+  await baseBranchShows("main")
   await select("Base branch", "develop")
   await user.click(
-    await within(newThreadDraft()).findByRole("button", { name: "Claude Code: Opus 5.5" }),
+    await within(await findDraft()).findByRole("button", { name: "Claude Code: Opus 5.5" }),
   )
   await user.click(choice(await screen.findByRole("dialog"), "Agent harness", "pi"))
-  await within(newThreadDraft()).findByRole("button", { name: "pi: gpt-test" })
+  await within(await findDraft()).findByRole("button", { name: "pi: gpt-test" })
   await user.click(choice(await screen.findByRole("dialog"), "Model", "Thinker"))
   await select("Effort", "High")
   await user.type(
@@ -445,10 +451,10 @@ it("keeps local branch, harness, model, effort, and unsent work when exploring a
     }),
   )
   await user.paste(clipboard)
-  await within(newThreadDraft()).findByRole("img", { name: "Attachment 1" })
+  await within(await findDraft()).findByRole("img", { name: "Attachment 1" })
 
   await select("Where the Thread runs", "Fake Sandboxes")
-  await within(newThreadDraft()).findByRole("button", { name: "Claude Code: Remote model" })
+  await within(await findDraft()).findByRole("button", { name: "Claude Code: Remote model" })
   expect(
     await within(
       within(newThreadDraft()).getByRole("combobox", { name: "Base branch" }),
@@ -458,31 +464,29 @@ it("keeps local branch, harness, model, effort, and unsent work when exploring a
   expect(within(newThreadDraft()).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
 
   await select("Where the Thread runs", "Local")
-  await within(newThreadDraft()).findByRole("button", { name: "pi: Thinker" })
+  await within(await findDraft()).findByRole("button", { name: "pi: Thinker" })
   expect(
     within(within(newThreadDraft()).getByRole("combobox", { name: "Effort" })).getByText("High"),
   ).toBeTruthy()
-  expect(
-    within(within(newThreadDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
-      "develop",
-    ),
-  ).toBeTruthy()
+  await baseBranchShows("develop")
   expect(within(newThreadDraft()).getByRole("textbox", { name: "Message" })).toHaveProperty(
     "textContent",
     "Keep my choices",
   )
-  await user.type(within(newThreadDraft()).getByRole("textbox", { name: "Message" }), "{Enter}")
-  expect(created).toMatchObject([
-    {
-      place: localPlace,
-      baseBranch: "develop",
-      harness: "pi",
-      model: "glass-test/thinker",
-      effort: "high",
-      permissionMode: null,
-      images: [pixel],
-    },
-  ])
+  await send(user)
+  await waitFor(() =>
+    expect(created).toMatchObject([
+      {
+        place: localPlace,
+        baseBranch: "develop",
+        harness: "pi",
+        model: "glass-test/thinker",
+        effort: "high",
+        permissionMode: null,
+        images: [pixel],
+      },
+    ]),
+  )
 })
 
 it("restores each harness's choices and keeps local Permission mode separate from a Sandbox", async () => {
@@ -506,17 +510,12 @@ it("restores each harness's choices and keeps local Permission mode separate fro
   )
 
   const select = async (name: string, option: string) => {
-    await user.click(
-      await within(await screen.findByRole("region", { name: "New Thread" })).findByRole(
-        "combobox",
-        { name },
-      ),
-    )
+    await user.click(await within(await findDraft()).findByRole("combobox", { name }))
     await user.click(await screen.findByRole("option", { name: option }))
   }
 
   await user.click(
-    await within(await screen.findByRole("region", { name: "New Thread" })).findByRole("button", {
+    await within(await findDraft()).findByRole("button", {
       name: "Claude Code: Opus 5.5",
     }),
   )
@@ -527,18 +526,18 @@ it("restores each harness's choices and keeps local Permission mode separate fro
     within(newThreadDraft()).getByRole("button", { name: "Claude Code: Sonnet 5.5" }),
   )
   await user.click(choice(await screen.findByRole("dialog"), "Agent harness", "pi"))
-  await within(newThreadDraft()).findByRole("button", { name: "pi: gpt-test" })
+  await within(await findDraft()).findByRole("button", { name: "pi: gpt-test" })
   expect(within(newThreadDraft()).queryByRole("combobox", { name: "Effort" })).toBeNull()
   await user.click(choice(await screen.findByRole("dialog"), "Agent harness", "Claude Code"))
   await user.keyboard("{Escape}")
-  await within(newThreadDraft()).findByRole("button", { name: "Claude Code: Sonnet 5.5" })
+  await within(await findDraft()).findByRole("button", { name: "Claude Code: Sonnet 5.5" })
   await select("Where the Thread runs", "Fake Sandboxes")
-  await within(await screen.findByRole("region", { name: "New Thread" })).findByRole("button", {
+  await within(await findDraft()).findByRole("button", {
     name: "Claude Code: Opus 5.5",
   })
   expect(within(newThreadDraft()).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
   await select("Where the Thread runs", "Local")
-  await within(await screen.findByRole("region", { name: "New Thread" })).findByRole("button", {
+  await within(await findDraft()).findByRole("button", {
     name: "Claude Code: Sonnet 5.5",
   })
   expect(
@@ -546,18 +545,15 @@ it("restores each harness's choices and keeps local Permission mode separate fro
       "Accept edits",
     ),
   ).toBeTruthy()
-  await user.type(
-    within(newThreadDraft()).getByRole("textbox", { name: "Message" }),
-    "Fix it{Enter}",
+  await send(user, "Fix it")
+  await waitFor(() =>
+    expect(created).toMatchObject([
+      { harness: "claude-code", model: "sonnet", effort: "high", permissionMode: "acceptEdits" },
+    ]),
   )
-  expect(created).toMatchObject([
-    { harness: "claude-code", model: "sonnet", effort: "high", permissionMode: "acceptEdits" },
-  ])
 })
 
-// Flaky: failed once in a full desktop test run, then passed on rerun.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("keeps branches per repository and falls back when a remembered branch disappears", async () => {
+it("keeps branches per repository and falls back when a remembered branch disappears", async () => {
   const other = new FollowedRepository({ owner: "glass-demo", repo: "lamp" })
   let localBranches = ["main", "develop"]
   const created: Array<NewThread> = []
@@ -589,61 +585,33 @@ it.skip("keeps branches per repository and falls back when a remembered branch d
   )
 
   const select = async (name: string, option: string) => {
-    await user.click(
-      await within(await screen.findByRole("region", { name: "New Thread" })).findByRole(
-        "combobox",
-        { name },
-      ),
-    )
+    await user.click(await within(await findDraft()).findByRole("combobox", { name }))
     await user.click(await screen.findByRole("option", { name: option }))
   }
 
-  await waitFor(() =>
-    expect(
-      within(within(newThreadDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
-        "main",
-      ),
-    ).toBeTruthy(),
-  )
+  await baseBranchShows("main")
   await select("Base branch", "develop")
   await select("Repository", "glass-demo/lamp")
-  await waitFor(() =>
-    expect(
-      within(within(newThreadDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
-        "trunk",
-      ),
-    ).toBeTruthy(),
-  )
+  await baseBranchShows("trunk")
   await select("Repository", "glass-demo/greeter")
+  await baseBranchShows("develop")
+  await select("Where the Thread runs", "Fake Sandboxes")
   await waitFor(() =>
     expect(
-      within(within(newThreadDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
-        "develop",
-      ),
-    ).toBeTruthy(),
+      within(newThreadDraft()).getByRole("combobox", { name: "Repository" }).textContent,
+    ).toContain("No repositories"),
   )
-  await select("Where the Thread runs", "Fake Sandboxes")
-  expect(
-    (await within(newThreadDraft()).findByRole("combobox", { name: "Repository" })).textContent,
-  ).toContain("No repositories")
   expect(within(newThreadDraft()).getByRole("button", { name: "Send" })).toHaveProperty(
     "disabled",
     true,
   )
   localBranches = ["main"]
   await select("Where the Thread runs", "Local")
+  await baseBranchShows("main")
+  await send(user, "Fix it")
   await waitFor(() =>
-    expect(
-      within(within(newThreadDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
-        "main",
-      ),
-    ).toBeTruthy(),
+    expect(created).toMatchObject([{ repository: thread.repository, baseBranch: "main" }]),
   )
-  await user.type(
-    within(newThreadDraft()).getByRole("textbox", { name: "Message" }),
-    "Fix it{Enter}",
-  )
-  expect(created).toMatchObject([{ repository: thread.repository, baseBranch: "main" }])
 })
 
 it.each([
@@ -661,14 +629,13 @@ it.each([
       "/threads/new",
     )
 
-    await within(await screen.findByRole("region", { name: "New Thread" })).findByRole("button", {
+    await within(await findDraft()).findByRole("button", {
       name: `Claude Code: ${expectedModel === null ? "Opus 5.5" : "Sonnet 5.5"}`,
     })
-    await user.type(
-      within(newThreadDraft()).getByRole("textbox", { name: "Message" }),
-      "Fix it{Enter}",
+    await send(user, "Fix it")
+    await waitFor(() =>
+      expect(created).toMatchObject([{ model: expectedModel, effort: expectedEffort }]),
     )
-    expect(created).toMatchObject([{ model: expectedModel, effort: expectedEffort }])
   },
 )
 
@@ -703,10 +670,11 @@ it("keeps an unlinked Local place blocked and never inherits Sandbox bypass perm
     "/threads/new",
   )
 
-  const draft = await screen.findByRole("region", { name: "New Thread" })
+  const where = await screen.findByRole("combobox", { name: "Where the Thread runs" })
+  const draft = newThreadDraft()
   await user.type(within(draft).getByRole("textbox", { name: "Message" }), "Unsent work")
   expect(within(draft).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
-  await user.click(await within(draft).findByRole("combobox", { name: "Where the Thread runs" }))
+  await user.click(where)
   await user.click(await screen.findByRole("option", { name: "Local" }))
   await waitFor(() =>
     expect(
@@ -765,17 +733,11 @@ it("starts a Sandbox Thread on the default branch, listing other branches only w
     "/threads/new",
   )
 
-  const draft = await screen.findByRole("region", { name: "New Thread" })
+  const draft = await findDraft()
   await user.click(await within(draft).findByRole("combobox", { name: "Where the Thread runs" }))
   await user.click(await screen.findByRole("option", { name: "Fake Sandboxes" }))
 
-  await waitFor(() =>
-    expect(
-      within(within(newThreadDraft()).getByRole("combobox", { name: "Base branch" })).getByText(
-        "trunk",
-      ),
-    ).toBeTruthy(),
-  )
+  await baseBranchShows("trunk")
   expect(within(newThreadDraft()).getByText("The agent works on a branch of its own.")).toBeTruthy()
   expect(within(newThreadDraft()).queryByRole("combobox", { name: "Permission mode" })).toBeNull()
   expect(listedModels).toContain("sandbox:fake")
@@ -785,19 +747,18 @@ it("starts a Sandbox Thread on the default branch, listing other branches only w
   await user.click(await screen.findByRole("option", { name: "release" }))
   expect(listedBranches).toBe(1)
 
-  await user.type(
-    within(newThreadDraft()).getByRole("textbox", { name: "Message" }),
-    "Fix the bug{Enter}",
-  )
+  await send(user, "Fix the bug")
 
-  expect(created).toMatchObject([
-    {
-      repository: followed,
-      baseBranch: "release",
-      place: SandboxPlace.make({ providerId: "fake" }),
-      permissionMode: null,
-    },
-  ])
+  await waitFor(() =>
+    expect(created).toMatchObject([
+      {
+        repository: followed,
+        baseBranch: "release",
+        place: SandboxPlace.make({ providerId: "fake" }),
+        permissionMode: null,
+      },
+    ]),
+  )
   await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
 })
 
@@ -816,7 +777,7 @@ it("lists every Agent harness's models before one is chosen", async () => {
     "/threads/new",
   )
 
-  await screen.findByRole("region", { name: "New Thread" })
+  await findDraft()
   await waitFor(() => expect(listed).toContain("pi"))
   expect(listed).toContain("claude-code")
 })
@@ -836,12 +797,12 @@ it("offers only the Agent harnesses a Sandbox provider runs", async () => {
     "/threads/new",
   )
 
-  const draft = await screen.findByRole("region", { name: "New Thread" })
+  const draft = await findDraft()
   await within(draft).findByRole("button", { name: "Claude Code: Opus 5.5" })
   await user.click(await within(draft).findByRole("combobox", { name: "Where the Thread runs" }))
   await user.click(await screen.findByRole("option", { name: "Fake Sandboxes" }))
 
-  await user.click(await within(newThreadDraft()).findByRole("button", { name: "pi: gpt-test" }))
+  await user.click(await within(await findDraft()).findByRole("button", { name: "pi: gpt-test" }))
 
   const harnesses = within(await screen.findByRole("dialog")).getByRole("group", {
     name: "Agent harness",
@@ -867,18 +828,19 @@ it("starts a Thread with the last one's harness, model, and effort, in the Defau
 
   const user = mount(newThreadHandlers(created, [last]), "/threads/new")
 
-  const draft = await screen.findByRole("region", { name: "New Thread" })
+  const draft = await findDraft()
   await within(draft).findByRole("button", { name: "Claude Code: Sonnet 5.5" })
   expect(
     within(within(draft).getByRole("combobox", { name: "Effort" })).getByText("High"),
   ).toBeTruthy()
 
-  await within(draft).findByRole("combobox", { name: "Base branch" })
-  await user.type(within(draft).getByRole("textbox", { name: "Message" }), "Fix the bug{Enter}")
+  await send(user, "Fix the bug")
 
-  expect(created).toMatchObject([
-    { harness: "claude-code", model: "sonnet", effort: "high", permissionMode: null },
-  ])
+  await waitFor(() =>
+    expect(created).toMatchObject([
+      { harness: "claude-code", model: "sonnet", effort: "high", permissionMode: null },
+    ]),
+  )
   await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
 })
 
@@ -886,7 +848,7 @@ it("offers the chosen Agent harness's own models, and efforts only for models th
   const created: Array<NewThread> = []
   const user = mount(newThreadHandlers(created, []), "/threads/new")
 
-  const draft = await screen.findByRole("region", { name: "New Thread" })
+  const draft = await findDraft()
   await user.click(await within(draft).findByRole("button", { name: "Claude Code: Opus 5.5" }))
   const picker = await screen.findByRole("dialog")
   await user.click(choice(picker, "Agent harness", "pi"))
@@ -904,12 +866,13 @@ it("offers the chosen Agent harness's own models, and efforts only for models th
     ).toBeTruthy(),
   )
 
-  await within(draft).findByRole("combobox", { name: "Base branch" })
-  await user.type(within(draft).getByRole("textbox", { name: "Message" }), "Fix the bug{Enter}")
+  await send(user, "Fix the bug")
 
-  expect(created).toMatchObject([
-    { harness: "pi", model: "glass-test/thinker", effort: "low", permissionMode: null },
-  ])
+  await waitFor(() =>
+    expect(created).toMatchObject([
+      { harness: "pi", model: "glass-test/thinker", effort: "low", permissionMode: null },
+    ]),
+  )
   await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
 })
 
