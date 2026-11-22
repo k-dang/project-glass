@@ -2,7 +2,7 @@ import { useEffect, useSyncExternalStore } from "react"
 
 export type PageHolder = "pane" | "agent"
 
-export interface PageFrame {
+interface PageFrame {
   readonly left: number
   readonly top: number
   readonly width: number
