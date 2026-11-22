@@ -7,7 +7,7 @@ Build a Glass Sandbox provider Plugin for my Sandbox platform.
 
 Glass is at https://github.com/k-dang/project-glass. Read these before writing code:
 
-- `docs/adr/0010-sandboxes-come-from-provider-plugins.md`: why providers work the way they do.
+- `docs/adr/0011-sandboxes-come-from-provider-plugins.md`: why providers work the way they do.
 - `packages/plugin/src/index.ts`: how Glass loads Plugins and the interface to implement. It isn't
   published, so copy it into the Plugin folder as `glass-plugin.ts` and import its types from there.
 - `examples/fake-sandboxes/`: a working provider that runs its "Sandboxes" on this device.

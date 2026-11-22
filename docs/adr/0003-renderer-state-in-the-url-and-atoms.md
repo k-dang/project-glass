@@ -28,10 +28,6 @@ stores, not in component state.
   navigation isn't.
 - **Route loaders for opening a PR**: the router's match cache would hold the workspace, whose
   lifetime (unsent work, confirm before discard) is not a cache's.
-- **File-based routes**: idiomatic at scale, but needs the router's Vite plugin and generated code
-  for a handful of routes.
-- **React context plus `useState` in `App`** for shared state: one prop path, but every change
-  re-renders every consumer, and each feature adds more state to `App`.
 - **Hand-written external stores or Zustand**: granular, but async status, retry, and cancellation
   for Effect calls would still be hand-built.
 
@@ -42,6 +38,5 @@ split or unified choice start over.
 
 ## Revisit when
 
-- The route count grows enough to justify file-based routes.
 - A tab or file needs its own address, such as a link to share, despite the scroll problem above.
 - Shared state stops being mostly Effect calls, which would weaken the case for atoms.

@@ -3,27 +3,21 @@
 A Thread's agent drives the same page the user sees in its Browser pane, often while the user is
 looking at another Thread. So each Browser pane's page is a `<webview>` kept mounted in one layer
 of the window, outside any Thread's view, and placed over its Thread's pane while that Thread is
-on screen. It stays alive while its Thread is on screen or its agent's Turn is running. The
-agent's browser tools are Glass tools answered by the backend (ADR 0013), which drives the page
-with Playwright's `connectOverCDP`. Electron allows one debugger per page, so main holds that
-attachment and serves a relay over it on a loopback WebSocket at a secret path. The relay answers
-the few browser-level `Target.*` and `Browser.*` commands Playwright sends for its one page and
-forwards the rest. It reaches Browser pane pages only, never Glass's own window, which holds the
-backend's secret. CDP sends a page's key events to whatever holds focus in Glass's window, so the
-relay types and presses keys through Electron's input for the page instead. That input doesn't
-reach a frame from another site, so the agent can click in such a frame but not type in it.
+on screen. It stays alive while its Thread is on screen or its agent's Turn is running.
 
-DevTools can stay open on a page while its agent drives it; DevTools doesn't take the debugger
-the relay holds.
+The agent's browser tools are Glass tools answered by the backend (ADR 0015), which drives the page
+with Playwright's `connectOverCDP`. Electron allows one debugger per page, so main holds that
+attachment and serves a relay over it on a loopback WebSocket at a secret path. The relay reaches
+Browser pane pages only, never Glass's own window, which holds the backend's secret. CDP sends a
+page's key events to whatever holds focus in Glass's window, so the relay types and presses keys
+through Electron's input for the page instead.
 
 The user can take the page from the agent: a click or keypress in it takes over the browser, and
 until the user hands it back or sends the Thread their next message, the agent's tools that open
-or act on the page fail while its reads keep working. Taking over also stops the agent's call
-already running and a page load still waiting for its response. Electron reports the agent's input to main
-just like the user's, so main tells them apart by its relay: the agent's input arrives only while
-a relayed `Input.*` command waits for its answer. The backend holds who controls each Thread's
-page, because it already sees every browser tool call, which the pane shows as the agent using
-the browser, and every message the user sends.
+or act on the page fail while its reads keep working. The backend holds who controls each Thread's
+page, because it already sees every browser tool call and every message the user sends. Electron
+reports the agent's input to main just like the user's, so main tells them apart by its relay: the
+agent's input arrives only while a relayed `Input.*` command waits for its answer.
 
 ## Considered options
 
@@ -42,3 +36,10 @@ the browser, and every message the user sends.
   from the agent when the user takes over.
 - **T3 Code's full relay**: it also splits screencast frames between viewers, which Glass doesn't
   need because it streams no pages.
+
+## Consequences
+
+- Electron's input doesn't reach a frame from another site, so the agent can click in such a frame
+  but not type in it.
+- DevTools can stay open on a page while its agent drives it, because DevTools doesn't take the
+  debugger the relay holds.

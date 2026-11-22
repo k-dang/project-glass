@@ -1,6 +1,6 @@
 # Upstash Boxes
 
-A Sandbox provider Plugin (ADR 0010) that runs Claude Code Threads in
+A Sandbox provider Plugin (ADR 0011) that runs Claude Code Threads in
 [Upstash Boxes](https://upstash.com/docs/box/overall/quickstart). Each Thread gets its own Box,
 named `glass-` and a random id.
 

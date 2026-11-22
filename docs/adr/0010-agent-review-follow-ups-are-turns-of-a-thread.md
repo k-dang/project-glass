@@ -7,21 +7,21 @@ Turn of it. The agent keeps what it read in earlier Turns instead of rereading t
 replayed transcript, and Follow-ups gain streamed answers, Steer, and Stop.
 
 The Thread's agent works in a checkout of the review's Revision from Glass's cached clone,
-with a shell like the review's own (ADR 0005), not a Local checkout worktree, since it never
-commits. It is seeded with the PR material and the review as data, never as instructions, because
+with a shell like the review's own (ADR 0006), not a Local checkout worktree (ADR 0008), since it
+never commits. It is seeded with the PR material and the review as data, never as instructions, because
 both come from the PR's author or an earlier agent.
 
 The agent proposes a Suggested draft by calling a Glass tool with a path, side, line, and body.
 Glass checks the line against the diff and rejects a call that misses it, so the agent can place it
 again or put the text in its answer: a stray placement costs one call rather than the whole answer,
-which is the failure ADR 0008 guards against by making each Hotspot's place optional. For the
+which is the failure ADR 0009 guards against by making each Hotspot's place optional. For the
 line to be one the user is reading, Follow-ups run only while the review is current; an outdated
 review keeps its transcript to read and takes no new Turns. Nothing reaches GitHub until the user
 adds a Suggested draft as a Draft.
 
 ## Considered options
 
-- **One read-only run per Follow-up on the shared seam (ADR 0006)**: no new Thread kinds, but
+- **One read-only run per Follow-up, as Agent reviews run (ADR 0004)**: no new Thread kinds, but
   each run replays the review and every earlier Follow-up as text, forgets what it read, and returns
   one JSON answer at the end with no streaming, Steer, or Stop. Glass built this first.
 - **Resuming the runner's own session for each Follow-up**: keeps what the agent read, but puts
@@ -29,5 +29,5 @@ adds a Suggested draft as a Draft.
   without its streaming, Steer, or Stop.
 - **One drafting pass with no back-and-forth**: smaller, but it can't question the review's points,
   which is half of following up.
-- **A Draft button on each point of the review**: needs every point placed on a line, while ADR 0008
+- **A Draft button on each point of the review**: needs every point placed on a line, while ADR 0009
   places only the Hotspots, and those only when their lines are in the diff.

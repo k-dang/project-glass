@@ -6,30 +6,16 @@ Sandboxes. A company's own Sandbox platform is one such plugin, kept outside thi
 can use internal packages and name internal hosts without Glass depending on them. The agent host,
 its journal, and the backend as the transcript of record (ADR 0007) are the same for every
 provider. A Sandbox's Thread reaches Glass's tools over the connection Glass already holds to
-its host (ADR 0013), so a provider opens no other way into this device.
+its host (ADR 0015), so a provider opens no other way into this device.
 
 The seam is coarse: Glass hands a provider what the agent host needs, and the provider does
-everything specific to its platform, including logins, cloning, and starting the host.
+everything specific to its platform, including logins, cloning, and starting the host (ADR 0012).
 `@glass/plugin` is the contract. It uses Promises and `AbortSignal`, so a plugin needs no Effect.
 
 Plugins install as files in a folder and run in the backend process, as pi extensions do. Glass
 keeps each provider's state as opaque JSON on the Thread's row, so that row stays the one
 record of the Thread and providers need no storage of their own. Because Glass holds that
 state, it can delete a half-built Sandbox even after a crash mid-provisioning.
-
-A Sandbox outlives Glass, so its Turns keep running while Glass is closed, and Glass reconnects to
-its host at launch from the last journal position it saved. That position belongs to one host
-instance, so each connection starts with a handshake naming the host's instance and protocol
-version: a replaced host's journal is followed from its start, and its Thread's running Turn
-is cut off. A Sandbox keeps its host across Glass upgrades, so when that host speaks another
-protocol Glass ends it and has the provider start Glass's own in its place. Starting the host is
-therefore a provider call of its own, `startHost`, which every new Sandbox goes through too, so
-the upgrade runs the same code as creation. Glass saves that a replacement is under way before it
-ends the old host, so one that fails part-way is tried again, even after a relaunch. The Agent
-harness keeps its session on the Sandbox's disk, so the Thread's agent remembers its work; only
-the Turn the old host was running, and what it hadn't yet delivered, are lost. Calls to a provider
-stay bounded: Glass stops retrying a Sandbox it can't reach until the user or a relaunch starts
-over.
 
 This device is the same seam's built-in placement, so the Threads service only calls
 placements and local and Sandbox Threads differ only in where their host runs.
@@ -47,11 +33,6 @@ placements and local and Sandbox Threads differ only in where their host runs.
   Node, and logins would still need a provider hook. The Vercel and Upstash providers share their
   GitHub login and clone, but each platform differs where the seam matters: how files get in, how
   credentials leave, and how a stopped machine restarts its host.
-- **The host replaces itself**: Glass would send the new bundle to the running host, with no
-  provider call. But how a process outlives the command that started it differs by platform,
-  which is what a provider knows, and the hosts already running couldn't do it.
-- **A Thread stays read-only while its host speaks another protocol**: how Glass first handled
-  upgrades. Nothing to add to the seam, but every protocol change stranded every Sandbox Thread.
 - **Plugins in a child process**: a crashing or blocking plugin couldn't stall the backend, as ADR
   0001 isolates the backend from the windows, at the cost of an IPC protocol for the seam. Providers
   do their work through async calls, so the backend process is enough.

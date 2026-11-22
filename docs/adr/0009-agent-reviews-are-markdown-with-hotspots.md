@@ -4,7 +4,7 @@ An Agent review is the agent's own Markdown, read beside the diff rather than pl
 to five ranked Hotspots: the places the reviewer should read most closely, each with a risk kind,
 why it matters, the code it rests on, and what to check. A Hotspot may name the lines it is about,
 and the Tour shows the Hotspots of an Agent review written for its Revision. The agent answers
-through the shared runner seam (ADR 0006) as JSON, and the files that need little attention come
+as JSON through the same runners as Tours and Ask (ADR 0004), and the files that need little attention come
 back with it.
 
 Reviews used to return Findings: rated points, each placed on a diff line, a file, or the whole PR,
@@ -29,7 +29,7 @@ Markdown.
   that any heading in a body could break.
 - **The review as the start of a Thread**: follow-up questions help, but it needs a
   Thread and its checkout for every review. Instead, a review gets a Thread only when
-  the user sends a Follow-up (ADR 0009).
+  the user sends a Follow-up (ADR 0010).
 - **Markdown only, with no Hotspots**: the simplest answer, but the reviewer can't jump to the risky
   lines, the diff can't collapse the plumbing, and the Tour can't say where to look first.
 - **Hotspots written by the Tour**: the Tour already places code, but it guides a first reading and

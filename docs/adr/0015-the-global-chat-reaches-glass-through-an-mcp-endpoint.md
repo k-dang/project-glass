@@ -6,18 +6,19 @@ MCP endpoint that Claude Code and pi both reach, with a credential of its own ra
 renderer's.
 
 Every other Thread working on a branch reaches the same tools through its agent host, on this
-device or in a Sandbox (ADR 0007); an Agent review's Thread gets none. The host serves an MCP endpoint of its own on loopback, with a credential it
-issues each Thread when its agent starts and drops when the agent stops. It handles no tool
-itself: it relays each call over the connection Glass already holds to it, and the backend answers
-it with the same handlers, as that Thread. Glass decides which Thread a call comes from
-per connection, never from the host's word alone: a Sandbox's host can call only as its own
-Thread, and a Thread in a Sandbox can create and message only Threads in a
-Sandbox. A call is delivered at most once, so one that loses its connection midway says it may or
-may not have happened rather than running twice.
+device or in a Sandbox (ADR 0007); an Agent review's Thread gets none. The host serves an MCP
+endpoint of its own on loopback, with a credential it issues each Thread when its agent starts and
+drops when the agent stops. It handles no tool itself: it relays each call over the connection
+Glass already holds to it, and the backend answers it with the same handlers, as that Thread.
+
+Glass decides which Thread a call comes from per connection, never from the host's word alone: a
+Sandbox's host can call only as its own Thread, and a Thread in a Sandbox can create and message
+only Threads in a Sandbox. A call is delivered at most once, so one that loses its connection
+midway says it may or may not have happened rather than running twice.
 
 ## Considered options
 
-- **Tools defined in the agent host**, as the Suggested draft tool is (ADR 0009): the host serves
+- **Tools defined in the agent host**, as the Suggested draft tool is (ADR 0010): the host serves
   the endpoint for its Threads, but defining the tools and their handlers there would need
   its own path to every backend service, and Claude Code's SDK tools and a pi extension would each
   need their own copy of the tools. So the backend offers its tools to each host it connects to,

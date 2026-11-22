@@ -198,7 +198,7 @@ export const wideEvents = (source: Source, stdout: Sink, stderr?: Sink) => {
   const emit = emitter(source, stdout, stderr)
 
   return Layer.mergeAll(
-    // WARNING: Logger.layer replaces the logger set, dropping Effect's text logger, which would add non-JSON lines to backend.log (ADR 0012).
+    // WARNING: Logger.layer replaces the logger set, dropping Effect's text logger, which would add non-JSON lines to backend.log.
     Logger.layer([lineLogger(emit)]),
     unitTracer(emit),
   )
