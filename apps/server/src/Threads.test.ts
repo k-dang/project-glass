@@ -24,6 +24,7 @@ import {
   scriptedHost,
   settled,
 } from "../test/threadsFixture"
+import { fakeAgentRunnersWith } from "../test/fakeAgentRunners"
 import type { FakePullRequest } from "../test/fakePullRequest"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome } from "../test/harness"
@@ -614,6 +615,22 @@ it.live("leaves out a merged PR from before the Thread on a branch name it reuse
       ),
       Stream.runHead,
     )
+  }),
+)
+
+it.live("names a Local Thread past a branch pushed since its checkout last fetched", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixtureWith({
+      agentRunners: fakeAgentRunnersWith(() => "fix/greeting"),
+    })
+
+    gitIn(f.clone.origin, "branch", "fix/greeting", "main")
+
+    const thread = yield* f.start("hold:first")
+    yield* f.transcript(thread.id, holding)
+
+    assert.equal(gitIn(f.worktree(thread.name), "branch", "--show-current"), "fix/greeting-2")
+    yield* f.release("first")
   }),
 )
 

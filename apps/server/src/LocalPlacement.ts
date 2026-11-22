@@ -89,20 +89,17 @@ export class LocalPlacement extends Context.Service<
         prefix: string,
       ) {
         const checkout = yield* checkoutOf(repository)
-        const remotePrefix = `refs/remotes/${checkout.remote}/`
+        const pattern = `refs/heads/${prefix}*`
 
-        const listed = yield* git
-          .run(checkout.path, [
-            "for-each-ref",
-            "--format=%(refname)",
-            `refs/heads/${prefix}*`,
-            `${remotePrefix}${prefix}*`,
-          ])
-          .pipe(gitFailure(`Couldn't check whether ${prefix} is taken.`))
+        const [local, remote] = yield* Effect.all(
+          [
+            git.run(checkout.path, ["for-each-ref", "--format=%(refname)", pattern]),
+            git.run(checkout.path, ["ls-remote", "--heads", checkout.remote, pattern]),
+          ],
+          { concurrency: "unbounded" },
+        ).pipe(gitFailure(`Couldn't check whether ${prefix} is taken.`))
 
-        return listed
-          .split("\n")
-          .map((ref) => ref.replace(/^refs\/heads\//, "").replace(remotePrefix, ""))
+        return `${local}\n${remote}`.split("\n").map((line) => line.replace(/^.*refs\/heads\//, ""))
       })
 
       const useBranch = ({ folder }: PlacedThread, branch: string) =>
