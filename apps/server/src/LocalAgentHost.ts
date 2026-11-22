@@ -78,7 +78,7 @@ const gone = (port: number) =>
     Effect.orElseSucceed(() => true),
   )
 
-export const shutDownHost = ({ port, token }: Pick<RecordedHost, "port" | "token">) =>
+const shutDownHost = ({ port, token }: Pick<RecordedHost, "port" | "token">) =>
   Effect.tryPromise((signal) =>
     fetch(hostUrl(port, SHUTDOWN_PATH), {
       method: "POST",

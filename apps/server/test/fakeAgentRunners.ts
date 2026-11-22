@@ -98,5 +98,3 @@ export const fakeAgentRunnersWith = (branchFor: (request: string) => string | un
         }),
     }),
   )
-
-export const fakeAgentRunners = fakeAgentRunnersWith(() => undefined)

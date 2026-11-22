@@ -1,0 +1,38 @@
+{
+  "$schema": "https://unpkg.com/knip@6.45.1/schema.json",
+  "ignore": [
+    "apps/desktop/src/renderer/components/ui/**",
+    "apps/desktop/src/renderer/components/message-scroller/**",
+    "tools/oxlint/anti-slop/**"
+  ],
+  "ignoreBinaries": ["netstat"],
+  "workspaces": {
+    ".": {
+      "entry": ["scripts/*.ts"],
+      "project": ["tools/**/*.ts", "scripts/**/*.ts"]
+    },
+    "apps/desktop": {
+      "entry": ["src/{main,preload,browserPreload}/index.ts", "e2e/**/*.ts"],
+      "project": ["src/**/*.{ts,tsx,css}", "test/**/*.{ts,tsx}", "e2e/**/*.ts"]
+    },
+    "apps/server": {
+      "entry": [
+        "src/{bin,agentHost,sqlReadWorker}.ts",
+        "src/agentHost/pi{DrawDiagram,SuggestDraft}.ts",
+        "test/{fakeBackend,fakeSandboxProvider,scriptedAgentHost,recordSessions,recordRunnerReplays,buildBundles,isolateHome}.ts"
+      ],
+      "project": ["src/**/*.ts", "test/**/*.ts"]
+    },
+    "apps/gallery": {
+      "entry": ["{capture,show}.ts"],
+      "project": ["**/*.{ts,tsx}"]
+    },
+    "packages/*": {},
+    "examples/*": {
+      "entry": ["index.ts"]
+    },
+    "packages/contracts": {
+      "entry": ["src/pluginConformance.ts"]
+    }
+  }
+}

@@ -30,12 +30,12 @@ import { startFakeGitRemote, type TrafficMeter, trafficMeter } from "./fakeGitRe
 import { gitBasicAuthorization } from "../src/gitEnv.ts"
 import { blobSha, type FakeFiles, fakeRepositories } from "./fakeRepositories.ts"
 
-export interface FakeGraphQLError {
+interface FakeGraphQLError {
   readonly type: string
   readonly message: string
 }
 
-export type FakeFailure = number | "disconnect"
+type FakeFailure = number | "disconnect"
 
 const PullRequestVariables = Schema.Struct({
   owner: Schema.String,
