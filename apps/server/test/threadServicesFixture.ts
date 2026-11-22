@@ -399,5 +399,7 @@ export const threadServicesFixture = Effect.gen(function* () {
         place,
       }),
     restart: running.close.pipe(Effect.andThen(boot)),
+    restartAfter: <E>(whileClosed: Effect.Effect<void, E>) =>
+      running.close.pipe(Effect.andThen(whileClosed), Effect.andThen(boot)),
   }
 })

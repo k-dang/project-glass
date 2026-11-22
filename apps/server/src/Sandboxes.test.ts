@@ -705,6 +705,41 @@ it.effect(
     }),
 )
 
+it.effect(
+  "fails a message whose delivery was waiting on the agent host when its Sandbox got a new one",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadServicesFixture
+      yield* f.holdStart
+      const thread = yield* createSandboxed(f)
+      yield* eventually(Effect.sync(() => assert.deepStrictEqual(f.starts, [thread.id])))
+
+      yield* f.sandboxes.restartHost(thread.id)
+
+      assert.equal(
+        failedReason(yield* afterRetries(f, thread.id, settled(1))),
+        "Glass lost the process that runs Threads. Try again.",
+      )
+    }),
+)
+
+it.effect(
+  "cuts off a Turn its Sandbox's agent host ran, when the host changed while Glass was closed",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadServicesFixture
+      const thread = yield* createSandboxed(f)
+      yield* reply(yield* f.started, ["one"])
+      yield* f.transcript(thread.id, ({ turns }) => texts(turns[0]).length === 1)
+
+      const { threads } = yield* f.restartAfter(f.sandboxes.restartHost(thread.id))
+      const [cutOff] = (yield* f.transcript(thread.id, settled(1), threads)).turns
+
+      assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
+      assert.deepStrictEqual(texts(cutOff), ["one"])
+    }),
+)
+
 const tookTooLong = (action: string) =>
   `Fake Sandboxes didn't answer in time, so Glass couldn't ${action}. Try again.`
 
