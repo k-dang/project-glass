@@ -1,33 +1,31 @@
 {
   "$schema": "https://unpkg.com/knip@6.45.1/schema.json",
   "ignore": [
+    ".agents/**",
+    ".claude/**",
     "apps/desktop/src/renderer/components/ui/**",
     "apps/desktop/src/renderer/components/message-scroller/**",
     "tools/oxlint/anti-slop/**"
   ],
-  "ignoreBinaries": ["netstat"],
   "workspaces": {
     ".": {
-      "entry": ["scripts/*.ts"],
-      "project": ["tools/**/*.ts", "scripts/**/*.ts"]
+      "entry": ["examples/fake-sandboxes/{index.ts,claude.mjs}"]
     },
     "apps/desktop": {
-      "entry": ["src/{main,preload,browserPreload}/index.ts", "e2e/**/*.ts"],
+      "entry": ["src/{main,preload,browserPreload}/index.ts"],
       "project": ["src/**/*.{ts,tsx,css}", "test/**/*.{ts,tsx}", "e2e/**/*.ts"]
     },
     "apps/server": {
       "entry": [
         "src/{bin,agentHost,sqlReadWorker}.ts",
         "src/agentHost/pi{DrawDiagram,SuggestDraft}.ts",
-        "test/{fakeBackend,fakeSandboxProvider,scriptedAgentHost,recordSessions,recordRunnerReplays,buildBundles,isolateHome}.ts"
+        "test/{fakeBackend,fakeSandboxProvider,scriptedAgentHost}.ts"
       ],
       "project": ["src/**/*.ts", "test/**/*.ts"]
     },
     "apps/gallery": {
-      "entry": ["{capture,show}.ts"],
       "project": ["**/*.{ts,tsx}"]
     },
-    "packages/*": {},
     "examples/*": {
       "entry": ["index.ts"]
     },
