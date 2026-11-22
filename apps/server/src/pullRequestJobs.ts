@@ -129,15 +129,19 @@ export const pullRequestJobs = Effect.fnUntraced(function* <O, P, F, S, E>(optio
     save: Effect.Effect<void, E2>,
     change: (output: O | null) => O,
   ) =>
-    save.pipe(
+    Effect.interruptible(job.lock.take(1)).pipe(
       Effect.andThen(
-        SubscriptionRef.update(job.state, ({ output }): JobState<O, P, F> => ({
-          output: change(output),
-          run: { status: "idle" },
-        })),
+        save.pipe(
+          Effect.andThen(
+            SubscriptionRef.update(job.state, ({ output }): JobState<O, P, F> => ({
+              output: change(output),
+              run: { status: "idle" },
+            })),
+          ),
+          Effect.ensuring(job.lock.release(1)),
+        ),
       ),
       Effect.uninterruptible,
-      job.lock.withPermits(1),
     )
 
   const amend = <E2>(

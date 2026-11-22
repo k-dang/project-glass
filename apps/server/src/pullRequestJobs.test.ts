@@ -79,6 +79,42 @@ it.live("replaces work that waits to commit while the replacement holds the lock
   }).pipe(Effect.scoped),
 )
 
+it.live("replaces uninterruptible work once it waits to commit behind the replacement", () =>
+  Effect.gen(function* () {
+    const jobs = yield* makeJobs
+    const job = yield* jobs.jobFor(pr)
+    const replacing = yield* Deferred.make<void>()
+    const first = yield* Deferred.make<void>()
+
+    yield* jobs.begin(job, (replace) =>
+      replace(
+        progress,
+        Deferred.await(replacing).pipe(
+          Effect.andThen(jobs.commit(job, Effect.void, () => "first")),
+          Effect.onInterrupt(() => Deferred.succeed(first, undefined)),
+          Effect.uninterruptible,
+        ),
+      ),
+    )
+
+    yield* jobs.begin(job, (replace) =>
+      Effect.gen(function* () {
+        yield* Deferred.succeed(replacing, undefined)
+        yield* Effect.yieldNow
+        yield* replace(
+          progress,
+          jobs.commit(job, Effect.void, () => "second"),
+        )
+      }),
+    )
+
+    yield* Deferred.await(first)
+    yield* until(job, "idle")
+
+    assert.strictEqual((yield* SubscriptionRef.get(job.state)).output, "second")
+  }).pipe(Effect.scoped),
+)
+
 it.live("turning off background work stops waiting and running background jobs only", () =>
   Effect.gen(function* () {
     const jobs = yield* makeJobs
