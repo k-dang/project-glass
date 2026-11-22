@@ -780,6 +780,37 @@ describe("MessageScroller", () => {
     expect(rendered.viewport().scrollTop).toBe(0)
   })
 
+  it("leaves the reader in place when a new anchor arrives after they scroll away with autoScroll", async () => {
+    const rendered = await renderTestScroller({
+      autoScroll: true,
+      messages: [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+      ],
+    })
+
+    await act(async () => {
+      rendered.viewport().dispatchEvent(new WheelEvent("wheel", { bubbles: true }))
+      rendered.viewport().scrollTop = 60
+      rendered.viewport().dispatchEvent(new Event("scroll", { bubbles: true }))
+      await flushAnimationFrames()
+    })
+
+    await rendered.rerender(
+      [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+        { id: "message-4", height: 40, scrollAnchor: true },
+      ],
+      { autoScroll: true },
+    )
+
+    expect(rendered.viewport().scrollTop).toBe(60)
+    expect(rendered.button().dataset.active).toBe("true")
+  })
+
   it("releases follow-bottom on a bare scroll-away so later resizes do not snap back", async () => {
     const rendered = await renderTestScroller({
       autoScroll: true,

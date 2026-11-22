@@ -8,6 +8,7 @@
 ## Local deviations
 
 - `useHoldScrollPosition`, `holdPosition` and the `"holding-position"` mode keep the viewport still while a disclosure in the transcript opens or closes, until the reader scrolls, jumps, or a new turn anchors. The controller's comment on deliberate gestures also lists the held position.
+- With `autoScroll`, a new scroll anchor leaves the reader in place once they have scrolled away (`"free-scrolling"`), instead of jumping to it.
 - Base UI's `mergeProps`/`useRender` replace upstream's copy, and `assignRef` replaces `composeRefs`.
 - Optional props take `| undefined` for `exactOptionalPropertyTypes`.
 - Tests run in happy-dom.
