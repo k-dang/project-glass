@@ -221,7 +221,11 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
   }
 
   const onResult = (result: SDKResultMessage) => {
-    if (state.stopping !== null) return end(state.stopping)
+    if (state.stopping !== null) {
+      showSteers(state.steers)
+
+      return end(state.stopping)
+    }
 
     const ending = endingOf(result)
     const earlierRunFailure = state.earlierRunFailure ?? (isFailure(result) ? ending : null)
@@ -316,7 +320,10 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
       if (settled !== undefined) emit(settled)
     },
     BackgroundWorkEnded: () => endedToolCall(input).forEach(emit),
-    Exited: () => end(TurnFailed.make({ reason: stoppedReason })),
+    Exited: () => {
+      showSteers(state.steers)
+      end(TurnFailed.make({ reason: stoppedReason }))
+    },
   })
 
   return { state: ended ? null : state, events }

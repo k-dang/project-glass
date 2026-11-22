@@ -566,7 +566,11 @@ export const claudeAdapter = (
 
           const cancelled = yield* interruptAll(session)
 
-          return steers.filter(({ id }) => cancelled.includes(id)).map(withContextOf)
+          const returned = yield* Effect.filter(steers, ({ id }) =>
+            cancelled.includes(id) ? turns.dropSteer(id) : Effect.succeed(false),
+          )
+
+          return returned.map(withContextOf)
         }),
       answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
         const asked = waiting.get(requestId)
