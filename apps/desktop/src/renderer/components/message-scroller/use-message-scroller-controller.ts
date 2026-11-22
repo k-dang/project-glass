@@ -441,8 +441,16 @@ function useMessageScrollerController({
             return
           }
 
-          scrollToElement(anchor, { align: "start" }, { keepPreviousPeek: true })
           handledScrollAnchorsRef.current.add(anchor)
+
+          if (autoScrollRef.current && modeRef.current === "free-scrolling") {
+            commitScrollState()
+            scheduleVisibilitySync()
+
+            return
+          }
+
+          scrollToElement(anchor, { align: "start" }, { keepPreviousPeek: true })
 
           return
         }
