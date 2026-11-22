@@ -12,10 +12,21 @@ For each Sandbox Thread, `Sandboxes` keeps a `HostLink` with three mutable field
 | Rule | In plain words | Harm if broken |
 | --- | --- | --- |
 | `DownHostGetsReplaced` | While a replacement has stopped the old host and not started the new one, Glass still knows it must replace it. | After a quit mid-replacement, Glass retries a host that no longer exists, and the Thread stays unreachable. |
-| `LostHostTurnsEnd` | Once Glass follows a new host, no Turn that ran on an old host shows as running. | The Thread shows "running" forever and every message only queues. |
+| `LostHostTurnsEnd` | Once Glass follows a new host, no Turn that ran on an old host shows as running, unless its delivery call is still waiting to fail. | The Thread shows "running" forever and every message only queues. |
 | `RunningTurnIsOnFollowedHost` | While Glass follows a host, its running Turn is on that host, has its end in the journal, or is being delivered. | Same as above. |
 | `CutOffTurnsRan` | A Turn cut off because the host changed had run on the old host. | Your message says "Glass lost the agent while it worked" though no agent ever saw it. |
-| `RanTurnsEndCutOff` | A lost Turn that ran on a host ends as Cut off, not as Interrupted. | A Turn whose host was replaced while Glass was closed says "Interrupted when Glass quit", though quitting Glass doesn't stop a Sandbox's agent. |
+| `RanTurnsEndCutOff` | A lost Turn that ran on a host ends as Cut off, not as Interrupted or as an undelivered message. | A Turn whose host went away says "Interrupted when Glass quit" or "Try again", though an agent worked on it. |
+
+## Finding (current code)
+
+`RanTurnsEndCutOff` breaks when a host goes away between accepting a Turn and Glass saving that it did:
+
+1. You send a message. The agent host accepts `StartTurn` and starts the agent.
+2. Before Glass records the acceptance, one of these happens:
+   - The Sandbox gets a new agent host while the reply is in flight. The pending `StartTurn` fails, and `deliver` ends the Turn as an undelivered message ("Glass lost the process that runs Threads. Try again.").
+   - Glass quits before the reply arrives, or before `takeTurn` writes `journal_turn`. On relaunch onto a new host, `placeLostTurn` finds no saved acceptance and ends the Turn as Interrupted.
+
+Either way the agent did work on the old host, but the Turn doesn't end as Cut off. Glass can't tell "the host accepted it, but the reply was lost" from "it never arrived", so a fix would need evidence from the old host, such as a journal entry for the Turn that Glass already saved.
 
 ## Run
 
@@ -23,7 +34,7 @@ For each Sandbox Thread, `Sandboxes` keeps a `HostLink` with three mutable field
 node tools/tla/tlc.ts .agents/skills/verify-sandbox-host-link/model/SandboxHostLink.tla --mutants
 ```
 
-Expect `Result: ok`: every rule holds and every mutant is caught. [`tools/tla/README.md`](../../../tools/tla/README.md) explains the output. Read a counterexample, or chart the model, with the `/statechart` skill.
+Expect `Result: ok`: every rule but `RanTurnsEndCutOff` holds, `RanTurnsEndCutOff` still breaks as the finding above, and every other mutant is caught (`TakenForgottenOnRestart` is skipped while its rule is a finding). [`tools/tla/README.md`](../../../tools/tla/README.md) explains the output. Read a counterexample, or chart the model, with the `/statechart` skill.
 
 ## Coverage
 
@@ -31,7 +42,9 @@ Synced with the code at commit `36004428a70b36b190ceba163543adec7771e062`. Befor
 
 | Model | Code (`apps/server/src/Sandboxes.ts` unless named) |
 | --- | --- |
-| `YouSendMessage`, `HostTakesTurn`, `DeliveryFails` | `deliver` and `dispatch` in `apps/server/src/ThreadTurns.ts`, waiting on `connect`; the `connected` client in `follow` (`whileOpen`, and `takeTurn` once `StartTurn` is accepted) |
+| `YouSendMessage`, `DeliveryFails` | `deliver`, `dispatch` and `settleUndelivered` in `apps/server/src/ThreadTurns.ts`, waiting on `connect`; `whileOpen` in the `connected` client in `follow` |
+| `HostTakesTurn` | The agent host accepting `StartTurn` (`apps/server/src/agentHost/handlers.ts`) |
+| `GlassGetsAcceptance`, `GlassSavesTaken` | The `connected` client's `StartTurn` reply, then `takeTurn` (`link.takenTurn`, then the `journal_turn` update) |
 | `AgentEndsTurn`, `GlassSavesJournal` | `followJournal` in `apps/server/src/hostJournal.ts`; `save` in `apps/server/src/Transcripts.ts` |
 | `Release`, `ConnectionDrops` | The `acquireRelease` release in `follow` that closes the `connected` client and sets `link.turnOnLostHost` |
 | `SandboxRestartsHost` | The provider restarting the agent host; any new `greet` host id |
