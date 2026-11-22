@@ -310,7 +310,7 @@ export const BrowserPane = memo(function BrowserPane(props: {
           />
           {view !== null && page !== null && (
             <PageNotes
-              key={pageKey(page)}
+              key={`${pageKey(page)} ${loads}`}
               view={view}
               threadId={threadId}
               page={page}

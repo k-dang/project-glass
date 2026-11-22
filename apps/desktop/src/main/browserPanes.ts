@@ -23,10 +23,26 @@ const opensInPane = (address: string) => {
   return url !== null && (PAGE_PROTOCOLS.has(url.protocol) || url.href === "about:blank")
 }
 
-const reachesThisDevice = (address: string) => {
-  const url = URL.parse(address)
+const isLoopbackAddress = (address: string) => {
+  const url = URL.parse(`http://${address.includes(":") ? `[${address}]` : address}/`)
 
   return url !== null && isLoopbackHost(url.hostname)
+}
+
+const reachesThisDevice = async (resolver: Session, address: string) => {
+  const url = URL.parse(address)
+
+  if (url === null || url.hostname === "") return false
+
+  if (isLoopbackHost(url.hostname)) return true
+
+  try {
+    const { endpoints } = await resolver.resolveHost(url.hostname)
+
+    return endpoints.some((endpoint) => isLoopbackAddress(endpoint.address))
+  } catch {
+    return false
+  }
 }
 
 const keepToPage = (event: { readonly url: string; preventDefault: () => void }) => {
@@ -71,8 +87,9 @@ export const setUpBrowserPanes = (options: {
 
   for (const browser of browsers) setUp(browser)
 
-  sandbox.webRequest.onBeforeRequest((details, callback) =>
-    callback({ cancel: reachesThisDevice(details.url) }),
+  sandbox.webRequest.onBeforeRequest(
+    (details, callback) =>
+      void reachesThisDevice(sandbox, details.url).then((cancel) => callback({ cancel })),
   )
 
   app.on("web-contents-created", (_event, contents) => {

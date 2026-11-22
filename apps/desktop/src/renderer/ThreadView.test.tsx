@@ -1992,6 +1992,53 @@ it("reloads an HTML file in the Browser pane when the next Turn ends, as the age
   await waitFor(() => expect(reloads()).toBe(1))
 })
 
+it("drops an unsaved Feedback note's editor when the page loads again, as its part is gone", async () => {
+  const user = mount({
+    FindThreadFiles: ({ paths }) => Effect.succeed(paths),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              ...runningTurn,
+              parts: [TextPart.make({ text: "Wrote `docs/plan.html`." })],
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
+
+  const pane = await screen.findByRole("complementary", { name: "Browser" })
+  const { navigate, fromPage, toPage } = attachPage(pane)
+  navigate(threadFileAddress(thread.id, "docs/plan.html"))
+  fromPage({ type: "ready" })
+  await waitFor(() => expect(toPage).not.toHaveLength(0))
+  fromPage({
+    type: "part",
+    part: PageText.make({ selector: "body > p", heading: null, excerpt: "five per minute" }),
+    rect: { top: 10, left: 10, bottom: 30, right: 200 },
+  })
+
+  const editor = await within(pane).findByRole("textbox", {
+    name: "Feedback on the selected part of the page",
+  })
+
+  await user.type(editor, "Make this ten")
+
+  fromPage({ type: "ready" })
+
+  await waitFor(() =>
+    expect(
+      within(pane).queryByRole("textbox", { name: "Feedback on the selected part of the page" }),
+    ).toBeNull(),
+  )
+})
+
 const appLinkTurn = (place: Thread["place"]) => ({
   WatchThreads: () => Stream.make([new Thread({ ...threadFields, place })]),
   WatchTranscript: () =>

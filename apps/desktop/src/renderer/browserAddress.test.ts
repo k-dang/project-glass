@@ -6,6 +6,7 @@ it("reads what the user typed as an address, plain http only for this device", (
   expect(addressOf("localhost:3000/settings")).toBe("http://localhost:3000/settings")
   expect(addressOf("127.0.0.1:5173")).toBe("http://127.0.0.1:5173/")
   expect(addressOf("app.localhost")).toBe("http://app.localhost/")
+  expect(addressOf("[::1]:3000")).toBe("http://[::1]:3000/")
   expect(addressOf("example.com/docs")).toBe("https://example.com/docs")
   expect(addressOf(" http://example.com ")).toBe("http://example.com/")
   expect(addressOf("about:blank")).toBe("about:blank")

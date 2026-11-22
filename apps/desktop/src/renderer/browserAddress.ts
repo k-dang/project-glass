@@ -41,7 +41,7 @@ export const addressOf = (typed: string) => {
       : null
   }
 
-  const host = text.split(/[/?#:]/)[0]?.toLowerCase() ?? ""
+  const host = /^(?:\[[^\]]*\]|[^/?#:]*)/.exec(text)?.[0].toLowerCase() ?? ""
 
   return URL.parse(`${isLoopbackHost(host) ? "http" : "https"}://${text}`)?.href ?? null
 }
