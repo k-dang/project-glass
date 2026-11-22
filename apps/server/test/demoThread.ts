@@ -16,14 +16,8 @@ import { connectRpcClient } from "../src/rpcSocket"
 import { artifactsThread } from "./demoArtifacts"
 import { longThread } from "./demoLongThread"
 import type { ScriptedThread } from "./demoScript"
-import {
-  DEMO_REPOSITORY,
-  seedMergedPullRequest,
-  settledBranch,
-  settledPullRequests,
-} from "./demoPullRequests"
+import { DEMO_REPOSITORY, settledBranch, settledPullRequests } from "./demoPullRequests"
 import { lastUserWords, replyTo, startFakeAnthropic } from "./fakeAnthropic"
-import type { FakeGitHub } from "./fakeGitHub"
 import { globalChatReply, isGlobalChat } from "./fakeGlobalChat"
 import {
   type FakeModelDelta,
@@ -194,7 +188,6 @@ export const seedDemoThreads = Effect.fnUntraced(function* (
   token: string,
   checkout: string,
   reviewed: PullRequestRef,
-  github: FakeGitHub,
   named: ReturnType<typeof demoThreadNames>["named"],
 ) {
   const client = yield* connectRpcClient(
@@ -245,10 +238,7 @@ export const seedDemoThreads = Effect.fnUntraced(function* (
   yield* thread("demo/linked-pr", "pi", "Pick up the README typo PR")
   yield* Effect.forEach(
     settledPullRequests,
-    (pr) =>
-      thread(`demo/${settledBranch(pr)}`, "pi", pr.title).pipe(
-        Effect.tap(() => Effect.sync(() => seedMergedPullRequest(github, pr))),
-      ),
+    (pr) => thread(`demo/${settledBranch(pr)}`, "pi", pr.title),
     { discard: true },
   )
   yield* thread("demo/keeps-working", "pi", keepWorkingPrompt)
