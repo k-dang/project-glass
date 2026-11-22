@@ -1,8 +1,7 @@
 # How Threads run
 
 Every Thread runs in an agent host. The host is a small Node server built from Glass's own code. It drives Claude Code
-or pi, keeps a journal of numbered events, and serves Effect RPC over WebSocket. The backend
-keeps the transcript of record. This page shows how the pieces fit. The ADRs linked from each section say why.
+or pi, keeps a journal of numbered events, and serves Effect RPC over WebSocket. The backend keeps the transcript of record.
 
 ## Where the host runs
 
@@ -19,7 +18,7 @@ host runs (ADR 0007).
 
 ![Outside agents and the Global chat call the backend's MCP endpoint; Work Threads call their host's MCP endpoint, which relays to the backend](glass-tools.svg)
 
-The backend defines Glass's tools once, in `apps/server/src/mcp/glassTools.ts`. It answers them on two paths:
+The backend defines Glass's tools once. It answers them on two paths:
 
 - **Directly**: the backend's own MCP endpoint serves the Global chat, with a credential of its own,
   and Outside agents, with an OAuth token.
@@ -33,7 +32,7 @@ The backend defines Glass's tools once, in `apps/server/src/mcp/glassTools.ts`. 
 
 The backend never takes the host's word for which Thread is calling. A call on a Sandbox host's
 connection may act only as that Sandbox's Thread. A call on the local host's connection must name a local Work
-Thread. Code: `agentHost/HostGlassTools.ts` on the host and `mcp/GlassToolRelay.ts` in the backend.
+Thread.
 
 ## What each kind of Thread gets
 
