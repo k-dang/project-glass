@@ -141,3 +141,19 @@ it("pins each note it finds on the page, numbered in the order they were left", 
 
   await eventually(() => expect(last()).toMatchObject({ type: "open", id: "found" }))
 })
+
+it("keeps highlighting a pick when a notes change crosses it on the way to the renderer", async () => {
+  const { document, overlay, last, send } = openPage()
+  const notes = [{ id: "saved", part: limits }]
+  send({ pick: true, notes: [], active: null })
+  await eventually(() => expect(document.head.textContent).toContain("crosshair"))
+
+  document.querySelector<HappyElement>("tbody td:nth-of-type(2)")!.click()
+  send({ pick: true, notes, active: null })
+  send({ pick: true, notes, active: { type: "draft" } })
+
+  await eventually(() => {
+    expect(overlay().querySelector(".element.draft")).not.toBeNull()
+    expect(last()).toMatchObject({ type: "rect" })
+  })
+})

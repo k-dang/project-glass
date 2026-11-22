@@ -528,8 +528,6 @@ export function pageNotes(window: typeof globalThis, { post, onState }: PageChan
   onState((next) => {
     anchors = new Map([...anchors].filter(([id]) => next.notes.some((note) => note.id === id)))
 
-    if (next.active === null) draft = null
-
     if (!next.pick) hover = null
 
     if (next.pick && !state.pick) {
