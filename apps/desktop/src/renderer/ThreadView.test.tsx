@@ -20,6 +20,9 @@ import {
   type TurnPart,
   FollowedRepository,
   PartAppended,
+  type BrowserPageAnswer,
+  BrowserPageReady,
+  BrowserPageRequest,
   type PageEvent,
   type PageState,
   PageText,
@@ -67,8 +70,15 @@ import { threadFileAddress } from "./browserAddress"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 
-const attachPage = (pane: HTMLElement) => {
-  const page = pane.querySelector("webview")!
+const attachPage = () => {
+  const page = document.querySelector("webview")!
+
+  const laidOut = vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockReturnValue(new DOMRect(0, 0, 800, 600))
+
+  onTestFinished(() => laidOut.mockRestore())
+
   const loaded: Array<string> = []
   const toPage: Array<PageState> = []
   let reloads = 0
@@ -79,6 +89,8 @@ const attachPage = (pane: HTMLElement) => {
     send: (_channel: string, state: PageState) => Promise.resolve(void toPage.push(state)),
     canGoBack: () => false,
     canGoForward: () => false,
+    getURL: () => "about:blank",
+    getTitle: () => "",
   })
   page.dispatchEvent(new Event("dom-ready"))
 
@@ -1851,8 +1863,8 @@ it("links the files a Turn named once it ends, and opens HTML in the Browser pan
   expect(within(transcript).queryByRole("button", { name: "notes.md" })).toBeNull()
   expect(asked).toContainEqual(["docs/explainer.html", "notes.md"])
 
-  const pane = await screen.findByRole("complementary", { name: "Browser" })
-  const { page, loaded } = attachPage(pane)
+  await screen.findByRole("complementary", { name: "Browser" })
+  const { page, loaded } = attachPage()
 
   expect(page.getAttribute("partition")).toBe(BROWSER_PARTITION)
   await waitFor(() => expect(loaded).toEqual([threadFileAddress(thread.id, "docs/explainer.html")]))
@@ -1966,9 +1978,7 @@ it("reloads an HTML file in the Browser pane when the next Turn ends, as the age
 
   await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
 
-  const { navigate, reloads } = attachPage(
-    await screen.findByRole("complementary", { name: "Browser" }),
-  )
+  const { navigate, reloads } = attachPage()
 
   navigate(threadFileAddress(thread.id, "docs/plan.html"))
   expect(reloads()).toBe(0)
@@ -1999,8 +2009,8 @@ it("drops an unsaved Feedback note's editor when the page loads again, as its pa
 
   await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
 
-  const pane = await screen.findByRole("complementary", { name: "Browser" })
-  const { navigate, fromPage, toPage } = attachPage(pane)
+  await screen.findByRole("complementary", { name: "Browser" })
+  const { navigate, fromPage, toPage } = attachPage()
   navigate(threadFileAddress(thread.id, "docs/plan.html"))
   fromPage({ type: "ready" })
   await waitFor(() => expect(toPage).not.toHaveLength(0))
@@ -2010,7 +2020,7 @@ it("drops an unsaved Feedback note's editor when the page loads again, as its pa
     rect: { top: 10, left: 10, bottom: 30, right: 200 },
   })
 
-  const editor = await within(pane).findByRole("textbox", {
+  const editor = await screen.findByRole("textbox", {
     name: "Feedback on the selected part of the page",
   })
 
@@ -2020,9 +2030,71 @@ it("drops an unsaved Feedback note's editor when the page loads again, as its pa
 
   await waitFor(() =>
     expect(
-      within(pane).queryByRole("textbox", { name: "Feedback on the selected part of the page" }),
+      screen.queryByRole("textbox", { name: "Feedback on the selected part of the page" }),
     ).toBeNull(),
   )
+})
+
+const pageRequest = (id: string, restoreLastPage: boolean) =>
+  new BrowserPageRequest({ id, threadId: thread.id, restoreLastPage })
+
+it("opens the Thread's Browser pane for its agent, answers once its last page loads unless the agent names another, and lets go when the Turn ends", async () => {
+  const answers = new Map<string, BrowserPageAnswer>()
+  const loaded: Array<string> = []
+  const lastPageLoaded = Promise.withResolvers<void>()
+  localStorage.setItem(`glass.browserPane.${thread.id}`, "http://localhost:3000/settings")
+  const turnEnded = Deferred.makeUnsafe<void>()
+
+  vi.stubGlobal("glass", {
+    browserRelay: (webContentsId: number) => Promise.resolve(`ws://relay/${webContentsId}`),
+  })
+
+  mount({
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    WatchWorkingThreads: () =>
+      Stream.make([thread.id]).pipe(
+        Stream.concat(Stream.fromEffect(Deferred.await(turnEnded).pipe(Effect.as([])))),
+      ),
+    WatchBrowserPageRequests: () =>
+      Stream.make([
+        pageRequest("open", true),
+        pageRequest("read", true),
+        pageRequest("open-address", false),
+      ]).pipe(Stream.concat(Stream.never)),
+    AnswerBrowserPageRequest: ({ id, answer }) => Effect.sync(() => void answers.set(id, answer)),
+  })
+
+  await screen.findByRole("complementary", { name: "Browser" })
+
+  const page = document.querySelector("webview")!
+  Object.assign(page, {
+    getWebContentsId: () => 7,
+    getURL: () => "about:blank",
+    loadURL: (url: string) => {
+      loaded.push(url)
+
+      return lastPageLoaded.promise
+    },
+  })
+  page.dispatchEvent(new Event("dom-ready"))
+
+  const ready = BrowserPageReady.make({ endpoint: "ws://relay/7" })
+
+  await waitFor(() => expect([...answers]).toEqual([["open-address", ready]]))
+  expect(loaded).toEqual(["http://localhost:3000/settings"])
+
+  lastPageLoaded.resolve()
+
+  await waitFor(() => expect(answers.size).toBe(3))
+  expect([answers.get("open"), answers.get("read")]).toEqual([ready, ready])
+
+  await userEvent.click(screen.getByRole("button", { name: "Close the Browser" }))
+  expect(document.querySelector("webview")).toBe(page)
+
+  Deferred.doneUnsafe(turnEnded, Exit.void)
+
+  await waitFor(() => expect(document.querySelector("webview")).toBeNull())
 })
 
 const appLinkTurn = (place: Thread["place"]) => ({
@@ -2050,7 +2122,7 @@ it("opens a Turn's link to this device in a local Thread's Browser pane", async 
 
   await user.click(await screen.findByRole("link", { name: "the app" }))
 
-  const { loaded } = attachPage(await screen.findByRole("complementary", { name: "Browser" }))
+  const { loaded } = attachPage()
 
   await waitFor(() => expect(loaded).toEqual(["http://localhost:3000/settings"]))
 })
@@ -2101,8 +2173,8 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
 
   await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
 
-  const pane = await screen.findByRole("complementary", { name: "Browser" })
-  const { toPage, navigate, fromPage } = attachPage(pane)
+  await screen.findByRole("complementary", { name: "Browser" })
+  const { toPage, navigate, fromPage } = attachPage()
   navigate(threadFileAddress(thread.id, "docs/plan.html"))
 
   const part = PageText.make({
@@ -2117,7 +2189,7 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
   fromPage({ type: "part", part, rect: { top: 10, left: 10, bottom: 30, right: 200 } })
 
   await user.type(
-    await within(pane).findByRole("textbox", { name: "Feedback on the selected part of the page" }),
+    await screen.findByRole("textbox", { name: "Feedback on the selected part of the page" }),
     "Make this ten",
   )
   await user.keyboard("{Control>}{Enter}{/Control}")
@@ -2130,10 +2202,10 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
   expect(toPage.at(-1)).toEqual({ pick: false, notes: [{ id: note?.id, part }], active: null })
 
   fromPage({ type: "open", id: note!.id, rect: { top: 10, left: 10, bottom: 30, right: 200 } })
-  await within(pane).findByRole("form", { name: "Edit Feedback note" })
+  await screen.findByRole("form", { name: "Edit Feedback note" })
   expect(screen.getByRole("button", { name: "Send" }).hasAttribute("disabled")).toBe(true)
 
-  await user.click(within(pane).getByRole("button", { name: "Cancel" }))
+  await user.click(screen.getByRole("button", { name: "Cancel" }))
   await user.type(screen.getByRole("textbox", { name: "Message" }), "{Enter}")
 
   await waitFor(() => expect(sent).toEqual([{ message: "", feedback: [note?.id] }]))

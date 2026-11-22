@@ -10,7 +10,9 @@ import {
 } from "@glass/contracts"
 import { PAGE_EVENT_CHANNEL, PAGE_STATE_CHANNEL } from "@glass/contracts/desktop"
 import { Option, Schema } from "effect"
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
+import { useEffect, useEffectEvent, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
+import { useBrowserPageFrame } from "./browserPages"
 import { FeedbackEditor, pagePartLabel, withText } from "./FeedbackNotes"
 import { pageNoteEditingAtom } from "./threadsArea"
 import { useFeedbackNotes } from "./useFeedbackNotes"
@@ -53,7 +55,6 @@ export function PageNotes(props: {
 }) {
   const { view, threadId, page, pick, loads } = props
   const store = useFeedbackNotes(threadId)
-  const area = useRef<HTMLDivElement>(null)
   const [opened, setEditing] = useState<Editing | null>(null)
 
   const notes = useMemo(
@@ -142,21 +143,7 @@ export function PageNotes(props: {
     }
   }, [view])
 
-  const [size, setSize] = useState({ width: 0, height: 0 })
-
-  useEffect(() => {
-    const element = area.current
-
-    if (element === null) return undefined
-
-    const observer = new ResizeObserver(() =>
-      setSize({ width: element.clientWidth, height: element.clientHeight }),
-    )
-
-    observer.observe(element)
-
-    return () => observer.disconnect()
-  }, [])
+  const frame = useBrowserPageFrame(threadId)
 
   const save = async (current: Editing, text: string) => {
     const note =
@@ -171,23 +158,24 @@ export function PageNotes(props: {
     return problem
   }
 
-  return (
-    <div ref={area} className="pointer-events-none absolute inset-0">
-      {editing !== null && (
-        <div className="pointer-events-auto absolute z-10" style={placement(editing.rect, size)}>
-          <FeedbackEditor
-            place={pagePartLabel(editing.part)}
-            about="page"
-            olderCode={null}
-            saved={editing.note !== null}
-            draft={editing.draft}
-            onDraftChange={(draft) => setEditing({ ...editing, draft })}
-            onSave={(text) => save(editing, text)}
-            onCancel={() => setEditing(null)}
-          />
-        </div>
-      )}
-    </div>
+  if (editing === null || frame === null) return null
+
+  return createPortal(
+    <div className="pointer-events-none fixed z-20" style={frame}>
+      <div className="pointer-events-auto absolute" style={placement(editing.rect, frame)}>
+        <FeedbackEditor
+          place={pagePartLabel(editing.part)}
+          about="page"
+          olderCode={null}
+          saved={editing.note !== null}
+          draft={editing.draft}
+          onDraftChange={(draft) => setEditing({ ...editing, draft })}
+          onSave={(text) => save(editing, text)}
+          onCancel={() => setEditing(null)}
+        />
+      </div>
+    </div>,
+    document.body,
   )
 }
 

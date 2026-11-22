@@ -9,6 +9,9 @@ interface WebviewEventMap extends HTMLElementEventMap {
 }
 
 interface HTMLWebViewElement {
+  getWebContentsId(): number
+  getURL(): string
+  getTitle(): string
   loadURL(url: string): Promise<void>
   canGoBack(): boolean
   canGoForward(): boolean

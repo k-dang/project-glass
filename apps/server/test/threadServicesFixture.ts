@@ -211,7 +211,7 @@ export const threadServicesFixture = Effect.gen(function* () {
         Threads.layer.pipe(
           Layer.provideMerge(
             Sandboxes.layer.pipe(
-              Layer.provide(Layer.mock(GlassToolRelay)({ tools: Effect.succeed([]) })),
+              Layer.provide(Layer.mock(GlassToolRelay)({ toolsFor: () => Effect.succeed([]) })),
               Layer.provide(
                 Layer.succeed(
                   Plugins,

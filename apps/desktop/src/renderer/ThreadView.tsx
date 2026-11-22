@@ -82,6 +82,7 @@ import { useStagedFeedback } from "./useStagedFeedback"
 import { DiagramPane, useDiagrams } from "./ThreadDiagrams"
 import { BrowserLinks, type BrowserOpening, BrowserPane } from "./BrowserPane"
 import { browserPolicyOf, threadFileAddress } from "./browserAddress"
+import { useAgentHoldsBrowserPage } from "./browserPages"
 import { FileLinks, FilePane, isHtmlFile, lastEndedOf, useFileLinks } from "./ThreadFiles"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
@@ -160,6 +161,15 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
       })),
     [setPane],
   )
+
+  const agentHoldsPage = useAgentHoldsBrowserPage(thread.id)
+  const [seenAgentHold, setSeenAgentHold] = useState(false)
+
+  if (agentHoldsPage !== seenAgentHold) {
+    setSeenAgentHold(agentHoldsPage)
+
+    if (agentHoldsPage && pane?.kind !== "browser") openBrowser(null)
+  }
 
   const openFile = useCallback(
     (path: string) =>

@@ -28,6 +28,13 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Toggle } from "@/components/ui/toggle"
 import { addressOf, type BrowserPolicy, pageOf, webAddress } from "./browserAddress"
+import {
+  browserPageReady,
+  liveBrowserPage,
+  remembered,
+  showBrowserPage,
+  usePaneBrowserPage,
+} from "./browserPages"
 import { fileName } from "./fileName"
 import { PageNotes } from "./PageNotes"
 import { SidePanel } from "./SidePanel"
@@ -50,13 +57,6 @@ const isReady = (message: { readonly channel: string; readonly args: ReadonlyArr
 
 const paneWidthAtom = Atom.make(720).pipe(Atom.keepAlive)
 
-const rememberedKey = (threadId: string) => `glass.browserPane.${threadId}`
-
-const remembered = (threadId: string) => localStorage.getItem(rememberedKey(threadId))
-
-const remember = (threadId: string, address: string) =>
-  localStorage.setItem(rememberedKey(threadId), address)
-
 const pageKey = (page: PageLocation) =>
   Predicate.isTagged(page, "FilePage") ? `file:${page.path}` : `web:${page.url}`
 
@@ -69,10 +69,20 @@ export const BrowserPane = memo(function BrowserPane(props: {
 }) {
   const { threadId, policy } = props
 
-  const [start] = useState(() => props.opening.address ?? remembered(threadId))
+  const [start] = useState(
+    () =>
+      props.opening.address ?? (liveBrowserPage(threadId) === null ? remembered(threadId) : null),
+  )
+
   const [seenSeq, setSeenSeq] = useState<number | null>(null)
-  const [view, setView] = useState<HTMLWebViewElement | null>(null)
+
+  const view = usePaneBrowserPage(
+    threadId,
+    policy.local ? BROWSER_PARTITION : SANDBOX_BROWSER_PARTITION,
+  )
+
   const [attached, setAttached] = useState(false)
+  const slot = useRef<HTMLDivElement>(null)
   const [requested, setRequested] = useState<{ readonly address: string } | null>(null)
   const [blocked, setBlocked] = useState<string | null>(null)
   const [address, setAddress] = useState<string | null>(null)
@@ -115,7 +125,7 @@ export const BrowserPane = memo(function BrowserPane(props: {
   useEffect(() => {
     if (view === null) return undefined
 
-    const onReady = () => setAttached(true)
+    let cancelled = false
 
     const navigated = (url: string) => {
       const shown = url === "about:blank" ? null : url
@@ -124,8 +134,6 @@ export const BrowserPane = memo(function BrowserPane(props: {
       setTyped(shown ?? "")
       setPick(false)
       setHistory({ back: view.canGoBack(), forward: view.canGoForward() })
-
-      if (shown !== null) remember(threadId, shown)
     }
 
     const onNavigate = (event: { readonly url: string }) => navigated(event.url)
@@ -145,7 +153,6 @@ export const BrowserPane = memo(function BrowserPane(props: {
       if (isReady(message)) setLoads((count) => count + 1)
     }
 
-    view.addEventListener("dom-ready", onReady)
     view.addEventListener("did-navigate", onNavigate)
     view.addEventListener("did-navigate-in-page", onNavigateInPage)
     view.addEventListener("page-title-updated", onTitle)
@@ -153,8 +160,25 @@ export const BrowserPane = memo(function BrowserPane(props: {
     view.addEventListener("did-stop-loading", onLoaded)
     view.addEventListener("ipc-message", onMessage)
 
+    void browserPageReady(threadId).then(
+      () => {
+        if (cancelled) return
+
+        setAttached(true)
+
+        const url = view.getURL()
+
+        if (url === "about:blank") return
+
+        navigated(url)
+        setTitle(view.getTitle())
+        setLoads((count) => Math.max(count, 1))
+      },
+      () => undefined,
+    )
+
     return () => {
-      view.removeEventListener("dom-ready", onReady)
+      cancelled = true
       view.removeEventListener("did-navigate", onNavigate)
       view.removeEventListener("did-navigate-in-page", onNavigateInPage)
       view.removeEventListener("page-title-updated", onTitle)
@@ -189,6 +213,14 @@ export const BrowserPane = memo(function BrowserPane(props: {
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.key === "Escape" && pick) setPick(false)
   }
+
+  const showsPage = blocked === null && !(address === null && requested === null)
+
+  useEffect(() => {
+    showBrowserPage(threadId, showsPage ? slot.current : null)
+
+    return () => showBrowserPage(threadId, null)
+  }, [threadId, showsPage])
 
   const web = webAddress(address)
   const file = showsFile ? fileName(page.path) : null
@@ -301,13 +333,7 @@ export const BrowserPane = memo(function BrowserPane(props: {
               : "Select text, or pick an element, to leave a Feedback note."}
           </p>
         )}
-        <div className="relative min-h-0 flex-1">
-          <webview
-            ref={setView}
-            src="about:blank"
-            partition={policy.local ? BROWSER_PARTITION : SANDBOX_BROWSER_PARTITION}
-            className="absolute inset-0 size-full bg-white"
-          />
+        <div ref={slot} className="relative min-h-0 flex-1">
           {view !== null && page !== null && (
             <PageNotes
               key={`${pageKey(page)} ${loads}`}

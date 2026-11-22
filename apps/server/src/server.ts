@@ -9,6 +9,7 @@ import { RendererAccess } from "./access"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
+import { BrowserPages } from "./BrowserPages"
 import { CheckoutRuns } from "./CheckoutRuns"
 import { Checkouts } from "./Checkouts"
 import { CompleteToDosOnMerge } from "./CompleteToDosOnMerge"
@@ -151,6 +152,7 @@ const services = (
     .pipe(
       Layer.provide(BranchNames.layer),
       Layer.provide(agentRunners),
+      Layer.provide(BrowserPages.layer),
       Layer.provide(agentCommands),
       Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
       Layer.provideMerge(OutsideAgents.layer),

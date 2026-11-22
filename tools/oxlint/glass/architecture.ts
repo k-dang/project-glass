@@ -30,6 +30,7 @@ const transportOwners = new Set([
   "mcp/oauthHttp.ts",
   "mcp/GlassToolRelay.ts",
   "threadFilesHttp.ts",
+  "mcp/browserTools.ts",
 ])
 
 const entryPoints = new Set([
