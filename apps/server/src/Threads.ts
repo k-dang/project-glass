@@ -305,7 +305,7 @@ export class Threads extends Context.Service<
           branch, harness, model, effort, permission_mode AS permissionMode, local_skills AS localSkills, folder,
           created_at AS createdAt,
           review_brief IS NOT NULL AS forReview
-        FROM thread ORDER BY created_at
+        FROM thread ORDER BY created_at DESC
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
       const packsOfThreads = yield* skillPacks.threadPacks.pipe(Effect.orDie)
@@ -591,7 +591,7 @@ export class Threads extends Context.Service<
                 Review: () => Effect.void,
               })
 
-              yield* SubscriptionRef.update(rows, (current) => [...current, { ...placed, thread }])
+              yield* SubscriptionRef.update(rows, (current) => [{ ...placed, thread }, ...current])
               yield* setKeptGoing(id, thread.createdAt)
               yield* transcripts.startOrQueue(id, { ...first, context: null })
 
@@ -976,7 +976,7 @@ export class Threads extends Context.Service<
           Effect.tapError(() =>
             SubscriptionRef.update(rows, (current) =>
               [...current, row].toSorted((a, b) =>
-                DateTime.Order(a.thread.createdAt, b.thread.createdAt),
+                DateTime.Order(b.thread.createdAt, a.thread.createdAt),
               ),
             ),
           ),

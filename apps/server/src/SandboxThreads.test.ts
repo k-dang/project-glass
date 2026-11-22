@@ -81,7 +81,7 @@ it.live("a Thread in a Sandbox can't create or message one on this device", () =
     )
     assert.deepStrictEqual(
       (yield* f.threads).map(({ id }) => id),
-      [local.id, sandboxed.id],
+      [sandboxed.id, local.id],
     )
   }),
 )

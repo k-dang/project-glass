@@ -31,7 +31,17 @@ import {
   Undo2,
 } from "lucide-react"
 import { cn } from "cn"
-import { use, useContext, useId, useState } from "react"
+import {
+  createContext,
+  type ReactNode,
+  type RefObject,
+  use,
+  useContext,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+} from "react"
 import { createPortal } from "react-dom"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -58,6 +68,8 @@ import { ago } from "./PullRequestRow"
 import { turnEndingLooks, warningTone } from "./status"
 import { harnessNames } from "./harnesses"
 import { ConfirmationDialog } from "./ConfirmationDialog"
+import { ThreadName } from "./ThreadName"
+import { fadeIn } from "./fadeIn"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { useActions } from "./actions"
@@ -247,28 +259,74 @@ function ThreadList() {
     .onFailure((cause) => (
       <ProblemAlert problem={streamProblem(cause)} action={{ label: "Retry", run: retry }} />
     ))
-    .onSuccess((list) => {
-      const shown = list.filter((thread) => !thread.forReview)
-      const going = shown.filter(({ id }) => !settledIds.has(id))
-      const settled = shown.filter(({ id }) => settledIds.has(id))
+    .onSuccess((list) => <ThreadNav list={list} settledIds={settledIds} now={now} />)
+    .render()
+}
 
-      return shown.length === 0 ? (
+const ListMounted = createContext<RefObject<boolean>>({ current: false })
+
+function useArrival<E extends HTMLElement>(animates: boolean) {
+  const mounted = use(ListMounted)
+  const ref = useRef<E>(null)
+
+  useEffect(() => {
+    if (animates && mounted.current && ref.current !== null)
+      fadeIn(ref.current, { translate: "0 0.375rem" }, 200)
+  }, [animates, mounted])
+
+  return ref
+}
+
+function ThreadNav(props: {
+  list: ReadonlyArray<Thread>
+  settledIds: ReadonlySet<string>
+  now: Date
+}) {
+  const { settledIds, now } = props
+  const shown = props.list.filter((thread) => !thread.forReview)
+  const mounted = useRef(false)
+
+  useEffect(() => {
+    mounted.current = true
+
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
+  const going = shown.filter(({ id }) => !settledIds.has(id))
+  const settled = shown.filter(({ id }) => settledIds.has(id))
+
+  return (
+    <ListMounted value={mounted}>
+      {shown.length === 0 ? (
         <p className="px-2 text-sm text-muted-foreground">No Threads yet.</p>
       ) : (
         <nav aria-label="Threads list" className="flex min-h-full flex-col gap-4">
           {groupThreads(going).map(({ machine, threads: onMachine }) => (
             <section key={machine} aria-label={groupNames[machine]} className="flex flex-col gap-1">
-              <h2 className="px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                {groupNames[machine]}
-              </h2>
+              <GroupHeading>{groupNames[machine]}</GroupHeading>
               <ThreadRows threads={onMachine} now={now} settled={false} />
             </section>
           ))}
           {settled.length > 0 && <SettledSection threads={settled} now={now} />}
         </nav>
-      )
-    })
-    .render()
+      )}
+    </ListMounted>
+  )
+}
+
+function GroupHeading(props: { children: ReactNode }) {
+  const ref = useArrival<HTMLHeadingElement>(true)
+
+  return (
+    <h2
+      ref={ref}
+      className="px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+    >
+      {props.children}
+    </h2>
+  )
 }
 
 function ThreadRows(props: { threads: ReadonlyArray<Thread>; now: Date; settled: boolean }) {
@@ -387,6 +445,7 @@ function BringBackButton(props: { thread: Thread }) {
 
 function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
   const { thread } = props
+  const arrival = useArrival<HTMLLIElement>(!props.settled)
   const navigate = useNavigate()
   const open = useParams({ strict: false }).threadId === thread.id
   const registry = useContext(RegistryContext)
@@ -437,7 +496,7 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
   }
 
   return (
-    <li className="group/row relative">
+    <li ref={arrival} className="group/row relative">
       <Link
         to="/threads/$threadId"
         params={{ threadId: thread.id }}
@@ -481,11 +540,10 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
             </span>
           )}
         </span>
-        <span
+        <ThreadName
+          name={thread.name}
           className={cn("truncate text-sm font-semibold", showsWorking && "text-muted-foreground")}
-        >
-          {thread.name}
-        </span>
+        />
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
           {sandboxText === null ? (
             <>

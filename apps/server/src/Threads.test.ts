@@ -106,40 +106,43 @@ it.live("fails only the Turn sent while the agent host bundle is missing", () =>
   }),
 )
 
-it.live("starts a Thread in a worktree, on a new branch it names from its base", () =>
-  Effect.gen(function* () {
-    const f = yield* threadsFixture
-    const thread = yield* f.start()
-    const other = yield* f.start()
-    const worktree = f.worktree(thread.name)
+it.live(
+  "starts a Thread in a worktree, on a new branch it names from its base, and lists the newest Thread first",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadsFixture
+      const thread = yield* f.start()
+      const other = yield* f.start()
+      const worktree = f.worktree(thread.name)
 
-    assert.match(thread.name, /^agent\//)
-    assert.notEqual(other.name, thread.name)
-    assert.equal(gitIn(worktree, "branch", "--show-current"), thread.name)
-    assert.equal(gitIn(worktree, "rev-parse", "HEAD"), f.clone.main)
+      assert.match(thread.name, /^agent\//)
+      assert.notEqual(other.name, thread.name)
+      assert.equal(gitIn(worktree, "branch", "--show-current"), thread.name)
+      assert.equal(gitIn(worktree, "rev-parse", "HEAD"), f.clone.main)
 
-    const [listed] = yield* f.client
-      .WatchThreads()
-      .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+      const [newest, listed] = yield* f.client
+        .WatchThreads()
+        .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
-    assert.deepStrictEqual(
-      { id: listed?.id, place: listed?.place, repository: listed?.repository },
-      { id: thread.id, place: localPlace, repository },
-    )
+      assert.equal(newest?.id, other.id)
+      assert.deepStrictEqual(
+        { id: listed?.id, place: listed?.place, repository: listed?.repository },
+        { id: thread.id, place: localPlace, repository },
+      )
 
-    const { activities } = yield* f.client.ListActivity({ limit: 10 })
-    assert.deepInclude(
-      activities.map(({ activity }) => activity),
-      ThreadStarted.make({
-        threadId: thread.id,
-        name: thread.name,
-        repository,
-        machine: "local",
-        harness: "pi",
-        message: "Say hello",
-      }),
-    )
-  }),
+      const { activities } = yield* f.client.ListActivity({ limit: 10 })
+      assert.deepInclude(
+        activities.map(({ activity }) => activity),
+        ThreadStarted.make({
+          threadId: thread.id,
+          name: thread.name,
+          repository,
+          machine: "local",
+          harness: "pi",
+          message: "Say hello",
+        }),
+      )
+    }),
 )
 
 it.live(

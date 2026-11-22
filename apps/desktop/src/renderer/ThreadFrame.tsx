@@ -88,11 +88,14 @@ export function ThreadFrame(props: {
       </header>
       <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">
         {props.children}
-        {details !== null && pins && pinned && (
+        {details !== null && pins && (
           <aside
             id={detailsId}
             aria-label="Details"
-            className="absolute top-2 right-4 z-10 max-h-[calc(100%-1rem)] w-64 overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
+            data-open={pinned}
+            aria-hidden={!pinned}
+            inert={!pinned}
+            className="pinned-details-motion [:active-view-transition-type(start-thread)_&]:data-[open=true]:[view-transition-name:thread-details] absolute top-2 right-4 z-10 max-h-[calc(100%-1rem)] w-64 overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
           >
             <ThreadDetails {...details} />
           </aside>
