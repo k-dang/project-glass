@@ -1,6 +1,49 @@
 # Glass
 
-TBD
+A desktop work hub for reviewing GitHub pull requests and working with coding agents.
+
+![A PR workspace with its Agent review](docs/images/agent-review.png)
+
+## What it does
+
+### Review pull requests
+
+The PR lists gather pull requests from your Followed repositories: **Needs review**, **My PRs**,
+**Reviewing**, and a **Queue** of PRs to review next. Each PR opens in a PR workspace pinned to
+one Revision, with its description, changed files, diffs, and Review threads. Drafts are saved
+to your pending GitHub review until you finish it.
+
+![The Needs review list](docs/images/reviews.png)
+
+### Read a Tour, get an Agent review
+
+A **Tour** is an agent-written reading order for a PR: why the change exists, a diagram or
+Before / after, then Chapters ordered from the part that matters most to the glue.
+
+![Reading a Tour](docs/images/tour.png)
+
+An **Agent review** ranks the few Hotspots worth your closest read and marks the Low-attention
+files. It stays on this device, read beside the diff, and never posts to GitHub. Ask about any
+line of the diff, or send a Follow-up and add the Suggested drafts you agree with.
+
+### Work with agents in Threads
+
+A **Thread** is your lasting work with one agent, run by Claude Code or pi in a worktree on this
+device or a Sandbox. Glass names its branch, links the Thread's PR, and brings Permission requests
+and Questions to you. The Global chat works through Glass's own tools from any Area.
+
+![A Thread waiting on a Permission request](docs/images/thread.png)
+
+### See what needs you
+
+The **Inbox** lists the Threads, Questions, Check-ins, and PRs waiting on you, grouped by why
+they wait. Outside agents, such as Claude Code in a terminal, can connect over MCP to ask you a
+question or check in on their changes ([outside agents](docs/user/outside-agents.md)).
+
+![A question from an outside agent in the Inbox](docs/images/inbox.png)
+
+The Dashboard picks up where you left off, To-dos keep track of what you mean to do, and the
+Activity log records what you did.
 
 ## Layout
 
@@ -23,7 +66,7 @@ Glass signs in to GitHub with `GH_TOKEN`, `GITHUB_TOKEN`, or your GitHub CLI log
 
 Tours, Agent reviews, and Threads use either an authenticated Claude Code CLI or an installed pi CLI.
 If Glass can't find them on your `PATH`, set `claudeCommand` or `piCommand` in `~/.project-glass/settings.json` to the full path and restart Glass.
-pi reuses the credentials and model configuration in `~/.pi/agent` (or `PI_CODING_AGENT_DIR`);
+pi reuses the credentials and model configuration in `~/.pi/agent` (or `PI_CODING_AGENT_DIR`).
 
 ## Commands
 
@@ -57,3 +100,11 @@ pnpm dev   # traces and logs at http://localhost:18888
 ## Storage
 
 The backend keeps the Activity log in `~/.project-glass/glass.db`.
+
+## Docs
+
+- [`GLOSSARY.md`](GLOSSARY.md): the domain words Glass uses in code, UI copy, and specs.
+- [`docs/adr`](docs/adr): architecture decisions.
+- [`docs/architecture/agent-threads.md`](docs/architecture/agent-threads.md): how Threads run.
+
+The screenshots come from `pnpm gallery:capture` on the demo data.
