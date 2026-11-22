@@ -3,6 +3,7 @@ import { Effect, Predicate } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
+import { BrowserPages } from "./BrowserPages"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Threads } from "./Threads"
 import { GitHubClient } from "./github/GitHubClient"
@@ -43,6 +44,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const settings = yield* SettingsStore
     const savedPlaces = yield* SavedPlaces
     const threads = yield* Threads
+    const browserPages = yield* BrowserPages
     const globalChat = yield* GlobalChat
     const sandboxes = yield* Sandboxes
     const checkouts = yield* LocalCheckouts
@@ -182,6 +184,8 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateThread: (input) => threads.create(input),
       WatchWorkingThreads: () => threads.watchWorking(),
+      WatchBrowserPageRequests: () => browserPages.requests,
+      AnswerBrowserPageRequest: ({ id, answer }) => browserPages.answer(id, answer),
       WatchThreadPullRequests: () => threadPullRequests.watch(),
       WatchSettledThreads: () => settledThreads.watch(),
       BringBackThread: ({ threadId }) => threads.bringBack(threadId),

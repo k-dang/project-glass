@@ -48,6 +48,10 @@ import {
   Stream,
 } from "effect"
 import { Tool, Toolkit } from "effect/ai"
+import type { Page } from "playwright-core"
+import { BrowserPages } from "../BrowserPages"
+import { callingThreadOnThisDevice } from "./browserTools"
+import { forThreadsOnThisDevice } from "./toolAudience"
 import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
 import { PullRequestMaterial, pullRequestMaterial } from "../agentReviewPrompt"
@@ -79,6 +83,8 @@ const MAX_TURNS = 20
 const MAX_TEXT_CHARS = 4_000
 
 const MAX_DIFF_CHARS = 60_000
+
+const MAX_SNAPSHOT_CHARS = 40_000
 
 const readOnly = Context.make(Tool.Readonly, true).pipe(
   Context.add(Tool.Destructive, false),
@@ -349,6 +355,50 @@ const CheckIn = Tool.make("check_in", {
   failure: GlassToolFailure,
 }).annotateMerge(action)
 
+const BrowserPage = Schema.Struct({ url: Schema.String, title: Schema.String })
+
+const OpenBrowser = Tool.make("open_browser", {
+  description:
+    "Opens a page in your Thread's Browser pane, the browser the user sees beside your Thread, and waits for it to load. Pass a full http or https address, such as your dev server's http://localhost:3000/. Without one, it opens the pane on the page it last showed. Returns the page's address and title. Then read_browser lists what's on it, screenshot_browser shows it, and browser_console lists its errors.",
+  parameters: Schema.Struct({
+    url: Schema.optional(
+      Schema.Trimmed.check(Schema.isPattern(/^https?:\/\//i)).annotate({
+        description: "The http or https address to open.",
+      }),
+    ),
+  }),
+  success: BrowserPage,
+  failure: GlassToolFailure,
+})
+  .annotateMerge(action)
+  .annotateMerge(forThreadsOnThisDevice)
+
+const ReadBrowser = Tool.make("read_browser", {
+  description:
+    "Reads the page in your Thread's Browser pane: its address, title, and an accessibility snapshot of what's on it, as roles, names and text. open_browser opens a page first.",
+  success: Schema.Struct({ ...BrowserPage.fields, snapshot: Schema.String }),
+  failure: GlassToolFailure,
+})
+  .annotateMerge(readOnly)
+  .annotateMerge(forThreadsOnThisDevice)
+
+const BrowserConsole = Tool.make("browser_console", {
+  description:
+    "Lists the console errors and warnings, uncaught page errors, and failed or HTTP 4xx/5xx requests of the page in your Thread's Browser pane since your browser tools last connected to it, oldest first.",
+  success: Schema.Struct({
+    entries: Schema.Array(
+      Schema.Struct({
+        at: Schema.String,
+        kind: Schema.Literals(["console error", "console warning", "page error", "request failed"]),
+        text: Schema.String,
+      }),
+    ),
+  }),
+  failure: GlassToolFailure,
+})
+  .annotateMerge(readOnly)
+  .annotateMerge(forThreadsOnThisDevice)
+
 const StartAgentReview = Tool.make("start_agent_review", {
   description:
     "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
@@ -380,6 +430,9 @@ export const GlassTools = Toolkit.make(
   SendThreadMessage,
   AskUser,
   CheckIn,
+  OpenBrowser,
+  ReadBrowser,
+  BrowserConsole,
 )
 
 type ServiceFailure =
@@ -425,8 +478,10 @@ const explained = (error: ServiceFailure) =>
     ),
   })
 
-const textOf = (text: string) =>
-  text.length > MAX_TEXT_CHARS ? `${text.slice(0, MAX_TEXT_CHARS)}… (cut short)` : text
+const truncated = (text: string, max: number) =>
+  text.length > max ? `${text.slice(0, max)}… (cut short)` : text
+
+const textOf = (text: string) => truncated(text, MAX_TEXT_CHARS)
 
 const activityOf = (turn: Turn) =>
   turn.parts.map((part) =>
@@ -521,6 +576,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const lists = yield* PullRequestLists
     const queue = yield* Queue
     const toDos = yield* ToDos
+    const browserPages = yield* BrowserPages
     const activityLog = yield* ActivityLog
     const github = yield* GitHubClient
     const threads = yield* Threads
@@ -552,6 +608,12 @@ export const GlassToolHandlers = GlassTools.toLayer(
           message: `That model has no Effort "${effort}". list_thread_options lists each model's Efforts.`,
         })
     })
+
+    const inBrowser = <A>(act: (page: Page) => Promise<A>) =>
+      callingThreadOnThisDevice(threads).pipe(
+        Effect.flatMap((threadId) => browserPages.use(threadId, act)),
+        Effect.mapError(({ message }) => new GlassToolFailure({ message })),
+      )
 
     const callingThreadId = McpCaller.current.pipe(
       Effect.map((caller) =>
@@ -718,6 +780,25 @@ export const GlassToolHandlers = GlassTools.toLayer(
                 timeout: Duration.seconds(timeoutSeconds ?? CHECK_IN_TIMEOUT_SECONDS),
               })
               .pipe(Effect.mapError(({ message }) => new GlassToolFailure({ message }))),
+        ),
+      open_browser: ({ url }) =>
+        inBrowser(async (page) => {
+          if (url !== undefined) await page.goto(url, { waitUntil: "load" })
+
+          return { url: page.url(), title: await page.title() }
+        }),
+      read_browser: () =>
+        inBrowser(async (page) => ({
+          url: page.url(),
+          title: await page.title(),
+          snapshot: truncated(await page.locator("body").ariaSnapshot(), MAX_SNAPSHOT_CHARS),
+        })),
+      browser_console: () =>
+        callingThreadOnThisDevice(threads).pipe(
+          Effect.flatMap((threadId) =>
+            browserPages.use(threadId, (_page, log) => Promise.resolve({ entries: [...log] })),
+          ),
+          Effect.mapError(({ message }) => new GlassToolFailure({ message })),
         ),
     })
   }),

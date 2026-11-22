@@ -89,7 +89,7 @@ export const followHost = (
   Effect.gen(function* () {
     const { save, alreadySaved, relay, origin, calls } = options
 
-    yield* client.OfferGlassTools({ host: position.host, tools: yield* relay.tools })
+    yield* client.OfferGlassTools({ host: position.host, tools: yield* relay.toolsFor(origin) })
 
     const toolCalls = client.WatchToolCalls({ host: position.host }).pipe(
       Stream.runForEach((call) =>

@@ -10,7 +10,8 @@ import {
 } from "@glass/contracts"
 import { PAGE_EVENT_CHANNEL, PAGE_STATE_CHANNEL } from "@glass/contracts/desktop"
 import { Option, Schema } from "effect"
-import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react"
+import { type RefObject, useEffect, useEffectEvent, useMemo, useState } from "react"
+import { createPortal } from "react-dom"
 import { FeedbackEditor, pagePartLabel, withText } from "./FeedbackNotes"
 import { pageNoteEditingAtom } from "./threadsArea"
 import { useFeedbackNotes } from "./useFeedbackNotes"
@@ -49,11 +50,11 @@ export function PageNotes(props: {
   page: PageLocation
   pick: boolean
   loads: number
+  slot: RefObject<HTMLDivElement | null>
   onStopPicking: () => void
 }) {
-  const { view, threadId, page, pick, loads } = props
+  const { view, threadId, page, pick, loads, slot } = props
   const store = useFeedbackNotes(threadId)
-  const area = useRef<HTMLDivElement>(null)
   const [opened, setEditing] = useState<Editing | null>(null)
 
   const notes = useMemo(
@@ -142,21 +143,24 @@ export function PageNotes(props: {
     }
   }, [view])
 
-  const [size, setSize] = useState({ width: 0, height: 0 })
+  const [frame, setFrame] = useState<Frame | null>(null)
 
   useEffect(() => {
-    const element = area.current
+    if (!isEditing) return undefined
 
-    if (element === null) return undefined
+    let following = requestAnimationFrame(function follow() {
+      const rect = slot.current?.getBoundingClientRect()
 
-    const observer = new ResizeObserver(() =>
-      setSize({ width: element.clientWidth, height: element.clientHeight }),
-    )
+      if (rect !== undefined)
+        setFrame((current) =>
+          current !== null && sameFrame(current, rect) ? current : frameOf(rect),
+        )
 
-    observer.observe(element)
+      following = requestAnimationFrame(follow)
+    })
 
-    return () => observer.disconnect()
-  }, [])
+    return () => cancelAnimationFrame(following)
+  }, [isEditing, slot])
 
   const save = async (current: Editing, text: string) => {
     const note =
@@ -171,25 +175,38 @@ export function PageNotes(props: {
     return problem
   }
 
-  return (
-    <div ref={area} className="pointer-events-none absolute inset-0">
-      {editing !== null && (
-        <div className="pointer-events-auto absolute z-10" style={placement(editing.rect, size)}>
-          <FeedbackEditor
-            place={pagePartLabel(editing.part)}
-            about="page"
-            olderCode={null}
-            saved={editing.note !== null}
-            draft={editing.draft}
-            onDraftChange={(draft) => setEditing({ ...editing, draft })}
-            onSave={(text) => save(editing, text)}
-            onCancel={() => setEditing(null)}
-          />
-        </div>
-      )}
-    </div>
+  if (editing === null || frame === null) return null
+
+  return createPortal(
+    <div className="pointer-events-none fixed z-20" style={frame}>
+      <div className="pointer-events-auto absolute" style={placement(editing.rect, frame)}>
+        <FeedbackEditor
+          place={pagePartLabel(editing.part)}
+          about="page"
+          olderCode={null}
+          saved={editing.note !== null}
+          draft={editing.draft}
+          onDraftChange={(draft) => setEditing({ ...editing, draft })}
+          onSave={(text) => save(editing, text)}
+          onCancel={() => setEditing(null)}
+        />
+      </div>
+    </div>,
+    document.body,
   )
 }
+
+interface Frame {
+  readonly left: number
+  readonly top: number
+  readonly width: number
+  readonly height: number
+}
+
+const frameOf = ({ left, top, width, height }: Frame): Frame => ({ left, top, width, height })
+
+const sameFrame = (a: Frame, b: Frame) =>
+  a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height
 
 const placement = (rect: PageRect, area: { readonly width: number; readonly height: number }) => {
   const width = Math.min(editorWidth, area.width - gap * 2)

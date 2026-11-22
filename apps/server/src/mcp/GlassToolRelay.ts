@@ -4,6 +4,7 @@ import { SqlClient } from "effect/sql"
 import { failedToolCall, type RelayedToolCall } from "../agentHost/protocol"
 import { annotateUnit } from "../wideEvents"
 import { ThreadCaller, McpCaller } from "./McpCredentials"
+import { RELAY_CLIENT_NAME, ThisDeviceOnly } from "./toolAudience"
 
 export type ToolCallOrigin = Data.TaggedEnum<{
   Sandbox: { readonly threadId: string }
@@ -23,7 +24,7 @@ const callerUnchecked = failedToolCall(
 const relayInitialize = {
   protocolVersion: "2025-11-25" as const,
   capabilities: new McpSchema.ClientCapabilities({}),
-  clientInfo: { name: "glass-agent-host", version: "1.0.0" },
+  clientInfo: { name: RELAY_CLIENT_NAME, version: "1.0.0" },
 }
 
 // WARNING: McpServer.callTool needs a client of a session, and a relayed call has none; Glass's tools must not reach back through getClient.
@@ -48,7 +49,7 @@ const decodeCallers = Schema.decodeUnknownEffect(
 export class GlassToolRelay extends Context.Service<
   GlassToolRelay,
   {
-    readonly tools: Effect.Effect<ReadonlyArray<McpSchema.Tool>>
+    readonly toolsFor: (origin: ToolCallOrigin) => Effect.Effect<ReadonlyArray<McpSchema.Tool>>
     readonly toolsRegistered: Effect.Effect<void>
     readonly answer: (
       origin: ToolCallOrigin,
@@ -97,9 +98,20 @@ export class GlassToolRelay extends Context.Service<
           )
 
       return GlassToolRelay.of({
-        tools: Deferred.await(registered).pipe(
-          Effect.andThen(Effect.sync(() => server.tools.map(({ tool }) => tool))),
-        ),
+        toolsFor: (origin) =>
+          Deferred.await(registered).pipe(
+            Effect.andThen(
+              Effect.sync(() =>
+                server.tools
+                  .filter(
+                    ({ annotations }) =>
+                      ToolCallOrigin.$is("ThisDevice")(origin) ||
+                      !Context.get(annotations, ThisDeviceOnly),
+                  )
+                  .map(({ tool }) => tool),
+              ),
+            ),
+          ),
         toolsRegistered: Deferred.succeed(registered, undefined).pipe(Effect.asVoid),
         answer: (origin, call) =>
           Effect.gen(function* () {

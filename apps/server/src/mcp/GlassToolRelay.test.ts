@@ -7,6 +7,7 @@ import { migrationLoader } from "../Migrations"
 import type { RelayedToolCall } from "../agentHost/protocol"
 import { GlassToolRelay, refused, ToolCallOrigin } from "./GlassToolRelay"
 import { McpCaller } from "./McpCredentials"
+import { forThreadsOnThisDevice } from "./toolAudience"
 import { wideEvents } from "../wideEvents"
 
 const named = (text: string) => new McpSchema.CallToolResult({ content: [{ type: "text", text }] })
@@ -146,5 +147,44 @@ it.effect(
           },
         ],
       )
+    }),
+)
+
+it.effect(
+  "offers a host on this device its tools for this device, and a Sandbox's host none of them",
+  () =>
+    Effect.gen(function* () {
+      const context = yield* Layer.build(
+        GlassToolRelay.layer.pipe(
+          Layer.provideMerge(McpServer.McpServer.layer),
+          Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
+        ),
+      )
+
+      const server = Context.get(context, McpServer.McpServer)
+
+      for (const [name, annotations] of [
+        ["anywhere", Context.empty()],
+        ["this_device", forThreadsOnThisDevice],
+      ] as const)
+        yield* server.addTool({
+          tool: new McpSchema.Tool({ name, inputSchema: { type: "object", properties: {} } }),
+          annotations,
+          handle: () => Effect.succeed(named(name)),
+        })
+
+      const glassToolRelay = Context.get(context, GlassToolRelay)
+      yield* glassToolRelay.toolsRegistered
+
+      const offered = (origin: ToolCallOrigin) =>
+        glassToolRelay.toolsFor(origin).pipe(Effect.map((tools) => tools.map(({ name }) => name)))
+
+      assert.deepStrictEqual(yield* offered(ToolCallOrigin.ThisDevice()), [
+        "anywhere",
+        "this_device",
+      ])
+      assert.deepStrictEqual(yield* offered(ToolCallOrigin.Sandbox({ threadId: "sandboxed" })), [
+        "anywhere",
+      ])
     }),
 )

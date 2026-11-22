@@ -10,6 +10,8 @@ export * from "./checkIn"
 
 export * from "./checkoutRun"
 
+export * from "./browserPage"
+
 export * from "./thread"
 
 export * from "./connection"
