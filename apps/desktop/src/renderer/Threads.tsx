@@ -161,7 +161,7 @@ export function ThreadsLayout() {
         <styles.heading className={styles.title}>Threads</styles.heading>
         <NewThreadLink />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="no-scrollbar min-h-0 flex-1 scroll-fade-y overflow-y-auto">
         <ThreadList />
       </div>
     </aside>
