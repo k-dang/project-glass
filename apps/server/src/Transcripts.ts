@@ -943,7 +943,9 @@ export class Transcripts extends Context.Service<
         askedToStop: (turnId) =>
           withStorageFailure(
             "record that a Turn was asked to stop",
-            sql`UPDATE thread_turn SET retries_delivery = 0 WHERE id = ${turnId}`,
+            sql`UPDATE thread_turn SET retries_delivery = 0 WHERE id = ${turnId}`.pipe(
+              Effect.asVoid,
+            ),
           ),
         watch: (threadId) =>
           Stream.unwrap(
