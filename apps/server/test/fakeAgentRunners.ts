@@ -78,7 +78,7 @@ const syntheticBranch = (prompt: string, branchFor: (request: string) => string 
   return { branch: branchFor(request) ?? `feat/${request.split(/\s+/).slice(0, 4).join("-")}` }
 }
 
-export const fakeAgentRunnersWith = (branchFor: (request: string) => string | undefined) =>
+export const fakeAgentRunners = (branchFor: (request: string) => string | undefined) =>
   Layer.succeed(
     AgentRunners,
     AgentRunners.of({
