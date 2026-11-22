@@ -41,9 +41,10 @@ it("serializes samples, retries after failure, and stops even with a request in 
     first.resolve(sample)
     await first.promise
   })
-  expect(hook.result.current).toEqual(sample)
+  expect(hook.result.current.usage).toEqual(sample)
   await act(() => vi.advanceTimersByTimeAsync(2000))
-  expect(hook.result.current).toBeNull()
+  expect(hook.result.current.usage).toBeNull()
+  expect(hook.result.current.trend).toEqual([{ cpu: 2, ram: 248 * 1024 ** 2 }])
   await act(() => vi.advanceTimersByTimeAsync(2000))
   expect(resourceUsage).toHaveBeenCalledTimes(3)
 

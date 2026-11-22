@@ -9,11 +9,12 @@ import {
   PopoverTitle,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import { localStorageBooleanAtom } from "./localStorageBooleanAtom"
 
 const percent = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 })
 
-const formatCPU = (value: number | undefined) =>
-  value === undefined ? "—" : `${percent.format(value)}%`
+const formatCPU = (value: number | null | undefined) =>
+  value === null || value === undefined ? "—" : `${percent.format(value)}%`
 
 const formatMemory = (bytes: number | null | undefined) => {
   if (bytes === null || bytes === undefined) return "—"
@@ -23,25 +24,49 @@ const formatMemory = (bytes: number | null | undefined) => {
   return `${Math.round(bytes / 1024 ** 2)} MB`
 }
 
+export const titleStripResourceUsageAtom = localStorageBooleanAtom("glass.titleStripResourceUsage")
+
+type Kind = "cpu" | "ram"
+
+type TrendPoint = Readonly<Record<Kind, number>>
+
 const readings = {
-  cpu: { icon: Cpu, label: "CPU", color: "text-[#6251b7] dark:text-[#ada6ff]" },
-  ram: { icon: MemoryStick, label: "RAM", color: "text-[#116e53] dark:text-[#6bd6b0]" },
+  cpu: {
+    icon: Cpu,
+    label: "CPU",
+    color: "text-[#6251b7] dark:text-[#ada6ff]",
+    of: (usage: Usage) => usage.cpuPercent,
+    format: formatCPU,
+    minSpan: 10,
+  },
+  ram: {
+    icon: MemoryStick,
+    label: "RAM",
+    color: "text-[#116e53] dark:text-[#6bd6b0]",
+    of: (usage: Usage) => usage.memoryBytes,
+    format: formatMemory,
+    minSpan: 64 * 1024 ** 2,
+  },
 }
 
-function Reading(props: { kind: "cpu" | "ram"; value: ReactNode; className?: string }) {
-  const { icon: Icon, label, color } = readings[props.kind]
+const kinds = ["cpu", "ram"] as const
 
-  return (
-    <span className={cn("flex items-center gap-1.5", props.className)}>
-      <Icon className={cn("size-3.5 shrink-0", color)} strokeWidth={1.65} aria-hidden />
-      <span>{label}</span>
-      <span className="ml-auto text-foreground">{props.value}</span>
-    </span>
-  )
-}
+const describe = (usage: Usage | null) =>
+  kinds
+    .map((kind) => {
+      const { label, of, format } = readings[kind]
+
+      return `${label} ${format(usage && of(usage))}`
+    })
+    .join(", ")
+
+const trendLength = 30
 
 export function useResourceUsage() {
-  const [usage, setUsage] = useState<Usage | null>(null)
+  const [samples, setSamples] = useState<{
+    usage: Usage | null
+    trend: ReadonlyArray<TrendPoint>
+  }>({ usage: null, trend: [] })
 
   useEffect(() => {
     let stopped = false
@@ -57,7 +82,13 @@ export function useResourceUsage() {
       }
 
       if (stopped) return
-      setUsage(next)
+      setSamples(({ trend }) => ({
+        usage: next,
+        trend:
+          next === null || next.memoryBytes === null
+            ? trend
+            : [...trend.slice(1 - trendLength), { cpu: next.cpuPercent, ram: next.memoryBytes }],
+      }))
       timer = setTimeout(() => void sample(), 2000)
     }
 
@@ -69,38 +100,150 @@ export function useResourceUsage() {
     }
   }, [])
 
-  return usage
+  return samples
 }
 
-export function ResourceReadings(props: { usage: Usage | null; className?: string }) {
+const sparkWidth = 40
+
+const sparkHeight = 12
+
+const sparkPoints = (values: ReadonlyArray<number>, minSpan: number) => {
+  const low = Math.min(...values)
+  const span = Math.max(Math.max(...values) - low, minSpan)
+  const step = sparkWidth / (values.length - 1)
+
+  return values
+    .map((value, index) => {
+      const y = sparkHeight - 1 - ((value - low) / span) * (sparkHeight - 2)
+
+      return `${(index * step).toFixed(1)},${y.toFixed(1)}`
+    })
+    .join(" ")
+}
+
+function Sparkline(props: { values: ReadonlyArray<number>; minSpan: number }) {
   return (
-    <span className={cn("flex items-center gap-3 tabular-nums", props.className)}>
-      <Reading kind="cpu" value={formatCPU(props.usage?.cpuPercent)} className="w-[84px]" />
-      <Reading kind="ram" value={formatMemory(props.usage?.memoryBytes)} className="w-[104px]" />
+    <svg
+      viewBox={`0 0 ${sparkWidth} ${sparkHeight}`}
+      width={sparkWidth}
+      height={sparkHeight}
+      className="shrink-0 overflow-visible"
+      aria-hidden
+    >
+      {props.values.length > 1 && (
+        <polyline
+          points={sparkPoints(props.values, props.minSpan)}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={1.25}
+          strokeLinejoin="round"
+          strokeLinecap="round"
+        />
+      )}
+    </svg>
+  )
+}
+
+function Reading(props: {
+  kind: Kind
+  usage: Usage | null
+  className: string
+  trend?: ReadonlyArray<TrendPoint>
+}) {
+  const { kind, usage, trend } = props
+  const { icon: Icon, label, color, of, format, minSpan } = readings[kind]
+
+  return (
+    <span className={cn("flex items-center gap-1.5", props.className)}>
+      <Icon className={cn("size-3.5 shrink-0", color)} strokeWidth={1.65} aria-hidden />
+      {trend === undefined ? (
+        <span>{label}</span>
+      ) : (
+        <span className={cn("hidden @min-[15rem]:block", color)}>
+          <Sparkline values={trend.map((point) => point[kind])} minSpan={minSpan} />
+        </span>
+      )}
+      <span className="ml-auto text-foreground">{format(usage && of(usage))}</span>
     </span>
   )
 }
 
-export function ResourceUsage() {
-  const usage = useResourceUsage()
-
+function ResourceUsagePopover(props: {
+  usage: Usage | null
+  side: "top" | "bottom"
+  sideOffset: number
+  className: string
+  children: ReactNode
+}) {
   return (
     <Popover>
       <PopoverTrigger
         aria-label="Show Glass resource usage"
-        aria-description={`CPU ${formatCPU(usage?.cpuPercent)}, RAM ${formatMemory(usage?.memoryBytes)}`}
-        className="flex h-6 items-center rounded px-1.5 text-[11px] text-muted-foreground hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+        aria-description={describe(props.usage)}
+        className={cn(
+          "flex items-center gap-3 text-[11px] text-muted-foreground tabular-nums",
+          props.className,
+        )}
       >
-        <ResourceReadings usage={usage} />
+        {props.children}
       </PopoverTrigger>
-      <PopoverContent side="top" align="end" sideOffset={10} className="w-72 gap-3 p-4">
-        <ResourceUsagePanel usage={usage} />
+      <PopoverContent
+        side={props.side}
+        align="end"
+        sideOffset={props.sideOffset}
+        className="w-72 gap-3 p-4"
+      >
+        <ResourceUsagePanel usage={props.usage} />
       </PopoverContent>
     </Popover>
   )
 }
 
-export function ResourceUsagePanel(props: { usage: Usage | null }) {
+export function ResourceUsage() {
+  const { usage } = useResourceUsage()
+
+  return (
+    <ResourceUsagePopover
+      usage={usage}
+      side="top"
+      sideOffset={10}
+      className="h-6 rounded px-1.5 hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+    >
+      <Reading kind="cpu" usage={usage} className="w-[84px]" />
+      <Reading kind="ram" usage={usage} className="w-[104px]" />
+    </ResourceUsagePopover>
+  )
+}
+
+export function TitleStripResourceUsage() {
+  const { usage, trend } = useResourceUsage()
+
+  return (
+    <div className="@container flex min-w-0 flex-1 justify-end">
+      <ResourceUsagePopover
+        usage={usage}
+        side="bottom"
+        sideOffset={6}
+        className="h-7 rounded-md px-2 outline-none [app-region:no-drag] hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/5"
+      >
+        <Reading
+          kind="cpu"
+          usage={usage}
+          trend={trend}
+          className="w-[54px] @min-[15rem]:w-[96px]"
+        />
+        <Reading
+          kind="ram"
+          usage={usage}
+          trend={trend}
+          className="w-[68px] @min-[15rem]:w-[112px]"
+        />
+      </ResourceUsagePopover>
+    </div>
+  )
+}
+
+function ResourceUsagePanel(props: { usage: Usage | null }) {
   const { usage } = props
   const cpu = formatCPU(usage?.cpuPercent)
   const memory = formatMemory(usage?.memoryBytes)

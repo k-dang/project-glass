@@ -44,7 +44,11 @@ import {
   listSearchAtom,
   reviewsLinkAtom,
 } from "./reviewsArea"
-import { ResourceUsage } from "./ResourceUsage"
+import {
+  ResourceUsage,
+  TitleStripResourceUsage,
+  titleStripResourceUsageAtom,
+} from "./ResourceUsage"
 import { ShellPanelSlot } from "./shellPanelSlot"
 import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog"
 import { useAppearance } from "./theme"
@@ -240,6 +244,8 @@ function ClassicFrame(props: { rail: ReactNode; children: ReactNode }) {
 }
 
 function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
+  const showsResourceUsage = useAtomValue(titleStripResourceUsageAtom)
+
   const [panelSlot] = useState(() =>
     Object.assign(document.createElement("div"), { className: "contents" }),
   )
@@ -264,8 +270,9 @@ function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
         className="contents"
       />
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="title-strip flex shrink-0 items-center pl-[max(0px,calc(env(titlebar-area-x,0px)-3.5rem))]">
+        <div className="title-strip title-strip-clear-controls flex shrink-0 items-center pl-[max(0px,calc(env(titlebar-area-x,0px)-3.5rem))]">
           <HistoryNav />
+          {showsResourceUsage && <TitleStripResourceUsage />}
         </div>
         <div className="mr-2 mb-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
           <ShellPanelSlot value={panelSlot}>{props.children}</ShellPanelSlot>
