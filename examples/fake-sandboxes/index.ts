@@ -34,6 +34,21 @@ const decodeSandbox = (state: SandboxState) => {
   throw new Error("This isn't a fake Sandbox's state")
 }
 
+const isFree = (port: number) =>
+  new Promise<boolean>((resolve) => {
+    const server = createServer()
+
+    server.once("error", () => resolve(false))
+    server.listen(port, "127.0.0.1", () => server.close(() => resolve(true)))
+  })
+
+const hostEnded = async (port: number, signal: AbortSignal) => {
+  while (!(await isFree(port))) {
+    signal.throwIfAborted()
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
+}
+
 const freePort = () =>
   new Promise<number>((resolve, reject) => {
     const server = createServer()
@@ -75,17 +90,19 @@ const plugin: Plugin = (glass) => {
         ["checkout", "--quiet", "-b", request.branch, `origin/${request.baseBranch}`],
         { cwd: clone, signal },
       )
+    },
+    startHost: async (state, { bundle, environment }, signal) => {
+      const { folder, port } = decodeSandbox(state)
+      await hostEnded(port, signal)
 
-      progress("Starting the agent")
-
-      const host = spawn(process.execPath, [request.host.bundle], {
+      const host = spawn(process.execPath, [bundle], {
         cwd: folder,
         detached: true,
         stdio: "ignore",
         windowsHide: true,
         env: {
           ...process.env,
-          ...request.host.environment,
+          ...environment,
           ELECTRON_RUN_AS_NODE: "1",
           GLASS_HOST_PORT: String(port),
           GLASS_HOST_ADDRESS: "127.0.0.1",

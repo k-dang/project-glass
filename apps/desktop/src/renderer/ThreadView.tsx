@@ -9,6 +9,8 @@ import {
   type Thread,
   emptyTranscript,
   asksPermission,
+  goneExplanation,
+  isGone,
   isNothingUnsent,
   isWaiting,
   nothingUnsent,
@@ -20,7 +22,6 @@ import {
   type SentMessage,
   sentOf,
   type Turn,
-  readOnlyExplanation,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Exit, Option, Predicate } from "effect"
@@ -321,7 +322,7 @@ export function ThreadChat(props: { thread: Thread; place: "thread" | "inbox" })
   const inBackground = useMemo(() => new Set(backgroundToolCalls), [backgroundToolCalls])
 
   const reach = thread.sandbox?.reach
-  const readOnly = readOnlyExplanation(reach)
+  const readOnly = isGone(reach) ? goneExplanation(reach) : null
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
