@@ -26,6 +26,7 @@ import { withWatchedClock } from "../test/deadlines"
 import { HOST_PROTOCOL } from "./agentHost/protocol"
 import { eventually } from "../test/eventually"
 import { creating } from "../test/inProcessSandboxes"
+import { QUICK_RETRY_SPACING } from "./reconnecting"
 import { SANDBOX_DEADLINES } from "./sandboxCalls"
 
 type Fixture = Effect.Success<typeof threadServicesFixture>
@@ -554,43 +555,58 @@ for (const [spoken, kind] of [
       }),
   )
 
+const failedReplacement = Effect.fnUntraced(function* (
+  f: Fixture,
+  retryWaitSet: Effect.Effect<void>,
+) {
+  const thread = yield* createSandboxed(f)
+  yield* end(yield* f.started)
+  yield* f.transcript(thread.id, settled(1))
+
+  f.sandboxes.configure({ failAt: "startHost" })
+  yield* f.sandboxes.restartHost(thread.id, { kind: "versioned", protocol: HOST_PROTOCOL + 1 })
+  yield* retryWaitSet
+
+  yield* f.threads.send(thread.id, say("Still there?"))
+  assert.equal(
+    failedReason(yield* f.transcript(thread.id, settled(2))),
+    "Couldn't start the agent in the Sandbox. Try again; Glass's backend log has the details.",
+  )
+  yield* eventually(Effect.sync(() => assert.include(f.sandboxes.events, `ended ${thread.id}`)))
+  f.sandboxes.configure({})
+
+  return thread
+})
+
 it.effect(
-  "says why a Sandbox's host from another version of Glass couldn't be replaced, then keeps trying after that host has ended",
+  "says why a Sandbox's host from another version of Glass couldn't be replaced, then replaces it for the next message though that host has ended",
   () =>
-    Effect.gen(function* () {
-      const f = yield* threadServicesFixture
-      const thread = yield* createSandboxed(f)
-      yield* end(yield* f.started)
-      yield* f.transcript(thread.id, settled(1))
+    withWatchedClock(QUICK_RETRY_SPACING, (retryWaitSet) =>
+      Effect.gen(function* () {
+        const f = yield* threadServicesFixture
+        const thread = yield* failedReplacement(f, retryWaitSet)
 
-      f.sandboxes.configure({ failAt: "startHost" })
-      yield* f.sandboxes.restartHost(thread.id, { kind: "versioned", protocol: HOST_PROTOCOL + 1 })
+        yield* f.threads.send(thread.id, say("Back?"))
+        yield* end(yield* f.started)
+        assert.equal(failedReason(yield* f.transcript(thread.id, settled(3))), "Done")
+      }),
+    ),
+)
 
-      yield* f.threads.send(thread.id, say("Still there?"))
-      assert.equal(
-        failedReason(yield* f.transcript(thread.id, settled(2))),
-        "Couldn't start the agent in the Sandbox. Try again; Glass's backend log has the details.",
-      )
-      assert.include(f.sandboxes.events, `ended ${thread.id}`)
+it.effect(
+  "replaces a Sandbox's host after Glass relaunches, when the replacement failed before it quit",
+  () =>
+    withWatchedClock(QUICK_RETRY_SPACING, (retryWaitSet) =>
+      Effect.gen(function* () {
+        const f = yield* threadServicesFixture
+        const thread = yield* failedReplacement(f, retryWaitSet)
 
-      f.sandboxes.configure({})
-      yield* eventually(
-        Effect.gen(function* () {
-          yield* TestClock.adjust("1 second")
-
-          const status = yield* sandboxOf(f.threads, thread.id).pipe(
-            Stream.runHead,
-            Effect.map(Option.getOrThrow),
-          )
-
-          assert.equal(status.reach, "reachable")
-        }),
-      )
-
-      yield* f.threads.send(thread.id, say("Back?"))
-      yield* end(yield* f.started)
-      assert.equal(failedReason(yield* f.transcript(thread.id, settled(3))), "Done")
-    }),
+        const { threads } = yield* f.restart
+        yield* threads.send(thread.id, say("Back?"))
+        yield* end(yield* f.started)
+        assert.equal(failedReason(yield* f.transcript(thread.id, settled(3), threads)), "Done")
+      }),
+    ),
 )
 
 it.effect("runs a message sent after Glass relaunches on its Sandbox's replacement host", () =>

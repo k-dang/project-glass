@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process"
 import { once } from "node:events"
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
+import { mkdir, rm } from "node:fs/promises"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -34,28 +34,17 @@ const decodeSandbox = (state: SandboxState) => {
   throw new Error("This isn't a fake Sandbox's state")
 }
 
-const hostPidFile = (folder: string) => join(folder, "host.pid")
+const isFree = (port: number) =>
+  new Promise<boolean>((resolve) => {
+    const server = createServer()
 
-const endHost = async (folder: string, signal: AbortSignal) => {
-  const pid = Number(await readFile(hostPidFile(folder), "utf8").catch(() => ""))
+    server.once("error", () => resolve(false))
+    server.listen(port, "127.0.0.1", () => server.close(() => resolve(true)))
+  })
 
-  if (pid === 0) return
-
-  try {
-    process.kill(pid)
-  } catch {
-    return
-  }
-
-  for (;;) {
+const hostEnded = async (port: number, signal: AbortSignal) => {
+  while (!(await isFree(port))) {
     signal.throwIfAborted()
-
-    try {
-      process.kill(pid, 0)
-    } catch {
-      return
-    }
-
     await new Promise((resolve) => setTimeout(resolve, 50))
   }
 }
@@ -104,7 +93,7 @@ const plugin: Plugin = (glass) => {
     },
     startHost: async (state, { bundle, environment }, signal) => {
       const { folder, port } = decodeSandbox(state)
-      await endHost(folder, signal)
+      await hostEnded(port, signal)
 
       const host = spawn(process.execPath, [bundle], {
         cwd: folder,
@@ -123,7 +112,6 @@ const plugin: Plugin = (glass) => {
 
       await once(host, "spawn")
       host.unref()
-      await writeFile(hostPidFile(folder), String(host.pid))
     },
     target: async (state) => ({
       url: `http://127.0.0.1:${decodeSandbox(state).port}`,
