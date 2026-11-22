@@ -2,12 +2,15 @@ import { fileURLToPath } from "node:url"
 import { defineConfig } from "vite-plus"
 import { Rolldown } from "vite-plus/pack"
 
+// WARNING: playwright-core reads its own files, such as browsers.json, relative to its package, which breaks once bundled.
+const unbundled: Array<string> = ["playwright-core"]
+
 const node = {
   format: "esm",
   platform: "node",
   target: "node24",
   sourcemap: true,
-  deps: { onlyBundle: false },
+  deps: { onlyBundle: false, neverBundle: unbundled },
 } as const
 
 const piExtensions = new Map([
@@ -71,7 +74,7 @@ export default defineConfig({
             },
             outDir: "dist-fake",
             // WARNING: @octokit/graphql-schema reads ../schema.json relative to its own module, which breaks once bundled.
-            deps: { ...node.deps, neverBundle: ["@octokit/graphql-schema"] },
+            deps: { ...node.deps, neverBundle: [...unbundled, "@octokit/graphql-schema"] },
           },
           agentHost("dist-fake"),
         ]),

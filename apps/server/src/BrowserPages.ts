@@ -40,6 +40,8 @@ const ANSWER_TIMEOUT = Duration.seconds(20)
 
 const MAX_LOG = 200
 
+const ELECTRON_WARNING = "%cElectron Security Warning"
+
 const firstLine = (cause: Error) => cause.message.split("\n")[0] ?? cause.message
 
 const logged = (connection: Pick<Connection, "page" | "log">) => {
@@ -49,6 +51,8 @@ const logged = (connection: Pick<Connection, "page" | "log">) => {
   }
 
   connection.page.on("console", (message) => {
+    if (message.text().startsWith(ELECTRON_WARNING)) return
+
     if (message.type() === "error") add("console error", message.text())
     else if (message.type() === "warning") add("console warning", message.text())
   })
