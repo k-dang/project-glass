@@ -23,7 +23,7 @@ import {
 import { ChildProcessSpawner } from "effect/process"
 import { join } from "node:path"
 import { type AgentFailure, agentFailure, runnerFailureReason } from "./agentFailure"
-import { launchCommand } from "./processes"
+import { argumentLength, launchCommand } from "./processes"
 import { type AgentTools, claudeTools, piLoadsNothing, piTools } from "./agentTools"
 import { AgentCommands } from "./SettingsStore"
 
@@ -47,9 +47,36 @@ const answerSchema = (answer: Schema.Decoder<unknown>): JsonSchema.JsonSchema =>
   return { ...document.schema, $defs: document.definitions }
 }
 
-// WARNING: Not --json-schema: endpoint security tools may kill processes with long arguments.
-const promptWithSchema = (task: AgentTask<unknown>) =>
-  `${task.prompt}\n\nOutput JSON Schema:\n${JSON.stringify(answerSchema(task.answer))}`
+// WARNING: Some endpoint security tools kill processes with an argument this long, as the process receives it, so longer schemas go in the prompt.
+export const argumentLimit = 1000
+
+const schemaText = (task: AgentTask<unknown>) => JSON.stringify(answerSchema(task.answer))
+
+const withSchema = (prompt: string, schema: string) => `${prompt}\n\nOutput JSON Schema:\n${schema}`
+
+const ClaudeEnvelope = Schema.Struct({
+  is_error: Schema.optional(Schema.Boolean),
+  result: Schema.optional(Schema.String),
+  structured_output: Schema.optional(Schema.Unknown),
+})
+
+const claudeAnswer = <A>(command: string, task: AgentTask<A>) => {
+  const schema = schemaText(task)
+
+  return argumentLength(command, schema) < argumentLimit
+    ? {
+        flags: ["--json-schema", schema],
+        prompt: task.prompt,
+        pick: (envelope: typeof ClaudeEnvelope.Type) => envelope.structured_output,
+        decode: task.answer,
+      }
+    : {
+        flags: [],
+        prompt: withSchema(task.prompt, schema),
+        pick: (envelope: typeof ClaudeEnvelope.Type) => envelope.result,
+        decode: Schema.fromJsonString(task.answer),
+      }
+}
 
 const unusableFailure =
   (name: string, subject: string, identity: AgentRunnerIdentity) =>
@@ -76,6 +103,15 @@ const startFailure = (name: string) => (error: { readonly reason: unknown }) => 
 }
 
 const claudeFlags = ["--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"]
+
+const claudeRequiredFlags = [
+  ...claudeFlags,
+  "--restricted",
+  "--setting-sources",
+  "--tools",
+  "--allowedTools",
+  "--json-schema",
+]
 
 // WARNING: Each flag set keeps the user's settings files, and their hooks, away from the PR's files; shell can't use --restricted, and -p refuses tools not allowed.
 const claudeToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
@@ -163,18 +199,12 @@ const runnerStrategies = Effect.gen(function* () {
     return { stdout, stderr, code }
   }, logFailedRun)
 
-  const decodeClaude = Schema.decodeUnknownEffect(
-    Schema.fromJsonString(
-      Schema.Struct({
-        is_error: Schema.optional(Schema.Boolean),
-        result: Schema.optional(Schema.String),
-      }),
-    ),
-  )
+  const decodeClaude = Schema.decodeUnknownEffect(Schema.fromJsonString(ClaudeEnvelope))
 
   const runClaudeCode = (model: string, identity: AgentRunnerIdentity): AgentRunner["run"] =>
     Effect.fn("runClaudeCode")(function* <A>(task: AgentTask<A>) {
       const unusable = unusableFailure("Claude Code", task.subject, identity)
+      const channel = claudeAnswer(commands.claudeCommand, task)
 
       const result = yield* execute(
         commands.claudeCommand,
@@ -186,9 +216,10 @@ const runnerStrategies = Effect.gen(function* () {
           model,
           "--output-format",
           "json",
+          ...channel.flags,
         ],
         task.checkout,
-        `${task.instructions}\n\n${promptWithSchema(task)}`,
+        `${task.instructions}\n\n${channel.prompt}`,
       ).pipe(
         Effect.mapError(() =>
           agentFailure("failed", "Claude Code could not start. Check your installation.", identity),
@@ -204,14 +235,13 @@ const runnerStrategies = Effect.gen(function* () {
           identity,
         )
 
-      if (envelope?.result === undefined)
-        return yield* unusable("its output had no result", result.stdout)
+      const answer = envelope === null ? undefined : channel.pick(envelope)
 
-      return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(task.answer))(
-        envelope.result,
-      ).pipe(
+      if (answer === undefined) return yield* unusable("its output had no answer", result.stdout)
+
+      return yield* Schema.decodeUnknownEffect(channel.decode)(answer).pipe(
         Effect.catch((error) =>
-          unusable("the answer didn't match the schema", error.message, envelope.result),
+          unusable("the answer didn't match the schema", error.message, answer),
         ),
       )
     })
@@ -248,9 +278,7 @@ const runnerStrategies = Effect.gen(function* () {
     if (
       Result.isFailure(help) ||
       help.success.code !== 0 ||
-      [...claudeFlags, "--restricted", "--setting-sources", "--tools", "--allowedTools"].some(
-        (flag) => !help.success.stdout.includes(flag),
-      )
+      claudeRequiredFlags.some((flag) => !help.success.stdout.includes(flag))
     )
       return yield* agentFailure(
         "not-ready",
@@ -320,7 +348,7 @@ const runnerStrategies = Effect.gen(function* () {
           instructions,
         ],
         task.checkout,
-        promptWithSchema(task),
+        withSchema(task.prompt, schemaText(task)),
       ).pipe(
         Effect.mapError(() =>
           agentFailure("failed", "pi could not start. Check its installation.", identity),

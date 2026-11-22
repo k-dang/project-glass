@@ -24,10 +24,16 @@ const resolve = (command: string, host: typeof thisHost) => {
 // WARNING: cmd.exe parses a .cmd's arguments twice, so metacharacters are escaped twice, as cross-spawn does.
 const metacharacters = /([()\][%!^"`<>&|;, *?])/g
 
-const escapeArgument = (argument: string) =>
+const quoteArgument = (argument: string) =>
   `"${argument.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1")}"`
-    .replace(metacharacters, "^$1")
-    .replace(metacharacters, "^$1")
+
+const escapeArgument = (argument: string) =>
+  quoteArgument(argument).replace(metacharacters, "^$1").replace(metacharacters, "^$1")
+
+export const argumentLength = (command: string, argument: string, host = thisHost) =>
+  host.platform !== "win32"
+    ? argument.length
+    : (isScript(resolve(command, host)) ? escapeArgument(argument) : quoteArgument(argument)).length
 
 export const nodeEntry = (script: string, args: ReadonlyArray<string> = []) => ({
   command: globalThis.process.execPath,
