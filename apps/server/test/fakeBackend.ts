@@ -166,6 +166,7 @@ const main = Effect.gen(function* () {
       Redacted.value(config.token),
       checkout,
       reviewed,
+      github,
       threadNames.named,
     ).pipe(
       Effect.catchCause((cause) => Effect.logWarning("Couldn't start the demo Threads", cause)),

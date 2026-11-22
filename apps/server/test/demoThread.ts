@@ -16,8 +16,14 @@ import { connectRpcClient } from "../src/rpcSocket"
 import { artifactsThread } from "./demoArtifacts"
 import { longThread } from "./demoLongThread"
 import type { ScriptedThread } from "./demoScript"
-import { DEMO_REPOSITORY } from "./demoPullRequests"
+import {
+  DEMO_REPOSITORY,
+  seedMergedPullRequest,
+  settledBranch,
+  settledPullRequests,
+} from "./demoPullRequests"
 import { lastUserWords, replyTo, startFakeAnthropic } from "./fakeAnthropic"
+import type { FakeGitHub } from "./fakeGitHub"
 import { globalChatReply, isGlobalChat } from "./fakeGlobalChat"
 import {
   type FakeModelDelta,
@@ -109,6 +115,9 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
     "Write another": "printf 'a second note\\n' > more.txt",
     "Pick up the README typo PR": "git switch -c fix-the-typo-in-the-readme",
     "Pick up the slow query PR": "git switch -c log-slow-database-queries",
+    ...Object.fromEntries(
+      settledPullRequests.map((pr) => [pr.title, `git switch -c ${settledBranch(pr)}`]),
+    ),
   }
 
   if (commandFor(changes, input) !== undefined) return runCommands(changes)(input)
@@ -185,6 +194,7 @@ export const seedDemoThreads = Effect.fnUntraced(function* (
   token: string,
   checkout: string,
   reviewed: PullRequestRef,
+  github: FakeGitHub,
   named: ReturnType<typeof demoThreadNames>["named"],
 ) {
   const client = yield* connectRpcClient(
@@ -233,6 +243,14 @@ export const seedDemoThreads = Effect.fnUntraced(function* (
   yield* Effect.forEach(scriptedThreads, scripted, { discard: true })
   yield* thread("demo/uncommitted-note", "pi", "Write a note")
   yield* thread("demo/linked-pr", "pi", "Pick up the README typo PR")
+  yield* Effect.forEach(
+    settledPullRequests,
+    (pr) =>
+      thread(`demo/${settledBranch(pr)}`, "pi", pr.title).pipe(
+        Effect.tap(() => Effect.sync(() => seedMergedPullRequest(github, pr))),
+      ),
+    { discard: true },
+  )
   yield* thread("demo/keeps-working", "pi", keepWorkingPrompt)
   yield* thread("demo/claude-permission", "claude-code", "Run `pnpm test` and tell me what fails.")
   yield* thread(
