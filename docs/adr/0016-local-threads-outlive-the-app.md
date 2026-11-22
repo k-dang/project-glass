@@ -12,8 +12,8 @@ running, and a backend has acknowledged everything in the journal. The journal l
 host's memory, so a Turn that ends while Glass is closed, or waits on a Permission request, keeps
 its host until Glass opens again. Starting a new host later costs nothing, because Claude Code and
 pi pick up a Thread from their own saved sessions. A host whose record is gone or names another
-host also stops, so a host Glass forgot, or whose data directory was deleted, doesn't run until the
-device restarts.
+host also stops once no backend follows its journal, so a host Glass forgot, or whose data
+directory was deleted, doesn't run until the device restarts.
 
 Glass reattaches only to a host with the same fingerprint, meaning the same host bundle and harness
 commands, and asks any other to shut down. Sandboxes reattach to any host that speaks the same

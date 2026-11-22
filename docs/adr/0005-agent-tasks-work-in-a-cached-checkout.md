@@ -9,7 +9,8 @@ reader who wants to know what changed in the system and not only in the files.
 Glass keeps one blobless partial clone per repository of its own and checks each run's head out of
 it. Git authenticates with the Connection's token, so checkouts work exactly when the rest of Glass
 does, without the user's git config or credentials. Glass fetches the base commit and every blob
-the PR's diff reads beforehand, so git in the checkout needs no token or network.
+the PR's diff reads beforehand, so `git diff <base>...HEAD` in the checkout needs no token or
+network. Older history is commits and trees only.
 
 Tours and Ask get read-only file tools (read, search, list) and the diff in their prompt, since a
 Tour places its links on hunks and Ask is about a single file. Agent reviews get a shell instead
