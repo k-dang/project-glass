@@ -14,7 +14,8 @@ Glass then reaches the host through `target` and keeps the transcript in SQLite,
 last saved event after a dropped connection. After a Glass upgrade that changes how Glass talks to
 the host, Glass calls `startHost` again to replace the one the Sandbox still runs.
 
-To write one, start from [`examples/fake-sandboxes`](../../examples/fake-sandboxes), see a real
-platform's in [`examples/vercel-sandboxes`](../../examples/vercel-sandboxes), or paste
+To write one, start from [`examples/fake-sandboxes`](../../examples/fake-sandboxes), see real
+ones in [`examples/vercel-sandboxes`](../../examples/vercel-sandboxes) and
+[`examples/upstash-boxes`](../../examples/upstash-boxes), or paste
 [`examples/sandbox-provider-prompt.md`](../../examples/sandbox-provider-prompt.md) into your coding
 agent.

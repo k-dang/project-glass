@@ -44,8 +44,9 @@ placements and local and Sandbox Threads differ only in where their host runs.
 - **Fine-grained primitives, like pi's tool `Operations`**: providers would offer exec, upload,
   and endpoints, and Glass would clone, upload, and start the host itself. Every provider would be
   small and Sandboxes would set up alike, but the seam would assume a Linux machine with git and
-  Node, and logins would still need a provider hook. One provider exists, so its duplication is
-  hypothetical.
+  Node, and logins would still need a provider hook. The Vercel and Upstash providers share their
+  GitHub login and clone, but each platform differs where the seam matters: how files get in, how
+  credentials leave, and how a stopped machine restarts its host.
 - **The host replaces itself**: Glass would send the new bundle to the running host, with no
   provider call. But how a process outlives the command that started it differs by platform,
   which is what a provider knows, and the hosts already running couldn't do it.
