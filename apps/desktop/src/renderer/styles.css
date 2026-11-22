@@ -515,6 +515,12 @@
   background: var(--chrome);
 }
 
+.title-strip-clear-controls {
+  padding-inline-end: calc(
+    100vw - env(titlebar-area-x, 0px) - env(titlebar-area-width, 100vw) + 0.5rem
+  );
+}
+
 .title-strip-below-controls {
   padding-top: min(env(titlebar-area-x, 0px), 2.25rem);
   height: calc(

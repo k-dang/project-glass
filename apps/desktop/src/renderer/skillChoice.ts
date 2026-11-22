@@ -3,6 +3,7 @@ import { type AgentHarness, type ThreadPlace, LOCAL_SKILLS_NAMESPACE } from "@gl
 import { Option, Predicate, Schema } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Backend, backendRuntime } from "./backend"
+import { localStorageBooleanAtom } from "./localStorageBooleanAtom"
 import { skillPacksAtom } from "./SkillPacks"
 
 const storageKey = "glass.newConversation.skillPacks"
@@ -22,13 +23,7 @@ const lastChosenAtom = Atom.writable(
   },
 ).pipe(Atom.keepAlive)
 
-const lastLocalSkillsAtom = Atom.writable(
-  () => localStorage.getItem(localSkillsKey) === "true",
-  (ctx, chosen: boolean) => {
-    localStorage.setItem(localSkillsKey, String(chosen))
-    ctx.setSelf(chosen)
-  },
-).pipe(Atom.keepAlive)
+const lastLocalSkillsAtom = localStorageBooleanAtom(localSkillsKey)
 
 const localSkillNamesAtom = Atom.family((harness: AgentHarness) =>
   backendRuntime.atom(Backend.use((backend) => backend.ListLocalSkills({ harness }))),
