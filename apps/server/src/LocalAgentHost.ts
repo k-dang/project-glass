@@ -92,7 +92,7 @@ export const shutDownHost = ({ port, token }: Pick<RecordedHost, "port" | "token
 
 export type CarriedOn = ReadonlySet<string>
 
-export interface Resumed {
+interface Resumed {
   readonly reattached: boolean
   readonly carriedOn: CarriedOn
 }

@@ -10,12 +10,12 @@ import { Atom, type AtomRegistry } from "effect/reactivity"
 import { Backend, backendRuntimeOf, type BackendRuntime } from "./backend"
 import { type Problem, problemOf } from "./problems"
 
-export type ReplyFeedback =
+type ReplyFeedback =
   | { readonly type: "sending" }
   | { readonly type: "failed"; readonly problem: Problem }
   | null
 
-export interface ReplyView {
+interface ReplyView {
   readonly body: string
   readonly feedback: ReplyFeedback
   readonly published: ReadonlyArray<PublishedComment>

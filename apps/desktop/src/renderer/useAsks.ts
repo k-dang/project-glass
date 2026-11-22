@@ -6,12 +6,12 @@ import { Backend, backendRuntimeOf, type BackendRuntime } from "./backend"
 import { type LineNotePlace, sameLineNotePlaces } from "./lineNotePlace"
 import { type Problem, problemOf } from "./problems"
 
-export type AskState =
+type AskState =
   | { readonly status: "pending" }
   | { readonly status: "answered"; readonly answer: AskAnswer }
   | { readonly status: "failed"; readonly problem: Problem }
 
-export interface AskView {
+interface AskView {
   readonly key: string
   readonly place: AskPlace
   readonly question: string

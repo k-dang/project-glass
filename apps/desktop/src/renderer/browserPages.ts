@@ -1,6 +1,6 @@
 import { useEffect, useSyncExternalStore } from "react"
 
-export type PageHolder = "pane" | "agent"
+type PageHolder = "pane" | "agent"
 
 interface PageFrame {
   readonly left: number

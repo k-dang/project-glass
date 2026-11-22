@@ -1,6 +1,6 @@
 export const recency = ["Today", "Yesterday", "Past week", "Older"] as const
 
-export type Recency = (typeof recency)[number]
+type Recency = (typeof recency)[number]
 
 const DAY = 24 * 60 * 60 * 1000
 

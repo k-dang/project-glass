@@ -89,7 +89,7 @@ const activeBranch = ({ entries, leafId }: typeof SessionEntries.Type) => {
   return branch.toReversed()
 }
 
-export type StartedWorkUpdateDelivery =
+type StartedWorkUpdateDelivery =
   | {
       readonly state: "pending" | "responding"
       readonly prompt: string

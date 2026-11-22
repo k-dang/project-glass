@@ -2,7 +2,7 @@ import { Option, Schema } from "effect"
 
 type JsonObject = Schema.JsonObject
 
-export interface RelayedPage {
+interface RelayedPage {
   readonly send: (
     method: string,
     params: JsonObject,

@@ -46,7 +46,7 @@ interface Ended {
   readonly toolCallId: string | null
 }
 
-export interface Tracked {
+interface Tracked {
   readonly tasks: BackgroundTasks
   readonly ended: Ended | null
 }

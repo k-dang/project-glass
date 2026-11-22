@@ -24,7 +24,7 @@ export interface Appearance {
 
 export type ResourceProcess = "Main" | "Renderer" | "Backend" | "GPU / other"
 
-export interface ResourceMeasurement {
+interface ResourceMeasurement {
   readonly cpuPercent: number
   readonly memoryBytes: number | null
 }

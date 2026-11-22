@@ -253,7 +253,7 @@ export type ListedNote =
   | { readonly type: "reviewThread"; readonly reviewThread: LineReviewThread }
   | { readonly type: "draft"; readonly draft: DraftView }
 
-export interface NoteSection {
+interface NoteSection {
   readonly path: string
   readonly notes: ReadonlyArray<ListedNote>
 }

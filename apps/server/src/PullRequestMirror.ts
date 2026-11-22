@@ -103,7 +103,7 @@ export const mirrorOf = (mirror: Mirror, repository: FollowedRepository) =>
 const newestFirst = (pullRequests: ReadonlyArray<MirroredPullRequest>) =>
   Arr.sortWith(pullRequests, (pr) => pr.updatedAt, Order.flip(DateTime.Order))
 
-export interface Synced {
+interface Synced {
   readonly mirror: Mirror
   readonly failures: ReadonlyMap<string, GitHubUnavailable>
 }

@@ -3,7 +3,7 @@ import type { ToDo } from "@glass/contracts"
 export const newestFirst = (toDos: ReadonlyArray<ToDo>) =>
   toDos.toSorted((left, right) => right.id - left.id)
 
-export interface NotePart {
+interface NotePart {
   readonly kind: "text" | "link"
   readonly value: string
 }

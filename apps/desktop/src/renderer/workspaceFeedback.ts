@@ -1,13 +1,32 @@
-import type { Activity, PullRequestWorkspace } from "@glass/contracts"
+import type { Activity, PullRequestWorkspace, Reaction } from "@glass/contracts"
 import { Effect } from "effect"
 import type { AtomRegistry } from "effect/reactivity"
 import { activityPullRequest } from "./activity"
+import { Backend } from "./backend"
+import { createKeyedWrites } from "./keyedWrites"
 import { AskStore } from "./useAsks"
 import { DraftStore } from "./useDrafts"
-import { createReactions, type Reactions } from "./useReactions"
 import { ReplyStore } from "./useReplies"
-import { createResolutions, type Resolutions } from "./useResolutions"
 import { ViewedFilesStore } from "./useViewedFiles"
+
+export interface ReactionChange {
+  readonly reaction: Reaction
+  readonly reacted: boolean
+}
+
+export const createReactions = (registry: AtomRegistry.AtomRegistry) =>
+  createKeyedWrites(registry, (commentId, change: ReactionChange) =>
+    Backend.use((backend) => backend.SetReaction({ commentId, ...change })),
+  )
+
+export type Reactions = ReturnType<typeof createReactions>
+
+export const createResolutions = (registry: AtomRegistry.AtomRegistry) =>
+  createKeyedWrites(registry, (reviewThreadId, resolved: boolean) =>
+    Backend.use((backend) => backend.SetReviewThreadResolved({ reviewThreadId, resolved })),
+  )
+
+export type Resolutions = ReturnType<typeof createResolutions>
 
 type ConfirmDiscard = (lost: ReadonlyArray<string>) => Effect.Effect<boolean>
 

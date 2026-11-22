@@ -36,7 +36,7 @@ export interface AgentTask<A> {
   readonly checkout: string
 }
 
-export interface AgentRunner {
+interface AgentRunner {
   readonly identity: AgentRunnerIdentity
   readonly run: <A>(task: AgentTask<A>) => Effect.Effect<A, AgentFailure>
 }

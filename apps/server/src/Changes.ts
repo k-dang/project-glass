@@ -13,7 +13,7 @@ import { createHash } from "node:crypto"
 import { join } from "node:path"
 import { Git } from "./git"
 
-export class ChangesFailed extends Schema.TaggedError<ChangesFailed>()("ChangesFailed", {
+class ChangesFailed extends Schema.TaggedError<ChangesFailed>()("ChangesFailed", {
   cause: Schema.Unknown,
 }) {}
 

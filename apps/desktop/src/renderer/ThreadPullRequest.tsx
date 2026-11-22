@@ -27,7 +27,7 @@ const statusOf = (state: ThreadPullRequestState): StatusLabel =>
     Closed: () => ({ ...closedLabel, label: "closed" }),
   })
 
-export const pullRequestLabel = ({ ref, state }: ThreadPullRequest) =>
+const pullRequestLabel = ({ ref, state }: ThreadPullRequest) =>
   `PR #${ref.number}, ${statusOf(state).label}`
 
 export function PullRequestStatusIcon(props: { state: ThreadPullRequestState; className: string }) {

@@ -44,8 +44,7 @@ import { cn } from "cn"
 import { type AskStore, useLineAskPlaces } from "./useAsks"
 import { type DraftStore, useLineDraftPlaces } from "./useDrafts"
 import type { ReplyStore } from "./useReplies"
-import type { Reactions } from "./useReactions"
-import type { Resolutions } from "./useResolutions"
+import type { Reactions, Resolutions } from "./workspaceFeedback"
 import { type ViewedFilesStore, useViewedFiles } from "./useViewedFiles"
 
 export interface Display {

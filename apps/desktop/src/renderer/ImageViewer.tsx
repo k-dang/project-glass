@@ -27,7 +27,7 @@ export interface PreviewImage {
   readonly name: string
 }
 
-export interface ImagePreview {
+interface ImagePreview {
   readonly images: ReadonlyArray<PreviewImage>
   readonly index: number
 }
