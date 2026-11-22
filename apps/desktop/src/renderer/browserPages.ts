@@ -19,6 +19,13 @@ interface LivePage {
 
 const OFFSCREEN = -100_000
 
+const rememberedKey = (threadId: string) => `glass.browserPane.${threadId}`
+
+export const remembered = (threadId: string) => localStorage.getItem(rememberedKey(threadId))
+
+export const remember = (threadId: string, address: string) =>
+  localStorage.setItem(rememberedKey(threadId), address)
+
 const pages = new Map<string, LivePage>()
 
 const listeners = new Set<() => void>()

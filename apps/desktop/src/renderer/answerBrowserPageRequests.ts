@@ -7,7 +7,9 @@ import {
   agentHeldThreads,
   browserPageReady,
   holdBrowserPage,
+  liveBrowserPage,
   releaseBrowserPage,
+  remembered,
 } from "./browserPages"
 import { workingThreadsAtom } from "./threadsArea"
 
@@ -37,9 +39,13 @@ export const answerBrowserPageRequests = (registry: AtomRegistry.AtomRegistry) =
 
         answered.add(id)
 
+        const restoring = liveBrowserPage(threadId) === null ? remembered(threadId) : null
         const view = holdBrowserPage(threadId, "agent", BROWSER_PARTITION)
 
         void browserPageReady(threadId)
+          .then(() =>
+            restoring === null ? undefined : view.loadURL(restoring).catch(() => undefined),
+          )
           .then(() => window.glass.browserRelay(view.getWebContentsId()))
           .then(
             (endpoint) => reply(id, BrowserPageReady.make({ endpoint })),

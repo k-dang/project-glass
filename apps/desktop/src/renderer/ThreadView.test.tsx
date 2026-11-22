@@ -2033,8 +2033,10 @@ it("drops an unsaved Feedback note's editor when the page loads again, as its pa
   )
 })
 
-it("opens the Thread's Browser pane for its agent, answers with the page's relay, and lets go when the Turn ends", async () => {
+it("opens the Thread's Browser pane for its agent on its last page, answers with the page's relay, and lets go when the Turn ends", async () => {
   const answers: Array<BrowserPageAnswer> = []
+  const loaded: Array<string> = []
+  localStorage.setItem(`glass.browserPane.${thread.id}`, "http://localhost:3000/settings")
   const turnEnded = Deferred.makeUnsafe<void>()
 
   vi.stubGlobal("glass", {
@@ -2058,12 +2060,17 @@ it("opens the Thread's Browser pane for its agent, answers with the page's relay
   await screen.findByRole("complementary", { name: "Browser" })
 
   const page = document.querySelector("webview")!
-  Object.assign(page, { getWebContentsId: () => 7, getURL: () => "about:blank" })
+  Object.assign(page, {
+    getWebContentsId: () => 7,
+    getURL: () => "about:blank",
+    loadURL: (url: string) => Promise.resolve(void loaded.push(url)),
+  })
   page.dispatchEvent(new Event("dom-ready"))
 
   await waitFor(() =>
     expect(answers).toEqual([BrowserPageReady.make({ endpoint: "ws://relay/7" })]),
   )
+  expect(loaded).toEqual(["http://localhost:3000/settings"])
 
   await userEvent.click(screen.getByRole("button", { name: "Close the Browser" }))
   expect(document.querySelector("webview")).toBe(page)

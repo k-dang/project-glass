@@ -108,7 +108,14 @@ export class BrowserPages extends Context.Service<
         cancelled: BrowserPageRefused.make({ message: "Glass is shutting down." }),
       })
 
-      const connections = new Map<string, Deferred.Deferred<Connection, BrowserUnavailable>>()
+      const connections = new Map<
+        string,
+        {
+          readonly endpoint: string
+          readonly ready: Deferred.Deferred<Connection, BrowserUnavailable>
+        }
+      >()
+
       const browsers = new Set<Browser>()
 
       yield* Effect.addFinalizer(() =>
@@ -161,35 +168,42 @@ export class BrowserPages extends Context.Service<
           catch: (cause) => failure(cause, "Glass couldn't reach this Thread's Browser pane: "),
         })
 
-      const connected = (threadId: string): Effect.Effect<Connection, BrowserUnavailable> =>
+      const connectionTo = (
+        threadId: string,
+        endpoint: string,
+      ): Effect.Effect<Connection, BrowserUnavailable> =>
         Effect.suspend(() => {
           const known = connections.get(threadId)
 
-          if (known !== undefined)
-            return Deferred.await(known).pipe(
+          if (known?.endpoint === endpoint)
+            return Deferred.await(known.ready).pipe(
               Effect.exit,
               Effect.flatMap((exit) => {
                 if (Exit.isSuccess(exit) && live(exit.value)) return Effect.succeed(exit.value)
 
                 if (connections.get(threadId) === known) connections.delete(threadId)
 
-                return connected(threadId)
+                return connectionTo(threadId, endpoint)
               }),
             )
 
-          const opening = Deferred.makeUnsafe<Connection, BrowserUnavailable>()
+          const ready = Deferred.makeUnsafe<Connection, BrowserUnavailable>()
+          const opening = { endpoint, ready }
           connections.set(threadId, opening)
 
-          return endpointFor(threadId).pipe(
-            Effect.flatMap(connect),
+          return connect(endpoint).pipe(
             Effect.onExit((exit) => {
               if (Exit.isFailure(exit) && connections.get(threadId) === opening)
                 connections.delete(threadId)
 
-              return Deferred.done(opening, exit)
+              return Deferred.done(ready, exit)
             }),
           )
         })
+
+      // WARNING: Each call asks the window again, which holds the page for the agent's running Turn even when the connection outlived an earlier Turn.
+      const connected = (threadId: string) =>
+        endpointFor(threadId).pipe(Effect.flatMap((endpoint) => connectionTo(threadId, endpoint)))
 
       const onPage = <A>(threadId: string, act: (connection: Connection) => Promise<A>) =>
         connected(threadId).pipe(
@@ -209,7 +223,7 @@ export class BrowserPages extends Context.Service<
           }),
         read: (threadId) =>
           onPage(threadId, async ({ page }) => {
-            const snapshot = await page.locator("body").ariaSnapshot()
+            const snapshot = await page.ariaSnapshot({ mode: "ai" })
 
             return {
               ...(await shown(page)),

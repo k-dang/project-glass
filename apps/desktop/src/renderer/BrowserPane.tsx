@@ -31,6 +31,8 @@ import { addressOf, type BrowserPolicy, pageOf, webAddress } from "./browserAddr
 import {
   browserPageReady,
   liveBrowserPage,
+  remember,
+  remembered,
   showBrowserPage,
   usePaneBrowserPage,
 } from "./browserPages"
@@ -55,13 +57,6 @@ const isReady = (message: { readonly channel: string; readonly args: ReadonlyArr
   Option.exists(decodeEvent(message.args[0]), ({ type }) => type === "ready")
 
 const paneWidthAtom = Atom.make(720).pipe(Atom.keepAlive)
-
-const rememberedKey = (threadId: string) => `glass.browserPane.${threadId}`
-
-const remembered = (threadId: string) => localStorage.getItem(rememberedKey(threadId))
-
-const remember = (threadId: string, address: string) =>
-  localStorage.setItem(rememberedKey(threadId), address)
 
 const pageKey = (page: PageLocation) =>
   Predicate.isTagged(page, "FilePage") ? `file:${page.path}` : `web:${page.url}`
