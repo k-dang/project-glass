@@ -320,7 +320,10 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
       if (settled !== undefined) emit(settled)
     },
     BackgroundWorkEnded: () => endedToolCall(input).forEach(emit),
-    Exited: () => end(TurnFailed.make({ reason: stoppedReason })),
+    Exited: () => {
+      showSteers(state.steers)
+      end(TurnFailed.make({ reason: stoppedReason }))
+    },
   })
 
   return { state: ended ? null : state, events }

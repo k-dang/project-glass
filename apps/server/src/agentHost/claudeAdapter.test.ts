@@ -1,7 +1,7 @@
 import { assert, it } from "@effect/vitest"
 import type { Options, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk"
 import { TurnStopped } from "@glass/contracts"
-import { Deferred, Effect, Predicate, Queue, Redacted, Stream } from "effect"
+import { type Cause, Deferred, Effect, Fiber, Predicate, Queue, Redacted, Stream } from "effect"
 import { claudeAdapter, type ClaudeQuery } from "./claudeAdapter"
 import { type GlassToolsAccess, type HostEvent, WorkRole } from "./protocol"
 import { workInstructions } from "./workRole"
@@ -102,11 +102,18 @@ it.live("gives a Work Thread Glass's tools and how to use them only when it has 
 const delivered = (text: string) => ({ message: text, images: [], context: null, prompt: text })
 
 const stoppableTurn = Effect.fnUntraced(function* () {
-  const messages = yield* Queue.unbounded<SDKMessage>()
+  const messages = yield* Queue.unbounded<SDKMessage, Cause.Done>()
   const ended = yield* Deferred.make<void>()
   const events: Array<HostEvent> = []
   const cancelled: Array<string> = []
   let prompts: AsyncIterator<SDKUserMessage> | undefined
+  let receipt = Promise.resolve()
+
+  const interrupt = async () => {
+    await receipt
+
+    return { cancelled }
+  }
 
   const query: ClaudeQuery = {
     [Symbol.asyncIterator]: () =>
@@ -118,7 +125,7 @@ const stoppableTurn = Effect.fnUntraced(function* () {
     applyFlagSettings: async () => {},
     // SAFETY: Claude Code's interrupt answers with the queued messages it cancelled, which the SDK's types leave out.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above.
-    interrupt: (async () => ({ cancelled })) as unknown as ClaudeQuery["interrupt"],
+    interrupt: interrupt as unknown as ClaudeQuery["interrupt"],
   }
 
   const session = yield* claudeAdapter("claude-test", {
@@ -151,6 +158,13 @@ const stoppableTurn = Effect.fnUntraced(function* () {
     session,
     cancelled,
     steer: (text: string) => session.steer(delivered(text)).pipe(Effect.andThen(sentUuid)),
+    holdReceipt: () => {
+      const held = Promise.withResolvers<void>()
+      receipt = held.promise
+
+      return Effect.sync(() => held.resolve())
+    },
+    exit: Queue.end(messages).pipe(Effect.andThen(Deferred.await(ended)), Effect.as(events)),
     end: Queue.offer(
       messages,
       // SAFETY: the result carries only the fields the Turn reads; Claude Code sends many more.
@@ -196,4 +210,26 @@ it.live("refuses a Steer once its Turn is stopping, so Glass queues it instead",
     assert.equal(refused._tag, "HostThreadError")
     assert.deepStrictEqual(shownSteers(yield* turn.end), [])
   }).pipe(Effect.scoped),
+)
+
+it.live(
+  "shows the Steers a stopping Turn holds when Claude Code exits before the stop's receipt",
+  () =>
+    Effect.gen(function* () {
+      const turn = yield* stoppableTurn()
+
+      turn.cancelled.push(yield* turn.steer("Use spaces"))
+      const release = turn.holdReceipt()
+
+      const stopping = yield* turn.session
+        .stopTurn("turn-1", TurnStopped.make({}))
+        .pipe(Effect.forkChild)
+
+      const events = yield* turn.exit
+      yield* release
+      const returned = yield* Fiber.join(stopping)
+
+      assert.deepStrictEqual(shownSteers(events), ["Use spaces"])
+      assert.deepStrictEqual(returned, [])
+    }).pipe(Effect.scoped),
 )
