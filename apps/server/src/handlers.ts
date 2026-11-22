@@ -59,6 +59,19 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const outsideAgents = yield* OutsideAgents
     const mcpCredentials = yield* McpCredentials
 
+    const handingBack =
+      (threadId: string) =>
+      <A, E, R>(sent: Effect.Effect<A, E, R>) =>
+        browserPages
+          .handBack(threadId)
+          .pipe(
+            Effect.flatMap((tookOver) =>
+              sent.pipe(
+                Effect.tapError(() => (tookOver ? browserPages.takeOver(threadId) : Effect.void)),
+              ),
+            ),
+          )
+
     return GlassRpcs.of({
       GetSavedPlaces: () => savedPlaces.list(),
       SavePlace: ({ destination }) => savedPlaces.save(destination),
@@ -186,6 +199,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       WatchWorkingThreads: () => threads.watchWorking(),
       WatchBrowserPageRequests: () => browserPages.requests,
       AnswerBrowserPageRequest: ({ id, answer }) => browserPages.answer(id, answer),
+      WatchBrowserControl: () => browserPages.control,
+      TakeOverBrowser: ({ threadId }) => browserPages.takeOver(threadId),
+      HandBackBrowser: ({ threadId }) => browserPages.handBack(threadId).pipe(Effect.asVoid),
       WatchThreadPullRequests: () => threadPullRequests.watch(),
       WatchSettledThreads: () => settledThreads.watch(),
       BringBackThread: ({ threadId }) => threads.bringBack(threadId),
@@ -207,12 +223,15 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       AnswerRequest: ({ threadId, requestId, answer }) =>
         threads.answer(threadId, requestId, answer),
       SendMessage: ({ threadId, message, images, feedback }) =>
-        threads.send(threadId, { message, images }, feedback).pipe(Effect.asVoid),
-      Steer: ({ threadId, message, images }) => threads.steer(threadId, { message, images }),
+        threads
+          .send(threadId, { message, images }, feedback)
+          .pipe(handingBack(threadId), Effect.asVoid),
+      Steer: ({ threadId, message, images }) =>
+        threads.steer(threadId, { message, images }).pipe(handingBack(threadId)),
       CancelQueuedMessage: ({ threadId, queuedMessageId }) =>
         threads.cancelQueued(threadId, queuedMessageId),
       SendQueuedMessage: ({ threadId, queuedMessageId }) =>
-        threads.sendQueued(threadId, queuedMessageId),
+        threads.sendQueued(threadId, queuedMessageId).pipe(handingBack(threadId)),
       StopTurn: ({ threadId }) => threads.stop(threadId),
       ReachSandbox: ({ threadId }) => threads.reachSandbox(threadId),
       GetUnsentMessage: ({ threadId }) => threads.unsent(threadId),

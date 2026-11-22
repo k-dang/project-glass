@@ -1,3 +1,4 @@
+import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { PageEvent, type PageLocation } from "@glass/contracts"
 import {
   BROWSER_PARTITION,
@@ -5,12 +6,13 @@ import {
   SANDBOX_BROWSER_PARTITION,
 } from "@glass/contracts/desktop"
 import { Option, Predicate, Schema } from "effect"
-import { Atom } from "effect/reactivity"
+import { AsyncResult, Atom } from "effect/reactivity"
 import {
   ArrowLeft,
   ArrowRight,
   Bug,
   ExternalLink,
+  LoaderCircle,
   MousePointerClick,
   RotateCw,
   X,
@@ -27,6 +29,8 @@ import {
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Toggle } from "@/components/ui/toggle"
+import { Backend, backendRuntime } from "./backend"
+import { browserControlAtom } from "./answerBrowserPageRequests"
 import { addressOf, type BrowserPolicy, pageOf, webAddress } from "./browserAddress"
 import {
   browserPageReady,
@@ -56,6 +60,47 @@ const isReady = (message: { readonly channel: string; readonly args: ReadonlyArr
   Option.exists(decodeEvent(message.args[0]), ({ type }) => type === "ready")
 
 const paneWidthAtom = Atom.make(720).pipe(Atom.keepAlive)
+
+const handBackBrowserAtom = backendRuntime.fn((threadId: string) =>
+  Backend.use((backend) => backend.HandBackBrowser({ threadId })),
+)
+
+function BrowserControlBar(props: { threadId: string }) {
+  const { threadId } = props
+  const controls = AsyncResult.getOrElse(useAtomValue(browserControlAtom), () => [])
+  const control = controls.find((each) => each.threadId === threadId)
+  const handBack = useAtomSet(handBackBrowserAtom)
+
+  if (control === undefined) return null
+
+  return (
+    <div className="flex min-h-9 items-center gap-2 border-b bg-muted/50 px-3 py-1 text-xs">
+      {control.agentUsing && (
+        <output
+          aria-label="Agent is using the browser"
+          className="flex items-center gap-1.5 font-medium"
+        >
+          <LoaderCircle aria-hidden className="size-3.5 animate-spin motion-reduce:animate-none" />
+          Agent is using the browser
+        </output>
+      )}
+      {control.userTookOver && (
+        <>
+          <span className="text-muted-foreground">You took over the browser.</span>
+          <Button
+            type="button"
+            variant="outline"
+            size="xs"
+            className="ml-auto"
+            onClick={() => handBack(threadId)}
+          >
+            Hand back to agent
+          </Button>
+        </>
+      )}
+    </div>
+  )
+}
 
 const pageKey = (page: PageLocation) =>
   Predicate.isTagged(page, "FilePage") ? `file:${page.path}` : `web:${page.url}`
@@ -326,6 +371,7 @@ export const BrowserPane = memo(function BrowserPane(props: {
             Pick element
           </Toggle>
         </div>
+        <BrowserControlBar threadId={threadId} />
         {canPick && (
           <p className="border-b px-3 py-1.5 text-xs text-muted-foreground">
             {pick

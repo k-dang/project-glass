@@ -127,6 +127,8 @@ export const setUpBrowserPanes = (options: {
       webPreferences.contextIsolation = true
       webPreferences.nodeIntegration = false
       webPreferences.sandbox = true
+      // WARNING: A covered or minimized window hides its pages, and a hidden page stops painting, so the agent's clicks would wait on it.
+      webPreferences.backgroundThrottling = false
     })
   })
 }

@@ -1,12 +1,34 @@
-import { type BrowserPageAnswer, BrowserPageRefused, BrowserPageRequest } from "@glass/contracts"
-import { Context, Deferred, Duration, Effect, Exit, Layer, Match, Schema, Stream } from "effect"
+import {
+  type BrowserPageAnswer,
+  BrowserControl,
+  BrowserPageRefused,
+  BrowserPageRequest,
+} from "@glass/contracts"
+import {
+  Context,
+  Deferred,
+  Duration,
+  Effect,
+  Exit,
+  Layer,
+  Match,
+  Option,
+  Schema,
+  Stream,
+  SubscriptionRef,
+} from "effect"
 import { randomUUID } from "node:crypto"
-import type { Browser, Page } from "playwright-core"
+import type { Browser, Locator, Page } from "playwright-core"
 import { inboxWaitsOf } from "./inboxWaits"
 
 export class BrowserUnavailable extends Schema.TaggedError<BrowserUnavailable>()(
   "BrowserUnavailable",
   { message: Schema.String },
+) {}
+
+export class BrowserTakenOver extends Schema.TaggedError<BrowserTakenOver>()(
+  "BrowserTakenOver",
+  {},
 ) {}
 
 export const PageLogEntry = Schema.Struct({
@@ -21,6 +43,32 @@ export const ShownPage = Schema.Struct({ url: Schema.String, title: Schema.Strin
 
 export type ShownPage = typeof ShownPage.Type
 
+export type PageAction =
+  | { readonly action: "click"; readonly ref: string }
+  | { readonly action: "type"; readonly ref: string; readonly text: string }
+  | { readonly action: "press"; readonly ref: string; readonly key: string }
+  | { readonly action: "scroll"; readonly ref: string }
+
+interface Control {
+  readonly using: number
+  readonly tookOver: boolean
+}
+
+const IDLE: Control = { using: 0, tookOver: false }
+
+const withControl = (
+  all: ReadonlyMap<string, Control>,
+  threadId: string,
+  control: Control,
+): ReadonlyMap<string, Control> => {
+  const updated = new Map(all)
+
+  if (control.using === 0 && !control.tookOver) updated.delete(threadId)
+  else updated.set(threadId, control)
+
+  return updated
+}
+
 interface Connection {
   readonly browser: Browser
   readonly page: Page
@@ -32,6 +80,8 @@ const ANSWER_TIMEOUT = Duration.seconds(20)
 const MAX_LOG = 200
 
 const MAX_SNAPSHOT_CHARS = 40_000
+
+const ACT_TIMEOUT_MS = 5_000
 
 const ELECTRON_WARNING = "%cElectron Security Warning"
 
@@ -75,15 +125,57 @@ const shown = async (page: Page): Promise<ShownPage> => ({
   title: await page.title(),
 })
 
+const SAME_SITE_AS_PAGE = `(() => {
+  const own = new URL(origin)
+  return Array.from(location.ancestorOrigins, (ancestor) => new URL(ancestor)).every(
+    (ancestor) => ancestor.protocol === own.protocol && ancestor.hostname === own.hostname,
+  )
+})()`
+
+const typeable = async (element: Locator, options: { timeout: number; signal: AbortSignal }) => {
+  // WARNING: The relay types through Electron's input for the page, which doesn't reach a frame from another site.
+  if ((await element.evaluate(SAME_SITE_AS_PAGE, undefined, options)) !== true)
+    throw new Error(
+      "act_in_browser can't type or press keys in a frame from another site; click works there.",
+    )
+}
+
+const perform = async (page: Page, action: PageAction, signal: AbortSignal) => {
+  const element = page.locator(`aria-ref=${action.ref}`)
+  const options = { timeout: ACT_TIMEOUT_MS, signal }
+
+  switch (action.action) {
+    case "click":
+      return element.click(options)
+    case "type":
+      await typeable(element, options)
+
+      return element.fill(action.text, options)
+    case "press":
+      await typeable(element, options)
+
+      return element.press(action.key, options)
+    case "scroll":
+      return element.scrollIntoViewIfNeeded(options)
+  }
+}
+
 export class BrowserPages extends Context.Service<
   BrowserPages,
   {
     readonly requests: Stream.Stream<ReadonlyArray<BrowserPageRequest>>
     readonly answer: (id: string, answer: BrowserPageAnswer) => Effect.Effect<void>
+    readonly control: Stream.Stream<ReadonlyArray<BrowserControl>>
+    readonly takeOver: (threadId: string) => Effect.Effect<void>
+    readonly handBack: (threadId: string) => Effect.Effect<boolean>
     readonly open: (
       threadId: string,
       url: string | undefined,
-    ) => Effect.Effect<ShownPage, BrowserUnavailable>
+    ) => Effect.Effect<ShownPage, BrowserUnavailable | BrowserTakenOver>
+    readonly act: (
+      threadId: string,
+      action: PageAction,
+    ) => Effect.Effect<ShownPage, BrowserUnavailable | BrowserTakenOver>
     readonly read: (
       threadId: string,
     ) => Effect.Effect<ShownPage & { readonly snapshot: string }, BrowserUnavailable>
@@ -117,6 +209,41 @@ export class BrowserPages extends Context.Service<
       >()
 
       const browsers = new Set<Browser>()
+
+      const controls = yield* SubscriptionRef.make<ReadonlyMap<string, Control>>(new Map())
+
+      const change = (threadId: string, next: (control: Control) => Control) =>
+        SubscriptionRef.updateSome(controls, (all) => {
+          const current = all.get(threadId) ?? IDLE
+          const changed = next(current)
+
+          return changed.using === current.using && changed.tookOver === current.tookOver
+            ? Option.none()
+            : Option.some(withControl(all, threadId, changed))
+        })
+
+      const claim = (threadId: string, acts: boolean) =>
+        SubscriptionRef.modifySome(controls, (all) => {
+          const current = all.get(threadId) ?? IDLE
+
+          return acts && current.tookOver
+            ? ([false, Option.none()] as const)
+            : ([
+                true,
+                Option.some(withControl(all, threadId, { ...current, using: current.using + 1 })),
+              ] as const)
+        })
+
+      const reading = (threadId: string) => claim(threadId, false).pipe(Effect.asVoid)
+
+      const acting = (threadId: string) =>
+        claim(threadId, true).pipe(
+          Effect.filterOrFail(
+            (claimed) => claimed,
+            () => new BrowserTakenOver(),
+          ),
+          Effect.asVoid,
+        )
 
       yield* Effect.addFinalizer(() =>
         waits
@@ -207,32 +334,83 @@ export class BrowserPages extends Context.Service<
           Effect.flatMap((endpoint) => connectionTo(threadId, endpoint)),
         )
 
-      const onPage = <A>(
+      const onPage = <A, E>(
         threadId: string,
-        act: (connection: Connection) => Promise<A>,
+        claimed: Effect.Effect<void, E>,
+        use: (connection: Connection, signal: AbortSignal) => Promise<A>,
         restoreLastPage = true,
       ) =>
-        connected(threadId, restoreLastPage).pipe(
-          Effect.flatMap((connection) =>
-            Effect.tryPromise({ try: () => act(connection), catch: (cause) => failure(cause) }),
-          ),
+        Effect.acquireUseRelease(
+          claimed,
+          () =>
+            connected(threadId, restoreLastPage).pipe(
+              Effect.flatMap((connection) =>
+                Effect.tryPromise({
+                  try: (signal) => use(connection, signal),
+                  catch: (cause) => failure(cause),
+                }),
+              ),
+            ),
+          () => change(threadId, (control) => ({ ...control, using: control.using - 1 })),
+        )
+
+      const untilTakenOver = (threadId: string) =>
+        SubscriptionRef.changes(controls).pipe(
+          Stream.filter((all) => all.get(threadId)?.tookOver === true),
+          Stream.runHead,
+          Effect.andThen(Effect.fail(new BrowserTakenOver())),
+        )
+
+      const actOnPage = <A>(
+        threadId: string,
+        use: (connection: Connection, signal: AbortSignal) => Promise<A>,
+        restoreLastPage = true,
+      ) =>
+        onPage(threadId, acting(threadId), use, restoreLastPage).pipe(
+          Effect.raceFirst(untilTakenOver(threadId)),
         )
 
       return BrowserPages.of({
         requests: waits.watch(),
         answer: (id, answer) => waits.resolve(id, answer).pipe(Effect.asVoid),
+        control: SubscriptionRef.changes(controls).pipe(
+          Stream.map((all) =>
+            [...all].map(
+              ([threadId, { using, tookOver }]) =>
+                new BrowserControl({ threadId, agentUsing: using > 0, userTookOver: tookOver }),
+            ),
+          ),
+        ),
+        takeOver: (threadId) => change(threadId, (control) => ({ ...control, tookOver: true })),
+        handBack: (threadId) =>
+          SubscriptionRef.modifySome(controls, (all) => {
+            const current = all.get(threadId) ?? IDLE
+
+            return current.tookOver
+              ? ([
+                  true,
+                  Option.some(withControl(all, threadId, { ...current, tookOver: false })),
+                ] as const)
+              : ([false, Option.none()] as const)
+          }),
         open: (threadId, url) =>
-          onPage(
+          actOnPage(
             threadId,
-            async ({ page }) => {
-              if (url !== undefined) await page.goto(url, { waitUntil: "load" })
+            async ({ page }, signal) => {
+              if (url !== undefined) await page.goto(url, { waitUntil: "load", signal })
 
               return shown(page)
             },
             url === undefined,
           ),
+        act: (threadId, action) =>
+          actOnPage(threadId, async ({ page }, signal) => {
+            await perform(page, action, signal)
+
+            return shown(page)
+          }),
         read: (threadId) =>
-          onPage(threadId, async ({ page }) => {
+          onPage(threadId, reading(threadId), async ({ page }) => {
             const snapshot = await page.ariaSnapshot({ mode: "ai" })
 
             return {
@@ -244,11 +422,12 @@ export class BrowserPages extends Context.Service<
             }
           }),
         screenshot: (threadId, fullPage) =>
-          onPage(threadId, async ({ page }) => ({
+          onPage(threadId, reading(threadId), async ({ page }) => ({
             png: new Uint8Array(await page.screenshot({ fullPage })),
             ...(await shown(page)),
           })),
-        consoleLog: (threadId) => onPage(threadId, ({ log }) => Promise.resolve([...log])),
+        consoleLog: (threadId) =>
+          onPage(threadId, reading(threadId), ({ log }) => Promise.resolve([...log])),
       })
     }),
   )

@@ -57,7 +57,7 @@ import {
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, LineNote, UnsentFeedback } from "./feedbackNote"
-import { BrowserPageAnswer, BrowserPageRequest } from "./browserPage"
+import { BrowserControl, BrowserPageAnswer, BrowserPageRequest } from "./browserPage"
 import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { MergeAction, MergePullRequestError } from "./merge"
@@ -393,6 +393,9 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("AnswerBrowserPageRequest", {
     payload: { id: Schema.String, answer: BrowserPageAnswer },
   }),
+  Rpc.make("WatchBrowserControl", { success: Schema.Array(BrowserControl), stream: true }),
+  Rpc.make("TakeOverBrowser", { payload: { threadId: Schema.String } }),
+  Rpc.make("HandBackBrowser", { payload: { threadId: Schema.String } }),
   Rpc.make("WatchSettledThreads", { success: Schema.Array(Schema.String), stream: true }),
   Rpc.make("BringBackThread", {
     payload: { threadId: Schema.String },

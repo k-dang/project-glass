@@ -21,6 +21,7 @@ import {
   FollowedRepository,
   PartAppended,
   type BrowserPageAnswer,
+  BrowserControl,
   BrowserPageReady,
   BrowserPageRequest,
   type PageEvent,
@@ -60,7 +61,7 @@ import {
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Deferred, Effect, Exit, Stream } from "effect"
+import { DateTime, Deferred, Effect, Exit, Stream, SubscriptionRef } from "effect"
 import { afterEach, expect, it, onTestFinished, vi } from "vite-plus/test"
 import { thread, threadFields } from "../../test/thread"
 import { changedFile, workspace } from "../../test/workspace"
@@ -91,6 +92,8 @@ const attachPage = () => {
     canGoForward: () => false,
     getURL: () => "about:blank",
     getTitle: () => "",
+    getWebContentsId: () => 7,
+    isWaitingForResponse: () => false,
   })
   page.dispatchEvent(new Event("dom-ready"))
 
@@ -2047,6 +2050,7 @@ it("opens the Thread's Browser pane for its agent, answers once its last page lo
 
   vi.stubGlobal("glass", {
     browserRelay: (webContentsId: number) => Promise.resolve(`ws://relay/${webContentsId}`),
+    onBrowserUserInput: () => undefined,
   })
 
   mount({
@@ -2095,6 +2099,69 @@ it("opens the Thread's Browser pane for its agent, answers once its last page lo
   Deferred.doneUnsafe(turnEnded, Exit.void)
 
   await waitFor(() => expect(document.querySelector("webview")).toBeNull())
+})
+
+const control = (agentUsing: boolean, userTookOver: boolean) => [
+  new BrowserControl({ threadId: thread.id, agentUsing, userTookOver }),
+]
+
+it("shows the agent using the browser, takes it over when the user clicks or types in the agent's page, stopping the agent's page load, and hands it back", async () => {
+  const answers = new Map<string, BrowserPageAnswer>()
+  const controls = Effect.runSync(SubscriptionRef.make<ReadonlyArray<BrowserControl>>([]))
+  const tookOver: Array<string> = []
+  const handedBack: Array<string> = []
+  const userInput = Promise.withResolvers<(webContentsId: number) => void>()
+
+  vi.stubGlobal("glass", {
+    browserRelay: (webContentsId: number) => Promise.resolve(`ws://relay/${webContentsId}`),
+    onBrowserUserInput: (listener: (webContentsId: number) => void) => userInput.resolve(listener),
+  })
+
+  mount({
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    WatchWorkingThreads: () => Stream.make([thread.id]).pipe(Stream.concat(Stream.never)),
+    WatchBrowserPageRequests: () =>
+      Stream.make([pageRequest("open", false)]).pipe(Stream.concat(Stream.never)),
+    AnswerBrowserPageRequest: ({ id, answer }) => Effect.sync(() => void answers.set(id, answer)),
+    WatchBrowserControl: () => SubscriptionRef.changes(controls),
+    TakeOverBrowser: ({ threadId }) =>
+      Effect.sync(() => void tookOver.push(threadId)).pipe(
+        Effect.andThen(SubscriptionRef.set(controls, control(false, true))),
+      ),
+    HandBackBrowser: ({ threadId }) =>
+      Effect.sync(() => void handedBack.push(threadId)).pipe(
+        Effect.andThen(SubscriptionRef.set(controls, [])),
+      ),
+  })
+
+  await screen.findByRole("complementary", { name: "Browser" })
+
+  const { page } = attachPage()
+  let stops = 0
+
+  await waitFor(() => expect(answers.has("open")).toBe(true))
+
+  await Effect.runPromise(SubscriptionRef.set(controls, control(true, false)))
+  await screen.findByRole("status", { name: "Agent is using the browser" })
+  expect(screen.queryByRole("button", { name: "Hand back to agent" })).toBeNull()
+
+  const onUserInput = await userInput.promise
+  onUserInput(8)
+  Object.assign(page, { isWaitingForResponse: () => true, stop: () => void stops++ })
+  onUserInput(7)
+
+  const handBack = await screen.findByRole("button", { name: "Hand back to agent" })
+  onUserInput(7)
+  await userEvent.click(handBack)
+  expect(tookOver).toEqual([thread.id])
+  expect(stops).toBe(1)
+  expect(screen.queryByText("Agent is using the browser")).toBeNull()
+
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: "Hand back to agent" })).toBeNull(),
+  )
+  expect(handedBack).toEqual([thread.id])
 })
 
 const appLinkTurn = (place: Thread["place"]) => ({
