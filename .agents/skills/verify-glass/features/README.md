@@ -50,5 +50,6 @@ Each feature file has an H1 title, one paragraph of user-visible behavior, then 
 - [Backend access](./backend-access.md): the standalone backend's secret and origin checks, for when it is promoted to a server.
 - [Agent reviews](./agent-reviews.md): private criticism beside the PR diff and its opening on Overview.
 - [Thread changes](./thread-changes.md): local worktree changes pinned until Show latest.
-- [Thread artifacts](./thread-artifacts.md): what an agent shows from its worktree: file links and inline images opening in a File pane, diagrams beside the Thread, and attached images full size.
-- [Feedback notes on a page](./page-notes.md): pointing at parts of an HTML page in a File pane, its pinned notes, and sending them with the next message.
+- [Thread artifacts](./thread-artifacts.md): what an agent shows from its worktree: file links and inline images opening in a File pane, HTML files in the Browser pane, diagrams beside the Thread, and attached images full size.
+- [Browser pane](./browser-pane.md): a web page beside a Thread, opened by address, from a transcript's `localhost` link, or from an HTML file, with Sandbox Threads kept off this device.
+- [Feedback notes on a page](./page-notes.md): pointing at parts of a page in the Browser pane, its pinned notes, and sending them with the next message.

@@ -98,6 +98,8 @@ import { TourFailure, TourState } from "./tour"
 
 export const RPC_PATH = "/rpc"
 
+export const THREAD_FILES_PATH = "/thread-files"
+
 export const TOKEN_PARAM = "token"
 
 export const NewDraft = Schema.Struct({

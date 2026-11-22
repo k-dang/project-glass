@@ -250,8 +250,15 @@ _Avoid_: Artifact, chart, whiteboard
 
 **File pane**:
 A file from a Thread's folder shown beside the Thread, opened from a path the agent
-named.
+named. An HTML file opens in the Browser pane instead.
 _Avoid_: Artifact, preview, viewer
+
+**Browser pane**:
+A web page shown beside a Thread, at an address the user or the Thread's agent opened. A Thread
+has at most one. What the user signs in to in one Browser pane stays signed in for every Thread on
+this device; Threads in a Sandbox share sign-ins only with each other, and their pages can't reach
+this device.
+_Avoid_: Preview, webview, browser tab
 
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn.
@@ -276,7 +283,7 @@ _Avoid_: Draft (a Draft is a GitHub comment)
 
 **Feedback note**:
 An instruction the user leaves on a line or range of a Thread's or Check-in's changes, or on
-part of an HTML page in a File pane, sent to the agent and never published.
+part of a page in a Browser pane, sent to the agent and never published.
 _Avoid_: Draft, review comment
 
 **Permission mode**:

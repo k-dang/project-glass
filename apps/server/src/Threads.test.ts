@@ -4,6 +4,7 @@ import {
   LineNote,
   Merge,
   PageNote,
+  FilePage,
   PullRequestRef,
   PageText,
   SandboxPlace,
@@ -321,7 +322,7 @@ it.live(
 
       const onPage = new PageNote({
         id: "page-1",
-        path: "docs/plan.html",
+        page: FilePage.make({ path: "docs/plan.html" }),
         part: PageText.make({
           selector: "#limits > p",
           heading: "Limits",

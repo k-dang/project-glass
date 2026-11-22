@@ -26,7 +26,7 @@ import {
 import { cn } from "cn"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { ArrowUp, Activity, FileDiff, MessageCircle, Workflow, X } from "lucide-react"
+import { ArrowUp, Activity, FileDiff, Globe, MessageCircle, Workflow, X } from "lucide-react"
 import {
   type ReactNode,
   useCallback,
@@ -80,7 +80,9 @@ import { useActions } from "./actions"
 import { shortcutLabel } from "./shortcutLabel"
 import { useStagedFeedback } from "./useStagedFeedback"
 import { DiagramPane, useDiagrams } from "./ThreadDiagrams"
-import { FileLinks, FilePane, lastEndedOf, useFileLinks } from "./ThreadFiles"
+import { BrowserLinks, type BrowserOpening, BrowserPane } from "./BrowserPane"
+import { browserPolicyOf, threadFileAddress } from "./browserAddress"
+import { FileLinks, FilePane, isHtmlFile, lastEndedOf, useFileLinks } from "./ThreadFiles"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
 import { markTurnSeenAtom } from "./needsYou"
 import { useWindowFocused } from "./useWindowFocused"
@@ -88,6 +90,7 @@ import { useWindowFocused } from "./useWindowFocused"
 type SidePane =
   | { kind: "diagram"; title: string }
   | { kind: "file"; path: string }
+  | { kind: "browser"; opening: BrowserOpening }
   | { kind: "pullRequest"; pullRequest: PullRequestRef }
   | null
 
@@ -149,7 +152,25 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
   const diagrams = useDiagrams(turns, Option.isSome(loaded), openDiagram)
   const openedDiagram = pane?.kind === "diagram" ? diagrams.diagrams.get(pane.title) : undefined
 
-  const openFile = useCallback((path: string) => setPane({ kind: "file", path }), [setPane])
+  const openBrowser = useCallback(
+    (address: string | null) =>
+      setPane((current) => ({
+        kind: "browser",
+        opening: { address, seq: current?.kind === "browser" ? current.opening.seq + 1 : 0 },
+      })),
+    [setPane],
+  )
+
+  const openFile = useCallback(
+    (path: string) =>
+      isHtmlFile(path)
+        ? openBrowser(threadFileAddress(thread.id, path))
+        : setPane({ kind: "file", path }),
+    [setPane, openBrowser, thread.id],
+  )
+
+  const policy = useMemo(() => browserPolicyOf(thread.place), [thread.place])
+  const browserLinks = useMemo(() => ({ policy, open: openBrowser }), [policy, openBrowser])
   const fileLinks = useFileLinks(thread.id, turns, Option.isSome(loaded), openFile)
 
   const openPullRequestPane = useCallback(
@@ -174,6 +195,16 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
       icon: tab === "chat" ? FileDiff : MessageCircle,
       shortcut: { key: "d", mod: true, allowInEditable: true },
       run: () => onTabChange(tab === "chat" ? "changes" : "chat"),
+    },
+    {
+      id: "thread-browser",
+      title: "Open Browser",
+      group: "Thread",
+      icon: Globe,
+      run: () => {
+        openBrowser(null)
+        onTabChange("chat")
+      },
     },
   ])
 
@@ -232,6 +263,10 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
                     Changes
                     <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
                   </ThreadDetailsAction>
+                  <ThreadDetailsAction onNavigate={() => openBrowser(null)}>
+                    <Globe aria-hidden className="text-muted-foreground" />
+                    Browser
+                  </ThreadDetailsAction>
                   {diagrams.titles.map((title) => (
                     <ThreadDetailsAction key={title} onNavigate={() => openDiagram(title)}>
                       <Workflow aria-hidden className="text-muted-foreground" />
@@ -252,7 +287,9 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
           <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
             <ToolCallView value={diagrams.cardOf}>
               <FileLinks value={fileLinks}>
-                <ThreadChat thread={thread} place="thread" />
+                <BrowserLinks value={browserLinks}>
+                  <ThreadChat thread={thread} place="thread" />
+                </BrowserLinks>
               </FileLinks>
             </ToolCallView>
             {openedDiagram !== undefined && (
@@ -263,6 +300,15 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
                 threadId={thread.id}
                 path={pane.path}
                 lastEnded={lastEndedOf(turns)}
+                onClose={closePane}
+              />
+            )}
+            {pane?.kind === "browser" && (
+              <BrowserPane
+                threadId={thread.id}
+                policy={policy}
+                lastEnded={lastEndedOf(turns)}
+                opening={pane.opening}
                 onClose={closePane}
               />
             )}

@@ -1,10 +1,14 @@
-import { PageElement, type PagePart, PageText } from "@glass/contracts"
-import { Option, Schema } from "effect"
+import {
+  PageElement,
+  type PageEvent,
+  type PagePart,
+  type PageState,
+  PageText,
+} from "@glass/contracts"
 import { type HTMLElement as HappyElement, Window } from "happy-dom"
 import { expect, it } from "vite-plus/test"
 import { eventually } from "../../test/eventually"
-import { FromPage, type PageEvent, type PageState } from "./pageMessages"
-import { withPageNotes } from "./pageNotesScript"
+import { pageNotes } from "./pageNotes"
 
 const page = `<!doctype html>
 <html><body>
@@ -20,8 +24,6 @@ const page = `<!doctype html>
   <button id="own">Own button</button>
 </body></html>`
 
-const fromPage = Schema.decodeUnknownOption(FromPage)
-
 const limits: PagePart = PageText.make({
   selector: "#limits > p",
   heading: "Limits",
@@ -29,20 +31,22 @@ const limits: PagePart = PageText.make({
 })
 
 const openPage = () => {
-  const window = new Window({ settings: { enableJavaScriptEvaluation: true } })
+  const window = new Window()
   const events: Array<PageEvent> = []
 
-  window.addEventListener("message", (message) => {
-    if (!(message instanceof window.MessageEvent)) return
-
-    const received = fromPage(message.data)
-
-    if (Option.isSome(received)) events.push(received.value.glassPageEvent)
-  })
   const box = new window.DOMRect(10, 10, 80, 16)
   Object.defineProperty(window.Range.prototype, "getClientRects", { value: () => [box] })
   Object.defineProperty(window.Range.prototype, "getBoundingClientRect", { value: () => box })
-  window.document.write(withPageNotes(page))
+  window.document.write(page)
+
+  let receive: ((state: PageState) => void) | null = null
+
+  pageNotes(
+    // SAFETY: happy-dom's Window implements the DOM the script uses.
+    // oxlint-disable-next-line typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above.
+    window as unknown as typeof globalThis,
+    { post: (event) => void events.push(event), onState: (next) => (receive = next) },
+  )
 
   const { document } = window
 
@@ -60,7 +64,7 @@ const openPage = () => {
     overlay,
     parts: () => events.flatMap((event) => (event.type === "part" ? [event.part] : [])),
     last: () => events.at(-1),
-    send: (state: PageState) => window.postMessage({ glassPageState: state }, "*"),
+    send: (state: PageState) => receive?.(state),
   }
 }
 

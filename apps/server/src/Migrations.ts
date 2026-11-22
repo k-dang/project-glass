@@ -22,6 +22,7 @@ import pageNotes from "./migrations/0020_page_notes"
 import conversationToDos from "./migrations/0021_conversation_to_dos"
 import reviewThreadReplies from "./migrations/0022_review_thread_replies"
 import threads from "./migrations/0023_threads"
+import pageLocations from "./migrations/0024_page_locations"
 
 const migrations = {
   "0001_baseline": baseline,
@@ -47,6 +48,7 @@ const migrations = {
   "0021_conversation_to_dos": conversationToDos,
   "0022_review_thread_replies": reviewThreadReplies,
   "0023_threads": threads,
+  "0024_page_locations": pageLocations,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

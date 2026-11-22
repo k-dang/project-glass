@@ -34,9 +34,17 @@ export const PagePart = Schema.Union([PageText, PageElement])
 
 export type PagePart = typeof PagePart.Type
 
+export const FilePage = Schema.TaggedStruct("FilePage", { path: Schema.String })
+
+export const WebPage = Schema.TaggedStruct("WebPage", { url: Schema.String })
+
+export const PageLocation = Schema.Union([FilePage, WebPage])
+
+export type PageLocation = typeof PageLocation.Type
+
 export class PageNote extends Schema.TaggedClass<PageNote>()("PageNote", {
   id: Schema.String,
-  path: Schema.String,
+  page: PageLocation,
   part: PagePart,
   text: NoteText,
 }) {}

@@ -12,6 +12,7 @@ import {
   createContext,
   memo,
   type ReactNode,
+  use,
   useCallback,
   useContext,
   useState,
@@ -45,6 +46,7 @@ import {
 import { plural } from "./plural"
 import { sentFrom, UserMessage } from "./UserMessage"
 import { PullRequestLink } from "./ThreadPullRequest"
+import { BrowserLinks } from "./BrowserPane"
 import { RequestCard } from "./RequestCard"
 import { MermaidDiagram } from "./MermaidDiagram"
 import { FileImage, FileLink, localFilePath, remarkLocalFiles } from "./ThreadFiles"
@@ -309,8 +311,28 @@ const streamdownLinkClass = "wrap-anywhere font-medium text-primary underline"
 function MarkdownLink(props: ComponentProps<typeof defaultComponents.a>) {
   const { href } = props
   const localPath = localFilePath(href)
+  const browserLinks = use(BrowserLinks)
 
   if (localPath !== null) return <FileLink text={localPath}>{props.children}</FileLink>
+
+  if (href !== undefined && browserLinks?.policy.opensLink(href) === true)
+    return (
+      <a
+        className={cn(streamdownLinkClass, props.className)}
+        data-streamdown="link"
+        href={href}
+        rel="noreferrer"
+        target="_blank"
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey) return
+
+          event.preventDefault()
+          browserLinks.open(href)
+        }}
+      >
+        {props.children}
+      </a>
+    )
 
   const pullRequest = href === undefined ? null : parsePullRequestReference(href)
 
