@@ -104,6 +104,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
   const shutDowns = new Map<string, Deferred.Deferred<void>>()
   const events: Array<string> = []
+  const branches = new Map<string, string>()
 
   const noteEnded = (threadId: string) => {
     if (!events.includes(`ended ${threadId}`)) events.push(`ended ${threadId}`)
@@ -207,6 +208,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       if (settings.noCapacity !== undefined) throw new NoCapacity(settings.noCapacity)
 
       record({ threadId: request.threadId })
+      branches.set(request.threadId, request.branch)
       createdAt.set(request.threadId, clock.currentTimeMillisUnsafe())
 
       for (const step of steps) {
@@ -296,6 +298,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
   return {
     provider,
     events,
+    branches,
     configure: (next: InProcessSandboxSettings) => {
       settings = next
 

@@ -547,12 +547,88 @@ it.live("finds a Thread's PR from the branch its agent left checked out, not a f
   }),
 )
 
+it.live("leaves out a merged PR from before the Thread on a branch name it reused", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+
+    const merged = {
+      owner: "glass-demo",
+      repo: "greeter",
+      state: "MERGED",
+      base: { sha: "b0", files: {} },
+      head: { sha: "h1", files: {} },
+    } as const
+
+    f.github.seedPullRequest({
+      ...merged,
+      number: 7,
+      headBranch: "feature/reused",
+      createdAt: "2020-01-01T00:00:00Z",
+    })
+
+    const reused = yield* f.start("hold:reused")
+    yield* f.transcript(reused.id, holding)
+    gitIn(f.worktree(reused.name), "switch", "--quiet", "-c", "feature/reused")
+    yield* f.release("reused")
+    yield* f.transcript(reused.id, settled(1))
+
+    const fresh = yield* f.start("hold:fresh")
+    yield* f.transcript(fresh.id, holding)
+    gitIn(f.worktree(fresh.name), "switch", "--quiet", "-c", "feature/fresh")
+    f.github.seedPullRequest({ ...merged, number: 8, headBranch: "feature/fresh" })
+    yield* f.release("fresh")
+
+    const listed = yield* f.client.WatchThreadPullRequests().pipe(
+      Stream.filter((found) => found.length > 0),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+    )
+
+    assert.deepStrictEqual(
+      listed.map(({ threadId, ref }) => [threadId, ref.number]),
+      [[fresh.id, 8]],
+    )
+
+    f.github.seedPullRequest({ ...merged, number: 9, headBranch: "feature/reused" })
+    yield* f.client.ListPullRequests()
+
+    yield* f.client.WatchThreadPullRequests().pipe(
+      Stream.filter((found) =>
+        found.some(({ threadId, ref }) => threadId === reused.id && ref.number === 9),
+      ),
+      Stream.runHead,
+    )
+
+    const later = yield* f.start("hold:later")
+    yield* f.transcript(later.id, holding)
+    gitIn(f.worktree(later.name), "switch", "--quiet", "--ignore-other-worktrees", "feature/reused")
+    yield* f.release("later")
+    yield* f.transcript(later.id, settled(1))
+    f.github.seedPullRequest({ ...merged, number: 10, headBranch: "feature/reused" })
+    yield* f.client.ListPullRequests()
+
+    yield* f.client.WatchThreadPullRequests().pipe(
+      Stream.filter((found) =>
+        found.some(({ threadId, ref }) => threadId === later.id && ref.number === 10),
+      ),
+      Stream.runHead,
+    )
+  }),
+)
+
 it.live("marks the To-dos a Thread started from done once its PR merges", () =>
   Effect.gen(function* () {
     const f = yield* threadsFixture
     yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
     yield* f.client.AddToDo({ title: "Fix spacing", notes: "" })
     yield* f.client.AddToDo({ title: "Tidy later", notes: "" })
+
+    const thread = yield* f.start(`hold:first
+${toDoMention({ id: 1, title: "Fix spacing" })}`)
+
+    yield* f.transcript(thread.id, holding)
+    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/spacing")
 
     const pr = f.github.seedPullRequest({
       owner: "glass-demo",
@@ -563,11 +639,6 @@ it.live("marks the To-dos a Thread started from done once its PR merges", () =>
       head: { sha: "h1", files: {} },
     })
 
-    const thread = yield* f.start(`hold:first
-${toDoMention({ id: 1, title: "Fix spacing" })}`)
-
-    yield* f.transcript(thread.id, holding)
-    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/spacing")
     yield* f.release("first")
     yield* f.transcript(thread.id, settled(1))
     yield* f.send(thread.id, toDoMention({ id: 2, title: "Tidy later" }))
@@ -600,6 +671,10 @@ it.live("settles a Thread right after its PR is merged from Glass", () =>
     const f = yield* threadsFixture
     yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
 
+    const thread = yield* f.start("hold:first")
+    yield* f.transcript(thread.id, holding)
+    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/merge-here")
+
     const pr = f.github.seedPullRequest({
       owner: "glass-demo",
       repo: "greeter",
@@ -609,9 +684,6 @@ it.live("settles a Thread right after its PR is merged from Glass", () =>
       head: { sha: "h1", files: {} },
     })
 
-    const thread = yield* f.start("hold:first")
-    yield* f.transcript(thread.id, holding)
-    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/merge-here")
     yield* f.release("first")
 
     yield* f.client.WatchThreadPullRequests().pipe(
@@ -650,6 +722,10 @@ it.live(
       const onPullRequest = Effect.fnUntraced(function* (gate: string, number: number) {
         const headBranch = `feature/${gate}`
 
+        const thread = yield* f.start(`hold:${gate}`)
+        yield* f.transcript(thread.id, holding)
+        gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", headBranch)
+
         const pr = f.github.seedPullRequest({
           owner: "glass-demo",
           repo: "greeter",
@@ -659,9 +735,6 @@ it.live(
           head: { sha: `h${number}`, files: {} },
         })
 
-        const thread = yield* f.start(`hold:${gate}`)
-        yield* f.transcript(thread.id, holding)
-        gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", headBranch)
         yield* f.release(gate)
 
         yield* f.client.WatchThreadPullRequests().pipe(

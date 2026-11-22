@@ -52,9 +52,9 @@ import { StartedWork } from "./StartedWork"
 import { Storage } from "./Storage"
 import { ToDos } from "./ToDos"
 import { AgentRunners } from "./agentRunners"
+import { BranchNames } from "./BranchNames"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
-import { ThreadNames } from "./threadNames"
 import { StartedWorkUpdates } from "./StartedWorkUpdates"
 
 const RendererRoutes = Layer.mergeAll(
@@ -147,6 +147,7 @@ const services = (
       Layer.provide(Git.layer),
     )
     .pipe(
+      Layer.provide(BranchNames.layer),
       Layer.provide(agentRunners),
       Layer.provide(agentCommands),
       Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
@@ -194,6 +195,4 @@ export const serve = (
     ),
   )
 
-export const ServerLive = serve(AgentRunners.layer, GlassMcpTools).pipe(
-  Layer.provide(ThreadNames.layer),
-)
+export const ServerLive = serve(AgentRunners.layer, GlassMcpTools)

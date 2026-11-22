@@ -291,6 +291,7 @@ const GraphQLRequest = Schema.Union([
     variables: Schema.Struct({
       owner: Schema.String,
       name: Schema.String,
+      query: Schema.NullOr(Schema.String),
       after: Schema.NullOr(Schema.String),
     }),
   }),
@@ -1046,7 +1047,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       }
 
       case "RepositoryBranches": {
-        const { owner, name, after } = request.variables
+        const { owner, name, query, after } = request.variables
         const seeded = repositories.branches(owner, name)
 
         if (seeded === undefined) return unresolvedRepository(owner, name)
@@ -1055,7 +1056,9 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
           data: {
             repository: {
               refs: connectionPage(
-                seeded.map((branch) => ({ name: branch })),
+                seeded
+                  .filter((branch) => branch.startsWith(query ?? ""))
+                  .map((branch) => ({ name: branch })),
                 after,
               ),
             },

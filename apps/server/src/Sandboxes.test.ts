@@ -19,7 +19,7 @@ import {
   TurnEnded,
   TurnStopped,
 } from "@glass/contracts"
-import { DateTime, Duration, Effect, Fiber, Option, Predicate, Stream } from "effect"
+import { DateTime, Deferred, Duration, Effect, Fiber, Option, Predicate, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { resolve } from "node:path"
 import { threadServicesFixture } from "../test/threadServicesFixture"
@@ -119,6 +119,35 @@ it.live("shows each step of making a Sandbox, then runs the first message in it"
     const done = yield* f.transcript(thread.id, settled(1))
     assert.isNull(done.status)
     assert.deepStrictEqual(done.turns[0]?.ended?.ending, TurnDone.make({}))
+  }),
+)
+
+it.live("makes each Sandbox on its own branch named for the first message", () =>
+  Effect.gen(function* () {
+    const f = yield* threadServicesFixture
+    const named = yield* Deferred.make<void>()
+    yield* f.takeBranches(["fix/greeting"])
+    yield* f.suggestBranch(Deferred.await(named).pipe(Effect.as(Option.some("fix/greeting"))))
+
+    const first = yield* createSandboxed(f)
+    const second = yield* createSandboxed(f)
+    assert.match(first.name, /^agent\/[0-9a-f]{8}$/)
+    yield* Deferred.succeed(named, undefined)
+
+    const started = [yield* f.started, yield* f.started].map(({ threadId }) => threadId)
+    assert.sameMembers(started, [first.id, second.id])
+
+    assert.sameMembers(
+      [f.sandboxes.branches.get(first.id), f.sandboxes.branches.get(second.id)],
+      ["fix/greeting-2", "fix/greeting-3"],
+    )
+
+    const listed = yield* f.threads.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+    assert.sameMembers(
+      listed.map(({ name, branch }) => `${name} ${branch}`),
+      ["fix/greeting-2 fix/greeting-2", "fix/greeting-3 fix/greeting-3"],
+    )
   }),
 )
 

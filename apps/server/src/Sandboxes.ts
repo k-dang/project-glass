@@ -35,7 +35,7 @@ import {
 import { SqlClient } from "effect/sql"
 import { Socket } from "effect/socket"
 import { newHostToken } from "./agentHost/protocol"
-import { uniqueThreadName } from "./threadNames"
+import { placeholderBranch } from "./BranchNames"
 import { GitHubClient } from "./github/GitHubClient"
 import { followHost, greet, type JournalPosition } from "./hostJournal"
 import { GlassToolRelay, ToolCallOrigin } from "./mcp/GlassToolRelay"
@@ -188,6 +188,8 @@ const notInstalled = (providerId: string): Placement => {
     branches: () => failure,
     files: () => Effect.succeed([]),
     place: () => failure,
+    takenBranches: () => failure,
+    useBranch: () => failure,
     prepareHost: () => failure,
     hostIfPrepared: () => Effect.succeedNone,
     connectedHost: () => Effect.succeedNone,
@@ -380,6 +382,10 @@ export class Sandboxes extends Context.Service<
 
             if (Predicate.isTagged(left, "Building")) yield* discard(provider, thread.id, left)
 
+            const branch =
+              thread.branch ??
+              (yield* new ThreadError({ message: "This Thread has no branch to work on." }))
+
             const token = newHostToken()
             let recorded: SandboxState | undefined
             const reports = yield* orderedReports
@@ -391,7 +397,7 @@ export class Sandboxes extends Context.Service<
                 owner: thread.repository.owner,
                 repo: thread.repository.repo,
               },
-              branch: thread.name,
+              branch,
               baseBranch: thread.baseBranch,
               folder,
               host: {
@@ -648,7 +654,7 @@ export class Sandboxes extends Context.Service<
             ),
           commands: () => Effect.succeed([]),
           defaultBranch: github.repositoryDefaultBranch,
-          branches: github.repositoryBranches,
+          branches: (repository) => github.repositoryBranches(repository, ""),
           files: (repository, baseBranch) =>
             github.repositoryFiles(repository, baseBranch).pipe(
               Effect.tap(({ truncated }) =>
@@ -666,10 +672,18 @@ export class Sandboxes extends Context.Service<
             ),
           place: (repository) =>
             Effect.sync(() => {
-              const name = uniqueThreadName()
-
-              return { name, branch: name, folder: repository.repo, discard: Effect.void }
+              return { branch: placeholderBranch(), folder: repository.repo, discard: Effect.void }
             }),
+          takenBranches: (repository, prefix) =>
+            github.repositoryBranches(repository, prefix).pipe(
+              Effect.tapError((cause) =>
+                Effect.logWarning("Couldn't list a repository's branches", cause),
+              ),
+              Effect.mapError(
+                () => new ThreadError({ message: `Couldn't check whether ${prefix} is taken.` }),
+              ),
+            ),
+          useBranch: () => Effect.void,
           prepareHost: (placed) =>
             connect(placed.thread.id, placed).pipe(
               Effect.catchTag("SandboxGone", () =>

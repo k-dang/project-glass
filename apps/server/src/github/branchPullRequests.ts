@@ -5,7 +5,7 @@ import {
   PullRequestMerged,
   PullRequestRef,
 } from "@glass/contracts"
-import { Schema } from "effect"
+import { type DateTime, Schema } from "effect"
 import { aliasedLookup } from "./aliasedLookups"
 
 export interface Branch {
@@ -18,6 +18,7 @@ export interface EndedPullRequest {
   readonly url: string
   readonly title: string
   readonly state: PullRequestEnded
+  readonly createdAt: DateTime.Utc
 }
 
 const endedFields = {
@@ -25,6 +26,7 @@ const endedFields = {
   url: Schema.String,
   title: Schema.String,
   isCrossRepository: Schema.Boolean,
+  createdAt: Schema.DateTimeUtcFromString,
 }
 
 const GitHubEndedPullRequest = Schema.Union([
@@ -44,7 +46,7 @@ export const EndedBranchPullRequests = aliasedLookup({
   selection: (index) =>
     `repository(owner: $owner${index}, name: $name${index}) { pullRequests(headRefName: $branch${index}, states: [MERGED, CLOSED], first: 10, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { ...EndedPullRequest } } }`,
   fragment: `fragment EndedPullRequest on PullRequest {
-  number url title state isCrossRepository mergedAt
+  number url title state isCrossRepository createdAt mergedAt
 }`,
   variables: ({ repository, branch }: Branch, index) => [
     [`owner${index}`, repository.owner],
@@ -67,6 +69,7 @@ export const EndedBranchPullRequests = aliasedLookup({
           }),
           url: node.url,
           title: node.title,
+          createdAt: node.createdAt,
           state:
             node.state === "MERGED"
               ? PullRequestMerged.make({ mergedAt: node.mergedAt })

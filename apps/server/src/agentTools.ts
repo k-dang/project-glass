@@ -1,15 +1,17 @@
-export type AgentTools = "read-only" | "shell"
+export type AgentTools = "none" | "read-only" | "shell"
 
 const claudeReadTools = ["Read", "Grep", "Glob"]
 
-export const claudeTools: Record<AgentTools, ReadonlyArray<string>> = {
+type ToolList = Record<Exclude<AgentTools, "none">, ReadonlyArray<string>>
+
+export const claudeTools: ToolList = {
   "read-only": claudeReadTools,
   shell: [...claudeReadTools, "Bash"],
 }
 
 const piReadTools = ["read", "grep", "find", "ls"]
 
-export const piTools: Record<AgentTools, ReadonlyArray<string>> = {
+export const piTools: ToolList = {
   "read-only": piReadTools,
   shell: [...piReadTools, "bash"],
 }
