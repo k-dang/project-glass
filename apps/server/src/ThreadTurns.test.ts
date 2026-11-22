@@ -886,6 +886,74 @@ it.effect(
     }).pipe(Effect.provide(layer)),
 )
 
+const database = Layer.provideMerge(
+  SqliteMigrator.layer({ loader: migrationLoader }),
+  SqliteClient.layer({ filename: ":memory:" }),
+)
+
+const glassRun = ThreadTurns.layer.pipe(
+  Layer.provideMerge(Transcripts.layer),
+  Layer.provideMerge(Layer.mock(ToDos)({})),
+)
+
+const stopStartedWorkUpdate = Effect.gen(function* () {
+  const begun = yield* Deferred.make<void>()
+
+  const desk = yield* scripted({
+    "agent-1": {
+      running: true,
+      startTurn: () => Deferred.succeed(begun, undefined).pipe(Effect.asVoid),
+      stopTurn: () => Effect.succeed([]),
+    },
+  })
+
+  const thread = desk.threads.get("agent-1")
+  assert.isDefined(thread)
+
+  yield* desk.turns.whenIdle("agent-1", (start) => start(startedWorkUpdateTurn, () => Effect.void))
+  yield* Deferred.await(begun)
+  yield* desk.turns.stop(thread)
+
+  const turn = (yield* desk.transcripts.read("agent-1")).turns[0]
+  assert.isDefined(turn)
+  assert.equal(turn.ended, null)
+
+  return turn.id
+})
+
+it.effect(
+  "ends a Turn that retries delivery when Glass restarts after the user stops it and before the host's Stopped is saved",
+  () =>
+    Effect.gen(function* () {
+      const turnId = yield* stopStartedWorkUpdate.pipe(Effect.provide(glassRun))
+
+      yield* Effect.gen(function* () {
+        const transcripts = yield* Transcripts
+
+        yield* reportStopped("agent-1", turnId)
+
+        const stopped = yield* transcripts.read("agent-1")
+        assert.deepStrictEqual(stopped.turns[0]?.ended?.ending, TurnStopped.make({}))
+        assert.lengthOf(yield* transcripts.retryDeliveries(["agent-1"]), 0)
+      }).pipe(Effect.provide(glassRun))
+    }).pipe(Effect.provide(database)),
+)
+
+it.effect(
+  "ends a Turn that retries delivery when the agent host is replaced after the user stops it",
+  () =>
+    Effect.gen(function* () {
+      const transcripts = yield* Transcripts
+
+      yield* stopStartedWorkUpdate
+      yield* transcripts.endRunning(TurnCutOff.make({}), ["agent-1"])
+
+      const cutOff = yield* transcripts.read("agent-1")
+      assert.deepStrictEqual(cutOff.turns[0]?.ended?.ending, TurnCutOff.make({}))
+      assert.lengthOf(yield* transcripts.retryDeliveries(["agent-1"]), 0)
+    }).pipe(Effect.provide(layer)),
+)
+
 it.effect(
   "ends a Turn that retries delivery when the user stops it after a timeout, once the host reports Stopped",
   () =>

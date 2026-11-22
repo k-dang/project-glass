@@ -260,7 +260,7 @@ export class Transcripts extends Context.Service<
       threadId: string,
       turnId: string,
     ) => Effect.Effect<void, ThreadError>
-    readonly askedToStop: (turnId: string) => Effect.Effect<void>
+    readonly askedToStop: (turnId: string) => Effect.Effect<void, ThreadError>
     readonly runningTurn: (threadId: string) => Effect.Effect<string | null, ThreadError>
     readonly idle: (threadId: string) => Effect.Effect<boolean, ThreadError>
     readonly startIfIdle: (
@@ -466,13 +466,6 @@ export class Transcripts extends Context.Service<
           return Option.some(next)
         })
 
-      const askedStops = new Set<string>()
-
-      const askedToStop = (turnId: string) =>
-        Effect.sync(() => {
-          askedStops.add(turnId)
-        })
-
       const failedAlready = (turnId: string) =>
         sql`
           SELECT id FROM thread_turn
@@ -539,7 +532,7 @@ export class Transcripts extends Context.Service<
                 sql`(ended IS NULL OR json_extract(ended, '$.ending._tag') = 'CutOff')`,
               ]
 
-              if (Predicate.isTagged(ended.ending, "Stopped") && !askedStops.has(turnId))
+              if (Predicate.isTagged(ended.ending, "Stopped"))
                 conditions.push(sql`retries_delivery = 0`)
 
               return sql`
@@ -947,7 +940,11 @@ export class Transcripts extends Context.Service<
         save,
         endRunning,
         endTurn,
-        askedToStop,
+        askedToStop: (turnId) =>
+          withStorageFailure(
+            "record that a Turn was asked to stop",
+            sql`UPDATE thread_turn SET retries_delivery = 0 WHERE id = ${turnId}`,
+          ),
         watch: (threadId) =>
           Stream.unwrap(
             withThread(
