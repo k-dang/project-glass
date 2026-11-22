@@ -77,8 +77,9 @@ const startFailure = (name: string) => (error: { readonly reason: unknown }) => 
 
 const claudeFlags = ["--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"]
 
-// WARNING: Both flag sets keep the user's settings files, and their hooks, away from the PR's files; shell can't use --restricted, and -p refuses tools not allowed.
+// WARNING: Each flag set keeps the user's settings files, and their hooks, away from the PR's files; shell can't use --restricted, and -p refuses tools not allowed.
 const claudeToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
+  none: ["--setting-sources", "", "--tools", ""],
   "read-only": ["--restricted", "--tools", claudeTools["read-only"].join(",")],
   shell: [
     "--setting-sources",
@@ -90,12 +91,17 @@ const claudeToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
   ],
 }
 
+const piToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
+  none: ["--no-tools"],
+  "read-only": ["--tools", piTools["read-only"].join(",")],
+  shell: ["--tools", piTools.shell.join(",")],
+}
+
 const piCliFlags = (tools: AgentTools) => [
   "--offline",
   "--no-session",
   ...piLoadsNothing,
-  "--tools",
-  piTools[tools].join(","),
+  ...piToolFlags[tools],
 ]
 
 // WARNING: pi --list-models matches its search fuzzily and prints a table of provider and model columns.

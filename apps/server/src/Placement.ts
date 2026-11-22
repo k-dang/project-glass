@@ -37,7 +37,6 @@ export interface PlacedThread {
 }
 
 export interface Placed {
-  readonly name: string
   readonly branch: string
   readonly folder: string
   readonly discard: Effect.Effect<void>
@@ -74,4 +73,9 @@ export interface Placement extends ThreadHosting {
     repository: FollowedRepository,
     baseBranch: string,
   ) => Effect.Effect<Placed, InvalidLocalCheckout | ThreadError>
+  readonly takenBranches: (
+    repository: FollowedRepository,
+    prefix: string,
+  ) => Effect.Effect<ReadonlyArray<string>, ThreadError>
+  readonly useBranch: (placed: PlacedThread, branch: string) => Effect.Effect<void, ThreadError>
 }

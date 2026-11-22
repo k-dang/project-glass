@@ -26,7 +26,7 @@ import {
 import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
-import { fakeAgentRunners } from "./fakeAgentRunners"
+import { fakeAgentRunnersWith } from "./fakeAgentRunners"
 import { seedDemoToDos } from "./demoToDos"
 import { seedTourOverviewPullRequests } from "./demoTourOverviews"
 import { FAKE_PI_MODEL } from "./fakeModelProvider"
@@ -128,8 +128,7 @@ const main = Effect.gen(function* () {
   const threadNames = demoThreadNames()
 
   const running = yield* Layer.build(
-    serve(fakeAgentRunners, GlassMcpTools).pipe(
-      Layer.provide(threadNames.layer),
+    serve(fakeAgentRunnersWith(threadNames.branchFor), GlassMcpTools).pipe(
       Layer.provide(ServerConfig.layer),
       Layer.provide(configured),
     ),

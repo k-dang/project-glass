@@ -8,12 +8,14 @@ export const Deadlines = Context.Reference<{
   readonly agentReviewMs: number
   readonly askMs: number
   readonly checkoutMs: number
+  readonly branchNameMs: number
 }>("@glass/server/Deadlines", {
   defaultValue: () => ({
     tourMs: 900_000,
     agentReviewMs: 900_000,
     askMs: 300_000,
     checkoutMs: 300_000,
+    branchNameMs: 60_000,
   }),
 })
 

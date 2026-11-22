@@ -234,9 +234,9 @@ export const RepositoryDefaultBranchResponse = GraphQLResponse(
   }),
 )
 
-export const REPOSITORY_BRANCHES_QUERY = `query RepositoryBranches($owner: String!, $name: String!, $after: String) {
+export const REPOSITORY_BRANCHES_QUERY = `query RepositoryBranches($owner: String!, $name: String!, $query: String, $after: String) {
   repository(owner: $owner, name: $name) {
-    refs(refPrefix: "refs/heads/", first: 100, after: $after) {
+    refs(refPrefix: "refs/heads/", query: $query, first: 100, after: $after) {
       pageInfo { hasNextPage endCursor }
       nodes { name }
     }

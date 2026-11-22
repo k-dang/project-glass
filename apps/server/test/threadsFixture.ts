@@ -31,7 +31,13 @@ export const scriptedHost = fileURLToPath(
   new URL("../dist-test/scriptedAgentHost.mjs", import.meta.url),
 )
 
-export const threadsFixtureWith = ({ agentHostBundle = scriptedHost } = {}) =>
+export const threadsFixtureWith = ({
+  agentHostBundle = scriptedHost,
+  agentRunners,
+}: {
+  readonly agentHostBundle?: string
+  readonly agentRunners?: Parameters<typeof startBackend>[2]
+} = {}) =>
   Effect.gen(function* () {
     const github = yield* startFakeGitHub()
     const home = yield* isolatedHome
@@ -60,13 +66,15 @@ export const threadsFixtureWith = ({ agentHostBundle = scriptedHost } = {}) =>
     const serverScope = yield* Scope.make()
     yield* Effect.addFinalizer((exit) => Scope.close(serverScope, exit))
 
-    const { client, baseUrl, mcpCredentials } = yield* startBackend(env, home).pipe(
+    const { client, baseUrl, mcpCredentials } = yield* startBackend(env, home, agentRunners).pipe(
       Effect.provideService(Scope.Scope, serverScope),
     )
 
     const quit = Scope.close(serverScope, Exit.void)
 
-    const launch = startBackend(env, home).pipe(Effect.map((backend) => backend.client))
+    const launch = startBackend(env, home, agentRunners).pipe(
+      Effect.map((backend) => backend.client),
+    )
 
     const watch = (
       threadId: string,

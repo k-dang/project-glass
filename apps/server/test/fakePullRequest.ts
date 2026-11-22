@@ -136,6 +136,7 @@ export interface FakePullRequestSeed {
   readonly viewerCanEnableAutoMerge?: boolean
   readonly viewerPermission?: FakePermission
   readonly mergeMethods?: ReadonlyArray<FakeMergeMethod>
+  readonly createdAt?: string
   readonly updatedAt?: string
   readonly base: FakeCommit
   readonly head: FakeCommit
@@ -195,6 +196,7 @@ export class FakePullRequest {
   #mergedAt: string | null
   #isDraft: boolean
   #updatedAt: string
+  #createdAt: string
   #base: FakeCommit
   #head: FakeCommit
   #changedFiles: ReadonlyArray<FakeChangedFile>
@@ -244,6 +246,7 @@ export class FakePullRequest {
     this.viewerPermission = seed.viewerPermission ?? "WRITE"
     this.mergeMethods = seed.mergeMethods ?? ["MERGE", "SQUASH", "REBASE"]
     this.#updatedAt = seed.updatedAt ?? now()
+    this.#createdAt = seed.createdAt ?? this.#updatedAt
     this.#mergedAt = this.#state === "MERGED" ? this.#updatedAt : null
     this.#base = seed.base
     this.#head = seed.head
@@ -339,6 +342,10 @@ export class FakePullRequest {
 
   get state(): FakePullRequestState {
     return this.#state
+  }
+
+  get createdAt(): string {
+    return this.#createdAt
   }
 
   get mergedAt(): string | null {

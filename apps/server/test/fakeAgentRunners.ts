@@ -3,6 +3,7 @@ import { basename } from "node:path"
 import { AgentRunners } from "../src/agentRunners"
 import { AgentReviewAnswer } from "../src/agentReviewPrompt"
 import { AskAgentAnswer } from "../src/askPrompt"
+import { BranchAnswer } from "../src/BranchNames"
 import type { TourAnswer } from "../src/tourPrompt"
 import { RATE_LIMIT_TITLE } from "./demoPullRequests"
 import { demoAgentReview } from "./demoAgentReview"
@@ -71,20 +72,31 @@ const syntheticReview = (prompt: string): AgentReviewAnswer => {
   }
 }
 
-export const fakeAgentRunners = Layer.succeed(
-  AgentRunners,
-  AgentRunners.of({
-    select: ({ harness }) =>
-      Effect.succeed({
-        identity: { harness, model: "fake/synthetic" },
-        run: (task) =>
-          Schema.decodeUnknownEffect(task.answer)(
-            Object.is(task.answer, AgentReviewAnswer)
-              ? syntheticReview(task.prompt)
-              : Object.is(task.answer, AskAgentAnswer)
-                ? { answer: "A synthetic answer: no agent read this code." }
-                : syntheticTour(task.prompt),
-          ).pipe(Effect.orDie, Effect.delay("2 seconds")),
-      }),
-  }),
-)
+const syntheticBranch = (prompt: string, branchFor: (request: string) => string | undefined) => {
+  const request = prompt.split("\n").slice(1).join("\n")
+
+  return { branch: branchFor(request) ?? `feat/${request.split(/\s+/).slice(0, 4).join("-")}` }
+}
+
+export const fakeAgentRunnersWith = (branchFor: (request: string) => string | undefined) =>
+  Layer.succeed(
+    AgentRunners,
+    AgentRunners.of({
+      select: ({ harness }) =>
+        Effect.succeed({
+          identity: { harness, model: "fake/synthetic" },
+          run: (task) =>
+            Schema.decodeUnknownEffect(task.answer)(
+              Object.is(task.answer, AgentReviewAnswer)
+                ? syntheticReview(task.prompt)
+                : Object.is(task.answer, BranchAnswer)
+                  ? syntheticBranch(task.prompt, branchFor)
+                  : Object.is(task.answer, AskAgentAnswer)
+                    ? { answer: "A synthetic answer: no agent read this code." }
+                    : syntheticTour(task.prompt),
+            ).pipe(Effect.orDie, Effect.delay("2 seconds")),
+        }),
+    }),
+  )
+
+export const fakeAgentRunners = fakeAgentRunnersWith(() => undefined)

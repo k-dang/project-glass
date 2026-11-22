@@ -280,6 +280,7 @@ const endedBranchPullRequests = (
             title: pr.title,
             state: pr.state,
             isCrossRepository: pr.isCrossRepository,
+            createdAt: pr.createdAt,
             mergedAt: pr.mergedAt,
           }))
 

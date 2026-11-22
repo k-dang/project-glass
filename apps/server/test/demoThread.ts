@@ -7,13 +7,12 @@ import {
   localPlace,
   TOKEN_PARAM,
 } from "@glass/contracts"
-import { Effect, Layer, Schema } from "effect"
+import { Effect, Schema } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { GLASS_MCP_PREFIX } from "../src/agentHost/toolCalls"
 import { connectRpcClient } from "../src/rpcSocket"
-import { shortThreadNames, ThreadNames } from "../src/threadNames"
 import { artifactsThread } from "./demoArtifacts"
 import { longThread } from "./demoLongThread"
 import type { ScriptedThread } from "./demoScript"
@@ -161,28 +160,14 @@ export const demoCheckout = (repositories: string) => {
 }
 
 export const demoThreadNames = () => {
-  let pending: string | undefined
+  const names = new Map<string, string>()
 
   return {
-    layer: Layer.succeed(ThreadNames)({
-      candidates: () => {
-        const name = pending
-        pending = undefined
-
-        return name === undefined ? shortThreadNames() : [name]
-      },
-    }),
-    named: <A, E, R>(name: string, create: Effect.Effect<A, E, R>) =>
+    branchFor: (request: string) => names.get(request),
+    named: <A, E, R>(name: string, message: string, create: Effect.Effect<A, E, R>) =>
       Effect.sync(() => {
-        pending = name
-      }).pipe(
-        Effect.andThen(create),
-        Effect.ensuring(
-          Effect.sync(() => {
-            pending = undefined
-          }),
-        ),
-      ),
+        names.set(message, name)
+      }).pipe(Effect.andThen(create)),
   }
 }
 
@@ -208,6 +193,7 @@ export const seedDemoThreads = Effect.fnUntraced(function* (
   ) =>
     named(
       name,
+      message,
       client.CreateThread({
         repository: linked.repository,
         baseBranch: "main",

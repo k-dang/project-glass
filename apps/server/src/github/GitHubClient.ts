@@ -332,6 +332,7 @@ export class GitHubClient extends Context.Service<
     ) => Effect.Effect<RepositoryFiles, ConnectionError>
     readonly repositoryBranches: (
       repository: FollowedRepository,
+      startingWith: string,
     ) => Effect.Effect<ReadonlyArray<string>, ConnectionError>
     readonly repositoryDefaultBranch: (
       repository: FollowedRepository,
@@ -1103,7 +1104,7 @@ export class GitHubClient extends Context.Service<
         }).pipe(Effect.withSpan("GitHubClient.repositoryDefaultBranch"))
       }
 
-      const repositoryBranches = (repository: FollowedRepository) => {
+      const repositoryBranches = (repository: FollowedRepository, startingWith: string) => {
         const notFound = repositoryNotFound(repository)
 
         return allPages((after) =>
@@ -1111,7 +1112,12 @@ export class GitHubClient extends Context.Service<
             const data = yield* graphql({
               name: "RepositoryBranches",
               query: REPOSITORY_BRANCHES_QUERY,
-              variables: { owner: repository.owner, name: repository.repo, after },
+              variables: {
+                owner: repository.owner,
+                name: repository.repo,
+                query: startingWith === "" ? null : startingWith,
+                after,
+              },
               response: RepositoryBranchesResponse,
               domainError: ({ type }) => (type === "NOT_FOUND" ? notFound : undefined),
             })
@@ -1121,7 +1127,9 @@ export class GitHubClient extends Context.Service<
             return data.repository.refs
           }),
         ).pipe(
-          Effect.map((refs) => refs.map(({ name }) => name)),
+          Effect.map((refs) =>
+            refs.map(({ name }) => name).filter((name) => name.startsWith(startingWith)),
+          ),
           Effect.withSpan("GitHubClient.repositoryBranches"),
         )
       }
