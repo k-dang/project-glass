@@ -21,10 +21,15 @@ A Sandbox outlives Glass, so its Turns keep running while Glass is closed, and G
 its host at launch from the last journal position it saved. That position belongs to one host
 instance, so each connection starts with a handshake naming the host's instance and protocol
 version: a replaced host's journal is followed from its start, and its Thread's running Turn
-is cut off; a host of another protocol, which a Sandbox keeps across Glass upgrades, leaves the
-Thread read-only while that host answers, and Glass checks again on its next connection. Calls
-to a provider stay bounded: Glass stops retrying a Sandbox it can't reach until the user or a
-relaunch starts over.
+is cut off. A Sandbox keeps its host across Glass upgrades, so when that host speaks another
+protocol Glass ends it and has the provider start Glass's own in its place. Starting the host is
+therefore a provider call of its own, `startHost`, which every new Sandbox goes through too, so
+the upgrade runs the same code as creation. Glass saves that a replacement is under way before it
+ends the old host, so one that fails part-way is tried again, even after a relaunch. The Agent
+harness keeps its session on the Sandbox's disk, so the Thread's agent remembers its work; only
+the Turn the old host was running, and what it hadn't yet delivered, are lost. Calls to a provider
+stay bounded: Glass stops retrying a Sandbox it can't reach until the user or a relaunch starts
+over.
 
 This device is the same seam's built-in placement, so the Threads service only calls
 placements and local and Sandbox Threads differ only in where their host runs.
@@ -41,6 +46,11 @@ placements and local and Sandbox Threads differ only in where their host runs.
   small and Sandboxes would set up alike, but the seam would assume a Linux machine with git and
   Node, and logins would still need a provider hook. One provider exists, so its duplication is
   hypothetical.
+- **The host replaces itself**: Glass would send the new bundle to the running host, with no
+  provider call. But how a process outlives the command that started it differs by platform,
+  which is what a provider knows, and the hosts already running couldn't do it.
+- **A Thread stays read-only while its host speaks another protocol**: how Glass first handled
+  upgrades. Nothing to add to the seam, but every protocol change stranded every Sandbox Thread.
 - **Plugins in a child process**: a crashing or blocking plugin couldn't stall the backend, as ADR
   0001 isolates the backend from the windows, at the cost of an IPC protocol for the seam. Providers
   do their work through async calls, so the backend process is enough.

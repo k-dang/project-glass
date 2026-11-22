@@ -3,7 +3,6 @@ import {
   ChangedFile,
   LineNote,
   FollowedRepository,
-  incompatibleExplanation,
   PartSet,
   PermissionRequestPart,
   SandboxPlace,
@@ -26,7 +25,7 @@ import { threadServicesFixture } from "../test/threadServicesFixture"
 import { withWatchedClock } from "../test/deadlines"
 import { HOST_PROTOCOL } from "./agentHost/protocol"
 import { eventually } from "../test/eventually"
-import { steps } from "../test/inProcessSandboxes"
+import { creating } from "../test/inProcessSandboxes"
 import { SANDBOX_DEADLINES } from "./sandboxCalls"
 
 type Fixture = Effect.Success<typeof threadServicesFixture>
@@ -102,15 +101,14 @@ it.live("shows each step of making a Sandbox, then runs the first message in it"
       }),
     ])
 
-    f.sandboxes.configure({ holdAt: steps[0] })
+    f.sandboxes.configure({ holdAt: "create" })
     const thread = yield* createSandboxed(f)
     assert.deepStrictEqual(thread.place, sandbox)
 
-    for (const [index, step] of steps.entries()) {
-      yield* f.transcript(thread.id, ({ status }) => status === step)
-      const next = steps[index + 1]
-      f.sandboxes.configure(next === undefined ? {} : { holdAt: next })
-    }
+    yield* f.transcript(thread.id, ({ status }) => status === creating)
+    f.sandboxes.configure({ holdAt: "startHost" })
+    yield* f.transcript(thread.id, ({ status }) => status === "Starting the agent")
+    f.sandboxes.configure({})
 
     const turn = yield* f.started
     assert.equal(turn.threadId, thread.id)
@@ -155,7 +153,7 @@ it.live("offers a Sandbox only the Agent harnesses its provider runs", () =>
 it.live("deletes a Sandbox that fails part-way, failing the first message safely", () =>
   Effect.gen(function* () {
     const f = yield* threadServicesFixture
-    f.sandboxes.configure({ failAt: steps[0] })
+    f.sandboxes.configure({ failAt: "create" })
     const thread = yield* createSandboxed(f)
 
     const failed = yield* f.transcript(thread.id, settled(1))
@@ -237,9 +235,9 @@ it.live("ends a Sandbox's agent host before deleting the Sandbox", () =>
 it.live("deletes a Sandbox still being made when its Thread is removed", () =>
   Effect.gen(function* () {
     const f = yield* threadServicesFixture
-    f.sandboxes.configure({ holdAt: steps[0] })
+    f.sandboxes.configure({ holdAt: "create" })
     const thread = yield* createSandboxed(f)
-    yield* f.transcript(thread.id, ({ status }) => status === steps[0])
+    yield* f.transcript(thread.id, ({ status }) => status === creating)
 
     yield* f.threads.remove(thread.id)
     yield* removed(f, thread.id)
@@ -249,9 +247,9 @@ it.live("deletes a Sandbox still being made when its Thread is removed", () =>
 it.live("shows no changes or files for a Sandbox still being made, without waiting on it", () =>
   Effect.gen(function* () {
     const f = yield* threadServicesFixture
-    f.sandboxes.configure({ holdAt: steps[0] })
+    f.sandboxes.configure({ holdAt: "create" })
     const thread = yield* createSandboxed(f)
-    yield* f.transcript(thread.id, ({ status }) => status === steps[0])
+    yield* f.transcript(thread.id, ({ status }) => status === creating)
 
     assert.isEmpty((yield* f.threads.changes(thread.id)).files)
     assert.isEmpty(yield* f.threads.files(thread.id))
@@ -269,9 +267,9 @@ it.live("shows no changes or files for a Sandbox still being made, without waiti
 it.live("deletes a Sandbox still being made when Glass quits, and makes a new one after", () =>
   Effect.gen(function* () {
     const f = yield* threadServicesFixture
-    f.sandboxes.configure({ holdAt: steps[0] })
+    f.sandboxes.configure({ holdAt: "create" })
     const thread = yield* createSandboxed(f)
-    yield* f.transcript(thread.id, ({ status }) => status === steps[0])
+    yield* f.transcript(thread.id, ({ status }) => status === creating)
 
     const { threads } = yield* f.restart
     yield* removed(f, thread.id)
@@ -527,7 +525,7 @@ for (const [spoken, kind] of [
   ["no protocol", { kind: "unversioned" }],
 ] as const)
   it.effect(
-    `keeps a Thread read-only while its Sandbox's host speaks ${spoken}, cutting off its Turn, until a compatible host answers`,
+    `replaces a Sandbox's host that speaks ${spoken}, cutting off its Turn, then runs the next message on the new host`,
     () =>
       Effect.gen(function* () {
         const f = yield* threadServicesFixture
@@ -535,7 +533,10 @@ for (const [spoken, kind] of [
         yield* reply(yield* f.started, ["one"])
         yield* f.transcript(thread.id, ({ turns }) => texts(turns[0]).length === 1)
 
+        f.sandboxes.configure({ holdAt: "startHost" })
         yield* f.sandboxes.restartHost(thread.id, kind)
+        yield* afterRetries(f, thread.id, ({ status }) => status === "Updating the agent")
+        f.sandboxes.configure({})
 
         const [cutOff] = (yield* afterRetries(
           f,
@@ -545,26 +546,52 @@ for (const [spoken, kind] of [
 
         assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
         assert.deepStrictEqual(texts(cutOff), ["one"])
-
-        const status = yield* sandboxOf(f.threads, thread.id).pipe(
-          Stream.runHead,
-          Effect.map(Option.getOrThrow),
-        )
-
-        assert.equal(status.reach, "incompatible")
+        assert.isNull((yield* f.transcript(thread.id, () => true)).status)
 
         yield* f.threads.send(thread.id, say("Still there?"))
-        assert.equal(
-          failedReason(yield* f.transcript(thread.id, settled(2))),
-          incompatibleExplanation,
-        )
-
-        yield* f.sandboxes.restartHost(thread.id)
-        yield* f.threads.send(thread.id, say("Back?"))
         yield* end(yield* f.started)
-        assert.equal(failedReason(yield* f.transcript(thread.id, settled(3))), "Done")
+        assert.equal(failedReason(yield* f.transcript(thread.id, settled(2))), "Done")
       }),
   )
+
+it.effect(
+  "says why a Sandbox's host from another version of Glass couldn't be replaced, then keeps trying after that host has ended",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadServicesFixture
+      const thread = yield* createSandboxed(f)
+      yield* end(yield* f.started)
+      yield* f.transcript(thread.id, settled(1))
+
+      f.sandboxes.configure({ failAt: "startHost" })
+      yield* f.sandboxes.restartHost(thread.id, { kind: "versioned", protocol: HOST_PROTOCOL + 1 })
+
+      yield* f.threads.send(thread.id, say("Still there?"))
+      assert.equal(
+        failedReason(yield* f.transcript(thread.id, settled(2))),
+        "Couldn't start the agent in the Sandbox. Try again; Glass's backend log has the details.",
+      )
+      assert.include(f.sandboxes.events, `ended ${thread.id}`)
+
+      f.sandboxes.configure({})
+      yield* eventually(
+        Effect.gen(function* () {
+          yield* TestClock.adjust("1 second")
+
+          const status = yield* sandboxOf(f.threads, thread.id).pipe(
+            Stream.runHead,
+            Effect.map(Option.getOrThrow),
+          )
+
+          assert.equal(status.reach, "reachable")
+        }),
+      )
+
+      yield* f.threads.send(thread.id, say("Back?"))
+      yield* end(yield* f.started)
+      assert.equal(failedReason(yield* f.transcript(thread.id, settled(3))), "Done")
+    }),
+)
 
 it.effect("runs a message sent after Glass relaunches on its Sandbox's replacement host", () =>
   Effect.gen(function* () {
@@ -615,14 +642,14 @@ it.effect(
 it.effect(
   "fails the first message when a new Sandbox's address never comes, deleting the half-built Sandbox",
   () =>
-    withWatchedClock(SANDBOX_DEADLINES.startHost, (deadlineSet) =>
+    withWatchedClock(SANDBOX_DEADLINES.hostAnswers, (deadlineSet) =>
       Effect.gen(function* () {
         const f = yield* threadServicesFixture
         f.sandboxes.configure({ stall: "target" })
         const thread = yield* createSandboxed(f)
 
         yield* deadlineSet
-        yield* TestClock.adjust(SANDBOX_DEADLINES.startHost)
+        yield* TestClock.adjust(SANDBOX_DEADLINES.hostAnswers)
         yield* abandoned(f, "target")
 
         f.sandboxes.configure({})
@@ -673,7 +700,7 @@ it.effect(
     withWatchedClock(SANDBOX_DEADLINES.remove, (deadlineSet) =>
       Effect.gen(function* () {
         const f = yield* threadServicesFixture
-        f.sandboxes.configure({ failAt: steps[0], stall: "remove" })
+        f.sandboxes.configure({ failAt: "create", stall: "remove" })
         const thread = yield* createSandboxed(f)
 
         yield* deadlineSet

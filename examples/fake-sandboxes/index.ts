@@ -1,6 +1,6 @@
 import { execFile, spawn } from "node:child_process"
 import { once } from "node:events"
-import { mkdir, rm } from "node:fs/promises"
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises"
 import { createServer } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
@@ -32,6 +32,32 @@ const decodeSandbox = (state: SandboxState) => {
   }
 
   throw new Error("This isn't a fake Sandbox's state")
+}
+
+const hostPidFile = (folder: string) => join(folder, "host.pid")
+
+const endHost = async (folder: string, signal: AbortSignal) => {
+  const pid = Number(await readFile(hostPidFile(folder), "utf8").catch(() => ""))
+
+  if (pid === 0) return
+
+  try {
+    process.kill(pid)
+  } catch {
+    return
+  }
+
+  for (;;) {
+    signal.throwIfAborted()
+
+    try {
+      process.kill(pid, 0)
+    } catch {
+      return
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 50))
+  }
 }
 
 const freePort = () =>
@@ -75,17 +101,19 @@ const plugin: Plugin = (glass) => {
         ["checkout", "--quiet", "-b", request.branch, `origin/${request.baseBranch}`],
         { cwd: clone, signal },
       )
+    },
+    startHost: async (state, { bundle, environment }, signal) => {
+      const { folder, port } = decodeSandbox(state)
+      await endHost(folder, signal)
 
-      progress("Starting the agent")
-
-      const host = spawn(process.execPath, [request.host.bundle], {
+      const host = spawn(process.execPath, [bundle], {
         cwd: folder,
         detached: true,
         stdio: "ignore",
         windowsHide: true,
         env: {
           ...process.env,
-          ...request.host.environment,
+          ...environment,
           ELECTRON_RUN_AS_NODE: "1",
           GLASS_HOST_PORT: String(port),
           GLASS_HOST_ADDRESS: "127.0.0.1",
@@ -95,6 +123,7 @@ const plugin: Plugin = (glass) => {
 
       await once(host, "spawn")
       host.unref()
+      await writeFile(hostPidFile(folder), String(host.pid))
     },
     target: async (state) => ({
       url: `http://127.0.0.1:${decodeSandbox(state).port}`,

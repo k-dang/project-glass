@@ -3,6 +3,7 @@ import { join } from "node:path"
 
 export const HOST_TOKEN_HEADER = "x-glass-host-token"
 
+// WARNING: Glass asks hosts of every version for these two, so neither they nor the token header may change.
 export const HEALTH_PATH = "/healthz"
 
 export const SHUTDOWN_PATH = "/shutdown"

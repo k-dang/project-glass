@@ -52,6 +52,16 @@ const HostFile = Schema.fromJsonString(
   Schema.Struct({ pid: Schema.Int, port: Schema.Int, token: Schema.String }),
 )
 
+const hostFileIn = (folder: string) => join(folder, "host.json")
+
+const hostIn = (folder: string) => {
+  const path = hostFileIn(folder)
+
+  return existsSync(path)
+    ? Schema.decodeUnknownSync(HostFile)(readFileSync(path, "utf8"))
+    : undefined
+}
+
 const requestLine = /^([A-Z]+) (\S+) HTTP\/1\.1\r$/gm
 
 const notFound = "HTTP/1.1 404 Not Found\r\nContent-Length: 0\r\nConnection: close\r\n\r\n"
@@ -68,18 +78,20 @@ const fromIngressPath = (text: string) => {
   return outside ? null : rewritten
 }
 
-const ingress = (folder: string, upstreamPort: number) =>
+const ingress = (folder: string) =>
   new Promise<number>((resolve, reject) => {
     const open = new Set<Socket>()
 
     const server = createServer((socket) => {
-      if (dropping(folder)) {
+      const host = hostIn(folder)
+
+      if (dropping(folder) || host === undefined) {
         socket.destroy()
 
         return
       }
 
-      const upstream = connect(upstreamPort, "127.0.0.1")
+      const upstream = connect(host.port, "127.0.0.1")
       let upgraded = false
       let pending = ""
 
@@ -198,12 +210,14 @@ const removeFolder = async (folder: string) => {
   }
 }
 
+const endHost = async (folder: string) => {
+  const host = hostIn(folder)
+
+  if (host !== undefined) await killTree(host.pid)
+}
+
 const removeSandbox = async (folder: string) => {
-  const hostPath = join(folder, "host.json")
-
-  if (existsSync(hostPath))
-    await killTree(Schema.decodeUnknownSync(HostFile)(readFileSync(hostPath, "utf8")).pid)
-
+  await endHost(folder)
   await removeFolder(folder)
 }
 
@@ -257,14 +271,21 @@ export const fakeSandboxProvider =
           ["checkout", "--quiet", "-b", request.branch, `origin/${request.baseBranch}`],
           { cwd: clone, env },
         )
+        record({ folder, ingressPort: await ingress(folder) })
+      },
+      startHost: async (state, { bundle: source, environment }) => {
+        const settings = readSettings(settingsPath)
+        const { folder } = decodeSandbox(state)
 
-        progress("Starting the agent")
+        if (!existsSync(folder)) throw glass.sandboxGone()
+
+        await endHost(folder)
         const bundle = join(folder, "agentHost.mjs")
-        copyFileSync(request.host.bundle, bundle)
+        copyFileSync(source, bundle)
 
         const hostEnv: NodeJS.ProcessEnv = {
           ...process.env,
-          ...request.host.environment,
+          ...environment,
           ELECTRON_RUN_AS_NODE: "1",
           GLASS_HOST_PORT: "0",
           GLASS_HOST_ADDRESS: "127.0.0.1",
@@ -285,16 +306,14 @@ export const fakeSandboxProvider =
         })
 
         if (host.pid === undefined) throw new Error("The agent host didn't start")
-        const port = await hostPort(host)
         writeFileSync(
-          join(folder, "host.json"),
+          hostFileIn(folder),
           Schema.encodeSync(HostFile)({
             pid: host.pid,
-            port,
-            token: request.host.environment["GLASS_HOST_TOKEN"] ?? "",
+            port: await hostPort(host),
+            token: environment["GLASS_HOST_TOKEN"] ?? "",
           }),
         )
-        record({ folder, ingressPort: await ingress(folder, port) })
       },
       target: async (state) => {
         const { folder, ingressPort } = decodeSandbox(state)
@@ -334,10 +353,14 @@ export const installFakeSandboxProvider = (
   )
 
   const sandboxFolder = (threadId: string) => join(settings.root, threadId)
-  const hostFile = (threadId: string) => join(sandboxFolder(threadId), "host.json")
 
-  const host = (threadId: string) =>
-    Schema.decodeUnknownSync(HostFile)(readFileSync(hostFile(threadId), "utf8"))
+  const host = (threadId: string) => {
+    const found = hostIn(sandboxFolder(threadId))
+
+    if (found === undefined) throw new Error(`No agent host runs in the Sandbox of ${threadId}`)
+
+    return found
+  }
 
   return {
     dropConnections: (threadId: string) => {
@@ -354,8 +377,7 @@ export const installFakeSandboxProvider = (
     killHost: (threadId: string) => killTree(host(threadId).pid),
     remove: (threadId: string) => removeSandbox(sandboxFolder(threadId)),
     stopHosts: async () => {
-      for (const threadId of readdirSync(settings.root))
-        if (existsSync(hostFile(threadId))) await killTree(host(threadId).pid)
+      for (const threadId of readdirSync(settings.root)) await endHost(sandboxFolder(threadId))
     },
   }
 }

@@ -13,7 +13,7 @@ import {
   Scope,
 } from "effect"
 import { NodeHttpServer } from "@effect/platform-node"
-import { HttpRouter, HttpServer } from "effect/http"
+import { HttpRouter, HttpServer, HttpServerResponse } from "effect/http"
 import { Rpc, RpcGroup, RpcSerialization, RpcServer } from "effect/rpc"
 import { RPC_PATH } from "@glass/contracts"
 import { createServer } from "node:http"
@@ -23,16 +23,19 @@ import type { FolderFiles } from "../src/agentHost/FolderFiles"
 import type { HostThreads } from "../src/agentHost/HostThreads"
 import type { HostGlassTools } from "../src/agentHost/HostGlassTools"
 import type { Journal } from "../src/agentHost/Journal"
+import { SHUTDOWN_PATH } from "../src/agentHost/hostAddress"
 import { Hello } from "../src/agentHost/protocol"
 import { hostServer } from "../src/agentHost/server"
 import { MissingLogin, NoCapacity, SandboxGone } from "../src/sandboxFailures"
 
 export type ProviderCall = "target" | "extend" | "remove" | "models"
 
+type MakingCall = "create" | "startHost"
+
 export interface InProcessSandboxSettings {
   readonly harnesses?: readonly [AgentHarness, ...Array<AgentHarness>]
-  readonly holdAt?: string
-  readonly failAt?: string
+  readonly holdAt?: MakingCall
+  readonly failAt?: MakingCall
   readonly missingLogin?: { readonly login: string; readonly fix: string }
   readonly noCapacity?: string
   readonly extensionMillis?: number
@@ -42,7 +45,7 @@ export interface InProcessSandboxSettings {
 
 const TWO_DAYS = Duration.toMillis(Duration.days(2))
 
-export const steps = ["Creating the Sandbox", "Starting the agent"] as const
+export const creating = "Creating the Sandbox"
 
 const SandboxId = Schema.Struct({ threadId: Schema.String })
 
@@ -55,11 +58,21 @@ const UnversionedHost = RpcGroup.make(Rpc.make("Acknowledge"))
 const serveRpcs = <Rpcs extends Rpc.Any>(
   group: RpcGroup.RpcGroup<Rpcs>,
   handlers: Layer.Layer<Rpc.ToHandler<Rpcs>>,
+  shutDown: Deferred.Deferred<void>,
 ) =>
-  HttpRouter.serve(RpcServer.layerHttp({ group, path: RPC_PATH, protocol: "websocket" }), {
-    disableLogger: true,
-    disableListenLog: true,
-  }).pipe(Layer.provide(handlers), Layer.provide(RpcSerialization.layerJson))
+  HttpRouter.serve(
+    Layer.merge(
+      RpcServer.layerHttp({ group, path: RPC_PATH, protocol: "websocket" }),
+      HttpRouter.add(
+        "POST",
+        SHUTDOWN_PATH,
+        Deferred.succeed(shutDown, undefined).pipe(
+          Effect.as(HttpServerResponse.empty({ headers: { connection: "close" } })),
+        ),
+      ),
+    ),
+    { disableLogger: true, disableListenLog: true },
+  ).pipe(Layer.provide(handlers), Layer.provide(RpcSerialization.layerJson))
 
 export type HostKind =
   | { readonly kind: "current" }
@@ -68,14 +81,22 @@ export type HostKind =
 
 const current: HostKind = { kind: "current" }
 
-const otherHost = (kind: Exclude<HostKind, { readonly kind: "current" }>) =>
+const otherHost = (
+  kind: Exclude<HostKind, { readonly kind: "current" }>,
+  shutDown: Deferred.Deferred<void>,
+) =>
   kind.kind === "unversioned"
-    ? serveRpcs(UnversionedHost, UnversionedHost.toLayer({ Acknowledge: () => Effect.void }))
+    ? serveRpcs(
+        UnversionedHost,
+        UnversionedHost.toLayer({ Acknowledge: () => Effect.void }),
+        shutDown,
+      )
     : serveRpcs(
         VersionedHost,
         VersionedHost.toLayer({
           Hello: () => Effect.succeed({ host: "other", protocol: kind.protocol }),
         }),
+        shutDown,
       )
 
 export const inProcessSandboxes = Effect.fnUntraced(function* (
@@ -137,7 +158,11 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       check()
     })
 
-  const passed = (step: string, signal: AbortSignal) => held(() => settings.holdAt === step, signal)
+  const reached = async (call: MakingCall, signal: AbortSignal) => {
+    await held(() => settings.holdAt === call, signal)
+
+    if (settings.failAt === call) throw new Error(`The fake Sandbox failed in ${call}`)
+  }
 
   const answered = (call: ProviderCall, signal: AbortSignal) =>
     held(
@@ -158,7 +183,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       return Scope.close(running.scope, Exit.void)
     })
 
-  const startHost = async (threadId: string, token: string, kind: HostKind) => {
+  const serveHost = async (threadId: string, token: string, kind: HostKind) => {
     const scope = Scope.makeUnsafe()
     const shutDown = Deferred.makeUnsafe<void>()
     const server = createServer()
@@ -173,7 +198,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       Layer.buildWithScope(
         (kind.kind === "current"
           ? hostServer({ token: Redacted.make(token), shutDown }).pipe(Layer.provide(host()))
-          : otherHost(kind)
+          : otherHost(kind, shutDown)
         ).pipe(
           Layer.provideMerge(NodeHttpServer.layer(() => server, { port: 0, host: "127.0.0.1" })),
         ),
@@ -208,15 +233,14 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
 
       record({ threadId: request.threadId })
       createdAt.set(request.threadId, clock.currentTimeMillisUnsafe())
-
-      for (const step of steps) {
-        progress(step)
-        await passed(step, signal)
-
-        if (settings.failAt === step) throw new Error(`The fake Sandbox failed at ${step}`)
-      }
-
-      await startHost(request.threadId, request.host.environment["GLASS_HOST_TOKEN"] ?? "", current)
+      progress(creating)
+      await reached("create", signal)
+    },
+    startHost: async (state, { environment }, signal) => {
+      const threadId = threadIdOf(state)
+      await reached("startHost", signal)
+      await runPromise(stop(threadId))
+      await serveHost(threadId, environment["GLASS_HOST_TOKEN"] ?? "", current)
     },
     target: async (state, signal) => {
       await answered("target", signal)
@@ -313,7 +337,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
         if (running === undefined) return Effect.die(`No running host for ${threadId}`)
 
         return stop(threadId).pipe(
-          Effect.andThen(Effect.promise(() => startHost(threadId, running.token, kind))),
+          Effect.andThen(Effect.promise(() => serveHost(threadId, running.token, kind))),
         )
       }),
     reclaim,
