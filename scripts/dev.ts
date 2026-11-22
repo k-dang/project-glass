@@ -15,7 +15,7 @@ import { createRequire } from "node:module"
 import { connect } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { removeGlassHome } from "../apps/server/test/glassHome.ts"
+import { stopAgentHost } from "../apps/server/test/glassHome.ts"
 
 const root = join(import.meta.dirname, "..")
 
@@ -134,13 +134,7 @@ const shutdown = async (code: number) => {
     ),
   )
 
-  if (fakeHome) {
-    try {
-      await removeGlassHome(fakeHome)
-    } catch (error) {
-      console.warn(`[dev] Could not remove ${fakeHome}: ${String(error)}`)
-    }
-  }
+  if (fakeHome) await stopAgentHost(fakeHome)
 
   process.exit(code)
 }
@@ -237,10 +231,9 @@ const launchElectron = () => {
   const child = start(electronPath, electronArgs, electronEnv)
   electron = child
   child.once("exit", (code) => {
-    if (electron === child) {
-      console.log(`[dev] Electron exited with code ${code}; stopping`)
-      void shutdown(code ?? 0)
-    }
+    if (electron !== child || shuttingDown) return
+    console.log(`[dev] Electron exited with code ${code}; stopping`)
+    void shutdown(code ?? 0)
   })
 }
 
