@@ -103,9 +103,8 @@ export default defineConfig({
         },
       },
       {
-        files: ["apps/desktop/src/renderer/pageNotesScript.ts"],
+        files: ["apps/desktop/src/browserPreload/pageNotes.ts"],
         rules: {
-          "unicorn/consistent-function-scoping": "off",
           "anti-slop-effect/prefer-effect-match": "off",
           "anti-slop-effect/no-manual-tag-comparison": "off",
           "anti-slop-effect/no-manual-tagged-construction": "off",

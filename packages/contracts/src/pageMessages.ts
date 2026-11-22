@@ -1,7 +1,7 @@
-import { PagePart } from "@glass/contracts"
+import { PagePart } from "./feedbackNote"
 import { Schema } from "effect"
 
-const PageRect = Schema.Struct({
+export const PageRect = Schema.Struct({
   top: Schema.Number,
   left: Schema.Number,
   bottom: Schema.Number,
@@ -10,7 +10,7 @@ const PageRect = Schema.Struct({
 
 export type PageRect = typeof PageRect.Type
 
-const PageEvent = Schema.Union([
+export const PageEvent = Schema.Union([
   Schema.Struct({ type: Schema.Literal("ready") }),
   Schema.Struct({ type: Schema.Literal("part"), part: PagePart, rect: PageRect }),
   Schema.Struct({ type: Schema.Literal("open"), id: Schema.String, rect: PageRect }),
@@ -19,8 +19,6 @@ const PageEvent = Schema.Union([
 ])
 
 export type PageEvent = typeof PageEvent.Type
-
-export const FromPage = Schema.Struct({ glassPageEvent: PageEvent })
 
 export interface PageState {
   readonly pick: boolean

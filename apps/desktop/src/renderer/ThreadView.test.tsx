@@ -20,6 +20,8 @@ import {
   type TurnPart,
   FollowedRepository,
   PartAppended,
+  type PageEvent,
+  type PageState,
   PageText,
   PartSet,
   PullRequestRef,
@@ -60,10 +62,39 @@ import { afterEach, expect, it, onTestFinished, vi } from "vite-plus/test"
 import { thread, threadFields } from "../../test/thread"
 import { changedFile, workspace } from "../../test/workspace"
 import { modelOption, mount, pixel } from "../../test/threadApp"
-import type { PageEvent, PageState } from "./pageMessages"
-import { withPageNotes } from "./pageNotesScript"
+import { BROWSER_PARTITION, PAGE_EVENT_CHANNEL } from "@glass/contracts/desktop"
+import { threadFileAddress } from "./browserAddress"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
+
+const attachPage = (pane: HTMLElement) => {
+  const page = pane.querySelector("webview")!
+  const loaded: Array<string> = []
+  const toPage: Array<PageState> = []
+  let reloads = 0
+
+  Object.assign(page, {
+    reload: () => void reloads++,
+    loadURL: (url: string) => Promise.resolve(void loaded.push(url)),
+    send: (_channel: string, state: PageState) => Promise.resolve(void toPage.push(state)),
+    canGoBack: () => false,
+    canGoForward: () => false,
+  })
+  page.dispatchEvent(new Event("dom-ready"))
+
+  return {
+    page,
+    loaded,
+    toPage,
+    reloads: () => reloads,
+    navigate: (url: string) =>
+      page.dispatchEvent(Object.assign(new Event("did-navigate"), { url })),
+    fromPage: (event: PageEvent) =>
+      page.dispatchEvent(
+        Object.assign(new Event("ipc-message"), { channel: PAGE_EVENT_CHANNEL, args: [event] }),
+      ),
+  }
+}
 
 afterEach(() => {
   cleanup()
@@ -1785,17 +1816,9 @@ it("keeps pasted lines and To-do mentions as written", async () => {
   expect(sent).toEqual([pasted])
 })
 
-it("links the files a Turn named once it ends, and opens HTML beside the Chat as its own sandboxed page", async () => {
+it("links the files a Turn named once it ends, and opens HTML in the Browser pane from the Thread's folder", async () => {
   const ended = Deferred.makeUnsafe<void>()
   const asked: Array<ReadonlyArray<string>> = []
-  const opened: Array<string> = []
-
-  vi.stubGlobal("glass", {
-    htmlPages: {
-      open: (html: string) => Promise.resolve(`glass-page://page/${opened.push(html)}`),
-      close: () => Promise.resolve(),
-    },
-  })
 
   const user = mount({
     FindThreadFiles: ({ paths }) =>
@@ -1804,7 +1827,6 @@ it("links the files a Turn named once it ends, and opens HTML beside the Chat as
 
         return paths.filter((path) => path.endsWith(".html"))
       }),
-    GetThreadFile: ({ path }) => Effect.succeed(TextFile.make({ text: `<h1>${path}</h1>` })),
     WatchTranscript: () =>
       Stream.make(
         TranscriptSnapshot.make({
@@ -1843,19 +1865,11 @@ it("links the files a Turn named once it ends, and opens HTML beside the Chat as
   expect(within(transcript).queryByRole("button", { name: "notes.md" })).toBeNull()
   expect(asked).toContainEqual(["docs/explainer.html", "notes.md"])
 
-  const pane = await screen.findByRole("complementary", { name: "File" })
-  expect(within(pane).getByRole("heading", { name: "explainer.html" })).toBeTruthy()
+  const pane = await screen.findByRole("complementary", { name: "Browser" })
+  const { page, loaded } = attachPage(pane)
 
-  const frame = await waitFor(() => {
-    const found = pane.querySelector("iframe")
-    expect(found).not.toBeNull()
-
-    return found!
-  })
-
-  expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms allow-popups")
-  expect(frame.getAttribute("src")).toBe("glass-page://page/1")
-  expect(opened).toEqual([withPageNotes("<h1>docs/explainer.html</h1>")])
+  expect(page.getAttribute("partition")).toBe(BROWSER_PARTITION)
+  await waitFor(() => expect(loaded).toEqual([threadFileAddress(thread.id, "docs/explainer.html")]))
 })
 
 it("shows a Turn's Markdown images and links to Windows paths in the Thread's folder, rereading images when a Turn ends", async () => {
@@ -1928,21 +1942,103 @@ it("shows a Turn's Markdown images and links to Windows paths in the Thread's fo
   ])
 })
 
-it("leaves a Feedback note on the part of an HTML page the page reports, and sends it with the next message", async () => {
-  let unsent = new UnsentFeedback({ notes: [], staged: [] })
-  const sent: Array<{ message: string; feedback: ReadonlyArray<string> }> = []
-
-  vi.stubGlobal("glass", {
-    htmlPages: {
-      open: () => Promise.resolve("glass-page://page/1"),
-      close: () => Promise.resolve(),
-    },
-  })
+it("reloads an HTML file in the Browser pane when the next Turn ends, as the agent may have changed it", async () => {
+  const nextEnded = Deferred.makeUnsafe<void>()
+  const nextTurn = { ...runningTurn, id: "turn-2" }
 
   const user = mount({
     FindThreadFiles: ({ paths }) => Effect.succeed(paths),
-    GetThreadFile: () =>
-      Effect.succeed(TextFile.make({ text: "<p>A refill of five per minute.</p>" })),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              ...runningTurn,
+              parts: [TextPart.make({ text: "Wrote `docs/plan.html`." })],
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+            },
+            nextTurn,
+          ],
+          queued: [],
+          status: null,
+        }),
+      ).pipe(
+        Stream.concat(
+          Stream.fromEffect(
+            Deferred.await(nextEnded).pipe(
+              Effect.as(
+                TurnEnded.make({
+                  turnId: nextTurn.id,
+                  ended: { at: DateTime.add(sentAt, { seconds: 3 }), ending: TurnDone.make({}) },
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
+
+  const { navigate, reloads } = attachPage(
+    await screen.findByRole("complementary", { name: "Browser" }),
+  )
+
+  navigate(threadFileAddress(thread.id, "docs/plan.html"))
+  expect(reloads()).toBe(0)
+
+  Deferred.doneUnsafe(nextEnded, Exit.void)
+
+  await waitFor(() => expect(reloads()).toBe(1))
+})
+
+const appLinkTurn = (place: Thread["place"]) => ({
+  WatchThreads: () => Stream.make([new Thread({ ...threadFields, place })]),
+  WatchTranscript: () =>
+    Stream.make(
+      TranscriptSnapshot.make({
+        turns: [
+          {
+            ...runningTurn,
+            parts: [
+              TextPart.make({ text: "It runs at [the app](http://localhost:3000/settings)." }),
+            ],
+            ended: { at: sentAt, ending: TurnDone.make({}) },
+          },
+        ],
+        queued: [],
+        status: null,
+      }),
+    ),
+})
+
+it("opens a Turn's link to this device in a local Thread's Browser pane", async () => {
+  const user = mount(appLinkTurn(thread.place))
+
+  await user.click(await screen.findByRole("link", { name: "the app" }))
+
+  const { loaded } = attachPage(await screen.findByRole("complementary", { name: "Browser" }))
+
+  await waitFor(() => expect(loaded).toEqual(["http://localhost:3000/settings"]))
+})
+
+it("shows a Sandbox Thread's Browser pane nothing from this device, not even an address it remembers", async () => {
+  localStorage.setItem(`glass.browserPane.${thread.id}`, "http://localhost:3000/settings")
+  const user = mount(appLinkTurn(SandboxPlace.make({ providerId: "fake" })))
+
+  await user.click(await screen.findByRole("button", { name: "Details" }))
+  await user.click(await screen.findByRole("button", { name: "Browser" }))
+
+  const pane = await screen.findByRole("complementary", { name: "Browser" })
+  expect(within(pane).getByText(/This Thread's apps run in its Sandbox/)).toBeTruthy()
+})
+
+it("leaves a Feedback note on the part of a page in the Browser pane the page reports, and sends it with the next message", async () => {
+  let unsent = new UnsentFeedback({ notes: [], staged: [] })
+  const sent: Array<{ message: string; feedback: ReadonlyArray<string> }> = []
+
+  const user = mount({
+    FindThreadFiles: ({ paths }) => Effect.succeed(paths),
     WatchTranscript: () =>
       Stream.make(
         TranscriptSnapshot.make({
@@ -1972,24 +2068,9 @@ it("leaves a Feedback note on the part of an HTML page the page reports, and sen
 
   await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
 
-  const pane = await screen.findByRole("complementary", { name: "File" })
-
-  const frame = await waitFor(() => {
-    const found = pane.querySelector("iframe")
-    expect(found).not.toBeNull()
-
-    return found!
-  })
-
-  const toPage: Array<{ readonly glassPageState: PageState }> = []
-  const { port1: page } = new MessageChannel()
-  page.postMessage = (data: { readonly glassPageState: PageState }) => void toPage.push(data)
-  Object.defineProperty(frame, "contentWindow", { value: page })
-
-  const fromPage = (event: PageEvent) =>
-    window.dispatchEvent(
-      new MessageEvent("message", { source: page, data: { glassPageEvent: event } }),
-    )
+  const pane = await screen.findByRole("complementary", { name: "Browser" })
+  const { toPage, navigate, fromPage } = attachPage(pane)
+  navigate(threadFileAddress(thread.id, "docs/plan.html"))
 
   const part = PageText.make({
     selector: "body > p",
@@ -1998,9 +2079,7 @@ it("leaves a Feedback note on the part of an HTML page the page reports, and sen
   })
 
   fromPage({ type: "ready" })
-  await waitFor(() =>
-    expect(toPage.at(-1)).toEqual({ glassPageState: { pick: false, notes: [], active: null } }),
-  )
+  await waitFor(() => expect(toPage.at(-1)).toEqual({ pick: false, notes: [], active: null }))
 
   fromPage({ type: "part", part, rect: { top: 10, left: 10, bottom: 30, right: 200 } })
 
@@ -2015,9 +2094,7 @@ it("leaves a Feedback note on the part of an HTML page the page reports, and sen
   expect(within(attached).getByText("Make this ten")).toBeTruthy()
 
   const [note] = unsent.notes
-  expect(toPage.at(-1)).toEqual({
-    glassPageState: { pick: false, notes: [{ id: note?.id, part }], active: null },
-  })
+  expect(toPage.at(-1)).toEqual({ pick: false, notes: [{ id: note?.id, part }], active: null })
 
   fromPage({ type: "open", id: note!.id, rect: { top: 10, left: 10, bottom: 30, right: 200 } })
   await within(pane).findByRole("form", { name: "Edit Feedback note" })
@@ -2027,7 +2104,5 @@ it("leaves a Feedback note on the part of an HTML page the page reports, and sen
   await user.type(screen.getByRole("textbox", { name: "Message" }), "{Enter}")
 
   await waitFor(() => expect(sent).toEqual([{ message: "", feedback: [note?.id] }]))
-  await waitFor(() =>
-    expect(toPage.at(-1)).toEqual({ glassPageState: { pick: false, notes: [], active: null } }),
-  )
+  await waitFor(() => expect(toPage.at(-1)).toEqual({ pick: false, notes: [], active: null }))
 })

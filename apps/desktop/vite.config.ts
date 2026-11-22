@@ -22,7 +22,7 @@ export default defineConfig({
   resolve: { alias: { "@": fileURLToPath(new URL("./src/renderer", import.meta.url)) } },
   server: { host: "127.0.0.1", strictPort: true },
   build: { outDir: "dist/renderer", sourcemap: true },
-  pack: [bundle("main"), bundle("preload")],
+  pack: [bundle("main"), bundle("preload"), bundle("browserPreload")],
   test: {
     include: ["src/**/*.test.{ts,tsx}"],
     setupFiles: ["test/setup.ts"],

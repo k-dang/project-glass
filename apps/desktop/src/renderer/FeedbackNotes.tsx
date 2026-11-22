@@ -1,6 +1,6 @@
 import { type FeedbackNote, LineNote, PageNote, type PagePart } from "@glass/contracts"
 import { cn } from "cn"
-import { Match } from "effect"
+import { Match, Predicate } from "effect"
 import { History, MessageSquarePlus, PenLine, Trash2, X } from "lucide-react"
 import { type ReactNode, useState } from "react"
 import { Badge } from "@/components/ui/badge"
@@ -54,12 +54,12 @@ const viewOf = (note: FeedbackNote): NoteView =>
 
       return { place, location: `${path} ${place}`, about: "code", code, quote: null }
     },
-    PageNote: ({ path, part }): NoteView => {
+    PageNote: ({ page, part }): NoteView => {
       const place = pagePartLabel(part)
 
       return {
         place,
-        location: `${path} · ${place}`,
+        location: `${Predicate.isTagged(page, "FilePage") ? page.path : page.url} · ${place}`,
         about: "page",
         code: null,
         quote: part.excerpt,

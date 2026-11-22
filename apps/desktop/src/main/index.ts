@@ -4,18 +4,16 @@ import {
   type BackendEndpoint,
   BRING_TO_FRONT_CHANNEL,
   CHOOSE_FOLDER_CHANNEL,
-  CLOSE_HTML_PAGE_CHANNEL,
   type BackendFailure,
   DISCARD_DOGFOOD_REPORT_CHANNEL,
   type DogfoodReportDetails,
   type DogfoodReportRecorded,
   FINISH_DOGFOOD_REPORT_CHANNEL,
-  HTML_PAGE_SCHEME,
-  OPEN_HTML_PAGE_CHANNEL,
   RECORD_DOGFOOD_REPORT_CHANNEL,
   RELAUNCH_CHANNEL,
   RESOURCE_USAGE_CHANNEL,
   SET_APPEARANCE_CHANNEL,
+  THREAD_FILE_SCHEME,
   type Appearance,
 } from "@glass/contracts/desktop"
 import type { Theme } from "@glass/contracts"
@@ -35,8 +33,8 @@ import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import { join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
+import { setUpBrowserPanes } from "./browserPanes"
 import { dogfoodReportWriter } from "./dogfoodReports"
-import { htmlPages } from "./htmlPages"
 import { summarizeResourceUsage } from "./resourceUsage"
 
 const devServerUrl = process.env["VITE_DEV_SERVER_URL"]
@@ -72,7 +70,6 @@ const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https://github.com https://*.githubusercontent.com",
   "media-src https://github.com https://*.githubusercontent.com",
-  `frame-src ${HTML_PAGE_SCHEME}:`,
   "connect-src ws://127.0.0.1:*",
   "object-src 'none'",
   "base-uri 'none'",
@@ -81,10 +78,11 @@ const CONTENT_SECURITY_POLICY = [
 
 protocol.registerSchemesAsPrivileged([
   { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
-  { scheme: HTML_PAGE_SCHEME, privileges: { standard: true, secure: true } },
+  {
+    scheme: THREAD_FILE_SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+  },
 ])
-
-const pages = htmlPages()
 
 const serveRenderer = () =>
   protocol.handle(APP_SCHEME, async (request) => {
@@ -206,6 +204,7 @@ const createWindow = () => {
       sandbox: true,
       nodeIntegration: false,
       spellcheck: true,
+      webviewTag: true,
       // WARNING: Chromium throttles timers in hidden windows, which can miss the backend WebSocket's pings.
       backgroundThrottling: false,
     },
@@ -266,9 +265,6 @@ const createWindow = () => {
 
     return { action: "deny" }
   })
-  // WARNING: A reload or crash skips the pages' close, so the next document starts with none.
-  window.webContents.on("did-navigate", pages.clear)
-  window.on("closed", pages.clear)
   window.webContents.on("will-navigate", (event) => {
     if (event.url.startsWith(`${rendererOrigin}/`)) return
 
@@ -333,9 +329,6 @@ void app.whenReady().then(() => {
   )
   ipcMain.handle(DISCARD_DOGFOOD_REPORT_CHANNEL, (_event, id: string) => dogfoodReports.discard(id))
 
-  ipcMain.handle(OPEN_HTML_PAGE_CHANNEL, (_event, html: string) => pages.open(html))
-  ipcMain.handle(CLOSE_HTML_PAGE_CHANNEL, (_event, url: string) => pages.close(url))
-  protocol.handle(HTML_PAGE_SCHEME, pages.serve)
   ipcMain.handle(RELAUNCH_CHANNEL, () => {
     app.relaunch()
     app.quit()
@@ -345,6 +338,17 @@ void app.whenReady().then(() => {
 
   if (devIcon !== undefined) app.dock?.setIcon(devIcon)
 
+  setUpBrowserPanes({
+    preload: join(__dirname, "../browserPreload/index.cjs"),
+    threadFile: async (threadId, pathname) => {
+      const [{ threadFileUrl }, endpoint] = await Promise.all([
+        import("./backend"),
+        backendReady.promise,
+      ])
+
+      return fetch(threadFileUrl(endpoint, threadId, pathname))
+    },
+  })
   createWindow()
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

@@ -42,12 +42,6 @@ export interface DesktopBridge {
   readonly chooseFolder: () => Promise<string | null>
   readonly bringToFront: () => Promise<void>
   readonly dogfoodReports: DogfoodReportsBridge
-  readonly htmlPages: HtmlPagesBridge
-}
-
-export interface HtmlPagesBridge {
-  readonly open: (html: string) => Promise<string>
-  readonly close: (url: string) => Promise<void>
 }
 
 export interface DogfoodReportsBridge {
@@ -94,10 +88,17 @@ export const FINISH_DOGFOOD_REPORT_CHANNEL = "glass:finish-dogfood-report"
 
 export const DISCARD_DOGFOOD_REPORT_CHANNEL = "glass:discard-dogfood-report"
 
-export const OPEN_HTML_PAGE_CHANNEL = "glass:open-html-page"
+export const BROWSER_PARTITION = "persist:glass-browser"
 
-export const CLOSE_HTML_PAGE_CHANNEL = "glass:close-html-page"
+export const SANDBOX_BROWSER_PARTITION = "persist:glass-browser-sandbox"
 
-export const HTML_PAGE_SCHEME = "glass-page"
+export const PAGE_EVENT_CHANNEL = "glass:page-event"
 
-export const HTML_PAGE_SANDBOX = "allow-scripts allow-forms allow-popups"
+export const PAGE_STATE_CHANNEL = "glass:page-state"
+
+export const THREAD_FILE_SCHEME = "glass-file"
+
+const LOOPBACK_HOST =
+  /^(?:localhost|.+\.localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[::1?\]|\[::ffff:7f[\da-f]{2}:[\da-f]{1,4}\])$/i
+
+export const isLoopbackHost = (host: string) => LOOPBACK_HOST.test(host.replace(/\.$/, ""))

@@ -26,6 +26,8 @@ export * from "./engine"
 
 export * from "./feedbackNote"
 
+export * from "./pageMessages"
+
 export * from "./followedRepository"
 
 export * from "./needsYou"

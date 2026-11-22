@@ -5,6 +5,7 @@ directories:
 files:
   - dist/main/**
   - dist/preload/**
+  - dist/browserPreload/**
   - "!**/*.map"
 extraResources:
   - from: ../server/dist

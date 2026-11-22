@@ -1,16 +1,43 @@
-import type { PagePart } from "@glass/contracts"
-import type { PageEvent, PageRect, PageState } from "./pageMessages"
+import type { PageEvent, PagePart, PageRect, PageState } from "@glass/contracts"
 
-// WARNING: This runs inside the page from its own source text, so it can't use anything from outside its body, and the build must not add helpers to it (such as keepNames or downleveling).
-export function pageNotes(): void {
-  const accent = "oklch(0.58 0.19 262)"
-  const post = (event: PageEvent) => window.parent.postMessage({ glassPageEvent: event }, "*")
-  const squash = (text: string) => text.replace(/\s+/g, " ").trim()
+const accent = "oklch(0.58 0.19 262)"
 
-  const trunc = (text: string, max: number) =>
-    text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text
+const squash = (text: string) => text.replace(/\s+/g, " ").trim()
 
-  const quoted = (text: string) => (text === "" ? "" : ` “${trunc(text, 40)}”`)
+const trunc = (text: string, max: number) =>
+  text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text
+
+const quoted = (text: string) => (text === "" ? "" : ` “${trunc(text, 40)}”`)
+
+const rectOf = (anchor: Range | Element): PageRect => {
+  const { top, left, bottom, right } = anchor.getBoundingClientRect()
+
+  return { top, left, bottom, right }
+}
+
+interface PageChannel {
+  readonly post: (event: PageEvent) => void
+  readonly onState: (receive: (state: PageState) => void) => void
+}
+
+// WARNING: This runs in every page of a Browser pane, so it builds PageParts by hand rather than load Effect into each one.
+export function pageNotes(window: typeof globalThis, { post, onState }: PageChannel): void {
+  const {
+    document,
+    CSS,
+    Element,
+    Node,
+    NodeFilter,
+    Range,
+    Text,
+    MutationObserver,
+    ResizeObserver,
+  } = window
+
+  const getComputedStyle = (element: Element) => window.getComputedStyle(element)
+
+  const requestAnimationFrame = (callback: FrameRequestCallback) =>
+    window.requestAnimationFrame(callback)
 
   let state: PageState = { pick: false, notes: [], active: null }
   let draft: Range | Element | null = null
@@ -266,12 +293,6 @@ export function pageNotes(): void {
       ? [...anchor.getClientRects()].filter((rect) => rect.width > 1)
       : [anchor.getBoundingClientRect()]
 
-  const rectOf = (anchor: Range | Element): PageRect => {
-    const { top, left, bottom, right } = anchor.getBoundingClientRect()
-
-    return { top, left, bottom, right }
-  }
-
   const add = (tag: string, className: string, rect: { top: number; left: number }) => {
     const element = document.createElement(tag)
     element.className = className
@@ -377,8 +398,15 @@ export function pageNotes(): void {
     if (activeRect !== null) post({ type: "rect", rect: activeRect })
   }
 
+  const nothingToDraw = () =>
+    state.notes.length === 0 &&
+    !state.pick &&
+    state.active === null &&
+    selected === null &&
+    layer.childElementCount === 0
+
   const schedule = () => {
-    if (scheduled) return
+    if (scheduled || nothingToDraw()) return
 
     scheduled = true
     requestAnimationFrame(draw)
@@ -497,15 +525,7 @@ export function pageNotes(): void {
     characterData: true,
   })
 
-  window.addEventListener("message", (event) => {
-    const data: unknown = event.data
-
-    if (typeof data !== "object" || data === null || !("glassPageState" in data)) return
-
-    // SAFETY: Glass, the parent window, always sends a PageState as glassPageState, and the page gains nothing by sending itself one.
-    // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- The page can't import Schema to decode it.
-    const next = data.glassPageState as PageState
-
+  onState((next) => {
     anchors = new Map([...anchors].filter(([id]) => next.notes.some((note) => note.id === id)))
 
     if (next.active === null) draft = null
@@ -525,6 +545,3 @@ export function pageNotes(): void {
 
   post({ type: "ready" })
 }
-
-export const withPageNotes = (html: string) =>
-  `${html}\n<script>(${pageNotes.toString()})()</script>`
