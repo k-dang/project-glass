@@ -2,6 +2,7 @@ import {
   BACKEND_ENDPOINT_CHANNEL,
   BACKEND_FAILURE_CHANNEL,
   BRING_TO_FRONT_CHANNEL,
+  BROWSER_RELAY_CHANNEL,
   CHOOSE_FOLDER_CHANNEL,
   type DesktopBridge,
   DISCARD_DOGFOOD_REPORT_CHANNEL,
@@ -21,6 +22,7 @@ const bridge: DesktopBridge = {
   resourceUsage: () => ipcRenderer.invoke(RESOURCE_USAGE_CHANNEL),
   chooseFolder: () => ipcRenderer.invoke(CHOOSE_FOLDER_CHANNEL),
   bringToFront: () => ipcRenderer.invoke(BRING_TO_FRONT_CHANNEL),
+  browserRelay: (webContentsId) => ipcRenderer.invoke(BROWSER_RELAY_CHANNEL, webContentsId),
   dogfoodReports: {
     record: () => ipcRenderer.invoke(RECORD_DOGFOOD_REPORT_CHANNEL),
     finish: (details) => ipcRenderer.invoke(FINISH_DOGFOOD_REPORT_CHANNEL, details),

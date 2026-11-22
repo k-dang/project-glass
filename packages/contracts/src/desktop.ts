@@ -42,6 +42,7 @@ export interface DesktopBridge {
   readonly chooseFolder: () => Promise<string | null>
   readonly bringToFront: () => Promise<void>
   readonly dogfoodReports: DogfoodReportsBridge
+  readonly browserRelay: (webContentsId: number) => Promise<string>
 }
 
 export interface DogfoodReportsBridge {
@@ -91,6 +92,8 @@ export const DISCARD_DOGFOOD_REPORT_CHANNEL = "glass:discard-dogfood-report"
 export const BROWSER_PARTITION = "persist:glass-browser"
 
 export const SANDBOX_BROWSER_PARTITION = "persist:glass-browser-sandbox"
+
+export const BROWSER_RELAY_CHANNEL = "glass:browser-relay"
 
 export const PAGE_EVENT_CHANNEL = "glass:page-event"
 

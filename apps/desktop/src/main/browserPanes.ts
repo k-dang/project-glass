@@ -1,10 +1,11 @@
 import {
   BROWSER_PARTITION,
+  BROWSER_RELAY_CHANNEL,
   isLoopbackHost,
   SANDBOX_BROWSER_PARTITION,
   THREAD_FILE_SCHEME,
 } from "@glass/contracts/desktop"
-import { app, type Session, session, type WebContents } from "electron"
+import { app, ipcMain, type Session, session, type WebContents, webContents } from "electron"
 
 const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set([
   "clipboard-sanitized-write",
@@ -86,6 +87,18 @@ export const setUpBrowserPanes = (options: {
   const browsers = [local, sandbox]
 
   for (const browser of browsers) setUp(browser)
+
+  // WARNING: Relays load Effect, which would delay the window if imported before it shows.
+  const relays = import("./pageRelays").then(({ pageRelays }) => pageRelays())
+
+  ipcMain.handle(BROWSER_RELAY_CHANNEL, async (event, webContentsId: number) => {
+    const pane = webContents.fromId(webContentsId)
+
+    if (pane?.hostWebContents !== event.sender || pane.session !== local)
+      throw new Error("Only a local Thread's Browser pane can be driven")
+
+    return (await relays)(pane)
+  })
 
   sandbox.webRequest.onBeforeRequest(
     (details, callback) =>
