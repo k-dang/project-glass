@@ -10,7 +10,7 @@ export const AgentHarness = Schema.Literals(agentHarnesses)
 
 export type AgentHarness = typeof AgentHarness.Type
 
-export const LocalPlace = Schema.TaggedStruct("local", {})
+const LocalPlace = Schema.TaggedStruct("local", {})
 
 export const SandboxPlace = Schema.TaggedStruct("sandbox", { providerId: Schema.String })
 
@@ -58,7 +58,7 @@ export type PermissionMode = typeof PermissionMode.Type
 
 export const defaultPermissionMode: PermissionMode = "auto"
 
-export interface AgentCapabilities {
+interface AgentCapabilities {
   readonly permissionModes: ReadonlyArray<PermissionMode>
 }
 
@@ -116,7 +116,6 @@ export const SandboxReach = Schema.Literals([
   "connecting",
   "reachable",
   "unreachable",
-  "incompatible",
   ...GoneReach.literals,
 ])
 
@@ -124,17 +123,10 @@ export type SandboxReach = typeof SandboxReach.Type
 
 export const isGone = Schema.is(GoneReach)
 
-export const isOutOfReach = (reach: SandboxReach) =>
-  reach === "unreachable" || reach === "incompatible" || isGone(reach)
+export const isOutOfReach = (reach: SandboxReach) => reach === "unreachable" || isGone(reach)
 
 export const goneExplanation = (reach: GoneReach) =>
   `This Thread's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Thread.`
-
-export const incompatibleExplanation =
-  "This Thread's Sandbox runs a different version of Glass, so it can't take messages. Its transcript stays until you remove the Thread."
-
-export const readOnlyExplanation = (reach: SandboxReach | undefined) =>
-  isGone(reach) ? goneExplanation(reach) : reach === "incompatible" ? incompatibleExplanation : null
 
 export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")({
   expiresAt: Schema.NullOr(Schema.DateTimeUtcFromString),
@@ -263,18 +255,20 @@ export const withContextOf = <Context extends TurnContext>({
   context,
 }: SentMessage & { readonly context: Context | null }) => ({ message, images, context })
 
-export const AcceptedMessage = Schema.Struct({
+const AcceptedMessage = Schema.Struct({
   ...MessageWithContext.fields,
   feedback: Schema.Array(FeedbackNote),
 })
 
-export type AcceptedMessage = typeof AcceptedMessage.Type
+type AcceptedMessage = typeof AcceptedMessage.Type
 
 export const TextPart = Schema.TaggedStruct("Text", { text: Schema.String })
 
 export const ThinkingPart = Schema.TaggedStruct("Thinking", { text: Schema.String })
 
-const ToolCallStatus = Schema.Literals(["running", "done", "failed"])
+export const SUBAGENT_TOOL = "Agent"
+
+const ToolCallStatus = Schema.Literals(["running", "done", "failed", "stopped"])
 
 export const ToolCallPart = Schema.TaggedStruct("ToolCall", {
   toolCallId: Schema.String,
@@ -446,7 +440,18 @@ export const PartAppended = Schema.TaggedStruct("PartAppended", {
 
 export const TurnEnded = Schema.TaggedStruct("TurnEnded", { turnId: Schema.String, ended: TurnEnd })
 
-export const AgentEvent = Schema.Union([TurnStarted, PartSet, PartAppended, TurnEnded])
+export const ToolCallStatusSet = Schema.TaggedStruct("ToolCallStatusSet", {
+  toolCallId: Schema.String,
+  status: ToolCallStatus,
+})
+
+export const AgentEvent = Schema.Union([
+  TurnStarted,
+  PartSet,
+  PartAppended,
+  ToolCallStatusSet,
+  TurnEnded,
+])
 
 export type AgentEvent = typeof AgentEvent.Type
 
@@ -564,6 +569,21 @@ export const applyThreadEvent = (
           const appended = appendText(parts[index], text)
 
           if (appended !== undefined) parts[index] = appended
+
+          return { ...turn, parts }
+        }),
+      ToolCallStatusSet: ({ toolCallId, status }) =>
+        turns.map((turn) => {
+          const index = turn.parts.findIndex(
+            (part) => Predicate.isTagged(part, "ToolCall") && part.toolCallId === toolCallId,
+          )
+
+          const part = turn.parts[index]
+
+          if (!Predicate.isTagged(part, "ToolCall")) return turn
+
+          const parts = [...turn.parts]
+          parts[index] = { ...part, status }
 
           return { ...turn, parts }
         }),

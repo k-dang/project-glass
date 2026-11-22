@@ -2,7 +2,7 @@ import { Effect } from "effect"
 import { chmod, mkdtemp, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, it } from "vite-plus/test"
+import { assert, describe, it } from "@effect/vitest"
 import { prependLoginShellPath } from "./loginShellPath"
 
 const tempDirectory = Effect.acquireRelease(
@@ -20,55 +20,50 @@ const fakeShell = (directory: string, name: string, profile: string) =>
   })
 
 describe("login shell PATH", () => {
-  it.skipIf(process.platform === "win32")(
+  it.live.skipIf(process.platform === "win32")(
     "prepends the shell's PATH, ignoring rc output and dropping duplicates",
     () =>
-      Effect.runPromise(
-        Effect.gen(function* () {
-          const directory = yield* tempDirectory
-
-          const shell = yield* fakeShell(
-            directory,
-            "zsh",
-            'echo "Welcome back"\nPATH=/home/me/.local/bin:/usr/bin; export PATH',
-          )
-
-          const env: NodeJS.ProcessEnv = { PATH: "/usr/bin:/bin" }
-
-          yield* prependLoginShellPath(env, [shell])
-
-          expect(env["PATH"]).toBe("/home/me/.local/bin:/usr/bin:/bin")
-        }).pipe(Effect.scoped),
-      ),
-  )
-
-  it.skipIf(process.platform === "win32")(
-    "falls through shells that are missing or report nothing",
-    () =>
-      Effect.runPromise(
-        Effect.gen(function* () {
-          const directory = yield* tempDirectory
-          const silent = yield* fakeShell(directory, "silent", "exit 1")
-
-          const bash = yield* fakeShell(directory, "bash", "PATH=/opt/homebrew/bin; export PATH")
-
-          const env: NodeJS.ProcessEnv = { PATH: "/usr/bin" }
-
-          yield* prependLoginShellPath(env, [undefined, join(directory, "missing"), silent, bash])
-
-          expect(env["PATH"]).toBe("/opt/homebrew/bin:/usr/bin")
-        }).pipe(Effect.scoped),
-      ),
-  )
-
-  it("keeps the inherited PATH when no shell answers", () =>
-    Effect.runPromise(
       Effect.gen(function* () {
+        const directory = yield* tempDirectory
+
+        const shell = yield* fakeShell(
+          directory,
+          "zsh",
+          'echo "Welcome back"\nPATH=/home/me/.local/bin:/usr/bin; export PATH',
+        )
+
         const env: NodeJS.ProcessEnv = { PATH: "/usr/bin:/bin" }
 
-        yield* prependLoginShellPath(env, ["/nonexistent/shell"])
+        yield* prependLoginShellPath(env, [shell])
 
-        expect(env["PATH"]).toBe("/usr/bin:/bin")
+        assert.strictEqual(env["PATH"], "/home/me/.local/bin:/usr/bin:/bin")
       }),
-    ))
+  )
+
+  it.live.skipIf(process.platform === "win32")(
+    "falls through shells that are missing or report nothing",
+    () =>
+      Effect.gen(function* () {
+        const directory = yield* tempDirectory
+        const silent = yield* fakeShell(directory, "silent", "exit 1")
+
+        const bash = yield* fakeShell(directory, "bash", "PATH=/opt/homebrew/bin; export PATH")
+
+        const env: NodeJS.ProcessEnv = { PATH: "/usr/bin" }
+
+        yield* prependLoginShellPath(env, [undefined, join(directory, "missing"), silent, bash])
+
+        assert.strictEqual(env["PATH"], "/opt/homebrew/bin:/usr/bin")
+      }),
+  )
+
+  it.live("keeps the inherited PATH when no shell answers", () =>
+    Effect.gen(function* () {
+      const env: NodeJS.ProcessEnv = { PATH: "/usr/bin:/bin" }
+
+      yield* prependLoginShellPath(env, ["/nonexistent/shell"])
+
+      assert.strictEqual(env["PATH"], "/usr/bin:/bin")
+    }),
+  )
 })

@@ -127,7 +127,10 @@ function DialogDescription({ className, ...props }: DialogPrimitive.Description.
   )
 }
 
+const createDialogHandle = DialogPrimitive.createHandle
+
 export {
+  createDialogHandle,
   Dialog,
   DialogClose,
   DialogContent,

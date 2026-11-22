@@ -23,7 +23,8 @@ const decodeTranscript = Schema.decodeUnknownSync(ReplayedTranscript)
 
 const withTurnIds = (scenario: string, events: ReadonlyArray<HostEvent>) =>
   events.map((event) =>
-    Predicate.isTagged(event, "AgentStatusesChanged")
+    Predicate.isTagged(event, "AgentStatusesChanged") ||
+    Predicate.isTagged(event, "ToolCallStatusSet")
       ? event
       : { ...event, turnId: `${scenario}:${event.turnId}` },
   )

@@ -1,4 +1,10 @@
-import { type Appearance, type ColorScheme, ColorSchemePreference, Theme } from "@glass/contracts"
+import {
+  type Appearance,
+  type ColorScheme,
+  ColorSchemePreference,
+  Layout,
+  Theme,
+} from "@glass/contracts"
 import { useAtom } from "@effect/atom-react"
 import { Option, Schema } from "effect"
 import { Atom } from "effect/reactivity"
@@ -7,35 +13,36 @@ const themeKey = "glass.theme"
 
 const colorSchemeKey = "glass.colorScheme"
 
+const layoutKey = "glass.layout"
+
 const appearanceAtom = Atom.writable(savedAppearance, (ctx, appearance: Appearance) => {
   localStorage.setItem(themeKey, appearance.theme)
   localStorage.setItem(colorSchemeKey, appearance.colorScheme)
+  localStorage.setItem(layoutKey, appearance.layout)
   ctx.setSelf(appearance)
 }).pipe(Atom.keepAlive)
 
-const decodeTheme = Schema.decodeUnknownOption(Theme)
-
-const decodeColorScheme = Schema.decodeUnknownOption(ColorSchemePreference)
+const saved = <A>(key: string, schema: Schema.Codec<A>, fallback: A): A =>
+  Option.getOrElse(Schema.decodeUnknownOption(schema)(localStorage.getItem(key)), () => fallback)
 
 export function savedAppearance(): Appearance {
   return {
-    theme: Option.getOrElse(decodeTheme(localStorage.getItem(themeKey)), () => "glass" as const),
-    colorScheme: Option.getOrElse(
-      decodeColorScheme(localStorage.getItem(colorSchemeKey)),
-      () => "system" as const,
-    ),
+    theme: saved(themeKey, Theme, "glass"),
+    colorScheme: saved(colorSchemeKey, ColorSchemePreference, "system"),
+    layout: saved(layoutKey, Layout, "classic"),
   }
 }
 
 export function applyAppearance(appearance: Appearance) {
   document.documentElement.dataset.theme = appearance.theme
+  document.documentElement.dataset.layout = appearance.layout
 
   return window.glass.setAppearance(appearance)
 }
 
 const colorSchemeTimeout = 300
 
-const darkScheme = window.matchMedia("(prefers-color-scheme: dark)")
+export const darkScheme = window.matchMedia("(prefers-color-scheme: dark)")
 
 const colorSchemeFollows = (colorScheme: ColorScheme) =>
   new Promise<void>((resolve) => {
@@ -77,5 +84,6 @@ export function useAppearance() {
     ...appearance,
     setTheme: (theme: Theme) => change({ ...appearance, theme }),
     setColorScheme: (colorScheme: ColorSchemePreference) => change({ ...appearance, colorScheme }),
+    setLayout: (layout: Layout) => change({ ...appearance, layout }),
   }
 }

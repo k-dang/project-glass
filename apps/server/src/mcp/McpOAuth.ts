@@ -160,7 +160,7 @@ export class OAuthRedirectError extends Schema.TaggedError<OAuthRedirectError>()
   },
 ) {}
 
-export class OAuthRegistrationError extends Schema.TaggedError<OAuthRegistrationError>()(
+class OAuthRegistrationError extends Schema.TaggedError<OAuthRegistrationError>()(
   "OAuthRegistrationError",
   {
     error: Schema.Literals(["invalid_redirect_uri", "invalid_client_metadata"]),
@@ -168,7 +168,7 @@ export class OAuthRegistrationError extends Schema.TaggedError<OAuthRegistration
   },
 ) {}
 
-export class OAuthTokenError extends Schema.TaggedError<OAuthTokenError>()("OAuthTokenError", {
+class OAuthTokenError extends Schema.TaggedError<OAuthTokenError>()("OAuthTokenError", {
   error: Schema.Literals([
     "invalid_request",
     "invalid_client",
@@ -198,7 +198,7 @@ export interface Authorization {
   readonly resource: string
 }
 
-export interface RegisteredClient {
+interface RegisteredClient {
   readonly clientId: string
   readonly name: string
   readonly redirectUris: ReadonlyArray<string>
@@ -213,7 +213,7 @@ interface PendingCode {
   readonly expiresAt: number
 }
 
-export type CsrfFields = Pick<
+type CsrfFields = Pick<
   Authorization,
   "clientId" | "redirectUri" | "codeChallenge" | "state" | "resource"
 >

@@ -9,6 +9,8 @@ Never edit, rename, or remove a migration that has shipped. Corrections get a ne
 are available. Effect tracks completed IDs in `effect_sql_migrations` and applies the
 pending batch in a transaction. A failure rolls back that batch and fails startup.
 
-Fresh installs and upgrades use the same migration sequence. Test changes against a
-populated previous schema, checking that existing data survives. Use temporary databases.
+Fresh installs and upgrades use the same migration sequence. Before merging a migration,
+check it against a populated copy of the previous schema in a temporary database, making
+sure existing data survives. Don't keep that check as a test: Glass has one user, so once
+their database has run a migration, no database is left for the test to protect.
 Reverting app code does not reverse a committed migration; migrations only run forward.

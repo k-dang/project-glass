@@ -3,7 +3,7 @@ import { Atom, AtomRegistry } from "effect/reactivity"
 import { type Backend, type BackendError, backendRuntime } from "./backend"
 import { type Problem, problemOf } from "./problems"
 
-export type WriteFeedback<Input> =
+type WriteFeedback<Input> =
   | { readonly type: "sending"; readonly input: Input }
   | { readonly type: "failed"; readonly input: Input; readonly problem: Problem }
 

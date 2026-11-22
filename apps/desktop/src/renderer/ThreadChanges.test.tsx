@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import {
   ThreadChanges,
   ThreadError,
@@ -21,6 +20,7 @@ import { backendLayerAtom } from "./backend"
 import { thread } from "../../test/thread"
 import { testLayer } from "../../test/testBackend"
 import { changedFile } from "../../test/workspace"
+import { RegistryProvider } from "../../test/registry"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 

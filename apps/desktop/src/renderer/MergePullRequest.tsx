@@ -45,29 +45,22 @@ export function MergePullRequest(props: {
   revision: Revision
   onReload: () => void
 }) {
-  const action = props.pullRequest.mergeAction
-
-  if (action === null) return null
-
-  return <MergeButton key={JSON.stringify(action)} {...props} action={action} />
-}
-
-function MergeButton(props: {
-  pullRequest: PullRequest
-  revision: Revision
-  action: MergeAction
-  onReload: () => void
-}) {
-  const { pullRequest, action } = props
+  const { pullRequest } = props
+  const action = pullRequest.mergeAction
   const runtime = useBackendRuntime()
-  const [state, setState] = useState<"idle" | "sending" | "sent">("idle")
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState<string | null>(null)
 
-  if (state === "sent") return null
+  const actionKey = action === null ? null : JSON.stringify(action)
+
+  if (sent !== null && sent !== actionKey) setSent(null)
+
+  if (action === null || sent === actionKey) return null
 
   const { label, hint, done } = copy(action, pullRequest.baseBranch)
 
   const merge = async () => {
-    setState("sending")
+    setSending(true)
 
     const exit = await runtime.runPromiseExit(
       Backend.use((backend) =>
@@ -79,8 +72,9 @@ function MergeButton(props: {
       ),
     )
 
+    setSending(false)
+
     if (Exit.isFailure(exit)) {
-      setState("idle")
       const problem = problemOf(exit.cause)
 
       const id = toast.add({
@@ -101,15 +95,15 @@ function MergeButton(props: {
       return
     }
 
-    setState("sent")
+    setSent(JSON.stringify(action))
     toast.add({ type: "success", title: done, description: pullRequest.title })
     props.onReload()
   }
 
   return (
     <TooltipHint content={hint}>
-      <Button variant="outline" disabled={state === "sending"} onClick={() => void merge()}>
-        {state === "sending" ? (
+      <Button variant="outline" disabled={sending} onClick={() => void merge()}>
+        {sending ? (
           <LoaderCircle data-icon="inline-start" className="animate-spin" aria-hidden />
         ) : (
           <GitMerge data-icon="inline-start" aria-hidden />

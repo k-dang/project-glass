@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  Check,
   type ConnectionError,
   Draft,
   FollowedRepository,
@@ -13,6 +14,7 @@ import {
   PullRequest,
   PullRequestNotFound,
   PullRequestRef,
+  PullRequestStatus,
   PullRequestSummary,
   type PullRequestList,
   PullRequestWorkspace,
@@ -30,7 +32,6 @@ import {
   type SettingsError,
   type SubmitReviewError,
 } from "@glass/contracts"
-import { RegistryProvider } from "@effect/atom-react"
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect, Predicate, PubSub, Stream } from "effect"
@@ -57,6 +58,7 @@ import {
   testRegistry,
 } from "../../test/testBackend"
 import { viewer } from "../../test/workspace"
+import { RegistryProvider } from "../../test/registry"
 
 const glass = new FollowedRepository({ owner: "octo-org", repo: "glass" })
 
@@ -504,6 +506,7 @@ it("shows the last rows at once on return to Reviews", async () => {
 
   await rowFor("Wave at the world")
   await user.click(screen.getByRole("link", { name: "Settings" }))
+  await screen.findByRole("main", { name: "Settings" })
   await user.click(screen.getByRole("link", { name: "Reviews" }))
   await rowFor("Wave at the world")
   expect(screen.queryByText("Loading PRs…")).toBeNull()
@@ -672,7 +675,7 @@ it("names the PR while it opens, and Back to PRs leaves before it arrives", asyn
 
   await user.click(await rowFor("Greet the world"))
   await next(opens)
-  const loading = screen.getByRole("status", { name: "Loading pull request" })
+  const loading = await screen.findByRole("status", { name: "Loading pull request" })
   expect(loading.textContent).toContain("octo-org/glass")
   expect(loading.textContent).toContain("#42")
 
@@ -696,6 +699,35 @@ it("starts loading a hovered PR and opens it from that same load", async () => {
   preload.answer(Effect.succeed(workspaceOf(greet, "head001")))
   await screen.findByText("head001")
   expect(opens).toHaveLength(0)
+})
+
+const statusWithCheck = (check: "running" | "passed") =>
+  new PullRequestStatus({
+    state: "open",
+    approval: null,
+    reviewers: [],
+    checks: [new Check({ name: "test", state: check, url: null })],
+    mergeable: "mergeable",
+    mergeAction: null,
+    mergeUnderWay: null,
+  })
+
+it("keeps the open PR's checks current as GitHub runs them", async () => {
+  const opens: Array<
+    Held<{ pullRequest: PullRequestRef }, PullRequestWorkspace, LoadPullRequestError>
+  > = []
+
+  const statuses: Array<Held<{ pullRequestId: string }, PullRequestStatus, ConnectionError>> = []
+  const user = mount({ LoadPullRequest: hold(opens), GetPullRequestStatus: hold(statuses) })
+
+  await user.click(await rowFor("Greet the world"))
+  ;(await next(opens)).answer(Effect.succeed(workspaceOf(greet, "head001")))
+  ;(await next(statuses)).answer(Effect.succeed(statusWithCheck("running")))
+  await screen.findByText("1 running")
+
+  act(() => void window.dispatchEvent(new Event("focus")))
+  ;(await next(statuses)).answer(Effect.succeed(statusWithCheck("passed")))
+  expect(await screen.findByText("Checks passed")).toBeTruthy()
 })
 
 const deleteDraft = () =>

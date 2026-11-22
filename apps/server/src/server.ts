@@ -9,10 +9,12 @@ import { RendererAccess } from "./access"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
+import { BrowserPages } from "./BrowserPages"
 import { CheckoutRuns } from "./CheckoutRuns"
 import { Checkouts } from "./Checkouts"
 import { CompleteToDosOnMerge } from "./CompleteToDosOnMerge"
 import { ThreadPullRequests } from "./ThreadPullRequests"
+import { ThreadFileRoutes } from "./threadFilesHttp"
 import { Threads } from "./Threads"
 import { ThreadTurns } from "./ThreadTurns"
 import { FeedbackNotes } from "./FeedbackNotes"
@@ -52,6 +54,7 @@ import { StartedWork } from "./StartedWork"
 import { Storage } from "./Storage"
 import { ToDos } from "./ToDos"
 import { AgentRunners } from "./agentRunners"
+import { BranchNames } from "./BranchNames"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
 import { StartedWorkUpdates } from "./StartedWorkUpdates"
@@ -59,13 +62,30 @@ import { StartedWorkUpdates } from "./StartedWorkUpdates"
 const RendererRoutes = Layer.mergeAll(
   RpcServer.layerHttp({ group: GlassRpcs, path: RPC_PATH, protocol: "websocket" }),
   HttpRouter.add("GET", "/health", HttpServerResponse.empty()),
+  ThreadFileRoutes,
 ).pipe(Layer.provide(RendererAccess.layer))
+
+// WARNING: server.close only drops the connections idle when it is called. One still answering stays open until its client lets go, so drop each as its response ends.
+const closingAnsweredConnections = () => {
+  const server = createServer()
+
+  server.on("request", (request, response) =>
+    response.once("close", () => {
+      if (!server.listening) request.socket.destroy()
+    }),
+  )
+
+  return server
+}
 
 const NodeServerLive = Layer.unwrap(
   Effect.gen(function* () {
     const config = yield* ServerConfig
 
-    return NodeHttpServer.layer(createServer, { port: config.port, host: "127.0.0.1" })
+    return NodeHttpServer.layer(closingAnsweredConnections, {
+      port: config.port,
+      host: "127.0.0.1",
+    })
   }),
 )
 
@@ -118,7 +138,7 @@ const services = (
       Layer.provide(Tours.layer),
       Layer.provide(AgentReviews.layer),
       Layer.provide(Asks.layer),
-      Layer.provide(ThreadsLive),
+      Layer.provideMerge(ThreadsLive),
       Layer.provideMerge(SkillPacks.layer),
       Layer.provideMerge(LocalSkills.layer),
       Layer.provide(Plugins.layer),
@@ -130,7 +150,9 @@ const services = (
       Layer.provide(Git.layer),
     )
     .pipe(
+      Layer.provide(BranchNames.layer),
       Layer.provide(agentRunners),
+      Layer.provide(BrowserPages.layer),
       Layer.provide(agentCommands),
       Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
       Layer.provideMerge(OutsideAgents.layer),

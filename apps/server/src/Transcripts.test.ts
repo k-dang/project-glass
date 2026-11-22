@@ -8,6 +8,7 @@ import {
   PartSet,
   TextPart,
   ToolCallPart,
+  ToolCallStatusSet,
   type Transcript,
   type TranscriptUpdate,
   TurnCutOff,
@@ -199,6 +200,43 @@ it.effect("records a cut-off Turn again when its real end arrives", () =>
         { turn_id: turnId, ending: "Done", outcome: "success" },
       ],
     )
+  }).pipe(Effect.provide(transcriptsLayer)),
+)
+
+it.effect("marks a tool call failed in the Turn that started it, after that Turn ended", () =>
+  Effect.gen(function* () {
+    const transcripts = yield* Transcripts
+    const at = yield* DateTime.now
+
+    const agentCall = ToolCallPart.make({
+      toolCallId: "toolu_1",
+      name: "Agent",
+      inputSummary: "Trace it",
+      input: "{}",
+      output: "Launched",
+      status: "done",
+      parentToolCallId: null,
+    })
+
+    yield* transcripts.save("agent-1", [
+      TurnStarted.make({
+        turnId: "turn-1",
+        message: "Trace it",
+        images: [],
+        context: null,
+        feedback: [],
+        sentAt: at,
+      }),
+      PartSet.make({ turnId: "turn-1", index: 0, part: agentCall }),
+      TurnEnded.make({ turnId: "turn-1", ended: { at, ending: TurnDone.make({}) } }),
+    ])
+    yield* transcripts.save("agent-1", [
+      ToolCallStatusSet.make({ toolCallId: "toolu_1", status: "failed" }),
+    ])
+
+    assert.deepStrictEqual((yield* transcripts.read("agent-1")).turns[0]?.parts, [
+      ToolCallPart.make({ ...agentCall, status: "failed" }),
+    ])
   }).pipe(Effect.provide(transcriptsLayer)),
 )
 

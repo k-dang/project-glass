@@ -4,12 +4,7 @@ import { AddedDraft, DraftState } from "./drafts"
 import { ReviewThreadResolution } from "./comments"
 import { ReactionMutationPayload } from "./reactions"
 import { AddedReply } from "./replies"
-import {
-  MERGING_FIELDS,
-  MERGING_REPOSITORY_FIELDS,
-  MergingFields,
-  MergingRepositoryFields,
-} from "./merging"
+import { MergingRepositoryFields } from "./merging"
 import { PULL_REQUEST_STATUS_FIELDS, PullRequestStatusFields } from "./pullRequestStatus"
 import {
   RepositoryPullRequestsData,
@@ -45,7 +40,6 @@ export const PULL_REQUEST_QUERY = `query PullRequest($owner: String!, $name: Str
       repository {
         owner { login }
         name
-        ${MERGING_REPOSITORY_FIELDS}
       }
       number
       url
@@ -56,12 +50,9 @@ export const PULL_REQUEST_QUERY = `query PullRequest($owner: String!, $name: Str
       baseRefOid
       headRefOid
       updatedAt
-      state
-      isDraft
       bodyHTML
       viewerDidAuthor
       ${PULL_REQUEST_STATUS_FIELDS}
-      ${MERGING_FIELDS}
     }
   }
 }`
@@ -69,6 +60,14 @@ export const PULL_REQUEST_QUERY = `query PullRequest($owner: String!, $name: Str
 export const PULL_REQUEST_REVISION_QUERY = `query PullRequestRevision($id: ID!) {
   node(id: $id) {
     ... on PullRequest { baseRefOid headRefOid updatedAt reviews(states: PENDING, first: 1) { nodes { id } } }
+  }
+}`
+
+export const PULL_REQUEST_STATUS_QUERY = `query PullRequestStatus($id: ID!) {
+  node(id: $id) {
+    ... on PullRequest {
+      ${PULL_REQUEST_STATUS_FIELDS}
+    }
   }
 }`
 
@@ -105,8 +104,6 @@ export const FILE_CONTENTS_QUERY = `query FileContents($owner: String!, $name: S
   }
 }`
 
-export const GitHubPullRequestState = Schema.Literals(["OPEN", "CLOSED", "MERGED"])
-
 export const ConnectionPageResponse = <A extends Schema.Top>(node: A) =>
   GraphQLResponse(
     Schema.Struct({
@@ -130,6 +127,7 @@ const PullRequestData = Schema.Struct({
     Schema.Struct({
       pullRequest: Schema.NullOr(
         Schema.Struct({
+          ...PullRequestStatusFields,
           id: Schema.String,
           repository: Schema.Struct({
             owner: Schema.Struct({ login: Schema.String }),
@@ -145,12 +143,8 @@ const PullRequestData = Schema.Struct({
           baseRefOid: Schema.String,
           headRefOid: Schema.String,
           updatedAt: Schema.DateTimeUtcFromString,
-          state: GitHubPullRequestState,
-          isDraft: Schema.Boolean,
           bodyHTML: Schema.String,
           viewerDidAuthor: Schema.Boolean,
-          ...PullRequestStatusFields,
-          ...MergingFields,
         }),
       ),
     }),
@@ -169,6 +163,12 @@ export const PullRequestRevisionResponse = GraphQLResponse(
         reviews: Schema.Struct({ nodes: Schema.Array(Schema.Struct({ id: Schema.String })) }),
       }),
     ),
+  }),
+)
+
+export const PullRequestStatusResponse = GraphQLResponse(
+  Schema.Struct({
+    node: Schema.NullOr(Schema.Struct(PullRequestStatusFields)),
   }),
 )
 
@@ -234,9 +234,9 @@ export const RepositoryDefaultBranchResponse = GraphQLResponse(
   }),
 )
 
-export const REPOSITORY_BRANCHES_QUERY = `query RepositoryBranches($owner: String!, $name: String!, $after: String) {
+export const REPOSITORY_BRANCHES_QUERY = `query RepositoryBranches($owner: String!, $name: String!, $query: String, $after: String) {
   repository(owner: $owner, name: $name) {
-    refs(refPrefix: "refs/heads/", first: 100, after: $after) {
+    refs(refPrefix: "refs/heads/", query: $query, first: 100, after: $after) {
       pageInfo { hasNextPage endCursor }
       nodes { name }
     }

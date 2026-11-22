@@ -42,6 +42,7 @@ import {
   type TurnSettings,
 } from "../src/agentHost/protocol"
 import { ActivityLog } from "../src/ActivityLog"
+import { BranchNames } from "../src/BranchNames"
 import { Threads } from "../src/Threads"
 import { ThreadTurns } from "../src/ThreadTurns"
 import { FeedbackNotes } from "../src/FeedbackNotes"
@@ -90,6 +91,8 @@ export const threadServicesFixture = Effect.gen(function* () {
   let leftOnStop: ReadonlyArray<MessageWithContext> = []
   let nextAnswer: Effect.Effect<void, HostThreadError | RequestNotWaiting> = Effect.void
   let nextName = 0
+  let suggestion: Effect.Effect<Option.Option<string>> = Effect.succeedNone
+  let takenBranches: ReadonlyArray<string> = []
   const models = Effect.succeed(new AgentModels({ defaultModel: null, models: [] }))
 
   const adapter: HarnessAdapter = {
@@ -191,8 +194,10 @@ export const threadServicesFixture = Effect.gen(function* () {
           Effect.sync(() => {
             const name = `agent/test-${++nextName}`
 
-            return { name, branch: name, folder: name, discard: Effect.void }
+            return { branch: name, folder: name, discard: Effect.void }
           }),
+        takenBranches: () => Effect.succeed([]),
+        useBranch: () => Effect.void,
         prepareHost: () => Effect.succeed(client),
         hostIfPrepared: () => Effect.succeedSome(client),
         connectedHost: () => Effect.succeedSome(client),
@@ -206,7 +211,7 @@ export const threadServicesFixture = Effect.gen(function* () {
         Threads.layer.pipe(
           Layer.provideMerge(
             Sandboxes.layer.pipe(
-              Layer.provide(Layer.mock(GlassToolRelay)({ tools: Effect.succeed([]) })),
+              Layer.provide(Layer.mock(GlassToolRelay)({ toolsFor: () => Effect.succeed([]) })),
               Layer.provide(
                 Layer.succeed(
                   Plugins,
@@ -214,7 +219,11 @@ export const threadServicesFixture = Effect.gen(function* () {
                 ),
               ),
               Layer.provide(NodeSocket.layerWebSocketConstructor),
-              Layer.provide(Layer.mock(GitHubClient)({})),
+              Layer.provide(
+                Layer.mock(GitHubClient)({
+                  repositoryBranches: () => Effect.sync(() => takenBranches),
+                }),
+              ),
               Layer.provide(
                 ServerConfig.layer.pipe(
                   Layer.provide(
@@ -251,6 +260,7 @@ export const threadServicesFixture = Effect.gen(function* () {
             ),
           ),
           Layer.provide(Layer.mock(ActivityLog)({ record: () => Effect.void })),
+          Layer.provide(Layer.succeed(BranchNames, BranchNames.of({ suggest: () => suggestion }))),
           Layer.provide(NodeFileSystem.layer),
         ),
       )
@@ -312,6 +322,14 @@ export const threadServicesFixture = Effect.gen(function* () {
         uncommitted = next.uncommitted
       }),
     started: Queue.take(started),
+    suggestBranch: (next: Effect.Effect<Option.Option<string>>) =>
+      Effect.sync(() => {
+        suggestion = next
+      }),
+    takeBranches: (taken: ReadonlyArray<string>) =>
+      Effect.sync(() => {
+        takenBranches = taken
+      }),
     failAnswers: (error: HostThreadError | RequestNotWaiting) =>
       Effect.sync(() => {
         nextAnswer = Effect.fail(error)

@@ -57,12 +57,18 @@ import {
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
 import { FeedbackNote, LineNote, UnsentFeedback } from "./feedbackNote"
+import { BrowserControl, BrowserPageAnswer, BrowserPageRequest } from "./browserPage"
 import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { MergeAction, MergePullRequestError } from "./merge"
 import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./needsYou"
 import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
-import { LoadPullRequestError, PullRequestRef, PullRequestWorkspace } from "./pullRequest"
+import {
+  LoadPullRequestError,
+  PullRequestRef,
+  PullRequestStatus,
+  PullRequestWorkspace,
+} from "./pullRequest"
 import {
   ThreadPullRequest,
   LatestPullRequestListings,
@@ -92,6 +98,8 @@ import { ToDo, ToDoError, ToDoImageSize, ToDoImageUploads, ToDoTitle } from "./t
 import { TourFailure, TourState } from "./tour"
 
 export const RPC_PATH = "/rpc"
+
+export const THREAD_FILES_PATH = "/thread-files"
 
 export const TOKEN_PARAM = "token"
 
@@ -269,6 +277,11 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Boolean,
     error: ConnectionError,
   }),
+  Rpc.make("GetPullRequestStatus", {
+    payload: { pullRequestId: Schema.String },
+    success: PullRequestStatus,
+    error: ConnectionError,
+  }),
   Rpc.make("GetFileContents", {
     payload: {
       pullRequest: PullRequestRef,
@@ -373,6 +386,16 @@ export class GlassRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("WatchWorkingThreads", { success: Schema.Array(Schema.String), stream: true }),
+  Rpc.make("WatchBrowserPageRequests", {
+    success: Schema.Array(BrowserPageRequest),
+    stream: true,
+  }),
+  Rpc.make("AnswerBrowserPageRequest", {
+    payload: { id: Schema.String, answer: BrowserPageAnswer },
+  }),
+  Rpc.make("WatchBrowserControl", { success: Schema.Array(BrowserControl), stream: true }),
+  Rpc.make("TakeOverBrowser", { payload: { threadId: Schema.String } }),
+  Rpc.make("HandBackBrowser", { payload: { threadId: Schema.String } }),
   Rpc.make("WatchSettledThreads", { success: Schema.Array(Schema.String), stream: true }),
   Rpc.make("BringBackThread", {
     payload: { threadId: Schema.String },

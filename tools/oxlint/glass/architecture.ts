@@ -29,6 +29,8 @@ const transportOwners = new Set([
   "mcp/mcpHttp.ts",
   "mcp/oauthHttp.ts",
   "mcp/GlassToolRelay.ts",
+  "threadFilesHttp.ts",
+  "mcp/browserTools.ts",
 ])
 
 const entryPoints = new Set([

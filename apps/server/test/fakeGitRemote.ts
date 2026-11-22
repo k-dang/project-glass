@@ -1,29 +1,91 @@
 import { type Duration, Effect, Latch, type Layer } from "effect"
 import { HttpRouter, HttpServerRequest, HttpServerResponse } from "effect/http"
 import { execFileSync, spawn } from "node:child_process"
+import { createHash } from "node:crypto"
 import { existsSync, mkdtempSync, rmSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { isolatedGitEnv } from "../src/gitEnv.ts"
 import type { FakeCommit, PublishCommits } from "./fakePullRequest.ts"
+import { fastImportData } from "./gitRepositories.ts"
 
 const gitEnv = isolatedGitEnv()
 
 const git = (directory: string, args: ReadonlyArray<string>, input?: Buffer) =>
   execFileSync("git", ["-C", directory, ...args], { env: gitEnv, input, encoding: "utf8" }).trim()
 
-const data = (text: string) => [`data ${Buffer.byteLength(text)}\n`, text, "\n"]
+const IDENTITY = "Glass Fake <fake@glass.test> 0 +0000"
 
-const deterministicCommit = (ref: string, files: FakeCommit["files"]) => [
-  `commit ${ref}\n`,
-  "committer Glass Fake <fake@glass.test> 0 +0000\n",
-  ...data("Fake commit"),
-  "deleteall\n",
-  ...Object.entries(files).flatMap(([path, contents]) => [
-    `M 100644 inline ${path}\n`,
-    ...data(contents),
-  ]),
-]
+const MESSAGE = "Fake commit"
+
+const objectId = (type: string, body: Buffer) =>
+  createHash("sha1").update(`${type} ${body.byteLength}\0`).update(body).digest()
+
+interface Tree extends Map<string, string | Tree> {}
+
+const treeId = (tree: Tree): Buffer => {
+  const entries = Array.from(tree, ([name, entry]) =>
+    entry instanceof Map
+      ? { sortKey: Buffer.from(`${name}/`), header: `40000 ${name}\0`, id: treeId(entry) }
+      : {
+          sortKey: Buffer.from(name),
+          header: `100644 ${name}\0`,
+          id: objectId("blob", Buffer.from(entry)),
+        },
+  ).toSorted((a, b) => Buffer.compare(a.sortKey, b.sortKey))
+
+  return objectId(
+    "tree",
+    Buffer.concat(entries.flatMap(({ header, id }) => [Buffer.from(header), id])),
+  )
+}
+
+const rootTreeId = (files: FakeCommit["files"]) => {
+  const root: Tree = new Map()
+
+  for (const [path, contents] of Object.entries(files)) {
+    const slash = path.lastIndexOf("/")
+    const name = path.slice(slash + 1)
+    let tree = root
+
+    for (const part of slash < 0 ? [] : path.slice(0, slash).split("/")) {
+      const child = tree.get(part)
+      const next: Tree = child instanceof Map ? child : new Map()
+      tree.set(part, next)
+      tree = next
+    }
+
+    tree.set(name, contents)
+  }
+
+  return treeId(root).toString("hex")
+}
+
+// WARNING: sha must hash what fast-import writes from stream: author defaults to committer, and parent is the ref's previous commit in the stream, since fast-import can't resolve an unwritten `from <sha>`.
+const fakeCommit = (ref: string, files: FakeCommit["files"], parent?: string) => ({
+  stream: [
+    parent === undefined ? `reset ${ref}\n` : "",
+    `commit ${ref}\n`,
+    `committer ${IDENTITY}\n`,
+    fastImportData(MESSAGE),
+    "deleteall\n",
+    ...Object.entries(files).map(
+      ([path, contents]) => `M 100644 inline ${path}\n${fastImportData(contents)}`,
+    ),
+  ].join(""),
+  sha: objectId(
+    "commit",
+    Buffer.from(
+      [
+        `tree ${rootTreeId(files)}\n`,
+        parent === undefined ? "" : `parent ${parent}\n`,
+        `author ${IDENTITY}\n`,
+        `committer ${IDENTITY}\n`,
+        `\n${MESSAGE}`,
+      ].join(""),
+    ),
+  ).toString("hex"),
+})
 
 export interface TrafficMeter {
   readonly around: <A, E, R>(request: Effect.Effect<A, E, R>) => Effect.Effect<A, E, R>
@@ -81,7 +143,7 @@ const httpBackend = (
   body: Uint8Array,
 ) =>
   Effect.callback<HttpServerResponse.HttpServerResponse>((resume) => {
-    const backend = spawn("git", ["http-backend"], {
+    const backend = spawn("git", ["-c", "uploadpack.allowFilter=true", "http-backend"], {
       env: {
         ...gitEnv,
         GIT_PROJECT_ROOT: root,
@@ -148,31 +210,35 @@ export const startFakeGitRemote = Effect.fnUntraced(function* (options: {
     (directory) => Effect.sync(() => rmSync(directory, { recursive: true, force: true })),
   )
 
-  const repositoryDirectory = (owner: string, repo: string) => {
-    const directory = join(root, owner, `${repo}.git`)
+  const unimported = new Map<string, string>()
 
-    if (!existsSync(directory)) {
-      git(root, ["init", "--bare", "--quiet", directory])
-      git(directory, ["config", "uploadpack.allowFilter", "true"])
-    }
+  const importPublished = (repository: string) => {
+    const stream = unimported.get(repository)
 
-    return directory
+    if (stream === undefined) return
+    const directory = join(root, `${repository}.git`)
+
+    if (!existsSync(directory)) git(root, ["init", "--bare", "--quiet", directory])
+
+    git(directory, ["fast-import", "--quiet", "--force"], Buffer.from(stream))
+    unimported.delete(repository)
   }
 
   const publish: PublishCommits = ({ owner, repo, number, base, head }) => {
-    const directory = repositoryDirectory(owner, repo)
+    const repository = `${owner}/${repo}`.toLowerCase()
     const ref = `refs/pull/${number}/head`
+    const baseCommit = fakeCommit(ref, base.files)
+    const headCommit = fakeCommit(ref, head.files, baseCommit.sha)
 
-    const stream = [
-      `reset ${ref}\n`,
-      ...deterministicCommit(ref, base.files),
-      ...deterministicCommit(ref, head.files),
-    ]
+    unimported.set(
+      repository,
+      (unimported.get(repository) ?? "") + baseCommit.stream + headCommit.stream,
+    )
 
-    git(directory, ["fast-import", "--quiet", "--force"], Buffer.from(stream.join("")))
-    const [headSha = "", baseSha = ""] = git(directory, ["rev-parse", ref, `${ref}^`]).split("\n")
-
-    return { base: { ...base, sha: baseSha }, head: { ...head, sha: headSha } }
+    return {
+      base: { ...base, sha: baseCommit.sha },
+      head: { ...head, sha: headCommit.sha },
+    }
   }
 
   const serve = Effect.gen(function* () {
@@ -188,6 +254,8 @@ export const startFakeGitRemote = Effect.fnUntraced(function* (options: {
     if (options.gitRefusedRepositories.has(repository)) {
       return HttpServerResponse.text("Permission denied.", { status: 403 })
     }
+
+    yield* Effect.sync(() => importPublished(repository.toLowerCase()))
 
     return yield* options.traffic.around(
       Effect.gen(function* () {

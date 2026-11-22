@@ -1,6 +1,8 @@
 node_modules/
 dist/
 dist-fake/
+dist-dev/
+dist-fake-dev/
 dist-test/
 release/
 .vitest/
@@ -11,3 +13,5 @@ release/
 test-results/
 playwright-report/
 .env
+
+*.tsbuildinfo

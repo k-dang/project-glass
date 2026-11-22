@@ -68,6 +68,7 @@ import { ProblemAlert } from "./ProblemAlert"
 import type { Problem } from "./problems"
 import { RepositoryBrowser } from "./RepositoryBrowser"
 import { FinishReview } from "./FinishReview"
+import { useLiveStatus } from "./liveStatus"
 import { MergePullRequest } from "./MergePullRequest"
 import { OpenPullRequestButton } from "./CommandMenu"
 import { closedAs, StatusChips } from "./PullRequestStatus"
@@ -83,8 +84,7 @@ import type { AskStore } from "./useAsks"
 import { type DraftStore, useDraftCount, useDraftsLocked } from "./useDrafts"
 import { useFullFiles } from "./useFullFiles"
 import type { ReplyStore } from "./useReplies"
-import type { Reactions } from "./useReactions"
-import type { Resolutions } from "./useResolutions"
+import type { Reactions, Resolutions } from "./workspaceFeedback"
 import { type ViewedFilesStore, useViewedFiles } from "./useViewedFiles"
 import { useActions } from "./actions"
 import { useShortcuts } from "./useShortcuts"
@@ -115,8 +115,8 @@ export function Workspace(props: {
   onBack: () => void
   onOpen: (pullRequest: PullRequestRef) => void
 }) {
-  const { pullRequest, revision, files, lineReviewThreads, outdatedReviewThreads, timeline } =
-    props.workspace
+  const { revision, files, lineReviewThreads, outdatedReviewThreads, timeline } = props.workspace
+  const pullRequest = useLiveStatus(props.workspace.pullRequest)
 
   const tour = useTour(pullRequest.ref, revision)
   const agentReview = useAgentReview(pullRequest.ref, revision, closedAs(pullRequest))

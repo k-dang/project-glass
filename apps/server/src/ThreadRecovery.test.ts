@@ -18,7 +18,8 @@ import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { threadsFixture, holding, lastText, settled } from "../test/threadsFixture"
-import { childProcesses, hostExited, startedHost } from "../test/agentHostProcesses"
+import { withSkippableWaits } from "../test/deadlines"
+import { hostExited, runningHost } from "../test/agentHostProcesses"
 import { LAUNCH_TOKEN } from "../test/harness"
 import {
   HOST_TOKEN_HEADER,
@@ -28,6 +29,7 @@ import {
 } from "./agentHost/hostAddress"
 import { AgentHostRpcs } from "./agentHost/protocol"
 import { greet } from "./hostJournal"
+import { JOURNAL_RETRY_SPACING } from "./LocalAgentHost"
 import { connectRpcClient } from "./rpcSocket"
 
 const toTestBackend = (url: string | URL) => String(url).includes(`${TOKEN_PARAM}=${LAUNCH_TOKEN}`)
@@ -100,14 +102,12 @@ it.live(
   () =>
     Effect.gen(function* () {
       const f = yield* threadsFixture
-      const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
       const thread = yield* f.start("Please ask permission")
 
       const [waiting] = yield* f.transcript(thread.id, (turns) => turns.some(hasWaiting))
       const request = waiting?.parts.find(isWaiting)
 
-      const host = startedHost(earlierHosts)
-      assert.isDefined(host, "the backend has no agent host running")
+      const host = runningHost(f.home)
       process.kill(host, "SIGKILL")
 
       const [cutOff] = yield* f.transcript(thread.id, settled(1))
@@ -237,116 +237,115 @@ it.live("starts a message Queued behind a Turn that ended while Glass was closed
   }),
 )
 
-// Flaky: listing processes through PowerShell returned JSON that failed to parse on Windows; passed on rerun.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("marks a running Turn interrupted when an updated Glass relaunches, stopping the old host", () =>
-  Effect.gen(function* () {
-    const f = yield* threadsFixture
-    const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
-    const thread = yield* f.start("First")
-    yield* f.transcript(thread.id, settled(1))
-
-    yield* f.send(thread.id, "hold:never")
-    yield* f.transcript(thread.id, holding)
-    const host = startedHost(earlierHosts)
-    assert.isDefined(host, "the backend has no agent host running")
-
-    yield* f.quit
-    yield* recordedHost(f.home).fingerprint("an earlier Glass")
-
-    const relaunched = yield* f.launch
-    yield* hostExited(host)
-
-    yield* relaunched.SendMessage({
-      threadId: thread.id,
-      message: "Third",
-      images: [],
-      feedback: [],
-    })
-    const turns = yield* f.transcript(thread.id, settled(3), relaunched)
-
-    assert.deepStrictEqual(
-      turns.map(({ ended }) => ended?.ending),
-      [TurnDone.make({}), TurnInterrupted.make({}), TurnDone.make({})],
-    )
-    assert.deepStrictEqual(lastText(turns[2]), TextPart.make({ text: "Reply to: Third" }))
-  }))
-
-// Flaky: listing processes through PowerShell returned JSON that failed to parse on Windows; passed on rerun.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("stops the agent host when Glass quits with no Turn running", () =>
-  Effect.gen(function* () {
-    const f = yield* threadsFixture
-    const earlierHosts = childProcesses(process.pid, "scriptedAgentHost.mjs")
-    const thread = yield* f.start("First")
-    yield* f.transcript(thread.id, settled(1))
-    const host = startedHost(earlierHosts)
-    assert.isDefined(host, "the backend has no agent host running")
-
-    yield* f.quit
-
-    yield* hostExited(host)
-  }))
-
 it.live(
-  "fills in what it missed while it lost its connection to the agent host, repeating nothing",
+  "marks a running Turn interrupted when an updated Glass relaunches, stopping the old host",
   () =>
     Effect.gen(function* () {
-      const connections = yield* droppableHostConnections
-
-      const f = yield* threadsFixture.pipe(
-        Effect.provideService(Socket.WebSocketConstructor, connections.constructor),
-      )
-
+      const f = yield* threadsFixture
       const thread = yield* f.start("First")
       yield* f.transcript(thread.id, settled(1))
-      const opened = connections.opened()
 
-      yield* f.send(thread.id, "hold:second")
+      yield* f.send(thread.id, "hold:never")
+      yield* f.transcript(thread.id, holding)
+      const host = runningHost(f.home)
 
-      const running = yield* f.transcript(
-        thread.id,
-        (turns) => turns.length === 2 && holding(turns.slice(1)),
-      )
+      yield* f.quit
+      yield* recordedHost(f.home).fingerprint("an earlier Glass")
 
-      const secondTurnId = running[1]!.id
+      const relaunched = yield* f.launch
+      yield* hostExited(host)
 
-      yield* connections.drop
-      yield* f.release("second")
-
-      const witness = yield* connections.witness
-      yield* witness.WatchJournal({ host: yield* greet(witness), after: 0 }).pipe(
-        Stream.filter(
-          ({ threadId, event }) =>
-            threadId === thread.id &&
-            Predicate.isTagged(event, "TurnEnded") &&
-            event.turnId === secondTurnId,
-        ),
-        Stream.runHead,
-        Effect.map(Option.getOrThrow),
-      )
-
-      const beforeReconnect = yield* f.transcript(thread.id, (turns) => turns.length === 2)
-      assert.isNull(beforeReconnect[1]?.ended)
-      yield* connections.reconnect
-
-      const turns = yield* f.transcript(thread.id, settled(2))
-      assert.isAbove(connections.opened(), opened)
+      yield* relaunched.SendMessage({
+        threadId: thread.id,
+        message: "Third",
+        images: [],
+        feedback: [],
+      })
+      const turns = yield* f.transcript(thread.id, settled(3), relaunched)
 
       assert.deepStrictEqual(
-        turns.map((turn) => ({ parts: turn.parts, ending: turn.ended?.ending })),
-        [
-          { parts: [TextPart.make({ text: "Reply to: First" })], ending: TurnDone.make({}) },
-          {
-            parts: [
-              TextPart.make({ text: "Holding." }),
-              TextPart.make({ text: "Reply to: hold:second" }),
-            ],
-            ending: TurnDone.make({}),
-          },
-        ],
+        turns.map(({ ended }) => ended?.ending),
+        [TurnDone.make({}), TurnInterrupted.make({}), TurnDone.make({})],
       )
+      assert.deepStrictEqual(lastText(turns[2]), TextPart.make({ text: "Reply to: Third" }))
     }),
+)
+
+it.live("stops the agent host when Glass quits with no Turn running", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    const thread = yield* f.start("First")
+    yield* f.transcript(thread.id, settled(1))
+    const host = runningHost(f.home)
+
+    yield* f.quit
+
+    yield* hostExited(host)
+  }),
+)
+
+it.effect(
+  "fills in what it missed while it lost its connection to the agent host, repeating nothing",
+  () =>
+    withSkippableWaits(JOURNAL_RETRY_SPACING, (skipRetryWaits) =>
+      Effect.gen(function* () {
+        const connections = yield* droppableHostConnections
+
+        const f = yield* threadsFixture.pipe(
+          Effect.provideService(Socket.WebSocketConstructor, connections.constructor),
+        )
+
+        const thread = yield* f.start("First")
+        yield* f.transcript(thread.id, settled(1))
+        const opened = connections.opened()
+
+        yield* f.send(thread.id, "hold:second")
+
+        const running = yield* f.transcript(
+          thread.id,
+          (turns) => turns.length === 2 && holding(turns.slice(1)),
+        )
+
+        const secondTurnId = running[1]!.id
+
+        yield* connections.drop
+        yield* f.release("second")
+
+        const witness = yield* connections.witness
+        yield* witness.WatchJournal({ host: yield* greet(witness), after: 0 }).pipe(
+          Stream.filter(
+            ({ threadId, event }) =>
+              threadId === thread.id &&
+              Predicate.isTagged(event, "TurnEnded") &&
+              event.turnId === secondTurnId,
+          ),
+          Stream.runHead,
+          Effect.map(Option.getOrThrow),
+        )
+
+        const beforeReconnect = yield* f.transcript(thread.id, (turns) => turns.length === 2)
+        assert.isNull(beforeReconnect[1]?.ended)
+        yield* connections.reconnect
+        yield* skipRetryWaits
+
+        const turns = yield* f.transcript(thread.id, settled(2))
+        assert.isAbove(connections.opened(), opened)
+
+        assert.deepStrictEqual(
+          turns.map((turn) => ({ parts: turn.parts, ending: turn.ended?.ending })),
+          [
+            { parts: [TextPart.make({ text: "Reply to: First" })], ending: TurnDone.make({}) },
+            {
+              parts: [
+                TextPart.make({ text: "Holding." }),
+                TextPart.make({ text: "Reply to: hold:second" }),
+              ],
+              ending: TurnDone.make({}),
+            },
+          ],
+        )
+      }),
+    ),
 )
 
 it.live(

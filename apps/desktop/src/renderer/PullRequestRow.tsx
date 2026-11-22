@@ -1,16 +1,14 @@
-import { useAtomSet } from "@effect/atom-react"
 import type { PullRequestRef, PullRequestState, PullRequestSummary } from "@glass/contracts"
-import { useRouter } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime } from "effect"
 import { History } from "lucide-react"
-import { type ReactNode, useEffect, useId, useRef, useState } from "react"
+import { type ReactNode, useId, useState } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipHint } from "@/components/ui/tooltip"
 import { type Problem, problemText } from "./problems"
-import { preloadPullRequestAtom } from "./reviewsArea"
 import { checksLabels, finishedStates, warningTone } from "./status"
+import { usePreloadOnHover } from "./preloadPullRequest"
 
 export function NotRefreshed(props: { problem: Problem; showLabel?: boolean }) {
   const reason = problemText(props.problem)
@@ -25,38 +23,6 @@ export function NotRefreshed(props: { problem: Problem; showLabel?: boolean }) {
       <TooltipContent>{reason}</TooltipContent>
     </Tooltip>
   )
-}
-
-const HOVER_INTENT_MS = 100
-
-const usePreloadOnHover = (ref: PullRequestRef) => {
-  const preloadData = useAtomSet(preloadPullRequestAtom)
-  const router = useRouter()
-  const pending = useRef<ReturnType<typeof setTimeout>>(undefined)
-
-  const preload = () => {
-    preloadData(ref)
-    void router.preloadRoute({
-      to: "/reviews/$owner/$repo/$number",
-      params: ref,
-    })
-  }
-
-  const cancel = () => clearTimeout(pending.current)
-
-  useEffect(() => () => clearTimeout(pending.current), [])
-
-  return {
-    onPointerEnter: () => {
-      cancel()
-      pending.current = setTimeout(preload, HOVER_INTENT_MS)
-    },
-    onPointerLeave: cancel,
-    onPointerDown: () => {
-      cancel()
-      preload()
-    },
-  }
 }
 
 export const columnsWithRepository =

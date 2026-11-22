@@ -52,6 +52,8 @@ Restart Glass. It reads the keys each time it needs one, so later changes need n
 - Upstash pauses a Box it counts as idle, after 1 hour on its free plan and 6 hours on paid plans,
   and keeps its files. The next time Glass connects, the Box resumes and restarts the agent host. A Turn
   that was running when the Box paused is cut off.
+- After a Glass upgrade that changes how Glass talks to the agent host, Glass has the Plugin replace
+  the host in each Box; a Turn that was running is cut off.
 - Removing the Thread deletes the Box.
 
 ## Check it

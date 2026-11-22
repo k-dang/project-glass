@@ -40,7 +40,7 @@ export const CHECK_IN_TIMEOUT_SECONDS = 60 * 60
 
 export const CHECK_IN_MAX_TIMEOUT_SECONDS = 2 * 60 * 60
 
-export class CheckInRefused extends Schema.TaggedError<CheckInRefused>()("CheckInRefused", {
+class CheckInRefused extends Schema.TaggedError<CheckInRefused>()("CheckInRefused", {
   message: Schema.String,
 }) {}
 

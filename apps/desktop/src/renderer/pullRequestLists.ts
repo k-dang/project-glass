@@ -134,7 +134,7 @@ export const syncListingsAtom = backendRuntime
   .fn(() => Backend.use((backend) => backend.ListPullRequests()))
   .pipe(Atom.keepAlive)
 
-export interface KnownPullRequest {
+interface KnownPullRequest {
   readonly ref: PullRequestRef
   readonly title: string
 }

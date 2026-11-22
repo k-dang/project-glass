@@ -98,7 +98,7 @@ export interface Starter {
   readonly sessionId: string
 }
 
-export interface PendingOutcome {
+interface PendingOutcome {
   readonly work: WorkOutcome
   readonly at: DateTime.Utc
 }

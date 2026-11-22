@@ -26,7 +26,7 @@ import {
 } from "./draftSync"
 import { type Problem, problemOf } from "./problems"
 
-export type SubmitOutcome =
+type SubmitOutcome =
   | { readonly type: "submitted"; readonly published: number }
   | { readonly type: "failed"; readonly problem: Problem }
   | { readonly type: "blocked" }

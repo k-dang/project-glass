@@ -2,6 +2,7 @@ import { ThreadError, RPC_PATH } from "@glass/contracts"
 import type {
   AgentHarness,
   SandboxCreation,
+  SandboxHost,
   SandboxProvider,
   SandboxRequest,
   SandboxState,
@@ -14,7 +15,8 @@ import { connectRpcClient } from "./rpcSocket"
 import { MissingLogin, NoCapacity, SandboxGone } from "./sandboxFailures"
 
 export const SANDBOX_DEADLINES = {
-  startHost: Duration.minutes(1),
+  startHost: Duration.minutes(3),
+  hostAnswers: Duration.minutes(1),
   connect: Duration.seconds(30),
   endHost: Duration.seconds(10),
   remove: Duration.minutes(2),
@@ -125,18 +127,18 @@ const hostUrl = (target: SandboxTarget, path: string) => {
   return url
 }
 
+const failureAbout =
+  (provider: SandboxProvider, action: string) =>
+  ({ rejected }: { readonly rejected: unknown }): Effect.Effect<never, ThreadError | SandboxGone> =>
+    rejected instanceof SandboxGone
+      ? Effect.fail(rejected)
+      : providerFailure(provider, action)({ rejected })
+
 const callAbout = <A>(
   provider: SandboxProvider,
   action: string,
   run: (signal: AbortSignal) => Promise<A>,
-) =>
-  fromProvider(run).pipe(
-    Effect.catch(({ rejected }): Effect.Effect<never, ThreadError | SandboxGone> =>
-      rejected instanceof SandboxGone
-        ? Effect.fail(rejected)
-        : providerFailure(provider, action)({ rejected }),
-    ),
-  )
+) => fromProvider(run).pipe(Effect.catch(failureAbout(provider, action)))
 
 const targetOf = (provider: SandboxProvider, state: SandboxState) =>
   callAbout(provider, "reach the Sandbox", (signal) => provider.target(state, signal))
@@ -163,25 +165,35 @@ export const extendSandbox = (
   )
 }
 
-const didntStart = () =>
+export const hostDidntStart = () =>
   new ThreadError({ message: "The agent in the Sandbox didn't start. Try again." })
 
-export const waitForHost = (provider: SandboxProvider, state: SandboxState) =>
+const waitForHost = (provider: SandboxProvider, state: SandboxState) =>
   targetOf(provider, state).pipe(
-    Effect.catchTag("SandboxGone", () => Effect.fail(didntStart())),
     Effect.flatMap((target) =>
       Effect.tryPromise((signal) =>
         fetch(hostUrl(target, HEALTH_PATH), { headers: { ...target.headers }, signal }),
       ).pipe(
         Effect.filterOrFail((response) => response.ok),
         Effect.retry({ schedule: Schedule.spaced("250 millis") }),
+        Effect.mapError(hostDidntStart),
       ),
     ),
     Effect.timeoutOrElse({
-      duration: SANDBOX_DEADLINES.startHost,
-      orElse: () => Effect.fail(didntStart()),
+      duration: SANDBOX_DEADLINES.hostAnswers,
+      orElse: () => Effect.fail(hostDidntStart()),
     }),
   )
+
+export const startHost = (provider: SandboxProvider, state: SandboxState, host: SandboxHost) => {
+  const action = "start the agent in the Sandbox"
+
+  return fromProviderAwaitingCleanup((signal) => provider.startHost(state, host, signal)).pipe(
+    Effect.catch(failureAbout(provider, action)),
+    boundSandboxCall(provider, action, SANDBOX_DEADLINES.startHost),
+    Effect.andThen(waitForHost(provider, state)),
+  )
+}
 
 export const connectToHost = (provider: SandboxProvider, state: SandboxState, token: string) =>
   targetOf(provider, state).pipe(
@@ -217,11 +229,17 @@ const shutDownHost = (provider: SandboxProvider, state: SandboxState, token: str
       ).pipe(Effect.filterOrFail((response) => response.ok)),
     ),
     Effect.timeout(SANDBOX_DEADLINES.endHost),
-    Effect.tapError((cause) =>
-      Effect.logWarning(`Couldn't end the agent host in a Sandbox of ${provider.name}`, cause),
-    ),
-    Effect.ignore,
+    Effect.ignore({
+      log: "Warn",
+      message: `Couldn't end the agent host in a Sandbox of ${provider.name}`,
+    }),
   )
+
+export const replaceHost = (
+  provider: SandboxProvider,
+  { state, token }: { readonly state: SandboxState; readonly token: string },
+  host: SandboxHost,
+) => shutDownHost(provider, state, token).pipe(Effect.andThen(startHost(provider, state, host)))
 
 export const deleteSandbox = (
   provider: SandboxProvider,

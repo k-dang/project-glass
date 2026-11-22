@@ -2,15 +2,15 @@ import { Duration, Match } from "effect"
 
 const LOST_AFTER_MISSES = 4
 
-const QUICK_RETRY_SPACING = Duration.millis(500)
+export const QUICK_RETRY_SPACING = Duration.millis(500)
 
-const FIRST_LOST_RETRY_SPACING = Duration.seconds(5)
+export const FIRST_LOST_RETRY_SPACING = Duration.seconds(5)
 
 const MAX_LOST_RETRY_SPACING = Duration.minutes(5)
 
 const GIVE_UP_AFTER = Duration.minutes(15)
 
-type Reach = "connecting" | "reachable" | "unreachable" | "incompatible"
+type Reach = "connecting" | "reachable" | "unreachable"
 
 export type Recovery<Client> =
   | { readonly phase: "connecting"; readonly reach: Reach }
@@ -28,7 +28,6 @@ export type Recovery<Client> =
       readonly delay: Duration.Duration
     }
   | { readonly phase: "abandoned" }
-  | { readonly phase: "incompatible" }
 
 export const recoveryReach = <C>(state: Recovery<C>) =>
   Match.value(state).pipe(
@@ -39,7 +38,6 @@ export const recoveryReach = <C>(state: Recovery<C>) =>
       retrying: ({ reach }) => reach,
       unreachable: () => "unreachable",
       abandoned: () => "unreachable",
-      incompatible: () => "incompatible",
     }),
   )
 

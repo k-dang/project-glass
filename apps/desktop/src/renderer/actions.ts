@@ -4,9 +4,9 @@ import { type Shortcut, useShortcuts } from "./useShortcuts"
 
 export const actionGroups = ["Pull request", "Thread", "Go to", "Glass"] as const
 
-export type ActionGroup = (typeof actionGroups)[number]
+type ActionGroup = (typeof actionGroups)[number]
 
-export type ActionShortcut = Omit<Shortcut, "run">
+type ActionShortcut = Omit<Shortcut, "run">
 
 export interface Action {
   readonly id: string

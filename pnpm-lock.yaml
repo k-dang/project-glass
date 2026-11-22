@@ -84,6 +84,9 @@ catalogs:
     '@types/react-dom':
       specifier: 19.3.0
       version: 19.3.0
+    '@types/ws':
+      specifier: 8.18.2
+      version: 8.18.2
     '@ui-sdk/core':
       specifier: 0.1.0-beta.2
       version: 0.1.0-beta.2
@@ -126,6 +129,9 @@ catalogs:
     pele:
       specifier: 1.13.0
       version: 1.13.0
+    playwright-core:
+      specifier: 1.64.1
+      version: 1.64.1
     react:
       specifier: 19.3.0
       version: 19.3.0
@@ -162,6 +168,9 @@ catalogs:
     vitest:
       specifier: 5.0.3
       version: 5.0.3
+    ws:
+      specifier: 8.22.0
+      version: 8.22.0
     zod:
       specifier: 4.6.7
       version: 4.6.7
@@ -211,6 +220,9 @@ importers:
       '@effect/atom-react':
         specifier: 'catalog:'
         version: 4.0.5(effect@4.0.5)(react@19.3.0)(scheduler@0.28.0)
+      '@effect/vitest':
+        specifier: 'catalog:'
+        version: 4.0.5(effect@4.0.5)(vitest@5.0.3)
       '@fontsource-variable/geist':
         specifier: 'catalog:'
         version: 5.3.0
@@ -268,6 +280,9 @@ importers:
       '@tiptap/react':
         specifier: 'catalog:'
         version: 3.32.1(@floating-ui/dom@1.8.0)(@tiptap/core@3.32.1(@tiptap/pm@3.32.1))(@tiptap/pm@3.32.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@types/mdast':
+        specifier: 4.0.4
+        version: 4.0.4
       '@types/node':
         specifier: 'catalog:'
         version: 24.19.2
@@ -277,6 +292,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.3.0(@types/react@19.3.0)
+      '@types/ws':
+        specifier: 'catalog:'
+        version: 8.18.2
       '@ui-sdk/core':
         specifier: 'catalog:'
         version: 0.1.0-beta.2
@@ -352,6 +370,9 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 1.1.0(@types/node@24.19.2)(@vitest/ui@5.0.3)(happy-dom@21.0.3)(jiti@2.7.0)(playwright@1.64.1)(typescript@7.0.2)(yaml@2.9.0)
+      ws:
+        specifier: 'catalog:'
+        version: 8.22.0
 
   apps/gallery:
     devDependencies:
@@ -424,6 +445,9 @@ importers:
       pele:
         specifier: 'catalog:'
         version: 1.13.0
+      playwright-core:
+        specifier: 'catalog:'
+        version: 1.64.1
       tar:
         specifier: 7.5.22
         version: 7.5.22

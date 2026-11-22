@@ -1,38 +1,34 @@
 import * as React from "react"
 
-import { loadHighlighter } from "@/lib/highlighter"
+import { type Highlighter, loadHighlighter, loadedHighlighter } from "@/lib/highlighter"
 
 export function useHighlightedCode(value: string, language: string) {
   const code = value.endsWith("\n") ? value.slice(0, -1) : value
-
-  const [loaded, setLoaded] = React.useState<{
-    language: string
-    highlighter: Awaited<ReturnType<typeof loadHighlighter>>
-  } | null>(null)
-
-  const highlighter = loaded?.language === language ? loaded.highlighter : null
+  const ready = loadedHighlighter(language)
+  const highlighter = ready ?? null
+  const [, rerender] = React.useReducer((loads: number) => loads + 1, 0)
 
   React.useEffect(() => {
+    if (ready !== undefined) return undefined
+
     let cancelled = false
 
     loadHighlighter(language)
-      .then((next) => {
-        if (!cancelled) {
-          setLoaded({ language, highlighter: next })
-        }
+      .then(() => {
+        if (!cancelled) rerender()
       })
       .catch(() => {})
 
     return () => {
       cancelled = true
     }
-  }, [language])
+  }, [language, ready])
 
   const [done, setDone] = React.useState<{
-    highlighter: typeof highlighter
+    highlighter: Highlighter | null
     text: string
     lines: React.ReactNode[]
-    state?: Parameters<NonNullable<typeof highlighter>["highlight"]>[1]
+    state?: Parameters<Highlighter["highlight"]>[1]
   }>({ highlighter: null, text: "", lines: [] })
 
   let next = done

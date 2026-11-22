@@ -19,9 +19,9 @@ A Thread's composer keeps working while its Turn runs. Sending then Queues the m
 
 Preconditions:
 
-- `node $V launch --backend fake`: `pnpm dev:fake`'s backend, which seeds eight demo Threads (five pi, three Claude Code) on its own fake GitHub and model provider. `node $V doctor` passes.
+- `node $V launch --backend fake`: `pnpm dev:fake`'s backend, which seeds the `demo/...` Threads on its own fake GitHub and model provider. `node $V doctor` passes.
 
-- **Open the demo Thread.** `click --role link --name "Threads"`, then the pi Thread whose transcript starts "Show me around this repository." (names such as `agent/quiet-raven` are generated per run), and `wait --text "README"`.
+- **Open the demo Thread.** `click --role link --name "Threads"`, then `click --role link --name demo/look-around`, and `wait --text "README"`.
 - **A running Turn.** `type --role textbox --name "Message" --text "Write the greeting, slowly"`, `press --key Enter`, `wait --text "Step 1"`. The demo Thread streams a message containing "slowly" over about 18 seconds.
 - **Queue (`composer-queue`).** While it runs, `type` and `press --key Enter` twice more, `wait --text "Starts when the agent finishes"`, and capture `queued`. After the Turn, each Queued message starts as its own Turn, answered "Got it: …".
 - **Steer (`composer-steer`).** In a new slow Turn, `type` a message and `press --key Enter --meta`, then `wait --text "Got it: “<message>”"` and capture `steered`: "Steered" sits over the message inside the Turn.

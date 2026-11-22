@@ -1,7 +1,7 @@
 import { execFileSync } from "node:child_process"
-import { mkdirSync, writeFileSync } from "node:fs"
+import { mkdirSync } from "node:fs"
 import { join } from "node:path"
-import { isolatedGitEnv } from "../src/gitEnv"
+import { isolatedGitEnv } from "../src/gitEnv.ts"
 
 const env = {
   ...isolatedGitEnv(),
@@ -14,23 +14,27 @@ const env = {
 export const gitIn = (cwd: string, ...args: ReadonlyArray<string>) =>
   execFileSync("git", args, { cwd, env, encoding: "utf8" }).trim()
 
+export const fastImportData = (text: string) => `data ${Buffer.byteLength(text)}\n${text}\n`
+
 export const seedClone = (directory: string, owner: string, repo: string) => {
   const origin = join(directory, `${repo}-origin.git`)
-  const seed = join(directory, `${repo}-seed`)
   const checkout = join(directory, repo)
   const url = `https://github.com/${owner}/${repo}.git`
+  const now = Math.floor(Date.now() / 1000)
 
-  mkdirSync(seed, { recursive: true })
+  mkdirSync(directory, { recursive: true })
   gitIn(directory, "init", "--quiet", "--bare", "--initial-branch=main", origin)
-  gitIn(seed, "init", "--quiet", "--initial-branch=main")
-  writeFileSync(join(seed, "README.md"), `# ${repo}\n`)
-  gitIn(seed, "add", ".")
-  gitIn(seed, "commit", "--quiet", "-m", "Start")
-  gitIn(seed, "branch", "develop")
-  gitIn(seed, "push", "--quiet", origin, "main", "develop")
-  gitIn(directory, "clone", "--quiet", origin, checkout)
-  gitIn(checkout, "remote", "set-url", "origin", url)
-  gitIn(checkout, "config", `url.${origin}.insteadOf`, url)
+  execFileSync("git", ["-C", origin, "fast-import", "--quiet"], {
+    env,
+    input: [
+      "commit refs/heads/main\n",
+      `committer ${env.GIT_COMMITTER_NAME} <${env.GIT_COMMITTER_EMAIL}> ${now} +0000\n`,
+      fastImportData("Start"),
+      `M 100644 inline README.md\n${fastImportData(`# ${repo}\n`)}`,
+      "reset refs/heads/develop\nfrom refs/heads/main\n",
+    ].join(""),
+  })
+  gitIn(directory, "clone", "--quiet", "-c", `url.${origin}.insteadOf=${url}`, url, checkout)
 
   return { checkout, origin, main: gitIn(checkout, "rev-parse", "origin/main") }
 }

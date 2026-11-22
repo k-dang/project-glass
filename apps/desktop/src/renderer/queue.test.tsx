@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import {
   GitHubConnection,
   GitHubUnavailable,
@@ -24,6 +23,7 @@ import { backendLayerAtom } from "./backend"
 import { openReview } from "../../test/finishReview"
 import { type Handlers, testLayer } from "../../test/testBackend"
 import { pullRequestFields, viewer } from "../../test/workspace"
+import { RegistryProvider } from "../../test/registry"
 
 const summary = (owner: string, repo: string, number: number, title: string) =>
   new PullRequestSummary({

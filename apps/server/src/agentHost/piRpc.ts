@@ -95,7 +95,7 @@ const decodeRecord = Schema.decodeUnknownOption(
   Schema.fromJsonString(Schema.Union([Response, PiEvent])),
 )
 
-export interface PiImage {
+interface PiImage {
   readonly type: "image"
   readonly data: string
   readonly mimeType: string

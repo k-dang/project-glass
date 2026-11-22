@@ -8,6 +8,7 @@ import {
   type TurnEnding,
   TurnFailed,
   type TurnPart,
+  ToolCallStatusSet,
   TurnStopped,
 } from "@glass/contracts"
 import { DateTime, Predicate } from "effect"
@@ -282,4 +283,18 @@ it("fails a Turn with Claude Code's own words for what went wrong", () => {
     ending,
     TurnFailed.make({ reason: "Claude Code stopped with an error: overloaded" }),
   )
+})
+
+const ended = (outcome: "completed" | "failed") =>
+  Input.BackgroundWorkEnded({
+    work: { kind: "subagent", description: "Explore: Trace it", outcome },
+    toolCallId: "toolu_1",
+  })
+
+it("marks the tool call that started background work as failed or stopped, whether a Turn runs or not", () => {
+  const marked = [ToolCallStatusSet.make({ toolCallId: "toolu_1", status: "failed" })]
+
+  assert.deepStrictEqual(step(null, ended("failed"), now).events, marked)
+  assert.deepStrictEqual(step(fresh, ended("failed"), now).events, marked)
+  assert.deepStrictEqual(step(null, ended("completed"), now).events, [])
 })

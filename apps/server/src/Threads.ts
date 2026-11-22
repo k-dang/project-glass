@@ -32,6 +32,7 @@ import {
   type Revision,
   localPlace,
   mentionedToDoIds,
+  repositoryKey,
   type Transcript,
   type TranscriptUpdate,
   type TurnEnd,
@@ -57,6 +58,8 @@ import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { changesId } from "./Changes"
 import { ActivityLog } from "./ActivityLog"
+import { firstFreeBranch } from "./BranchNames"
+import { threadBranchNaming } from "./threadBranchNaming"
 import { threadWith, decodeStored, sandboxProviderOf, toRow } from "./threadRows"
 import { type ClaimedThread, type ThreadHost, ThreadTurns } from "./ThreadTurns"
 import { threadNotes, FeedbackNotes } from "./FeedbackNotes"
@@ -73,7 +76,6 @@ import { LocalPlacement } from "./LocalPlacement"
 import { type RepositoryRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
-import { forgetStartedWork } from "./startedWorkRows"
 import { ToDos } from "./ToDos"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
@@ -125,7 +127,7 @@ type Purpose = Data.TaggedEnum<{
 
 const Purpose = Data.taggedEnum<Purpose>()
 
-export interface NewReviewThread {
+interface NewReviewThread {
   readonly name: string
   readonly repository: FollowedRepository
   readonly revision: Revision
@@ -383,6 +385,60 @@ export class Threads extends Context.Service<
       const hostingOf = (row: PlacedThread): ThreadHosting =>
         row.forReview ? reviewHosting : placementFor(row.thread.place)
 
+      const saveBranch = (
+        threadId: string,
+        change: { readonly branch: string | null; readonly name?: string },
+      ) =>
+        lock.withPermits(1)(
+          Effect.gen(function* () {
+            const found = yield* find(threadId)
+
+            yield* sql`UPDATE thread SET ${sql.update(change)} WHERE id = ${threadId}`.pipe(
+              Effect.tapError((cause) =>
+                Effect.logWarning("Couldn't save a Thread's branch", cause),
+              ),
+              Effect.mapError(storageFailure),
+            )
+            yield* replace(threadWith(found.thread, change))
+          }),
+        )
+
+      const claimBranch = Effect.fnUntraced(function* (threadId: string, suggested: string) {
+        const row = yield* find(threadId)
+        const { repository } = row.thread
+        const placement = placementFor(row.thread.place)
+
+        const known = (yield* SubscriptionRef.get(rows)).flatMap(({ thread }) =>
+          thread.branch !== null && repositoryKey(thread.repository) === repositoryKey(repository)
+            ? [thread.branch]
+            : [],
+        )
+
+        const taken = [...(yield* placement.takenBranches(repository, suggested)), ...known]
+
+        const branch = yield* firstFreeBranch(suggested, taken).pipe(
+          Option.match({
+            onNone: () =>
+              Effect.fail(
+                new ThreadError({ message: `Every branch name like ${suggested} is taken.` }),
+              ),
+            onSome: Effect.succeed,
+          }),
+        )
+
+        yield* placement.useBranch(row, branch)
+        yield* saveBranch(threadId, { name: branch, branch })
+      })
+
+      const naming = yield* threadBranchNaming(claimBranch)
+
+      // WARNING: A Sandbox makes its branch when its host is prepared, so the host waits for the name.
+      const prepareHostOf = (threadId: string) =>
+        naming.named(threadId).pipe(
+          Effect.andThen(find(threadId)),
+          Effect.flatMap((row) => hostingOf(row).prepareHost(row)),
+        )
+
       const withSandbox = (thread: Thread) =>
         sandboxes.status(thread.id).pipe(Effect.map((sandbox) => threadWith(thread, { sandbox })))
 
@@ -442,7 +498,11 @@ export class Threads extends Context.Service<
               : startAs(client, WorkRole.make({}))
             ).pipe(Effect.asVoid),
           settings: { model, effort, permissionMode },
-          prepareHost: hosting.prepareHost(row),
+          prepareHost: prepareHostOf(id).pipe(
+            Effect.catchTag("ThreadNotFound", () =>
+              Effect.fail(new ThreadError({ message: "This Thread was removed." })),
+            ),
+          ),
           connectedHost: hosting.connectedHost(row),
         }
       }
@@ -481,20 +541,7 @@ export class Threads extends Context.Service<
           .CurrentBranch({ folder: row.folder })
           .pipe(Effect.mapError(asThreadError))
 
-        if (branch !== row.thread.branch)
-          yield* lock.withPermits(1)(
-            Effect.gen(function* () {
-              const found = yield* find(threadId)
-
-              yield* sql`UPDATE thread SET branch = ${branch} WHERE id = ${threadId}`.pipe(
-                Effect.tapError((cause) =>
-                  Effect.logWarning("Couldn't save a Thread's branch", cause),
-                ),
-                Effect.mapError(storageFailure),
-              )
-              yield* replace(threadWith(found.thread, { branch }))
-            }),
-          )
+        if (branch !== row.thread.branch) yield* saveBranch(threadId, { branch })
 
         return true
       })
@@ -602,11 +649,11 @@ export class Threads extends Context.Service<
         const { message, images } = input
         const placement = yield* placementRunning(place, harness)
 
-        const { name, branch, folder, discard } = yield* placement.place(repository, baseBranch)
+        const { branch, folder, discard } = yield* placement.place(repository, baseBranch)
 
         const thread = new Thread({
           id: randomUUID(),
-          name,
+          name: branch,
           place,
           repository,
           baseBranch,
@@ -621,16 +668,20 @@ export class Threads extends Context.Service<
           sandbox: null,
         })
 
+        yield* naming.hold(thread.id)
+
         const created = yield* insert(
           { thread, folder, forReview: false },
           { message, images },
           Purpose.Work({ packs: input.skillPacks }),
-        ).pipe(Effect.onError(() => discard))
+        ).pipe(Effect.onError(() => discard.pipe(Effect.andThen(naming.release(thread.id)))))
+
+        yield* naming.name(thread.id, message)
 
         yield* activityLog.record(
           ThreadStarted.make({
             threadId: thread.id,
-            name,
+            name: branch,
             repository,
             machine: place._tag,
             harness: thread.harness,
@@ -905,10 +956,9 @@ export class Threads extends Context.Service<
           const running = yield* hosting.connectedHost(row)
 
           if (Option.isSome(running))
-            yield* running.value.StopThread({ threadId }).pipe(
-              Effect.tapError((cause) => Effect.logWarning("Couldn't stop a Thread", cause)),
-              Effect.ignore,
-            )
+            yield* running.value
+              .StopThread({ threadId })
+              .pipe(Effect.ignore({ log: "Warn", message: "Couldn't stop a Thread" }))
 
           yield* hosting.remove(row)
 
@@ -917,7 +967,8 @@ export class Threads extends Context.Service<
             yield* turns.removeUnsent(threadId)
             yield* notes.removeAll(threadNotes(threadId))
             yield* skillPacks.releaseThread(threadId)
-            yield* forgetStartedWork(sql, threadId)
+            yield* sql`DELETE FROM started_thread WHERE thread_id = ${threadId} OR started_by = ${threadId}`
+            yield* sql`DELETE FROM started_agent_review WHERE started_by = ${threadId}`
             yield* toDos.unlinkThread(threadId)
             yield* sql`DELETE FROM thread WHERE id = ${threadId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
@@ -997,11 +1048,7 @@ export class Threads extends Context.Service<
           ),
         sendQueued,
         stop,
-        reachSandbox: (threadId) =>
-          find(threadId).pipe(
-            Effect.flatMap((row) => hostingOf(row).prepareHost(row)),
-            Effect.asVoid,
-          ),
+        reachSandbox: (threadId) => prepareHostOf(threadId).pipe(Effect.asVoid),
         unsent,
         saveUnsent,
         watchWaiting: () =>

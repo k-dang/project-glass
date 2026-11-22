@@ -21,9 +21,9 @@ export const TurnSeen = Schema.Struct({
 
 export type TurnSeen = typeof TurnSeen.Type
 
-export const ThreadReason = Schema.Union([WaitingRequests, TurnFinished])
+const ThreadReason = Schema.Union([WaitingRequests, TurnFinished])
 
-export type ThreadReason = typeof ThreadReason.Type
+type ThreadReason = typeof ThreadReason.Type
 
 export const AgentReviewFinished = Schema.TaggedStruct("AgentReviewFinished", {
   writtenAt: Schema.DateTimeUtcFromString,

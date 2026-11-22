@@ -2,7 +2,7 @@ import { NoCredentials, type TokenSource } from "@glass/contracts"
 import { Config, Context, Effect, Layer, Option, Redacted } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 
-export interface ResolvedToken {
+interface ResolvedToken {
   readonly token: Redacted.Redacted
   readonly source: TokenSource
 }

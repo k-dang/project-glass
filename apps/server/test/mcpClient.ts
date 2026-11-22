@@ -66,19 +66,26 @@ export const mcpPost = (
     }
   })
 
-export const initialize: JsonRpcMessage = {
+const initializeAs = (clientName: string): JsonRpcMessage => ({
   jsonrpc: "2.0",
   id: 0,
   method: "initialize",
   params: {
     protocolVersion: "2025-11-25",
     capabilities: {},
-    clientInfo: { name: "glass-test", version: "1.0.0" },
+    clientInfo: { name: clientName, version: "1.0.0" },
   },
-}
+})
 
-export const connectMcp = Effect.fnUntraced(function* (baseUrl: string, bearer: Redacted.Redacted) {
-  const initialized = yield* mcpPost(baseUrl, initialize, { bearer })
+export const initialize = initializeAs("glass-test")
+
+export const connectMcp = Effect.fnUntraced(function* (
+  baseUrl: string,
+  bearer: Redacted.Redacted,
+  clientName = "glass-test",
+) {
+  const initialized = yield* mcpPost(baseUrl, initializeAs(clientName), { bearer })
+
   const sessionId = initialized.sessionId
 
   if (initialized.status !== 200 || sessionId === undefined) {

@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import { RegistryProvider } from "@effect/atom-react"
 import { PullRequest } from "@glass/contracts"
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -8,6 +7,7 @@ import { Toaster } from "@/components/ui/toast"
 import { pullRequestFields } from "../../test/workspace"
 import { CopyMenu } from "./CopyMenu"
 import { CommandMenu } from "./CommandMenu"
+import { RegistryProvider } from "../../test/registry"
 
 afterEach(() => {
   cleanup()

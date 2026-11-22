@@ -1,7 +1,7 @@
 import { AgentHarness, ThreadError, type FollowedRepository } from "@glass/contracts"
-import { Context, Effect, Exit, FileSystem, Layer, Option, Stream } from "effect"
+import { Context, Effect, FileSystem, Layer, Option, Stream } from "effect"
 import { join } from "node:path"
-import { shortThreadNames, uniqueThreadName } from "./threadNames"
+import { placeholderBranch } from "./BranchNames"
 import { Git, type GitFailed } from "./git"
 import { type CarriedOn, LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
@@ -15,9 +15,6 @@ const gitFailure =
       Effect.tapError((cause) => Effect.logWarning(message, cause)),
       Effect.mapError(() => new ThreadError({ message })),
     )
-
-const succeeds = <E, R>(effect: Effect.Effect<unknown, E, R>) =>
-  effect.pipe(Effect.exit, Effect.map(Exit.isSuccess))
 
 export class LocalPlacement extends Context.Service<
   LocalPlacement,
@@ -41,17 +38,7 @@ export class LocalPlacement extends Context.Service<
         baseBranch: string,
       ) {
         const checkout = yield* checkouts.get(repository)
-
-        const free = (candidate: string) =>
-          Effect.findFirst(
-            [`refs/heads/${candidate}`, `refs/remotes/${checkout.remote}/${candidate}`],
-            (ref) => succeeds(git.run(checkout.path, ["show-ref", "--verify", "--quiet", ref])),
-          ).pipe(Effect.map(Option.isNone))
-
-        const name = Option.getOrElse(
-          yield* Effect.findFirst(shortThreadNames(), free),
-          uniqueThreadName,
-        )
+        const name = placeholderBranch()
 
         yield* git
           .run(checkout.path, ["fetch", checkout.remote, baseBranch])
@@ -85,17 +72,43 @@ export class LocalPlacement extends Context.Service<
           .run(checkout.path, ["worktree", "remove", "--force", folder])
           .pipe(Effect.andThen(git.run(checkout.path, ["branch", "-D", name])), Effect.ignore)
 
-        return { name, branch: name, folder, discard }
+        return { branch: name, folder, discard }
       })
 
-      const baseRef = Effect.fn("LocalPlacement.baseRef")(function* ({ thread }: PlacedThread) {
-        const checkout = yield* checkouts
-          .get(thread.repository)
+      const checkoutOf = (repository: FollowedRepository) =>
+        checkouts
+          .get(repository)
           .pipe(
             Effect.catchTag("InvalidLocalCheckout", ({ message }) =>
               Effect.fail(new ThreadError({ message })),
             ),
           )
+
+      const takenBranches = Effect.fn("LocalPlacement.takenBranches")(function* (
+        repository: FollowedRepository,
+        prefix: string,
+      ) {
+        const checkout = yield* checkoutOf(repository)
+        const pattern = `refs/heads/${prefix}*`
+
+        const [local, remote] = yield* Effect.all(
+          [
+            git.run(checkout.path, ["for-each-ref", "--format=%(refname)", pattern]),
+            git.run(checkout.path, ["ls-remote", "--heads", checkout.remote, pattern]),
+          ],
+          { concurrency: "unbounded" },
+        ).pipe(gitFailure(`Couldn't check whether ${prefix} is taken.`))
+
+        return `${local}\n${remote}`.split("\n").map((line) => line.replace(/^.*refs\/heads\//, ""))
+      })
+
+      const useBranch = ({ folder }: PlacedThread, branch: string) =>
+        git
+          .run(folder, ["branch", "-m", branch])
+          .pipe(gitFailure(`Couldn't rename the Thread's branch to ${branch}.`))
+
+      const baseRef = Effect.fn("LocalPlacement.baseRef")(function* ({ thread }: PlacedThread) {
+        const checkout = yield* checkoutOf(thread.repository)
 
         return `refs/remotes/${checkout.remote}/${thread.baseBranch}`
       })
@@ -148,6 +161,8 @@ export class LocalPlacement extends Context.Service<
           return listed.split("\0").filter((file) => file !== "")
         }),
         place,
+        takenBranches,
+        useBranch,
         prepareHost: ({ thread }) =>
           host.client.pipe(Effect.tap(() => Effect.sync(() => void hosted.add(thread.id)))),
         connectedHost: () => host.running,

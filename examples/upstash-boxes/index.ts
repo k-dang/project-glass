@@ -18,8 +18,6 @@ const WORK = "/workspace/home/glass"
 
 const HOST = "/workspace/home/.glass"
 
-const BUNDLE = "/workspace/home/agent-host.mjs.gz"
-
 const PLACEHOLDER = "added-by-the-upstash-proxy"
 
 const EFFORTS = ["low", "medium", "high", "xhigh", "max"]
@@ -33,8 +31,11 @@ const MODELS: ReadonlyArray<AgentModel> = [
   { id: "haiku", name: "Haiku", efforts: EFFORTS },
 ]
 
+// WARNING: The bracket keeps pkill from matching the shell that runs it.
+const END_HOST = `pkill -f '[n]ode ${HOST}/agent-host.mjs'; flock -w 30 ${HOST}/host.lock true`
+
 // WARNING: Also the Box's init command, so the host comes back each time a request resumes a paused Box.
-const START_HOST = `cd ${WORK} && setsid nohup flock -n ${HOST}/host.lock node ${HOST}/agent-host.mjs >> ${HOST}/host.log 2>&1 < /dev/null &`
+const START_HOST = `cd ${WORK} && set -a && . ${HOST}/host.env && set +a && setsid nohup flock -n ${HOST}/host.lock node ${HOST}/agent-host.mjs >> ${HOST}/host.log 2>&1 < /dev/null &`
 
 const decode = (state: SandboxState) => {
   if (typeof state === "object" && state !== null && "name" in state && "port" in state) {
@@ -64,6 +65,22 @@ const shell = async (box: Box, script: string) => {
 
   if (done.exitCode !== 0)
     throw new Error(`A command in the Box exited ${done.exitCode}: ${done.stderr.trim()}`)
+}
+
+// WARNING: Writing files through Upstash's API rewrites any git index in the Box as root, which locks git out, so files go in through a command's stdin.
+const pipeInto = async (box: Box, script: string, input: Buffer) => {
+  let stderr = ""
+
+  const session = await box.exec.session({
+    cmd: script,
+    onStderr: (data) => (stderr += Buffer.from(data).toString()),
+  })
+
+  session.write(input)
+  session.endStdin()
+  const exitCode = await session.wait()
+
+  if (exitCode !== 0) throw new Error(`A command in the Box exited ${exitCode}: ${stderr.trim()}`)
 }
 
 const upstashBoxes: Plugin = (glass) => {
@@ -110,19 +127,18 @@ const upstashBoxes: Plugin = (glass) => {
     create: async (request, { progress, record, signal }) => {
       progress("Creating the Box")
 
-      const [apiKey, claude, github, gitName, gitEmail, bundle] = await Promise.all([
+      const [apiKey, claude, github, gitName, gitEmail] = await Promise.all([
         boxKey(),
         key("CLAUDE_CODE_OAUTH_TOKEN", "a Claude token from `claude setup-token`"),
         githubToken(signal),
         gitConfig("user.name"),
         gitConfig("user.email"),
-        readFile(request.host.bundle).then((file) => gzipped(file)),
       ])
 
       const name = `glass-${randomUUID()}`
       const basic = Buffer.from(`x-access-token:${github}`).toString("base64")
 
-      record({ name, port: request.host.port })
+      record({ name, port: request.hostPort })
       signal.throwIfAborted()
 
       const box = await Box.create({
@@ -130,11 +146,7 @@ const upstashBoxes: Plugin = (glass) => {
         name,
         runtime: "node",
         initCommand: START_HOST,
-        env: {
-          ...request.host.environment,
-          CLAUDE_CODE_OAUTH_TOKEN: PLACEHOLDER,
-          GH_TOKEN: PLACEHOLDER,
-        },
+        env: { CLAUDE_CODE_OAUTH_TOKEN: PLACEHOLDER, GH_TOKEN: PLACEHOLDER },
         git: { userName: gitName, userEmail: gitEmail },
         // WARNING: Upstash's proxy adds these headers on the way out, so the tokens never enter the Box. It takes them only at creation.
         attachHeaders: {
@@ -157,15 +169,6 @@ const upstashBoxes: Plugin = (glass) => {
         signal.throwIfAborted()
       }
 
-      // WARNING: Writing files through Upstash's API rewrites any git index in the Box as root, which locks git out, so the bundle goes in before the clone.
-      // WARNING: Upstash refuses files somewhere under the bundle's 14 MB, so it travels gzipped.
-      await box.files.write({
-        path: BUNDLE,
-        content: bundle.toString("base64"),
-        encoding: "base64",
-      })
-
-      signal.throwIfAborted()
       progress("Cloning the repository")
       const { owner, repo } = request.repository
       const clone = `${WORK}/${request.folder}`
@@ -173,17 +176,28 @@ const upstashBoxes: Plugin = (glass) => {
       await shell(
         box,
         [
-          `mkdir -p ${HOST}`,
-          `gunzip -c ${BUNDLE} > ${HOST}/agent-host.mjs`,
-          `rm ${BUNDLE}`,
           `git clone --quiet --single-branch --branch ${quote(request.baseBranch)} ${quote(`https://github.com/${owner}/${repo}.git`)} ${quote(clone)}`,
           `git -C ${quote(clone)} checkout --quiet -b ${quote(request.branch)} ${quote(`origin/${request.baseBranch}`)}`,
         ].join(" && "),
       )
+    },
+    startHost: async (state, host) => {
+      const bundle = await gzipped(await readFile(host.bundle))
 
-      signal.throwIfAborted()
-      progress("Starting the agent")
-      await shell(box, START_HOST)
+      const environment = Object.entries(host.environment)
+        .map(([name, value]) => `${name}=${quote(value)}\n`)
+        .join("")
+
+      await withBox(state, async (box) => {
+        await shell(box, `mkdir -p ${HOST} && ${END_HOST}`)
+        await pipeInto(box, `umask 077 && cat > ${HOST}/host.env`, Buffer.from(environment))
+        await pipeInto(
+          box,
+          `gunzip -c > ${HOST}/agent-host.mjs.new && mv ${HOST}/agent-host.mjs.new ${HOST}/agent-host.mjs`,
+          bundle,
+        )
+        await shell(box, START_HOST)
+      })
     },
     target: (state) =>
       withBox(state, async (box, port) => {

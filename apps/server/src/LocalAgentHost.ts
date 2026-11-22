@@ -3,6 +3,7 @@ import {
   Context,
   Data,
   Deferred,
+  Duration,
   Effect,
   Exit,
   FileSystem,
@@ -47,6 +48,8 @@ const REATTACH_DEADLINE = "10 seconds"
 
 const HEALTH_DEADLINE = "5 seconds"
 
+export const JOURNAL_RETRY_SPACING = Duration.seconds(1)
+
 class HostGone extends Data.TaggedError("HostGone") {}
 
 class ReattachTimedOut extends Data.TaggedError("ReattachTimedOut") {}
@@ -89,7 +92,7 @@ export const shutDownHost = ({ port, token }: Pick<RecordedHost, "port" | "token
 
 export type CarriedOn = ReadonlySet<string>
 
-export interface Resumed {
+interface Resumed {
   readonly reattached: boolean
   readonly carriedOn: CarriedOn
 }
@@ -204,7 +207,10 @@ export class LocalAgentHost extends Context.Service<
                 ),
               ),
               Effect.tapCause((cause) => Effect.logWarning("Lost the agent host's journal", cause)),
-              Effect.retry({ while: lostConnection, schedule: Schedule.spaced("1 second") }),
+              Effect.retry({
+                while: lostConnection,
+                schedule: Schedule.spaced(JOURNAL_RETRY_SPACING),
+              }),
               // WARNING: A fresh launch waits on the offer while holding the lock that stop takes.
               Effect.ensuring(Deferred.succeed(offered, undefined)),
               Effect.catch(() =>

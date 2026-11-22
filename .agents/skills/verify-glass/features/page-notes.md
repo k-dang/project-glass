@@ -1,6 +1,6 @@
 # Feedback notes on a page
 
-A Thread's HTML file opens in a File pane beside the Chat. The user selects text in the page, or turns on Pick element and clicks part of it, and leaves a Feedback note in an editor over the page. Each note is pinned on the page, numbered, and attached to the next message at once. Sending the message delivers the notes with what each points at, and their pins leave the page.
+A Thread's HTML file, or any page the user opens by address, shows in the Browser pane beside the Chat. The user selects text in the page, or turns on Pick element and clicks part of it, and leaves a Feedback note in an editor over the page. Each note is pinned on the page, numbered, and attached to the next message at once. Sending the message delivers the notes with what each points at, and their pins leave the page.
 
 ## Sub-features
 
@@ -11,12 +11,12 @@ A Thread's HTML file opens in a File pane beside the Chat. The user selects text
 
 ## How to get to it (user POV)
 
-Open a Thread whose agent named an `.html` file in inline code, and click that path once the Turn ends. The File pane's toolbar reads "Select text, or pick an element, to leave a Feedback note." with a Pick element button.
+Open a Thread whose agent named an `.html` file in inline code, and click that path once the Turn ends; or open the Thread's Details, click Browser, and type an address. The Browser pane shows the page under its address bar and the line "Select text, or pick an element, to leave a Feedback note.", with a Pick element button.
 
 ## Driving it with glass-verify
 
-1. `node $V launch --backend fake`, doctor. Open Threads, then the seeded pi Thread whose transcript starts "Show me around this repository.". `wait --text README`.
-2. `type --role textbox --name Message --text "Write a page"`, `press --key Enter`, `wait --text "I wrote the plan to"`. `click --role button --name plan.html`, `wait --text "pick an element"`. Screenshot.
+1. `node $V launch --backend fake`, doctor. Open Threads, then `click --role link --name demo/artifacts`. `wait --text "proposed one stays"`.
+2. `click --role button --name "the plan"`, `wait --text "pick an element"`. Screenshot.
 3. Click `Pick element`, `wait --text "Click part of the page"`. Move the mouse over the table's `5` cell and click it (see Gotchas), then `wait --text "Add feedback"`. Snapshot: `form "Add Feedback note"` names `Table cell · Token bucket × Refill / min`.
 4. `type --role textbox --name "Feedback on the selected part of the page" --text "Make this ten"`, `press --key Enter --meta`, `wait --text "attached to this message"`. Screenshot: pin 1 on the cell.
 5. Click `Pick element` again to turn it off, drag across "refill of five per minute" in the page, click `Add Feedback note` beside it, write and save a second note. `wait --text "2 Feedback notes attached"`.
@@ -24,6 +24,6 @@ Open a Thread whose agent named an `.html` file in inline code, and click that p
 
 ## Gotchas
 
-- The page runs in its own sandboxed frame, outside the window's accessibility tree, so `click` and `snapshot` can't reach inside it. Drive the page with raw CDP `Input.dispatchMouseEvent` (`mouseMoved`, `mousePressed`, `mouseReleased`) on the page target from `http://127.0.0.1:<port>/json/list`, at points read off a screenshot.
-- Only the exact message `Write a page` makes the demo agent write `plan.html`.
+- The page runs in a `<webview>`, outside the window's accessibility tree, so `click` and `snapshot` can't reach inside it. Drive it with raw CDP `Input.dispatchMouseEvent` (`mouseMoved`, `mousePressed`, `mouseReleased`) on the `webview` target from `http://127.0.0.1:<port>/json/list`; `Runtime.evaluate` on that target gives an element's rect to click at.
+- Pick element turns off when the page changes.
 - The note editor saves on ⌘Enter / Ctrl+Enter; plain Enter adds a line.

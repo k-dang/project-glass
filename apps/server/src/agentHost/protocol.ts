@@ -13,6 +13,7 @@ import {
   PartSet,
   RequestAnswer,
   RequestNotWaiting,
+  ToolCallStatusSet,
   TurnEnded,
   TurnStarted,
 } from "@glass/contracts"
@@ -30,7 +31,7 @@ export const SteersNotTakenIn = Schema.Array(MessageWithContext)
 
 export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
 
-export const HostTurnEnded = Schema.TaggedStruct("TurnEnded", {
+const HostTurnEnded = Schema.TaggedStruct("TurnEnded", {
   ...TurnEnded.fields,
   steersNotTakenIn: Schema.optional(SteersNotTakenIn),
 })
@@ -39,6 +40,7 @@ export const HostEvent = Schema.Union([
   TurnStarted,
   PartSet,
   PartAppended,
+  ToolCallStatusSet,
   HostTurnEnded,
   AgentStatusesChanged,
 ])
@@ -108,13 +110,13 @@ export const ReviewBrief = Schema.Struct({
 
 export type ReviewBrief = typeof ReviewBrief.Type
 
-export const SkillFile = Schema.Struct({
+const SkillFile = Schema.Struct({
   path: Schema.String,
   executable: Schema.Boolean,
   contents: Schema.Uint8Array,
 })
 
-export type SkillFile = typeof SkillFile.Type
+type SkillFile = typeof SkillFile.Type
 
 export const SentSkill = Schema.Struct({ name: Schema.String, files: Schema.Array(SkillFile) })
 

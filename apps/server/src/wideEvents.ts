@@ -18,7 +18,7 @@ import { randomUUID } from "node:crypto"
 import type { Delivery } from "./ThreadTurns"
 
 // WARNING: Fields hold only IDs, counts, choices and durations, never message text, prompts, diffs, transcripts or credentials: users attach backend.log to bug reports.
-export interface UnitFields {
+interface UnitFields {
   readonly pr?: string
   readonly head?: string
   readonly thread_id?: string

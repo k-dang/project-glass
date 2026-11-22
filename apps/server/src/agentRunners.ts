@@ -36,7 +36,7 @@ export interface AgentTask<A> {
   readonly checkout: string
 }
 
-export interface AgentRunner {
+interface AgentRunner {
   readonly identity: AgentRunnerIdentity
   readonly run: <A>(task: AgentTask<A>) => Effect.Effect<A, AgentFailure>
 }
@@ -77,8 +77,9 @@ const startFailure = (name: string) => (error: { readonly reason: unknown }) => 
 
 const claudeFlags = ["--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"]
 
-// WARNING: Both flag sets keep the user's settings files, and their hooks, away from the PR's files; shell can't use --restricted, and -p refuses tools not allowed.
+// WARNING: Each flag set keeps the user's settings files, and their hooks, away from the PR's files; shell can't use --restricted, and -p refuses tools not allowed.
 const claudeToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
+  none: ["--setting-sources", "", "--tools", ""],
   "read-only": ["--restricted", "--tools", claudeTools["read-only"].join(",")],
   shell: [
     "--setting-sources",
@@ -90,12 +91,17 @@ const claudeToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
   ],
 }
 
+const piToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
+  none: ["--no-tools"],
+  "read-only": ["--tools", piTools["read-only"].join(",")],
+  shell: ["--tools", piTools.shell.join(",")],
+}
+
 const piCliFlags = (tools: AgentTools) => [
   "--offline",
   "--no-session",
   ...piLoadsNothing,
-  "--tools",
-  piTools[tools].join(","),
+  ...piToolFlags[tools],
 ]
 
 // WARNING: pi --list-models matches its search fuzzily and prints a table of provider and model columns.
@@ -105,18 +111,23 @@ const listedModelIds = (listing: string) =>
     .slice(1)
     .map((row) => row.trim().split(/\s+/, 2).join("/"))
 
+const logFailedRun = <A, E, R>(run: Effect.Effect<A, E, R>, command: string) =>
+  run.pipe(
+    Effect.scoped,
+    Effect.tapError((cause) => Effect.logWarning(`Couldn't run ${command}`, cause)),
+  )
+
 const runnerStrategies = Effect.gen(function* () {
   const commands = yield* AgentCommands
   const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
   const fs = yield* FileSystem.FileSystem
 
-  const workingDirectory = fs
-    .makeTempDirectoryScoped({ prefix: "glass-agent-" })
-    .pipe(
-      Effect.mapError(() =>
-        agentFailure("storage", "Couldn't prepare a directory for the agent. Try again."),
-      ),
-    )
+  const workingDirectory = fs.makeTempDirectoryScoped({ prefix: "glass-agent-" }).pipe(
+    Effect.tapError((cause) => Effect.logWarning("Couldn't make the agent's directory", cause)),
+    Effect.mapError(() =>
+      agentFailure("storage", "Couldn't prepare a directory for the agent. Try again."),
+    ),
+  )
 
   const execute = Effect.fnUntraced(function* (
     command: string,
@@ -150,7 +161,7 @@ const runnerStrategies = Effect.gen(function* () {
     )
 
     return { stdout, stderr, code }
-  }, Effect.scoped)
+  }, logFailedRun)
 
   const decodeClaude = Schema.decodeUnknownEffect(
     Schema.fromJsonString(
@@ -287,13 +298,12 @@ const runnerStrategies = Effect.gen(function* () {
 
       // WARNING: pi reads --system-prompt from a file path, which keeps instructions out of argv, where endpoint security tools may kill long commands.
       const instructions = join(instructionsDirectory, "instructions.md")
-      yield* fs
-        .writeFileString(instructions, task.instructions)
-        .pipe(
-          Effect.mapError(() =>
-            agentFailure("storage", "Couldn't prepare pi's instructions. Try again.", identity),
-          ),
-        )
+      yield* fs.writeFileString(instructions, task.instructions).pipe(
+        Effect.tapError((cause) => Effect.logWarning("Couldn't write pi's instructions", cause)),
+        Effect.mapError(() =>
+          agentFailure("storage", "Couldn't prepare pi's instructions. Try again.", identity),
+        ),
+      )
 
       const result = yield* execute(
         commands.piCommand,

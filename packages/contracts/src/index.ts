@@ -10,6 +10,8 @@ export * from "./checkIn"
 
 export * from "./checkoutRun"
 
+export * from "./browserPage"
+
 export * from "./thread"
 
 export * from "./connection"
@@ -25,6 +27,8 @@ export * from "./draft"
 export * from "./engine"
 
 export * from "./feedbackNote"
+
+export * from "./pageMessages"
 
 export * from "./followedRepository"
 

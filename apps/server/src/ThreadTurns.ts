@@ -21,22 +21,12 @@ import {
   TurnInterrupted,
   TurnStopped,
 } from "@glass/contracts"
-import {
-  Context,
-  DateTime,
-  Effect,
-  Layer,
-  Option,
-  Predicate,
-  Schema,
-  Scope,
-  Semaphore,
-  Stream,
-} from "effect"
+import { Context, DateTime, Effect, Layer, Option, Predicate, Schema, Scope, Stream } from "effect"
 import { SqlClient } from "effect/sql"
 import type { DeliveredTurn } from "./agentHost/deliveredMessage"
 import type { TurnSettings } from "./agentHost/protocol"
 import { boundHostCall } from "./hostControl"
+import { keyedLock } from "./keyedLock"
 import { type HostCallError, type HostClient, hostFailure } from "./Placement"
 import { prompt } from "./prompt"
 import { ToDos } from "./ToDos"
@@ -63,11 +53,9 @@ export interface ClaimedThread {
   readonly connectedHost: Effect.Effect<Option.Option<ThreadHost>>
 }
 
-export type ClaimThread = (
-  threadId: string,
-) => Effect.Effect<Option.Option<ClaimedThread>, ThreadError>
+type ClaimThread = (threadId: string) => Effect.Effect<Option.Option<ClaimedThread>, ThreadError>
 
-export interface Served {
+interface Served {
   readonly claim: ClaimThread
   readonly lost: Stream.Stream<ReadonlyArray<string>>
   readonly interrupted: Effect.Effect<ReadonlyArray<string>>
@@ -147,30 +135,7 @@ export class ThreadTurns extends Context.Service<
       const transcripts = yield* Transcripts
       const toDos = yield* ToDos
       const scope = yield* Scope.Scope
-      const locks = new Map<string, { semaphore: Semaphore.Semaphore; holders: number }>()
-
-      const withThread = <A, E, R>(threadId: string, effect: Effect.Effect<A, E, R>) =>
-        Effect.suspend(() => {
-          const lock = locks.get(threadId) ?? {
-            semaphore: Semaphore.makeUnsafe(1),
-            holders: 0,
-          }
-
-          lock.holders += 1
-          locks.set(threadId, lock)
-
-          return lock.semaphore
-            .withPermits(1)(effect)
-            .pipe(
-              Effect.ensuring(
-                Effect.sync(() => {
-                  lock.holders -= 1
-
-                  if (lock.holders === 0 && locks.get(threadId) === lock) locks.delete(threadId)
-                }),
-              ),
-            )
-        })
+      const withThread = keyedLock().withLock
 
       const delivered = Effect.fnUntraced(function* <Context extends TurnContext>(
         sent: SentMessage & { readonly context: Context | null },

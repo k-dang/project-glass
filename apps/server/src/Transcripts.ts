@@ -47,7 +47,6 @@ import {
   PubSub,
   Schema,
   Scope,
-  Semaphore,
   Stream,
   SubscriptionRef,
 } from "effect"
@@ -62,13 +61,14 @@ import {
 } from "./threadState"
 import type { HostEvent } from "./agentHost/protocol"
 import type { SavedThrough } from "./hostJournal"
+import { keyedLock } from "./keyedLock"
 import { recordUnit } from "./wideEvents"
 
 const encodePart = Schema.encodeSync(Schema.fromJsonString(TurnPart))
 
 const encodeEnd = Schema.encodeSync(Schema.fromJsonString(TurnEnd))
 
-export const ImagesJson = Schema.fromJsonString(Schema.Array(Image))
+const ImagesJson = Schema.fromJsonString(Schema.Array(Image))
 
 export const encodeImages = Schema.encodeSync(ImagesJson)
 
@@ -180,7 +180,7 @@ export interface WaitingRequest {
 
 export type WaitingByThread = ReadonlyMap<string, Arr.NonEmptyReadonlyArray<WaitingRequest>>
 
-export type UnseenByThread = ReadonlyMap<string, TurnEnd>
+type UnseenByThread = ReadonlyMap<string, TurnEnd>
 
 export type StartedTurn = typeof TurnStarted.Type & { readonly threadId: string }
 
@@ -316,12 +316,13 @@ export class Transcripts extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const published = yield* PubSub.unbounded<Published>()
-      const locks = new Map<string, Semaphore.Semaphore>()
+      const withThread = keyedLock().withLock
       const statuses = new Map<string, string>()
       const agentStatuses = new Map<string, AgentStatusesChanged>()
 
       const setAgentStatuses = (threadId: string, shown: AgentStatusesChanged) =>
-        lockFor(threadId).withPermits(1)(
+        withThread(
+          threadId,
           Effect.suspend(() => {
             const cleared =
               shown.agentStatuses.length === 0 && shown.backgroundToolCalls.length === 0
@@ -465,13 +466,6 @@ export class Transcripts extends Context.Service<
           return Option.some(next)
         })
 
-      const lockFor = (threadId: string) => {
-        const lock = locks.get(threadId) ?? Semaphore.makeUnsafe(1)
-        locks.set(threadId, lock)
-
-        return lock
-      }
-
       const askedStops = new Set<string>()
 
       const askedToStop = (turnId: string) =>
@@ -527,6 +521,18 @@ export class Transcripts extends Context.Service<
                   WHERE turn_id = ${turnId} AND position = ${index}
                 `.pipe(Effect.as(true)),
               ),
+            ToolCallStatusSet: ({ toolCallId, status }) =>
+              sql`
+                UPDATE thread_turn_part SET part = json_set(part, '$.status', ${status})
+                WHERE json_extract(part, '$._tag') = 'ToolCall'
+                  AND json_extract(part, '$.toolCallId') = ${toolCallId}
+                  AND turn_id IN (
+                    SELECT id FROM thread_turn
+                    WHERE thread_id = ${threadId}
+                      AND json_extract(ended, '$.ending._tag') IS NOT 'Failed'
+                  )
+                RETURNING turn_id
+              `.pipe(Effect.map((rows) => rows.length > 0)),
             TurnEnded: ({ turnId, ended }) => {
               const conditions = [
                 sql`id = ${turnId}`,
@@ -654,7 +660,8 @@ export class Transcripts extends Context.Service<
           R
         >,
       ) =>
-        lockFor(threadId).withPermits(1)(
+        withThread(
+          threadId,
           Effect.gen(function* () {
             const [decided, decidedUpdates, reported = []] = yield* sql.withTransaction(effect)
             const updates: ReadonlyArray<TranscriptUpdate> = [...reported, ...decidedUpdates]
@@ -918,7 +925,8 @@ export class Transcripts extends Context.Service<
       )
 
       const setStatus = (threadId: string, status: string | null) =>
-        lockFor(threadId).withPermits(1)(
+        withThread(
+          threadId,
           Effect.suspend(() => {
             if (status === null) statuses.delete(threadId)
             else statuses.set(threadId, status)
@@ -942,7 +950,8 @@ export class Transcripts extends Context.Service<
         askedToStop,
         watch: (threadId) =>
           Stream.unwrap(
-            lockFor(threadId).withPermits(1)(
+            withThread(
+              threadId,
               Effect.gen(function* () {
                 const live = yield* PubSub.subscribe(published)
                 const first = yield* snapshot(threadId)
@@ -962,14 +971,12 @@ export class Transcripts extends Context.Service<
             Stream.mapError(storageFailure),
           ),
         read: (threadId, turns) =>
-          withStorageFailure(
-            "read a transcript",
-            lockFor(threadId).withPermits(1)(snapshot(threadId, turns)),
-          ),
+          withStorageFailure("read a transcript", withThread(threadId, snapshot(threadId, turns))),
         loadEarlier: (threadId, before) =>
           withStorageFailure(
             "read earlier Turns",
-            lockFor(threadId).withPermits(1)(
+            withThread(
+              threadId,
               turnPage(threadId, RECENT_TURNS, before).pipe(
                 Effect.flatMap((page) =>
                   PubSub.publish(published, {
@@ -1018,7 +1025,8 @@ export class Transcripts extends Context.Service<
           withStorageFailure(
             "retry undelivered Turns",
             Effect.forEach(threadIds, (threadId) =>
-              lockFor(threadId).withPermits(1)(
+              withThread(
+                threadId,
                 Effect.gen(function* () {
                   const retried = yield* sql`
                     SELECT id, message, images, context, feedback, sent_at AS sentAt, ended
@@ -1180,7 +1188,8 @@ export class Transcripts extends Context.Service<
 
           return withStorageFailure(
             "mark a Turn seen",
-            lockFor(threadId).withPermits(1)(
+            withThread(
+              threadId,
               Effect.all(
                 [
                   sql`
@@ -1199,7 +1208,8 @@ export class Transcripts extends Context.Service<
         },
         setStatus,
         remove: Effect.fn("Transcripts.remove")(function* (threadId: string) {
-          yield* lockFor(threadId).withPermits(1)(
+          yield* withThread(
+            threadId,
             Effect.gen(function* () {
               yield* sql`
                 DELETE FROM thread_turn_part
@@ -1209,7 +1219,6 @@ export class Transcripts extends Context.Service<
               yield* sql`DELETE FROM thread_queued_message WHERE thread_id = ${threadId}`
             }).pipe(sql.withTransaction),
           )
-          locks.delete(threadId)
           statuses.delete(threadId)
           agentStatuses.delete(threadId)
           yield* markWaiting(threadId, [])

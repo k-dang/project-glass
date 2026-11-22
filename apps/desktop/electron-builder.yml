@@ -5,11 +5,14 @@ directories:
 files:
   - dist/main/**
   - dist/preload/**
+  - dist/browserPreload/**
   - "!**/*.map"
 extraResources:
   - from: ../server/dist
     to: server
     filter: ["**/*", "!**/*.map"]
+  - from: ../server/node_modules/playwright-core
+    to: server/node_modules/playwright-core
   - from: dist/renderer
     to: renderer
     filter: ["**/*", "!**/*.map"]

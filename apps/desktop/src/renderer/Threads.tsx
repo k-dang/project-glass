@@ -9,7 +9,6 @@ import {
   type Thread,
   type ThreadNeedsYou,
   isGone,
-  readOnlyExplanation,
   isOutOfReach,
   type PlaceTag,
   repositoryKey,
@@ -32,7 +31,8 @@ import {
   Undo2,
 } from "lucide-react"
 import { cn } from "cn"
-import { useContext, useId, useState } from "react"
+import { use, useContext, useId, useState } from "react"
+import { createPortal } from "react-dom"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { Kbd } from "@/components/ui/kbd"
@@ -61,6 +61,7 @@ import { ConfirmationDialog } from "./ConfirmationDialog"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { useActions } from "./actions"
+import { ShellPanelSlot } from "./shellPanelSlot"
 import { shortcutLabel } from "./shortcutLabel"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
@@ -97,8 +98,6 @@ const expiryFormat = new Intl.DateTimeFormat(undefined, {
 const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
   if (isGone(reach)) return `Sandbox ${reach}`
 
-  if (reach === "incompatible") return "Sandbox on another Glass version"
-
   const expiry =
     expiresAt === null ? null : `Expires ${expiryFormat.format(DateTime.toDateUtc(expiresAt))}`
 
@@ -110,12 +109,33 @@ const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
 const threadLink =
   "flex flex-col gap-0.5 rounded-lg px-2 py-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
 
+const panelStyles: Record<
+  "inline" | "beside",
+  { aside: string; header: string; heading: "h1" | "h2"; title: string }
+> = {
+  inline: {
+    aside: "flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4",
+    header: "flex items-center justify-between pl-2",
+    heading: "h1",
+    title: "text-sm font-semibold",
+  },
+  beside: {
+    aside: "flex w-64 shrink-0 flex-col gap-2 pr-2 pb-2",
+    header:
+      "title-strip flex shrink-0 items-center justify-between pl-[max(0.5rem,calc(env(titlebar-area-x,0px)-3rem))]",
+    heading: "h2",
+    title: "text-base font-semibold",
+  },
+}
+
 const panelId = "threads-panel"
 
 const panelToggleId = "threads-panel-toggle"
 
 export function ThreadsLayout() {
   const [panelOpen, setPanelOpen] = useAtom(threadsPanelOpenAtom)
+  const panelSlot = use(ShellPanelSlot)
+  const styles = panelSlot === null ? panelStyles.inline : panelStyles.beside
 
   const togglePanel = () => {
     if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
@@ -135,22 +155,21 @@ export function ThreadsLayout() {
     },
   ])
 
+  const panel = (
+    <aside id={panelId} aria-label="Threads panel" hidden={!panelOpen} className={styles.aside}>
+      <div className={styles.header}>
+        <styles.heading className={styles.title}>Threads</styles.heading>
+        <NewThreadLink />
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto">
+        <ThreadList />
+      </div>
+    </aside>
+  )
+
   return (
     <main aria-label="Threads" className="flex min-h-0 flex-1">
-      <aside
-        id={panelId}
-        aria-label="Threads panel"
-        hidden={!panelOpen}
-        className="flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4"
-      >
-        <div className="flex items-center justify-between pl-2">
-          <h1 className="text-sm font-semibold">Threads</h1>
-          <NewThreadLink />
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">
-          <ThreadList />
-        </div>
-      </aside>
+      {panelSlot === null ? panel : createPortal(panel, panelSlot)}
       <div className="flex min-w-0 flex-1 flex-col">
         <Outlet />
       </div>
@@ -200,7 +219,10 @@ function NewThreadLink() {
       <Link
         to="/threads/new"
         aria-label="New Thread"
-        className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
+        className={cn(
+          buttonVariants({ variant: "ghost", size: "icon-sm" }),
+          "[app-region:no-drag]",
+        )}
       >
         <SquarePen aria-hidden />
       </Link>
@@ -233,7 +255,7 @@ function ThreadList() {
       return shown.length === 0 ? (
         <p className="px-2 text-sm text-muted-foreground">No Threads yet.</p>
       ) : (
-        <nav aria-label="Threads list" className="flex flex-col gap-4">
+        <nav aria-label="Threads list" className="flex min-h-full flex-col gap-4">
           {groupThreads(going).map(({ machine, threads: onMachine }) => (
             <section key={machine} aria-label={groupNames[machine]} className="flex flex-col gap-1">
               <h2 className="px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
@@ -284,7 +306,7 @@ function SettledSection(props: { threads: ReadonlyArray<Thread>; now: Date }) {
       onOpenChange={setOpen}
       render={<section />}
       aria-label="Settled"
-      className="flex flex-col gap-1"
+      className="mt-auto flex flex-col gap-1"
     >
       <div className="group/settled flex items-center pr-1">
         <h2 className="min-w-0 flex-1">
@@ -342,7 +364,8 @@ const removalWarning = (thread: Thread, warning: "some" | "unchecked") => {
     : `Its worktree has uncommitted changes, which removing it discards. The branch ${thread.name} and its commits stay.`
 }
 
-const rowAction = "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100"
+const rowAction =
+  "opacity-0 transition-none group-hover/row:opacity-100 group-hover/row:disabled:opacity-100 focus-visible:opacity-100"
 
 function BringBackButton(props: { thread: Thread }) {
   const bringBack = useAtomSet(bringBackThreadAtom)
@@ -476,7 +499,7 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
               id={originId}
               className={cn(
                 "min-w-0 flex-1 truncate",
-                readOnlyExplanation(sandbox?.reach) !== null && "text-destructive",
+                isGone(sandbox?.reach) && "text-destructive",
               )}
             >
               {sandboxText}

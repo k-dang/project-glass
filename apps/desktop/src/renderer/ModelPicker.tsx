@@ -1,9 +1,18 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import type { AgentHarness, AgentModels, ModelChoice } from "@glass/contracts"
+import {
+  Command,
+  CommandEmpty,
+  CommandInput,
+  CommandItem,
+  CommandItemText,
+  CommandList,
+  type ListFilter,
+} from "@ui-sdk/react/command"
 import { AsyncResult } from "effect/reactivity"
 import { cn } from "cn"
-import { LoaderCircle } from "lucide-react"
-import { memo, useState, type ReactNode } from "react"
+import { Check, LoaderCircle, Search } from "lucide-react"
+import { memo, useRef, useState, type RefObject } from "react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group"
@@ -41,6 +50,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
   const listed = useAtomValue(offered)
   const retry = useAtomRefresh(offered)
   const [open, setOpen] = useState(false)
+  const search = useRef<HTMLInputElement>(null)
   const { model, effort, harnessChoice } = props
 
   const { summary, body, efforts } = AsyncResult.builder(listed)
@@ -72,6 +82,7 @@ export const ModelPicker = memo(function ModelPicker(props: {
             effort={effort}
             onChange={props.onChange}
             onPick={() => setOpen(false)}
+            inputRef={search}
           />
         ),
       }
@@ -104,30 +115,17 @@ export const ModelPicker = memo(function ModelPicker(props: {
         <PopoverContent
           side="top"
           align="end"
+          initialFocus={search}
           className="h-96 max-h-(--available-height) w-80 max-w-(--available-width) gap-1 overflow-hidden p-1"
         >
           {harnessChoice !== undefined && (
-            <div className="shrink-0">
-              <RequiredChoice
-                label="Agent harness"
-                value={props.harness}
-                onChange={harnessChoice.onChange}
-                items={harnessChoice.options.map((harness) => ({
-                  value: harness,
-                  label: (
-                    <>
-                      <AgentHarnessIcon harness={harness} />
-                      {harnessNames[harness]}
-                    </>
-                  ),
-                }))}
-              />
-            </div>
+            <HarnessChoice
+              harness={props.harness}
+              options={harnessChoice.options}
+              onChange={harnessChoice.onChange}
+            />
           )}
-          <div
-            key={props.harness}
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain [scrollbar-gutter:stable]"
-          >
+          <div key={props.harness} className="min-h-0 flex-1 overflow-y-auto">
             {body}
           </div>
         </PopoverContent>
@@ -156,99 +154,138 @@ function PrefetchModels(props: { harness: AgentHarness; placeKey: string }) {
   return null
 }
 
-function Models(props: {
+function Models({
+  inputRef,
+  ...props
+}: {
   models: AgentModels
   model: string | null
   effort: string | null
   onChange: (choice: ModelChoice) => void
   onPick: () => void
+  inputRef: RefObject<HTMLInputElement | null>
 }) {
   const { defaultModel, models } = props.models
   const { model, effort } = props
   const current = find(props.models, model)
+  const currentKey = toKey(model)
 
-  const modelItems: Array<{ value: string; label: ReactNode }> = []
+  const rows: Array<ModelRow> = []
 
   if (defaultModel !== null)
-    modelItems.push({
+    rows.push({
       value: DEFAULT_KEY,
-      label: (
-        <>
-          Default
-          <span className="ml-auto text-muted-foreground">{defaultModel.name}</span>
-        </>
-      ),
+      label: "Default",
+      detail: defaultModel.name,
+      keywords: [defaultModel.name],
     })
 
-  for (const { id, name } of models) modelItems.push({ value: id, label: name })
+  for (const { id, name } of models) rows.push({ value: id, label: name, keywords: [id] })
 
-  const unlisted = model !== null && current === undefined
+  if (model !== null && current === undefined)
+    rows.push({ value: model, label: model, keywords: [] })
 
-  if (unlisted) modelItems.push({ value: model, label: model })
+  const choose = (chosen: string) => {
+    if (chosen !== currentKey) {
+      const next = fromKey(chosen)
+      const kept = effort !== null && (find(props.models, next)?.efforts ?? []).includes(effort)
+      props.onChange({ model: next, effort: kept ? effort : null })
+    }
+
+    props.onPick()
+  }
 
   return (
-    <RequiredChoice
-      label="Model"
-      heading
-      orientation="vertical"
-      value={toKey(model)}
-      items={modelItems}
-      onPick={props.onPick}
-      onChange={(chosen) => {
-        const next = fromKey(chosen)
-        const kept = effort !== null && (find(props.models, next)?.efforts ?? []).includes(effort)
-        props.onChange({ model: next, effort: kept ? effort : null })
-      }}
-    />
+    <Command
+      defaultValue={currentKey}
+      onAction={choose}
+      filter={everyWord}
+      className="flex h-full min-h-0 flex-col"
+    >
+      <div className="flex shrink-0 items-center gap-2 border-b px-2">
+        <Search aria-hidden className="size-3.5 shrink-0 text-muted-foreground" />
+        <CommandInput
+          ref={inputRef}
+          aria-label="Search models"
+          placeholder="Search models"
+          spellCheck={false}
+          className="h-8 min-w-0 flex-1 bg-transparent text-xs outline-none placeholder:text-muted-foreground"
+        />
+      </div>
+      <CommandEmpty className="px-2 py-1.5 text-xs text-muted-foreground">
+        No models match.
+      </CommandEmpty>
+      <CommandList className="min-h-0 flex-1 overflow-y-auto overscroll-contain pt-1 [scrollbar-gutter:stable]">
+        {rows.map((row) => {
+          const isCurrent = row.value === currentKey
+
+          return (
+            <CommandItem
+              key={row.value}
+              value={row.value}
+              label={row.label}
+              keywords={row.keywords}
+              aria-current={isCurrent || undefined}
+              className="flex cursor-default items-center gap-1.5 rounded-md px-2 py-1.5 text-xs outline-none aria-current:font-medium data-highlighted:bg-accent data-highlighted:text-accent-foreground"
+            >
+              <CommandItemText className="min-w-0 flex-1 truncate" />
+              {row.detail !== undefined && (
+                <span className="shrink-0 text-muted-foreground">{row.detail}</span>
+              )}
+              {isCurrent && <Check aria-hidden className="size-3.5 shrink-0" />}
+            </CommandItem>
+          )
+        })}
+      </CommandList>
+    </Command>
   )
 }
 
-function RequiredChoice<Value extends string>(props: {
-  label: string
-  heading?: boolean
-  value: Value
-  items: ReadonlyArray<{ value: Value; label: ReactNode }>
-  onChange: (value: Value) => void
-  onPick?: () => void
-  orientation?: "horizontal" | "vertical"
+interface ModelRow {
+  readonly value: string
+  readonly label: string
+  readonly detail?: string
+  readonly keywords: Array<string>
+}
+
+const everyWord: ListFilter = (item, query) => {
+  const text = [item.label, ...(item.keywords ?? [])].join(" ").toLowerCase()
+
+  return query
+    .toLowerCase()
+    .split(/\s+/)
+    .every((word) => text.includes(word))
+}
+
+function HarnessChoice(props: {
+  harness: AgentHarness
+  options: ReadonlyArray<AgentHarness>
+  onChange: (harness: AgentHarness) => void
 }) {
-  const stacked = props.orientation === "vertical"
-
   return (
-    <>
-      {props.heading === true && (
-        <p aria-hidden className="px-2 pt-1.5 text-xs font-medium text-muted-foreground">
-          {props.label}
-        </p>
-      )}
-      <ToggleGroup
-        aria-label={props.label}
-        orientation={stacked ? "vertical" : "horizontal"}
-        variant={stacked ? "default" : "outline"}
-        size="sm"
-        spacing={stacked ? 1 : 0}
-        value={[props.value]}
-        onValueChange={([pressed]) => {
-          const chosen = props.items.find((item) => item.value === (pressed ?? props.value))
+    <ToggleGroup
+      aria-label="Agent harness"
+      variant="outline"
+      size="sm"
+      spacing={0}
+      value={[props.harness]}
+      onValueChange={([pressed]) => {
+        const chosen = props.options.find((harness) => harness === pressed)
 
-          if (chosen === undefined) return
-
-          if (chosen.value !== props.value) props.onChange(chosen.value)
-
-          props.onPick?.()
-        }}
-        className={stacked ? "w-auto gap-0 *:justify-start" : "m-1 w-auto *:flex-1"}
-      >
-        {props.items.map((item) => (
-          <ToggleGroupItem
-            key={item.value}
-            value={item.value}
-            className="gap-1.5 text-xs font-normal hover:bg-accent hover:text-accent-foreground aria-pressed:bg-accent"
-          >
-            {item.label}
-          </ToggleGroupItem>
-        ))}
-      </ToggleGroup>
-    </>
+        if (chosen !== undefined && chosen !== props.harness) props.onChange(chosen)
+      }}
+      className="m-1 w-auto shrink-0 *:flex-1"
+    >
+      {props.options.map((harness) => (
+        <ToggleGroupItem
+          key={harness}
+          value={harness}
+          className="gap-1.5 text-xs font-normal hover:bg-accent hover:text-accent-foreground aria-pressed:bg-accent"
+        >
+          <AgentHarnessIcon harness={harness} />
+          {harnessNames[harness]}
+        </ToggleGroupItem>
+      ))}
+    </ToggleGroup>
   )
 }

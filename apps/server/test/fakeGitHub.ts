@@ -92,6 +92,43 @@ const unprocessable = (field: string, message: string) => ({
   errors: [{ type: "UNPROCESSABLE", path: [field], message }],
 })
 
+const prNode = (pr: FakePullRequest) => ({
+  id: pr.id,
+  repository: {
+    owner: { login: pr.owner },
+    name: pr.repo,
+    viewerPermission: pr.viewerPermission,
+    viewerDefaultMergeMethod: pr.mergeMethods[0] ?? "MERGE",
+    squashMergeAllowed: pr.mergeMethods.includes("SQUASH"),
+    mergeCommitAllowed: pr.mergeMethods.includes("MERGE"),
+    rebaseMergeAllowed: pr.mergeMethods.includes("REBASE"),
+  },
+  number: pr.number,
+  url: pr.url,
+  title: pr.title,
+  author: author(pr.author),
+  baseRefName: pr.baseBranch,
+  headRefName: pr.headBranch,
+  baseRefOid: pr.base.sha,
+  headRefOid: pr.head.sha,
+  updatedAt: pr.updatedAt,
+  state: pr.state,
+  isDraft: pr.isDraft,
+  bodyHTML: pr.bodyHtml,
+  body: pr.body,
+  viewerDidAuthor: pr.author === VIEWER.login,
+  reviewDecision: pr.reviewDecision,
+  mergeable: pr.mergeable,
+  latestOpinionatedReviews: { nodes: latestOpinionatedReviews(pr) },
+  reviewRequests: { nodes: reviewRequestNodes(pr) },
+  commits: checkContextsNode(pr),
+  mergeStateStatus: pr.mergeStateStatus,
+  isMergeQueueEnabled: pr.mergeQueue,
+  isInMergeQueue: pr.inMergeQueue,
+  autoMergeRequest: pr.autoMerge ? { __typename: "AutoMergeRequest" } : null,
+  viewerCanEnableAutoMerge: pr.viewerCanEnableAutoMerge,
+})
+
 const refuseReview = (field: string, pr: FakePullRequest, event: ReviewEvent) => {
   const refusal = pr.author === VIEWER.login ? ownPullRequestRefusals[event] : undefined
 
@@ -178,6 +215,10 @@ const GraphQLRequest = Schema.Union([
     variables: Schema.Struct({ id: Schema.String }),
   }),
   Schema.Struct({
+    operationName: Schema.Literal("PullRequestStatus"),
+    variables: Schema.Struct({ id: Schema.String }),
+  }),
+  Schema.Struct({
     operationName: Schema.Literals(["MarkFileAsViewed", "UnmarkFileAsViewed"]),
     variables: Schema.Struct({ pullRequestId: Schema.String, path: Schema.String }),
   }),
@@ -250,6 +291,7 @@ const GraphQLRequest = Schema.Union([
     variables: Schema.Struct({
       owner: Schema.String,
       name: Schema.String,
+      query: Schema.NullOr(Schema.String),
       after: Schema.NullOr(Schema.String),
     }),
   }),
@@ -428,7 +470,7 @@ export interface FakeGitHub {
     ref: string,
     files: FakeFiles,
   ): string
-  failNext(failure: FakeFailure): void
+  failNext(path: string, failure: FakeFailure): void
   failNextGraphQL(error: FakeGraphQLError): void
   beforeNext(path: string, action: () => void): void
   readonly gitTraffic: TrafficMeter
@@ -453,7 +495,7 @@ interface FakeGitHubOptions {
 }
 
 export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubOptions = {}) {
-  const failures: Array<FakeFailure> = []
+  const failures: Array<{ readonly path: string; readonly failure: FakeFailure }> = []
   const graphQLFailures: Array<FakeGraphQLError> = []
   const gitTraffic = trafficMeter()
   const pullRequests: Array<FakePullRequest> = []
@@ -515,7 +557,11 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
           fake,
         )
 
-        const failure = (Effect.isEffect(decided) ? yield* decided : decided) ?? failures.shift()
+        const failing = failures.findIndex(({ path }) => pathname.startsWith(path))
+
+        const failure =
+          (Effect.isEffect(decided) ? yield* decided : decided) ??
+          (failing === -1 ? undefined : failures.splice(failing, 1)[0]?.failure)
 
         if (failure === "disconnect") {
           NodeHttpServerRequest.toIncomingMessage(request).socket.destroy()
@@ -562,48 +608,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       }
     }
 
-    return {
-      data: {
-        repository: {
-          pullRequest: {
-            id: pr.id,
-            repository: {
-              owner: { login: pr.owner },
-              name: pr.repo,
-              viewerPermission: pr.viewerPermission,
-              viewerDefaultMergeMethod: pr.mergeMethods[0] ?? "MERGE",
-              squashMergeAllowed: pr.mergeMethods.includes("SQUASH"),
-              mergeCommitAllowed: pr.mergeMethods.includes("MERGE"),
-              rebaseMergeAllowed: pr.mergeMethods.includes("REBASE"),
-            },
-            number: pr.number,
-            url: pr.url,
-            title: pr.title,
-            author: author(pr.author),
-            baseRefName: pr.baseBranch,
-            headRefName: pr.headBranch,
-            baseRefOid: pr.base.sha,
-            headRefOid: pr.head.sha,
-            updatedAt: pr.updatedAt,
-            state: pr.state,
-            isDraft: pr.isDraft,
-            bodyHTML: pr.bodyHtml,
-            body: pr.body,
-            viewerDidAuthor: pr.author === VIEWER.login,
-            reviewDecision: pr.reviewDecision,
-            mergeable: pr.mergeable,
-            latestOpinionatedReviews: { nodes: latestOpinionatedReviews(pr) },
-            reviewRequests: { nodes: reviewRequestNodes(pr) },
-            commits: checkContextsNode(pr),
-            mergeStateStatus: pr.mergeStateStatus,
-            isMergeQueueEnabled: pr.mergeQueue,
-            isInMergeQueue: pr.inMergeQueue,
-            autoMergeRequest: pr.autoMerge ? { __typename: "AutoMergeRequest" } : null,
-            viewerCanEnableAutoMerge: pr.viewerCanEnableAutoMerge,
-          },
-        },
-      },
-    }
+    return { data: { repository: { pullRequest: prNode(pr) } } }
   }
 
   const fileContentsQuery = ({ owner, name, expression }: FileContentsVariables) => {
@@ -934,6 +939,14 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       case "EndedBranchPullRequests":
         return answerListing(request, pullRequests, unavailableRepositories, timingOutRepositories)
 
+      case "PullRequestStatus": {
+        const pr = pullRequestById(request.variables.id)
+
+        if (pr === undefined) return unresolvedNode(request.variables.id)
+
+        return { data: { node: prNode(pr) } }
+      }
+
       case "PullRequestRevision": {
         const pr = pullRequestById(request.variables.id)
 
@@ -1034,7 +1047,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
       }
 
       case "RepositoryBranches": {
-        const { owner, name, after } = request.variables
+        const { owner, name, query, after } = request.variables
         const seeded = repositories.branches(owner, name)
 
         if (seeded === undefined) return unresolvedRepository(owner, name)
@@ -1043,7 +1056,9 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
           data: {
             repository: {
               refs: connectionPage(
-                seeded.map((branch) => ({ name: branch })),
+                seeded
+                  .filter((branch) => branch.startsWith(query ?? ""))
+                  .map((branch) => ({ name: branch })),
                 after,
               ),
             },
@@ -1202,8 +1217,8 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     },
     seedBranches: repositories.seedBranches,
     pushRepository: repositories.push,
-    failNext: (failure) => {
-      failures.push(failure)
+    failNext: (path, failure) => {
+      failures.push({ path, failure })
     },
     failNextGraphQL: (error) => {
       graphQLFailures.push(error)

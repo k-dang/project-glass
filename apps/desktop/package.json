@@ -18,6 +18,7 @@
   "devDependencies": {
     "@base-ui/react": "catalog:",
     "@effect/atom-react": "catalog:",
+    "@effect/vitest": "catalog:",
     "@fontsource-variable/geist": "catalog:",
     "@fontsource-variable/geist-mono": "catalog:",
     "@fontsource-variable/inter": "catalog:",
@@ -37,9 +38,11 @@
     "@tiptap/extensions": "catalog:",
     "@tiptap/pm": "catalog:",
     "@tiptap/react": "catalog:",
+    "@types/mdast": "4.0.4",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@types/ws": "catalog:",
     "@ui-sdk/core": "catalog:",
     "@ui-sdk/react": "catalog:",
     "@vitejs/plugin-react": "catalog:",
@@ -64,7 +67,8 @@
     "tailwindcss": "catalog:",
     "tw-animate-css": "catalog:",
     "vite": "catalog:",
-    "vite-plus": "catalog:"
+    "vite-plus": "catalog:",
+    "ws": "catalog:"
   },
   "productName": "Glass"
 }

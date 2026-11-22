@@ -45,8 +45,9 @@ import {
   placeOfKey,
 } from "./threadsArea"
 import { threadColumn } from "./threadColumn"
+import { DitherGlow } from "./DitherGlow"
 import { ThreadFrame } from "./ThreadFrame"
-import { UserMessage } from "./ThreadView"
+import { UserMessage } from "./UserMessage"
 import type { BackendError } from "./backend"
 import { ChipSelect } from "./chips"
 import { repositoriesAtom } from "./FollowedRepositories"
@@ -67,6 +68,8 @@ interface Choosable {
   readonly repository: FollowedRepository
   readonly title?: string | undefined
 }
+
+type Followed = Atom.Type<typeof repositoriesAtom>
 
 interface PlaceOptions {
   readonly place: ThreadPlace
@@ -98,7 +101,7 @@ const inSandboxOf = ({ id, name, harnesses }: SandboxProviderInfo): PlaceOptions
   harnesses,
 })
 
-export const defaultPlace = (
+const defaultPlace = (
   newest: Thread | undefined,
   providers: ReadonlyArray<SandboxProviderInfo>,
   hasCheckouts: boolean,
@@ -129,28 +132,32 @@ const unlistedBranches: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<string>,
   Atom.make(AsyncResult.initial())
 
 export function NewThread(props: { repository: string | undefined }) {
-  const checkouts = useAtomValue(localCheckoutsAtom)
+  const places = AsyncResult.all([
+    useAtomValue(localCheckoutsAtom),
+    useAtomValue(sandboxProvidersAtom),
+  ])
 
-  const providers = Option.getOrElse(
-    AsyncResult.value(useAtomValue(sandboxProvidersAtom)),
-    (): ReadonlyArray<SandboxProviderInfo> => [],
-  )
+  const threads = useAtomValue(threadsAtom)
+  const followed = useAtomValue(repositoriesAtom)
 
-  const threads = Option.getOrElse(AsyncResult.value(useAtomValue(threadsAtom)), () => [])
+  if (AsyncResult.isInitial(threads) || AsyncResult.isInitial(followed)) return null
 
-  return AsyncResult.builder(checkouts)
+  return AsyncResult.builder(places)
     .onInitial(() => null)
     .onFailure((cause) => (
       <div className="p-6">
         <ProblemAlert problem={problemOf(cause)} />
       </div>
     ))
-    .onSuccess((linked) => (
+    .onSuccess(([checkouts, providers]) => (
       <ChoosePlace
-        checkouts={linked}
+        checkouts={checkouts}
         providers={providers}
+        followed={followed}
         repository={props.repository}
-        newest={threads.findLast((thread) => !thread.forReview)}
+        newest={Option.getOrElse(AsyncResult.value(threads), () => []).findLast(
+          (thread) => !thread.forReview,
+        )}
       />
     ))
     .render()
@@ -193,6 +200,7 @@ interface DraftChoices {
 function ChoosePlace(props: {
   checkouts: ReadonlyArray<LocalCheckout>
   providers: ReadonlyArray<SandboxProviderInfo>
+  followed: Followed
   repository: string | undefined
   newest: Thread | undefined
 }) {
@@ -239,38 +247,29 @@ function ChoosePlace(props: {
     newest,
   }
 
-  return provider === undefined ? (
-    <>
-      {props.checkouts.map((linked) => (
-        <PrefetchBranches key={repositoryKey(linked.repository)} checkout={linked} />
-      ))}
-      <Draft
-        {...choices}
-        repositories={props.checkouts.map(({ repository, path }) => ({
-          repository,
-          title: path,
-        }))}
-      />
-    </>
-  ) : (
-    <InSandbox {...choices} />
-  )
-}
-
-function InSandbox(props: DraftChoices) {
-  const followed = useAtomValue(repositoriesAtom)
-
-  return AsyncResult.builder(followed)
-    .onInitial(() => null)
-    .onFailure((cause) => (
+  if (provider !== undefined && AsyncResult.isFailure(props.followed))
+    return (
       <div className="p-6">
-        <ProblemAlert problem={problemOf(cause)} />
+        <ProblemAlert problem={problemOf(props.followed.cause)} />
       </div>
-    ))
-    .onSuccess((repositories) => (
-      <Draft {...props} repositories={repositories.map((repository) => ({ repository }))} />
-    ))
-    .render()
+    )
+
+  const repositories =
+    provider === undefined
+      ? props.checkouts.map(({ repository, path }) => ({ repository, title: path }))
+      : Option.getOrElse(AsyncResult.value(props.followed), () => []).map((repository) => ({
+          repository,
+        }))
+
+  return (
+    <>
+      {provider === undefined &&
+        props.checkouts.map((linked) => (
+          <PrefetchBranches key={repositoryKey(linked.repository)} checkout={linked} />
+        ))}
+      <Draft {...choices} repositories={repositories} />
+    </>
+  )
 }
 
 function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> }) {
@@ -412,7 +411,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   return (
     <ThreadFrame
       label="New Thread"
-      className="[&_[data-slot=input-group]]:[view-transition-name:new-thread-composer]"
+      className="[&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:[view-transition-name:new-thread-composer]"
       heading={
         <h1 className="truncate font-medium">
           {starting === null ? "New Thread" : "Starting Thread…"}
@@ -421,10 +420,13 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       details={null}
     >
       {starting === null ? (
-        <div className="flex flex-1 flex-col items-center justify-end gap-2 px-6 pb-4 text-center">
-          <h2 className="text-2xl font-semibold tracking-tight">What should we work on?</h2>
-          <p className="max-w-md text-sm text-muted-foreground">{where.describe(key)}</p>
-        </div>
+        <>
+          <DitherGlow className="absolute inset-0 -z-10" />
+          <div className="flex flex-1 flex-col items-center justify-end gap-2 px-6 pb-4 text-center">
+            <h2 className="text-2xl font-semibold tracking-tight">What should we work on?</h2>
+            <p className="max-w-md text-sm text-muted-foreground">{where.describe(key)}</p>
+          </div>
+        </>
       ) : (
         <div className="flex-1 overflow-y-auto px-6 py-4">
           <MessageGroup

@@ -3,6 +3,7 @@ import { Effect, Predicate } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
+import { BrowserPages } from "./BrowserPages"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Threads } from "./Threads"
 import { GitHubClient } from "./github/GitHubClient"
@@ -43,6 +44,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const settings = yield* SettingsStore
     const savedPlaces = yield* SavedPlaces
     const threads = yield* Threads
+    const browserPages = yield* BrowserPages
     const globalChat = yield* GlobalChat
     const sandboxes = yield* Sandboxes
     const checkouts = yield* LocalCheckouts
@@ -56,6 +58,19 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const checkIns = yield* CheckIns
     const outsideAgents = yield* OutsideAgents
     const mcpCredentials = yield* McpCredentials
+
+    const handingBack =
+      (threadId: string) =>
+      <A, E, R>(sent: Effect.Effect<A, E, R>) =>
+        browserPages
+          .handBack(threadId)
+          .pipe(
+            Effect.flatMap((tookOver) =>
+              sent.pipe(
+                Effect.tapError(() => (tookOver ? browserPages.takeOver(threadId) : Effect.void)),
+              ),
+            ),
+          )
 
     return GlassRpcs.of({
       GetSavedPlaces: () => savedPlaces.list(),
@@ -111,6 +126,10 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         github
           .hasChanged(pullRequestId, revision, updatedAt)
           .pipe(Effect.provideService(BackgroundGitHubRequest, true)),
+      GetPullRequestStatus: ({ pullRequestId }) =>
+        github
+          .pullRequestStatus(pullRequestId)
+          .pipe(Effect.provideService(BackgroundGitHubRequest, true)),
       GetFileContents: ({ pullRequest, revision, side, path }) =>
         github.fileContents(pullRequest, revision, side, path),
       ListRepositoryFiles: ({ pullRequest, revision }) =>
@@ -127,7 +146,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ReplyToReviewThread: ({ reviewThreadId, body }) =>
         github.replyToReviewThread(reviewThreadId, body),
       MergePullRequest: ({ pullRequestId, revision, action }) =>
-        github.mergePullRequest(pullRequestId, revision, action),
+        github
+          .mergePullRequest(pullRequestId, revision, action)
+          .pipe(Effect.andThen(lists.refreshSoon)),
       SetReviewThreadResolved: ({ reviewThreadId, resolved }) =>
         github.setReviewThreadResolved(reviewThreadId, resolved),
       SetReaction: ({ commentId, reaction, reacted }) =>
@@ -176,6 +197,11 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateThread: (input) => threads.create(input),
       WatchWorkingThreads: () => threads.watchWorking(),
+      WatchBrowserPageRequests: () => browserPages.requests,
+      AnswerBrowserPageRequest: ({ id, answer }) => browserPages.answer(id, answer),
+      WatchBrowserControl: () => browserPages.control,
+      TakeOverBrowser: ({ threadId }) => browserPages.takeOver(threadId),
+      HandBackBrowser: ({ threadId }) => browserPages.handBack(threadId).pipe(Effect.asVoid),
       WatchThreadPullRequests: () => threadPullRequests.watch(),
       WatchSettledThreads: () => settledThreads.watch(),
       BringBackThread: ({ threadId }) => threads.bringBack(threadId),
@@ -197,12 +223,15 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       AnswerRequest: ({ threadId, requestId, answer }) =>
         threads.answer(threadId, requestId, answer),
       SendMessage: ({ threadId, message, images, feedback }) =>
-        threads.send(threadId, { message, images }, feedback).pipe(Effect.asVoid),
-      Steer: ({ threadId, message, images }) => threads.steer(threadId, { message, images }),
+        threads
+          .send(threadId, { message, images }, feedback)
+          .pipe(handingBack(threadId), Effect.asVoid),
+      Steer: ({ threadId, message, images }) =>
+        threads.steer(threadId, { message, images }).pipe(handingBack(threadId)),
       CancelQueuedMessage: ({ threadId, queuedMessageId }) =>
         threads.cancelQueued(threadId, queuedMessageId),
       SendQueuedMessage: ({ threadId, queuedMessageId }) =>
-        threads.sendQueued(threadId, queuedMessageId),
+        threads.sendQueued(threadId, queuedMessageId).pipe(handingBack(threadId)),
       StopTurn: ({ threadId }) => threads.stop(threadId),
       ReachSandbox: ({ threadId }) => threads.reachSandbox(threadId),
       GetUnsentMessage: ({ threadId }) => threads.unsent(threadId),

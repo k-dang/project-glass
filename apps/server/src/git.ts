@@ -56,7 +56,10 @@ export class Git extends Context.Service<
 
             return { stdout: out, stderr: err, code: Number(exit) }
           }),
-        ).pipe(Effect.mapError(() => new GitFailed({ args: [...args], code: null, stderr: "" })))
+        ).pipe(
+          Effect.tapError((cause) => Effect.logWarning("Couldn't run git", cause)),
+          Effect.mapError(() => new GitFailed({ args: [...args], code: null, stderr: "" })),
+        )
 
         if (code !== 0) return yield* new GitFailed({ args: [...args], code, stderr })
 

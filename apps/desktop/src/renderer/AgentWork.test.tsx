@@ -8,7 +8,10 @@ import type { useTour } from "./useTour"
 import type { AgentReviewControls } from "./useAgentReview"
 import { controls, reviewOf } from "../../test/agentReview"
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.useRealTimers()
+})
 
 const noTour: ReturnType<typeof useTour> = {
   known: true,
@@ -41,9 +44,9 @@ const open = async (review: AgentReviewControls, onRead = vi.fn<() => void>()) =
 
 const trigger = () => screen.getByRole("button", { name: "Agent work" })
 
-// Flaky: elapsed time read 1:06 instead of 1:05 in a full desktop run; passed alone on rerun.
-// oxlint-disable-next-line vitest/no-disabled-tests
-it.skip("shows a running review's elapsed time on the trigger and cancels it from the menu", async () => {
+it("shows a running review's elapsed time on the trigger and cancels it from the menu", async () => {
+  vi.useFakeTimers({ toFake: ["Date"] })
+
   const running = controls({
     job: { status: "reviewing", startedAt: Date.now() - 65_000, runner: null },
   })

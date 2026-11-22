@@ -2,7 +2,10 @@ import { assert, it } from "@effect/vitest"
 import {
   ThreadStarted,
   LineNote,
+  Merge,
   PageNote,
+  FilePage,
+  PullRequestRef,
   PageText,
   SandboxPlace,
   TextPatch,
@@ -22,6 +25,7 @@ import {
   scriptedHost,
   settled,
 } from "../test/threadsFixture"
+import { fakeAgentRunnersWith } from "../test/fakeAgentRunners"
 import type { FakePullRequest } from "../test/fakePullRequest"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome } from "../test/harness"
@@ -318,7 +322,7 @@ it.live(
 
       const onPage = new PageNote({
         id: "page-1",
-        path: "docs/plan.html",
+        page: FilePage.make({ path: "docs/plan.html" }),
         part: PageText.make({
           selector: "#limits > p",
           heading: "Limits",
@@ -545,42 +549,89 @@ it.live("finds a Thread's PR from the branch its agent left checked out, not a f
   }),
 )
 
-it.live("keeps showing a Thread's PR as merged once it merges", () =>
+it.live("leaves out a merged PR from before the Thread on a branch name it reused", () =>
   Effect.gen(function* () {
     const f = yield* threadsFixture
     yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
 
-    const pr = f.github.seedPullRequest({
+    const merged = {
       owner: "glass-demo",
       repo: "greeter",
-      number: 7,
-      headBranch: "feature/greeting",
+      state: "MERGED",
       base: { sha: "b0", files: {} },
       head: { sha: "h1", files: {} },
+    } as const
+
+    f.github.seedPullRequest({
+      ...merged,
+      number: 7,
+      headBranch: "feature/reused",
+      createdAt: "2020-01-01T00:00:00Z",
     })
+
+    const reused = yield* f.start("hold:reused")
+    yield* f.transcript(reused.id, holding)
+    gitIn(f.worktree(reused.name), "switch", "--quiet", "-c", "feature/reused")
+    yield* f.release("reused")
+    yield* f.transcript(reused.id, settled(1))
+
+    const fresh = yield* f.start("hold:fresh")
+    yield* f.transcript(fresh.id, holding)
+    gitIn(f.worktree(fresh.name), "switch", "--quiet", "-c", "feature/fresh")
+    f.github.seedPullRequest({ ...merged, number: 8, headBranch: "feature/fresh" })
+    yield* f.release("fresh")
+
+    const listed = yield* f.client.WatchThreadPullRequests().pipe(
+      Stream.filter((found) => found.length > 0),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+    )
+
+    assert.deepStrictEqual(
+      listed.map(({ threadId, ref }) => [threadId, ref.number]),
+      [[fresh.id, 8]],
+    )
+
+    f.github.seedPullRequest({ ...merged, number: 9, headBranch: "feature/reused" })
+    yield* f.client.ListPullRequests()
+
+    yield* f.client.WatchThreadPullRequests().pipe(
+      Stream.filter((found) =>
+        found.some(({ threadId, ref }) => threadId === reused.id && ref.number === 9),
+      ),
+      Stream.runHead,
+    )
+
+    const later = yield* f.start("hold:later")
+    yield* f.transcript(later.id, holding)
+    gitIn(f.worktree(later.name), "switch", "--quiet", "--ignore-other-worktrees", "feature/reused")
+    yield* f.release("later")
+    yield* f.transcript(later.id, settled(1))
+    f.github.seedPullRequest({ ...merged, number: 10, headBranch: "feature/reused" })
+    yield* f.client.ListPullRequests()
+
+    yield* f.client.WatchThreadPullRequests().pipe(
+      Stream.filter((found) =>
+        found.some(({ threadId, ref }) => threadId === later.id && ref.number === 10),
+      ),
+      Stream.runHead,
+    )
+  }),
+)
+
+it.live("names a Local Thread past a branch pushed since its checkout last fetched", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixtureWith({
+      agentRunners: fakeAgentRunnersWith(() => "fix/greeting"),
+    })
+
+    gitIn(f.clone.origin, "branch", "fix/greeting", "main")
 
     const thread = yield* f.start("hold:first")
     yield* f.transcript(thread.id, holding)
-    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/greeting")
+
+    assert.equal(gitIn(f.worktree(thread.name), "branch", "--show-current"), "fix/greeting-2")
     yield* f.release("first")
-
-    const stateOfPr = (tag: string) =>
-      f.client.WatchThreadPullRequests().pipe(
-        Stream.map((listed) => listed.find(({ threadId }) => threadId === thread.id)),
-        Stream.filter((found) => found?.state._tag === tag),
-        Stream.runHead,
-        Effect.map(Option.getOrThrow),
-      )
-
-    yield* stateOfPr("Open")
-
-    pr.edit({ state: "MERGED" })
-    yield* f.client.ListPullRequests()
-
-    const merged = yield* stateOfPr("Merged")
-
-    assert.equal(merged?.ref.number, 7)
-    assert.equal(merged?.url, pr.url)
   }),
 )
 
@@ -591,6 +642,12 @@ it.live("marks the To-dos a Thread started from done once its PR merges", () =>
     yield* f.client.AddToDo({ title: "Fix spacing", notes: "" })
     yield* f.client.AddToDo({ title: "Tidy later", notes: "" })
 
+    const thread = yield* f.start(`hold:first
+${toDoMention({ id: 1, title: "Fix spacing" })}`)
+
+    yield* f.transcript(thread.id, holding)
+    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/spacing")
+
     const pr = f.github.seedPullRequest({
       owner: "glass-demo",
       repo: "greeter",
@@ -600,11 +657,6 @@ it.live("marks the To-dos a Thread started from done once its PR merges", () =>
       head: { sha: "h1", files: {} },
     })
 
-    const thread = yield* f.start(`hold:first
-${toDoMention({ id: 1, title: "Fix spacing" })}`)
-
-    yield* f.transcript(thread.id, holding)
-    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/spacing")
     yield* f.release("first")
     yield* f.transcript(thread.id, settled(1))
     yield* f.send(thread.id, toDoMention({ id: 2, title: "Tidy later" }))
@@ -632,6 +684,52 @@ ${toDoMention({ id: 1, title: "Fix spacing" })}`)
   }),
 )
 
+it.live("settles a Thread right after its PR is merged from Glass", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+
+    const thread = yield* f.start("hold:first")
+    yield* f.transcript(thread.id, holding)
+    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/merge-here")
+
+    const pr = f.github.seedPullRequest({
+      owner: "glass-demo",
+      repo: "greeter",
+      number: 7,
+      headBranch: "feature/merge-here",
+      base: { sha: "b0", files: {} },
+      head: { sha: "h1", files: {} },
+    })
+
+    yield* f.release("first")
+
+    yield* f.client.WatchThreadPullRequests().pipe(
+      Stream.filter((listed) =>
+        listed.some(
+          ({ threadId, state }) => threadId === thread.id && Predicate.isTagged(state, "Open"),
+        ),
+      ),
+      Stream.runHead,
+    )
+
+    const { pullRequest, revision } = yield* f.client.LoadPullRequest({
+      pullRequest: new PullRequestRef(pr),
+    })
+
+    yield* f.client.MergePullRequest({
+      pullRequestId: pullRequest.id,
+      revision,
+      action: Merge.make({ method: "merge" }),
+    })
+
+    yield* f.client.WatchSettledThreads().pipe(
+      Stream.filter((ids) => ids.includes(thread.id)),
+      Stream.runHead,
+    )
+  }),
+)
+
 it.live(
   "settles a Thread once its PR merges, until the user writes, steers, or brings it back",
   () =>
@@ -642,6 +740,10 @@ it.live(
       const onPullRequest = Effect.fnUntraced(function* (gate: string, number: number) {
         const headBranch = `feature/${gate}`
 
+        const thread = yield* f.start(`hold:${gate}`)
+        yield* f.transcript(thread.id, holding)
+        gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", headBranch)
+
         const pr = f.github.seedPullRequest({
           owner: "glass-demo",
           repo: "greeter",
@@ -651,10 +753,16 @@ it.live(
           head: { sha: `h${number}`, files: {} },
         })
 
-        const thread = yield* f.start(`hold:${gate}`)
-        yield* f.transcript(thread.id, holding)
-        gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", headBranch)
         yield* f.release(gate)
+
+        yield* f.client.WatchThreadPullRequests().pipe(
+          Stream.filter((listed) =>
+            listed.some(
+              ({ threadId, state }) => threadId === thread.id && Predicate.isTagged(state, "Open"),
+            ),
+          ),
+          Stream.runHead,
+        )
 
         return { pr, threadId: thread.id }
       })
@@ -698,22 +806,32 @@ it.live(
         const restarted = yield* f.restart
         yield* restarted.ListPullRequests()
 
-        yield* restarted.WatchThreadPullRequests().pipe(
+        const merged = yield* restarted.WatchThreadPullRequests().pipe(
           Stream.filter(
             (listed) =>
               listed.length === 3 &&
               listed.every(({ state }) => Predicate.isTagged(state, "Merged")),
           ),
           Stream.runHead,
+          Effect.map(Option.getOrThrow),
         )
 
         const ids = yield* restarted.WatchSettledThreads().pipe(Stream.runHead)
 
-        return { client: restarted, ids: Option.getOrThrow(ids) }
+        return { client: restarted, merged, ids: Option.getOrThrow(ids) }
       })
 
       const restarted = yield* settledAfterRestart
       assert.deepStrictEqual(restarted.ids, [broughtBack.threadId])
+
+      assert.sameDeepMembers(
+        restarted.merged.map(({ threadId, ref, url }) => ({ threadId, number: ref.number, url })),
+        [written, steered, broughtBack].map(({ threadId, pr }) => ({
+          threadId,
+          number: pr.number,
+          url: pr.url,
+        })),
+      )
 
       yield* restarted.client.BringBackThread({ threadId: broughtBack.threadId })
       assert.deepStrictEqual((yield* settledAfterRestart).ids, [])

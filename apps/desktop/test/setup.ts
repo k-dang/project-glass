@@ -1,6 +1,10 @@
 import { configure } from "@testing-library/react"
+import { afterEach } from "vite-plus/test"
+import { disposeRegistries } from "./registry"
 
 configure({ asyncUtilTimeout: 25_000 })
+
+afterEach(disposeRegistries)
 
 if ("document" in globalThis && !("startViewTransition" in document))
   Object.defineProperty(document, "startViewTransition", {

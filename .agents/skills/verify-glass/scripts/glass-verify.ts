@@ -17,11 +17,12 @@ import { connect, createServer as createNetServer } from "node:net"
 import { basename, delimiter, join } from "node:path"
 import { parseArgs } from "node:util"
 import { Cdp, cdpJson } from "./cdp.ts"
+import { checkoutProcesses } from "./processes.ts"
 import { formatAreas, formatSummary, type MemorySample, startSampler } from "./memory.ts"
 import { githubMode } from "./launch-options.ts"
 import { FAKE_MODES, isFakeMode, serveFakeGitHub } from "./fake-github.ts"
 import { writeAgentCommands } from "../../../../apps/server/test/agentCommands.ts"
-import { stopAgentHost } from "../../../../apps/server/test/stopAgentHost.ts"
+import { removeFolder, stopAgentHost } from "../../../../apps/server/test/glassHome.ts"
 import { VIEWER } from "../../../../apps/server/test/fakePullRequest.ts"
 
 const root = join(import.meta.dirname, "..", "..", "..", "..")
@@ -69,6 +70,8 @@ const USAGE = `Usage: node .agents/skills/verify-glass/scripts/glass-verify.ts <
   kill-backend                           kill the backend process, as a crash would
   relaunch                               quit Glass and open it again on the same data
   stop                                   quit Glass, keep logs as evidence, delete run state
+  ps                                     list this checkout's node and Electron processes, naming
+                                         the live run each belongs to
   list                                   show runs with live state
 
 Every command except launch/list takes --run <id>; it defaults to the only live run.`
@@ -182,6 +185,21 @@ const listenerPid = (port: number) => {
 }
 
 const glassPid = (run: RunState) => listenerPid(run.cdpPort)
+
+const listProcesses = () => {
+  const processes = checkoutProcesses(root)
+  if (processes.length === 0) return console.log("(no node or Electron processes from this checkout)")
+  const runOf = new Map(
+    liveRuns().flatMap((id) => {
+      const run = loadRun(id)
+      return [glassPid(run), run.fake?.pid].flatMap((pid) => (pid === undefined ? [] : [[pid, id] as const]))
+    }),
+  )
+  for (const { pid, command } of processes) {
+    const run = runOf.get(pid)
+    console.log(`${String(pid).padStart(7)}  ${run === undefined ? "" : `[run ${run}] `}${command}`)
+  }
+}
 
 const CdpTarget = Schema.Struct({
   type: Schema.String,
@@ -613,7 +631,7 @@ const stop = async (run: RunState) => {
     if (await glassRunning(run)) return fail(`Glass is still running (pid ${pid}); run state kept`)
   }
   if (run.fake !== undefined) killTree(run.fake.pid)
-  await stopAgentHost(join(paths.home, ".project-glass"))
+  await stopAgentHost(paths.home)
   if (backendUrl) {
     const port = Number(new URL(backendUrl).port)
     for (let attempt = 0; attempt < 50 && (await portIsOpen(port)); attempt++) await sleep(100)
@@ -627,7 +645,7 @@ const stop = async (run: RunState) => {
   ]) {
     if (existsSync(log)) copyFileSync(log, join(paths.evidence, basename(log)))
   }
-  rmSync(paths.state, { recursive: true, force: true, maxRetries: 20, retryDelay: 250 })
+  await removeFolder(paths.state)
   console.log(`Stopped run ${run.id}. Evidence kept in ${paths.evidence}`)
 }
 
@@ -710,6 +728,8 @@ const main = async () => {
       })
     case "list":
       return console.log(liveRuns().join("\n") || "(no live runs)")
+    case "ps":
+      return listProcesses()
     case undefined:
     case "help":
       return console.log(USAGE)

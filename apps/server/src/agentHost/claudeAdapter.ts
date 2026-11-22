@@ -30,6 +30,7 @@ import {
 import {
   Deferred,
   Effect,
+  FiberSet,
   Match,
   Option,
   Predicate,
@@ -209,6 +210,8 @@ const startClaude = (
   Scope.Scope
 > =>
   Effect.gen(function* () {
+    const runFork = yield* FiberSet.makeRuntime()
+
     const session = yield* Effect.acquireRelease(
       Effect.sync(() =>
         sdk.query({
@@ -224,8 +227,7 @@ const startClaude = (
             // WARNING: Required so the user can switch to bypassPermissions between Turns.
             allowDangerouslySkipPermissions: true,
             stderr: (data) => {
-              if (data.trim() !== "")
-                Effect.runFork(Effect.logWarning("claude wrote to stderr", data))
+              if (data.trim() !== "") runFork(Effect.logWarning("claude wrote to stderr", data))
             },
           },
         }),
@@ -424,6 +426,7 @@ export const claudeAdapter = (
     const prompts = yield* Queue.unbounded<SDKUserMessage>()
     const requests = yield* Queue.unbounded<Input>()
     const waiting = new Map<string, Asked>()
+    const runPromise = yield* FiberSet.makeRuntimePromise()
 
     const ask = (toolName: string, input: ToolInput, requestId: string) =>
       Effect.gen(function* () {
@@ -456,7 +459,7 @@ export const claudeAdapter = (
     const canUseTool: CanUseTool = (toolName, input, { toolUseID, signal }) =>
       approved(toolName)
         ? Promise.resolve({ behavior: "allow", updatedInput: input })
-        : Effect.runPromise(
+        : runPromise(
             ask(
               toolName,
               Option.getOrElse(decodeToolInput(input), () => ({})),
@@ -501,7 +504,7 @@ export const claudeAdapter = (
 
         const inputs = [
           Input.Message({ message }),
-          ...(tracked.ended === null ? [] : [Input.BackgroundWorkEnded({ work: tracked.ended })]),
+          ...(tracked.ended === null ? [] : [Input.BackgroundWorkEnded(tracked.ended)]),
         ]
 
         return show(backgroundActivity(background)).pipe(Effect.as(inputs))

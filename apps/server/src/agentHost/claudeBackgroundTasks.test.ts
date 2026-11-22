@@ -60,9 +60,8 @@ it("reports the work a notification ends and stops showing it", () => {
   )
 
   assert.deepStrictEqual(tracked.ended, {
-    kind: "subagent",
-    description: "Explore: Trace it",
-    outcome: "failed",
+    work: { kind: "subagent", description: "Explore: Trace it", outcome: "failed" },
+    toolCallId: "toolu_1",
   })
   assert.deepStrictEqual(backgroundActivity(tracked.tasks).backgroundToolCalls, [])
 })

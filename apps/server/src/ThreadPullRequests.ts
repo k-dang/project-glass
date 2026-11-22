@@ -1,5 +1,5 @@
 import { type Thread, ThreadPullRequest, PullRequestOpen, repositoryKey } from "@glass/contracts"
-import { Context, Effect, Layer, Ref, Schema, Stream, SubscriptionRef } from "effect"
+import { Context, DateTime, Effect, Layer, Ref, Schema, Stream, SubscriptionRef } from "effect"
 import type { Branch, EndedPullRequest } from "./github/branchPullRequests"
 import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
@@ -21,13 +21,17 @@ const branchOf = ({ repository, branch }: Thread): Branch | undefined =>
 const openPullRequestOf = (mirror: Mirror, { repository, branch }: Branch) =>
   mirrorOf(mirror, repository)?.pullRequests.find((pr) => pr.headBranch === branch)
 
+interface Lookup extends Branch {
+  readonly since: DateTime.Utc
+}
+
 const endedLookups = (
   threads: ReadonlyArray<Thread>,
   mirror: Mirror | undefined,
-): ReadonlyArray<Branch> => {
+): ReadonlyArray<Lookup> => {
   if (mirror === undefined) return []
 
-  const lookups = new Map<string, Branch>()
+  const lookups = new Map<string, Lookup>()
 
   for (const thread of threads) {
     const branch = branchOf(thread)
@@ -38,12 +42,18 @@ const endedLookups = (
       mirrorOf(mirror, branch.repository) !== undefined &&
       openPullRequestOf(mirror, branch) === undefined
     ) {
-      lookups.set(branchKey(branch), branch)
+      const since = lookups.get(branchKey(branch))?.since ?? thread.createdAt
+
+      lookups.set(branchKey(branch), { ...branch, since: DateTime.max(since, thread.createdAt) })
     }
   }
 
   return [...lookups.values()]
 }
+
+// WARNING: Deleted branches' names come back, so a PR opened before the Thread (even one its agent picked up) drops off once it ends.
+const endedSince = (since: DateTime.Utc, ended: EndedPullRequest | undefined) =>
+  ended !== undefined && DateTime.isGreaterThanOrEqualTo(ended.createdAt, since) ? ended : undefined
 
 const pullRequestsOf = (
   threads: ReadonlyArray<Thread>,
@@ -61,7 +71,7 @@ const pullRequestsOf = (
 
         const found =
           open === undefined
-            ? ended.get(branchKey(branch))
+            ? endedSince(thread.createdAt, ended.get(branchKey(branch)))
             : { ...open, state: PullRequestOpen.make({ checks: open.checks }) }
 
         return found === undefined
@@ -111,9 +121,12 @@ export class ThreadPullRequests extends Context.Service<
         Effect.forkScoped,
       )
 
-      const lookUpEnded = Effect.fnUntraced(function* (branches: ReadonlyArray<Branch>) {
+      const lookUpEnded = Effect.fnUntraced(function* (branches: ReadonlyArray<Lookup>) {
         const known = yield* Ref.get(ended)
-        const unknown = branches.filter((branch) => !known.has(branchKey(branch)))
+
+        const cached = (lookup: Lookup) => endedSince(lookup.since, known.get(branchKey(lookup)))
+
+        const unknown = branches.filter((branch) => cached(branch) === undefined)
         yield* annotateUnit({ ended_lookups: unknown.length })
         const answers = yield* github.endedBranchPullRequests(unknown)
         const found = new Map(unknown.map((branch, index) => [branchKey(branch), answers[index]]))
@@ -123,7 +136,7 @@ export class ThreadPullRequests extends Context.Service<
           new Map(
             branches.flatMap((branch) => {
               const key = branchKey(branch)
-              const pullRequest = known.get(key) ?? found.get(key)
+              const pullRequest = cached(branch) ?? found.get(key)
 
               return pullRequest == null ? [] : [[key, pullRequest] as const]
             }),
@@ -136,7 +149,11 @@ export class ThreadPullRequests extends Context.Service<
         mirrored: Mirror | undefined,
       ) {
         const branches = endedLookups(current, mirrored)
-        const keys = branches.map(branchKey).join()
+
+        const keys = branches
+          .map((branch) => `${branchKey(branch)}@${DateTime.formatIso(branch.since)}`)
+          .join()
+
         const last = yield* Ref.get(asked)
 
         if (mirrored !== undefined && (last?.mirrored !== mirrored || last.keys !== keys)) {

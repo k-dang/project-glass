@@ -35,7 +35,6 @@ import {
   type EngineFeature,
   type EngineSettings,
 } from "@glass/contracts"
-import { RegistryProvider } from "@effect/atom-react"
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { DateTime, Effect, Queue, Stream } from "effect"
@@ -46,6 +45,7 @@ import { backendLayerAtom } from "./backend"
 import { openReview } from "../../test/finishReview"
 import { type Held, hold, next, testLayer } from "../../test/testBackend"
 import { viewer } from "../../test/workspace"
+import { RegistryProvider } from "../../test/registry"
 
 const workspace = new PullRequestWorkspace({
   viewer,
@@ -120,6 +120,8 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   window.history.replaceState(null, "", "#/")
+  localStorage.removeItem("glass.layout")
+  localStorage.removeItem("glass.titleStripResourceUsage")
 })
 
 it("breaks storage down by table in Settings, and retries a failed measurement", async () => {
@@ -311,6 +313,30 @@ it("opens the keyboard shortcuts from any area, not only a PR workspace", async 
   await user.keyboard("?")
   const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
   expect(within(dialog).getByRole("heading", { name: "Threads" })).toBeTruthy()
+})
+
+it("keeps Keyboard shortcuts in the Connection menu in the Inset layout", async () => {
+  localStorage.setItem("glass.layout", "inset")
+  const user = mount({})
+  const avatar = await screen.findByRole("button", { name: /^@kevin/ })
+
+  await user.click(avatar)
+  await user.click(await screen.findByRole("menuitem", { name: "Keyboard shortcuts ?" }))
+  await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
+  await user.keyboard("{Escape}")
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+  await waitFor(() => expect(document.activeElement).toBe(avatar))
+})
+
+it("shows CPU and memory in the Inset title strip once turned on in Settings", async () => {
+  localStorage.setItem("glass.layout", "inset")
+  const user = mount({})
+  await user.click(await screen.findByRole("link", { name: "Settings" }))
+  expect(screen.queryByRole("button", { name: "Show Glass resource usage" })).toBeNull()
+
+  await user.click(await screen.findByRole("switch", { name: "Show CPU and memory" }))
+  await user.click(await screen.findByRole("button", { name: "Show Glass resource usage" }))
+  await screen.findByRole("dialog", { name: "Glass resource usage" })
 })
 
 it("preserves a pending follow and its failure when leaving and returning to Settings", async () => {

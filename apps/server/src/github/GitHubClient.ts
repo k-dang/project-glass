@@ -19,8 +19,8 @@ import {
   PullRequestAccessDenied,
   PullRequestNotFound,
   PullRequestRef,
+  PullRequestStatus,
   type PublishedComment,
-  type PullRequestState,
   type Reaction,
   type ReactionGroup,
   PullRequestWorkspace,
@@ -103,7 +103,7 @@ import {
   toChecks,
   toReviewRequestsPage,
 } from "./repositoryPullRequests"
-import { HEAD_MOVED, mergeOperation, toMerging } from "./merging"
+import { HEAD_MOVED, mergeOperation } from "./merging"
 import { toPullRequestStatus } from "./pullRequestStatus"
 import { type LookedUpPullRequest, QueuedPullRequests } from "./queuedPullRequests"
 import { type Branch, EndedBranchPullRequests, type EndedPullRequest } from "./branchPullRequests"
@@ -129,12 +129,13 @@ import {
   ConnectionPageResponse,
   PULL_REQUEST_QUERY,
   PULL_REQUEST_REVISION_QUERY,
+  PULL_REQUEST_STATUS_QUERY,
   TOUR_INPUT_QUERY,
   TourInputResponse,
   FILE_CONTENTS_QUERY,
-  GitHubPullRequestState,
   PullRequestResponse,
   PullRequestRevisionResponse,
+  PullRequestStatusResponse,
   FileContentsResponse,
   RepositoryPullRequestsResponse,
   SearchPullRequestsResponse,
@@ -200,12 +201,6 @@ const foundRepository = <A>({ repository }: { readonly repository: A | null }) =
 const CHECKS_BATCH_SIZE = 100
 
 const ATTENTION_BATCH_SIZE = 50
-
-const states: Record<typeof GitHubPullRequestState.Type, PullRequestState> = {
-  OPEN: "open",
-  CLOSED: "closed",
-  MERGED: "merged",
-}
 
 class CommentGone extends Data.TaggedError("CommentGone") {}
 
@@ -294,6 +289,9 @@ export class GitHubClient extends Context.Service<
       revision: Revision,
       updatedAt: DateTime.Utc,
     ) => Effect.Effect<boolean, ConnectionError>
+    readonly pullRequestStatus: (
+      pullRequestId: string,
+    ) => Effect.Effect<PullRequestStatus, ConnectionError>
     readonly repositoryPullRequests: (
       repository: FollowedRepository,
       viewerLogin: string,
@@ -334,6 +332,7 @@ export class GitHubClient extends Context.Service<
     ) => Effect.Effect<RepositoryFiles, ConnectionError>
     readonly repositoryBranches: (
       repository: FollowedRepository,
+      startingWith: string,
     ) => Effect.Effect<ReadonlyArray<string>, ConnectionError>
     readonly repositoryDefaultBranch: (
       repository: FollowedRepository,
@@ -641,11 +640,9 @@ export class GitHubClient extends Context.Service<
             author: login(pr.author),
             baseBranch: pr.baseRefName,
             headBranch: pr.headRefName,
-            state: pr.state === "OPEN" && pr.isDraft ? "draft" : states[pr.state],
             descriptionHtml: pr.bodyHTML,
             viewerIsAuthor: pr.viewerDidAuthor,
             ...toPullRequestStatus(pr),
-            ...toMerging(pr),
           }),
           revision: new Revision({ base: pr.baseRefOid, head: pr.headRefOid }),
           updatedAt: pr.updatedAt,
@@ -672,6 +669,22 @@ export class GitHubClient extends Context.Service<
         return (
           !matchesRevision(current, revision) || !DateTime.Equivalence(current.updatedAt, updatedAt)
         )
+      })
+
+      const pullRequestStatus = Effect.fn("GitHubClient.pullRequestStatus")(function* (
+        pullRequestId: string,
+      ) {
+        const { node } = yield* graphql({
+          name: "PullRequestStatus",
+          query: PULL_REQUEST_STATUS_QUERY,
+          variables: { id: pullRequestId },
+          response: PullRequestStatusResponse,
+          domainError: () => undefined,
+        })
+
+        if (node == null) return yield* missingPullRequest("PullRequestStatus")
+
+        return new PullRequestStatus(toPullRequestStatus(node))
       })
 
       const setFileViewed = Effect.fn("GitHubClient.setFileViewed")(function* (
@@ -1091,7 +1104,7 @@ export class GitHubClient extends Context.Service<
         }).pipe(Effect.withSpan("GitHubClient.repositoryDefaultBranch"))
       }
 
-      const repositoryBranches = (repository: FollowedRepository) => {
+      const repositoryBranches = (repository: FollowedRepository, startingWith: string) => {
         const notFound = repositoryNotFound(repository)
 
         return allPages((after) =>
@@ -1099,7 +1112,12 @@ export class GitHubClient extends Context.Service<
             const data = yield* graphql({
               name: "RepositoryBranches",
               query: REPOSITORY_BRANCHES_QUERY,
-              variables: { owner: repository.owner, name: repository.repo, after },
+              variables: {
+                owner: repository.owner,
+                name: repository.repo,
+                query: startingWith === "" ? null : startingWith,
+                after,
+              },
               response: RepositoryBranchesResponse,
               domainError: ({ type }) => (type === "NOT_FOUND" ? notFound : undefined),
             })
@@ -1109,7 +1127,9 @@ export class GitHubClient extends Context.Service<
             return data.repository.refs
           }),
         ).pipe(
-          Effect.map((refs) => refs.map(({ name }) => name)),
+          Effect.map((refs) =>
+            refs.map(({ name }) => name).filter((name) => name.startsWith(startingWith)),
+          ),
           Effect.withSpan("GitHubClient.repositoryBranches"),
         )
       }
@@ -1381,6 +1401,7 @@ export class GitHubClient extends Context.Service<
         tourInput,
         reviewInput,
         hasChanged,
+        pullRequestStatus,
         repositoryPullRequests,
         pullRequestsUpdatedSince,
         pullRequestChecks,

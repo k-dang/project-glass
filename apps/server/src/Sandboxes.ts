@@ -4,14 +4,13 @@ import {
   AgentModels,
   GoneReach,
   goneExplanation,
-  incompatibleExplanation,
   isOutOfReach,
   SandboxProviderInfo,
   type SandboxReach,
   SandboxStatus,
   TurnCutOff,
 } from "@glass/contracts"
-import type { SandboxProvider, SandboxRequest, SandboxState } from "@glass/plugin"
+import type { SandboxHost, SandboxProvider, SandboxRequest, SandboxState } from "@glass/plugin"
 import {
   type Cause,
   Context,
@@ -35,7 +34,7 @@ import {
 import { SqlClient } from "effect/sql"
 import { Socket } from "effect/socket"
 import { newHostToken } from "./agentHost/protocol"
-import { uniqueThreadName } from "./threadNames"
+import { placeholderBranch } from "./BranchNames"
 import { GitHubClient } from "./github/GitHubClient"
 import { followHost, greet, type JournalPosition } from "./hostJournal"
 import { GlassToolRelay, ToolCallOrigin } from "./mcp/GlassToolRelay"
@@ -47,7 +46,9 @@ import {
   deleteSandbox,
   extendSandbox,
   listModels,
-  waitForHost,
+  hostDidntStart,
+  replaceHost,
+  startHost,
 } from "./sandboxCalls"
 import { missedConnection, type Recovery, recoveryReach } from "./reconnecting"
 import { isSandboxGone, SandboxGone } from "./sandboxFailures"
@@ -62,7 +63,10 @@ const leaseFields = { ...sandboxFields, expiresAt: Schema.optional(Schema.DateTi
 
 const Building = Schema.TaggedStruct("Building", sandboxFields)
 
-const Ready = Schema.TaggedStruct("Ready", leaseFields)
+const Ready = Schema.TaggedStruct("Ready", {
+  ...leaseFields,
+  replacingHost: Schema.optional(Schema.Boolean),
+})
 
 const Gone = Schema.TaggedStruct("Gone", { ...leaseFields, reason: GoneReach })
 
@@ -87,8 +91,6 @@ const decodeStored = Schema.decodeUnknownEffect(
 )
 
 const decodeModels = Schema.decodeUnknownEffect(AgentModels)
-
-const incompatible = () => new ThreadError({ message: incompatibleExplanation })
 
 const unreachable = () =>
   new ThreadError({ message: "Glass couldn't reach the Thread's Sandbox. Try again." })
@@ -188,6 +190,8 @@ const notInstalled = (providerId: string): Placement => {
     branches: () => failure,
     files: () => Effect.succeed([]),
     place: () => failure,
+    takenBranches: () => failure,
+    useBranch: () => failure,
     prepareHost: () => failure,
     hostIfPrepared: () => Effect.succeedNone,
     connectedHost: () => Effect.succeedNone,
@@ -319,6 +323,21 @@ export class Sandboxes extends Context.Service<
           }).pipe(Effect.uninterruptible),
         )
 
+      const updateReady = (
+        threadId: string,
+        update: (ready: typeof Ready.Type) => typeof Ready.Type,
+      ) =>
+        Effect.gen(function* () {
+          const { record } = yield* knownOf(threadId)
+
+          if (!Predicate.isTagged(record, "Ready")) return
+
+          const next = update(record)
+
+          yield* persist(threadId, next)
+          yield* setRecord(threadId, next)
+        }).pipe(linkOf(threadId).recordLock.withPermits(1), Effect.uninterruptible)
+
       const becomeGone = (threadId: string) =>
         Effect.gen(function* () {
           const { record } = yield* knownOf(threadId)
@@ -373,12 +392,25 @@ export class Sandboxes extends Context.Service<
           Effect.andThen(save(threadId, null)),
         )
 
+      const hostWith = (token: string): SandboxHost => ({
+        bundle: config.agentHostBundle,
+        environment: {
+          GLASS_HOST_TOKEN: token,
+          GLASS_HOST_PORT: String(hostPort),
+          GLASS_HOST_ADDRESS: "0.0.0.0",
+        },
+      })
+
       const makePlacement = (provider: SandboxProvider) => {
         const provision = ({ thread, folder }: PlacedThread) =>
           Effect.gen(function* () {
             const { record: left } = yield* knownOf(thread.id)
 
             if (Predicate.isTagged(left, "Building")) yield* discard(provider, thread.id, left)
+
+            const branch =
+              thread.branch ??
+              (yield* new ThreadError({ message: "This Thread has no branch to work on." }))
 
             const token = newHostToken()
             let recorded: SandboxState | undefined
@@ -391,18 +423,10 @@ export class Sandboxes extends Context.Service<
                 owner: thread.repository.owner,
                 repo: thread.repository.repo,
               },
-              branch: thread.name,
+              branch,
               baseBranch: thread.baseBranch,
               folder,
-              host: {
-                bundle: config.agentHostBundle,
-                port: hostPort,
-                environment: {
-                  GLASS_HOST_TOKEN: token,
-                  GLASS_HOST_PORT: String(hostPort),
-                  GLASS_HOST_ADDRESS: "0.0.0.0",
-                },
-              },
+              hostPort,
             }
 
             yield* Effect.gen(function* () {
@@ -425,7 +449,10 @@ export class Sandboxes extends Context.Service<
                   ),
                 )
 
-              yield* waitForHost(provider, recorded)
+              yield* transcripts.setStatus(thread.id, "Starting the agent")
+              yield* startHost(provider, recorded, hostWith(token)).pipe(
+                Effect.catchTag("SandboxGone", () => Effect.fail(hostDidntStart())),
+              )
 
               return yield* save(thread.id, Ready.make({ state: recorded, token }))
             }).pipe(
@@ -453,11 +480,9 @@ export class Sandboxes extends Context.Service<
               )
                 return
 
-              const { record: current } = yield* knownOf(threadId)
+              if (!Predicate.isTagged((yield* knownOf(threadId)).record, "Ready")) return
 
-              if (!Predicate.isTagged(current, "Ready")) return
-
-              yield* save(threadId, { ...current, expiresAt })
+              yield* updateReady(threadId, (ready) => ({ ...ready, expiresAt }))
 
               const left =
                 DateTime.toEpochMillis(expiresAt) - DateTime.toEpochMillis(yield* DateTime.now)
@@ -491,59 +516,85 @@ export class Sandboxes extends Context.Service<
             if (provider.extend !== undefined)
               yield* extendAhead(threadId, provider.extend).pipe(Effect.forkChild)
 
-            for (;;) {
-              const ended = yield* Effect.gen(function* () {
-                const client = yield* connectToHost(provider, record.state, record.token).pipe(
-                  Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
-                )
+            const replacingHost = knownOf(threadId).pipe(
+              Effect.map(
+                (found) =>
+                  Predicate.isTagged(found.record, "Ready") && found.record.replacingHost === true,
+              ),
+            )
 
-                // WARNING: Effect's socket client reconnects in the background to whichever host answers, so journal calls name their host.
-                const host = yield* greet(client)
-                yield* refuseIfGone(threadId)
-                const position = yield* followFrom(threadId, host)
+            const connection = Effect.gen(function* () {
+              const client = yield* connectToHost(provider, record.state, record.token).pipe(
+                Effect.provideService(Socket.WebSocketConstructor, webSocketConstructor),
+              )
 
-                const following = yield* followHost(client, position, {
-                  save: transcripts.save,
-                  alreadySaved: () => position.saved,
-                  relay,
-                  origin: ToolCallOrigin.Sandbox({ threadId }),
-                  calls: scope,
-                })
+              // WARNING: Effect's socket client reconnects in the background to whichever host answers, so journal calls name their host.
+              const host = yield* greet(client)
+              yield* refuseIfGone(threadId)
 
-                yield* Effect.acquireRelease(
-                  recover(threadId, opened, () => ({ phase: "reachable", client })),
-                  () =>
-                    runningTurn(threadId).pipe(
-                      Effect.map((running) => {
-                        link.turnOnLostHost = running
-                      }),
-                      Effect.andThen(
-                        recover(threadId, opened, (before) =>
-                          before.phase === "reachable" && before.client === client
-                            ? { phase: "connecting", reach: "reachable" }
-                            : before,
-                        ),
+              if (yield* replacingHost)
+                yield* updateReady(threadId, (ready) => ({ ...ready, replacingHost: false }))
+
+              const position = yield* followFrom(threadId, host)
+
+              const following = yield* followHost(client, position, {
+                save: transcripts.save,
+                alreadySaved: () => position.saved,
+                relay,
+                origin: ToolCallOrigin.Sandbox({ threadId }),
+                calls: scope,
+              })
+
+              yield* Effect.acquireRelease(
+                recover(threadId, opened, () => ({ phase: "reachable", client })),
+                () =>
+                  runningTurn(threadId).pipe(
+                    Effect.map((running) => {
+                      link.turnOnLostHost = running
+                    }),
+                    Effect.andThen(
+                      recover(threadId, opened, (before) =>
+                        before.phase === "reachable" && before.client === client
+                          ? { phase: "connecting", reach: "reachable" }
+                          : before,
                       ),
                     ),
-                )
-                yield* Deferred.succeed(opened, client)
-                yield* following
-              }).pipe(Effect.scoped, Effect.result)
+                  ),
+              )
+              yield* Deferred.succeed(opened, client)
+              yield* following
+            }).pipe(Effect.scoped)
+
+            const afterReplacing = transcripts.setStatus(threadId, "Updating the agent").pipe(
+              Effect.andThen(replaceHost(provider, record, hostWith(record.token))),
+              Effect.ensuring(transcripts.setStatus(threadId, null)),
+              Effect.tapErrorTag("ThreadError", (failure) => Deferred.fail(opened, failure)),
+              Effect.andThen(connection),
+            )
+
+            const replacingIfIncompatible = connection.pipe(
+              Effect.catchTag("IncompatibleHost", ({ protocol }) =>
+                Effect.logWarning(
+                  "Replacing a Sandbox's agent host, which speaks another protocol",
+                  threadId,
+                  protocol,
+                ).pipe(
+                  Effect.andThen(
+                    updateReady(threadId, (ready) => ({ ...ready, replacingHost: true })),
+                  ),
+                  Effect.andThen(afterReplacing),
+                ),
+              ),
+            )
+
+            for (;;) {
+              const ended = yield* (
+                (yield* replacingHost) ? afterReplacing : replacingIfIncompatible
+              ).pipe(Effect.result)
 
               if (Result.isSuccess(ended)) return yield* Effect.void
 
               if (isSandboxGone(ended.failure)) return yield* Effect.fail(ended.failure)
-
-              if (Predicate.isTagged(ended.failure, "IncompatibleHost")) {
-                yield* Effect.logWarning(
-                  "A Thread's Sandbox runs another agent host protocol",
-                  threadId,
-                  ended.failure.protocol,
-                )
-                yield* recover(threadId, opened, () => ({ phase: "incompatible" }))
-
-                return yield* Effect.fail(incompatible())
-              }
 
               const following = (yield* knownOf(threadId)).following
 
@@ -648,7 +699,7 @@ export class Sandboxes extends Context.Service<
             ),
           commands: () => Effect.succeed([]),
           defaultBranch: github.repositoryDefaultBranch,
-          branches: github.repositoryBranches,
+          branches: (repository) => github.repositoryBranches(repository, ""),
           files: (repository, baseBranch) =>
             github.repositoryFiles(repository, baseBranch).pipe(
               Effect.tap(({ truncated }) =>
@@ -666,10 +717,18 @@ export class Sandboxes extends Context.Service<
             ),
           place: (repository) =>
             Effect.sync(() => {
-              const name = uniqueThreadName()
-
-              return { name, branch: name, folder: repository.repo, discard: Effect.void }
+              return { branch: placeholderBranch(), folder: repository.repo, discard: Effect.void }
             }),
+          takenBranches: (repository, prefix) =>
+            github.repositoryBranches(repository, prefix).pipe(
+              Effect.tapError((cause) =>
+                Effect.logWarning("Couldn't list a repository's branches", cause),
+              ),
+              Effect.mapError(
+                () => new ThreadError({ message: `Couldn't check whether ${prefix} is taken.` }),
+              ),
+            ),
+          useBranch: () => Effect.void,
           prepareHost: (placed) =>
             connect(placed.thread.id, placed).pipe(
               Effect.catchTag("SandboxGone", () =>

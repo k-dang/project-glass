@@ -11,6 +11,7 @@ import {
   SteerPart,
   TextPart,
   ThinkingPart,
+  ToolCallStatusSet,
   type Turn,
   TurnDone,
   type TurnEnding,
@@ -30,7 +31,7 @@ export type Input = Data.TaggedEnum<{
   Asked: { readonly part: RequestPart }
   Answered: { readonly requestId: string; readonly answer: RequestAnswer }
   Expired: { readonly requestId: string }
-  BackgroundWorkEnded: { readonly work: BackgroundWork }
+  BackgroundWorkEnded: { readonly work: BackgroundWork; readonly toolCallId: string | null }
   Exited: {}
 }>
 
@@ -142,8 +143,15 @@ const streamedText = (delta: {
   }
 }
 
+const endedToolCall = (input: Input) =>
+  Input.$is("BackgroundWorkEnded")(input) &&
+  input.toolCallId !== null &&
+  input.work.outcome !== "completed"
+    ? [ToolCallStatusSet.make({ toolCallId: input.toolCallId, status: input.work.outcome })]
+    : []
+
 export const step = (current: TurnState | null, input: Input, now: DateTime.Utc): Step => {
-  if (current === null) return { state: null, events: [] }
+  if (current === null) return { state: null, events: endedToolCall(input) }
 
   let state: TurnState = current
   let ended = false
@@ -307,7 +315,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 
       if (settled !== undefined) emit(settled)
     },
-    BackgroundWorkEnded: () => {},
+    BackgroundWorkEnded: () => endedToolCall(input).forEach(emit),
     Exited: () => end(TurnFailed.make({ reason: stoppedReason })),
   })
 

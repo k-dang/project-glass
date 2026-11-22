@@ -5,7 +5,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test"
 import { Button } from "@/components/ui/button"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { BackToPullRequests } from "./BackToPullRequests"
-import { ShortcutsDialog } from "./ShortcutsDialog"
+import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog"
 
 afterEach(() => {
   cleanup()
@@ -63,7 +63,12 @@ it("shows an opener's tooltip on hover, not when tabbing to it or closing back t
 
 it("searches shortcuts, recovers from no results, and starts fresh when reopened", async () => {
   const user = userEvent.setup()
-  render(<ShortcutsDialog />)
+  render(
+    <>
+      <ShortcutsButton />
+      <ShortcutsDialog />
+    </>,
+  )
   const trigger = screen.getByRole("button", { name: "Keyboard shortcuts ?" })
   await user.click(trigger)
   const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
@@ -112,7 +117,12 @@ it("opens without Shift and leaves typing and other dialogs alone", () => {
 it.each(["MacIntel", "Win32"])("shows platform keys on %s", async (platform) => {
   vi.spyOn(navigator, "platform", "get").mockReturnValue(platform)
   const user = userEvent.setup()
-  render(<ShortcutsDialog />)
+  render(
+    <>
+      <ShortcutsButton />
+      <ShortcutsDialog />
+    </>,
+  )
   await user.click(screen.getByRole("button", { name: "Keyboard shortcuts ?" }))
   const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
   expect(within(dialog).getAllByText(platform === "MacIntel" ? "⌘" : "Ctrl")).not.toHaveLength(0)

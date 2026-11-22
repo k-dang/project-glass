@@ -11,6 +11,7 @@ import {
   PullRequestAccessDenied,
   PullRequestNotFound,
   PullRequestRef,
+  PullRequestStatus,
   PullRequestWorkspace,
   Viewer,
   RepositoryFiles,
@@ -73,7 +74,7 @@ describe("GetConnection", () => {
   it.live("explains a dropped connection in plain words", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
-      github.failNext("disconnect")
+      github.failNext("/user", "disconnect")
 
       const error = yield* Effect.flip(client.GetConnection())
 
@@ -89,7 +90,7 @@ describe("GetConnection", () => {
   it.live("explains a GitHub server error in plain words", () =>
     Effect.gen(function* () {
       const { github, client } = yield* startSignedInBackend
-      github.failNext(503)
+      github.failNext("/user", 503)
 
       const error = yield* Effect.flip(client.GetConnection())
 
@@ -297,6 +298,37 @@ describe("LoadPullRequest", () => {
         new Check({ name: "docs", state: "skipped", url: null }),
         new Check({ name: "ci/circleci", state: "running", url: "https://circle.test" }),
       ])
+    }),
+  )
+
+  it.live("reads the PR's latest status as its checks finish", () =>
+    Effect.gen(function* () {
+      const { github, client } = yield* startSignedInBackend
+
+      const pr = github.seedPullRequest({
+        checkContexts: [{ kind: "CheckRun", name: "test", status: "IN_PROGRESS" }],
+        mergeStateStatus: "BLOCKED",
+        base,
+        head,
+      })
+
+      const { pullRequest } = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
+
+      pr.checkContexts = [{ kind: "CheckRun", name: "test" }]
+      pr.mergeStateStatus = "CLEAN"
+
+      assert.deepStrictEqual(
+        yield* client.GetPullRequestStatus({ pullRequestId: pullRequest.id }),
+        new PullRequestStatus({
+          state: "open",
+          approval: null,
+          reviewers: [],
+          checks: [new Check({ name: "test", state: "passed", url: null })],
+          mergeable: "mergeable",
+          mergeAction: Merge.make({ method: "merge" }),
+          mergeUnderWay: null,
+        }),
+      )
     }),
   )
 

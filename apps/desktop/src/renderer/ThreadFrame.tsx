@@ -86,7 +86,7 @@ export function ThreadFrame(props: {
             <DetailsPopover details={details} />
           ))}
       </header>
-      <div className="relative flex min-h-0 min-w-0 flex-1 flex-col">
+      <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">
         {props.children}
         {details !== null && pins && pinned && (
           <aside

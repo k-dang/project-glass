@@ -4,7 +4,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
 import { createServer } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { describe, expect, it } from "vite-plus/test"
+import { assert, describe, it } from "@effect/vitest"
 import { BackendError, keepRunning, openBackendLog, waitForBackend } from "./backendIo"
 
 const tempDirectory = Effect.acquireRelease(
@@ -13,121 +13,116 @@ const tempDirectory = Effect.acquireRelease(
 )
 
 describe("backend log", () => {
-  it("appends to a small log and flushes output before closing", () =>
-    Effect.runPromise(
-      Effect.gen(function* () {
-        const directory = yield* tempDirectory
-        const path = join(directory, "backend.log")
-        yield* Effect.promise(() => writeFile(path, "previous launch\n"))
+  it.live("appends to a small log and flushes output before closing", () =>
+    Effect.gen(function* () {
+      const directory = yield* tempDirectory
+      const path = join(directory, "backend.log")
+      yield* Effect.promise(() => writeFile(path, "previous launch\n"))
 
-        const stream = yield* Effect.gen(function* () {
-          const log = yield* openBackendLog(path)
-          log.stream.write("current launch")
+      const stream = yield* Effect.gen(function* () {
+        const log = yield* openBackendLog(path)
+        log.stream.write("current launch")
 
-          return log.stream
-        }).pipe(Effect.scoped)
+        return log.stream
+      }).pipe(Effect.scoped)
 
-        expect(stream.closed).toBe(true)
-        expect(yield* Effect.promise(() => readFile(path, "utf8"))).toBe(
-          "previous launch\ncurrent launch",
-        )
-      }).pipe(Effect.scoped),
-    ))
+      assert.strictEqual(stream.closed, true)
+      assert.strictEqual(
+        yield* Effect.promise(() => readFile(path, "utf8")),
+        "previous launch\ncurrent launch",
+      )
+    }),
+  )
 
-  it("rotates a large log aside before appending", () =>
-    Effect.runPromise(
-      Effect.gen(function* () {
-        const directory = yield* tempDirectory
-        const path = join(directory, "backend.log")
-        const large = "x".repeat(5 * 1024 * 1024)
-        yield* Effect.promise(() => writeFile(path, large))
+  it.live("rotates a large log aside before appending", () =>
+    Effect.gen(function* () {
+      const directory = yield* tempDirectory
+      const path = join(directory, "backend.log")
+      const large = "x".repeat(5 * 1024 * 1024)
+      yield* Effect.promise(() => writeFile(path, large))
 
-        yield* Effect.gen(function* () {
-          const log = yield* openBackendLog(path)
-          log.stream.write("current launch")
-        }).pipe(Effect.scoped)
+      yield* Effect.gen(function* () {
+        const log = yield* openBackendLog(path)
+        log.stream.write("current launch")
+      }).pipe(Effect.scoped)
 
-        expect(yield* Effect.promise(() => readFile(path, "utf8"))).toBe("current launch")
-        expect(
-          yield* Effect.promise(() => readFile(join(directory, "backend.previous.log"), "utf8")),
-        ).toBe(large)
-      }).pipe(Effect.scoped),
-    ))
+      assert.strictEqual(yield* Effect.promise(() => readFile(path, "utf8")), "current launch")
+      assert.strictEqual(
+        yield* Effect.promise(() => readFile(join(directory, "backend.previous.log"), "utf8")),
+        large,
+      )
+    }),
+  )
 
-  it("reports an unusable log path as a typed failure", () =>
-    Effect.runPromise(
-      Effect.gen(function* () {
-        const directory = yield* tempDirectory
-        const existing = join(directory, "existing")
-        yield* Effect.promise(() => writeFile(existing, "not a directory"))
+  it.live("reports an unusable log path as a typed failure", () =>
+    Effect.gen(function* () {
+      const directory = yield* tempDirectory
+      const existing = join(directory, "existing")
+      yield* Effect.promise(() => writeFile(existing, "not a directory"))
 
-        const error = yield* openBackendLog(join(existing, "backend.log")).pipe(
-          Effect.scoped,
-          Effect.flip,
-        )
+      const error = yield* openBackendLog(join(existing, "backend.log")).pipe(
+        Effect.scoped,
+        Effect.flip,
+      )
 
-        expect(error).toBeInstanceOf(BackendError)
-        expect(error.message).toMatch(/backend log/i)
-      }).pipe(Effect.scoped),
-    ))
+      assert.instanceOf(error, BackendError)
+      assert.match(error.message, /backend log/i)
+    }),
+  )
 
-  it("reports errors after opening and closes the failed stream", () =>
-    Effect.runPromise(
-      Effect.gen(function* () {
-        const directory = yield* tempDirectory
+  it.live("reports errors after opening and closes the failed stream", () =>
+    Effect.gen(function* () {
+      const directory = yield* tempDirectory
 
-        const stream = yield* Effect.gen(function* () {
-          const log = yield* openBackendLog(join(directory, "backend.log"))
-          log.stream.destroy(new Error("simulated disk failure"))
-          const error = yield* Effect.flip(log.failed)
+      const stream = yield* Effect.gen(function* () {
+        const log = yield* openBackendLog(join(directory, "backend.log"))
+        log.stream.destroy(new Error("simulated disk failure"))
+        const error = yield* Effect.flip(log.failed)
 
-          expect(error).toBeInstanceOf(BackendError)
-          expect(error.message).toContain("simulated disk failure")
+        assert.instanceOf(error, BackendError)
+        assert.include(error.message, "simulated disk failure")
 
-          return log.stream
-        }).pipe(Effect.scoped)
+        return log.stream
+      }).pipe(Effect.scoped)
 
-        expect(stream.closed).toBe(true)
-      }).pipe(Effect.scoped),
-    ))
+      assert.strictEqual(stream.closed, true)
+    }),
+  )
 })
 
-it("aborts the health request when startup is interrupted", () =>
-  Effect.runPromise(
-    Effect.gen(function* () {
-      const accepted = Promise.withResolvers<string>()
-      const disconnected = Promise.withResolvers<void>()
+it.live("aborts the health request when startup is interrupted", () =>
+  Effect.gen(function* () {
+    const accepted = Promise.withResolvers<string>()
+    const disconnected = Promise.withResolvers<void>()
 
-      const server = createServer((request) => {
-        request.once("close", () => disconnected.resolve())
-        accepted.resolve(request.url ?? "")
-      })
+    const server = createServer((request) => {
+      request.once("close", () => disconnected.resolve())
+      accepted.resolve(request.url ?? "")
+    })
 
-      yield* Effect.acquireRelease(
+    yield* Effect.acquireRelease(
+      Effect.promise(() => new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))),
+      () =>
         Effect.promise(
-          () => new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve)),
+          () =>
+            new Promise<void>((resolve) => {
+              server.closeAllConnections()
+              server.close(() => resolve())
+            }),
         ),
-        () =>
-          Effect.promise(
-            () =>
-              new Promise<void>((resolve) => {
-                server.closeAllConnections()
-                server.close(() => resolve())
-              }),
-          ),
-      )
+    )
 
-      const address = yield* Schema.decodeUnknownEffect(Schema.Struct({ port: Schema.Number }))(
-        server.address(),
-      )
+    const address = yield* Schema.decodeUnknownEffect(Schema.Struct({ port: Schema.Number }))(
+      server.address(),
+    )
 
-      const starting = yield* waitForBackend(address.port, "test-token").pipe(Effect.forkChild())
-      expect(yield* Effect.promise(() => accepted.promise)).toBe("/health?token=test-token")
+    const starting = yield* waitForBackend(address.port, "test-token").pipe(Effect.forkChild())
+    assert.strictEqual(yield* Effect.promise(() => accepted.promise), "/health?token=test-token")
 
-      yield* Fiber.interrupt(starting)
-      yield* Effect.promise(() => disconnected.promise)
-    }).pipe(Effect.scoped),
-  ))
+    yield* Fiber.interrupt(starting)
+    yield* Effect.promise(() => disconnected.promise)
+  }),
+)
 
 const supervise = (runFor: (run: number) => Duration.Input) =>
   Effect.gen(function* () {
@@ -149,22 +144,26 @@ const supervise = (runFor: (run: number) => Duration.Input) =>
     const error = yield* Fiber.join(fiber)
 
     return { runs, delays, error: error.message }
-  }).pipe(Effect.provide(TestClock.layer()), Effect.runPromise)
+  })
 
 describe("keepRunning", () => {
-  it("restarts with growing delays, then gives up with the last failure", async () => {
-    expect(await supervise(() => 0)).toEqual({
-      runs: 4,
-      delays: [500, 1000, 2000],
-      error: "crash 4",
-    })
-  })
+  it.effect("restarts with growing delays, then gives up with the last failure", () =>
+    Effect.gen(function* () {
+      assert.deepStrictEqual(yield* supervise(() => 0), {
+        runs: 4,
+        delays: [500, 1000, 2000],
+        error: "crash 4",
+      })
+    }),
+  )
 
-  it("restores the restart budget after a run that stayed up", async () => {
-    expect(await supervise((run) => (run === 4 ? "1 minute" : 0))).toEqual({
-      runs: 7,
-      delays: [500, 1000, 2000, 500, 1000, 2000],
-      error: "crash 7",
-    })
-  })
+  it.effect("restores the restart budget after a run that stayed up", () =>
+    Effect.gen(function* () {
+      assert.deepStrictEqual(yield* supervise((run) => (run === 4 ? "1 minute" : 0)), {
+        runs: 7,
+        delays: [500, 1000, 2000, 500, 1000, 2000],
+        error: "crash 7",
+      })
+    }),
+  )
 })

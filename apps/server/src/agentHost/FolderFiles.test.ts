@@ -30,13 +30,19 @@ it.effect("finds and reads a folder's files by kind, refusing paths that leave i
       ImageFile.make({ mediaType: "image/png", data: Buffer.from(png).toString("base64") }),
     )
     assert.deepStrictEqual(yield* read("data.bin"), BinaryFile.make({}))
+    assert.deepStrictEqual(yield* read(join(folder, "data.bin")), BinaryFile.make({}))
 
     assert.deepStrictEqual(
       yield* files.existing(folder, ["chart.png", "missing.md", "linked.txt", "artifact.html"]),
       ["chart.png", "artifact.html"],
     )
 
-    for (const path of ["../" + basename(outside) + "/secret.txt", "linked.txt", "."])
+    for (const path of [
+      "../" + basename(outside) + "/secret.txt",
+      join(outside, "secret.txt"),
+      "linked.txt",
+      ".",
+    ])
       assert.instanceOf(yield* Effect.flip(read(path)), HostThreadError)
   }).pipe(Effect.provide(FolderFiles.layer.pipe(Layer.provide(NodeServices.layer)))),
 )
