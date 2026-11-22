@@ -45,16 +45,16 @@ const ALWAYS_GROWING_COUNTERS = new Set([
   "V8CompileDuration",
 ])
 
-export type ProcessRole = "main" | "renderer" | "gpu" | "backend" | "utility" | "child" | "other"
+type ProcessRole = "main" | "renderer" | "gpu" | "backend" | "utility" | "child" | "other"
 
-export interface ProcessRow {
+interface ProcessRow {
   readonly pid: number
   readonly role: ProcessRole
   readonly rss: number
   readonly private: number
 }
 
-export interface WorkerSample {
+interface WorkerSample {
   readonly type: string
   readonly url: string
   readonly heap: HeapUsage
@@ -164,7 +164,7 @@ const roleOf = (process: RawProcess, parentRole: ProcessRole): ProcessRole => {
   }
 }
 
-export const processTree = (rootPid: number | undefined): ReadonlyArray<ProcessRow> => {
+const processTree = (rootPid: number | undefined): ReadonlyArray<ProcessRow> => {
   if (rootPid === undefined) return []
   const processes = readProcesses()
   const byPid = new Map(processes.map((process) => [process.pid, process]))
@@ -193,7 +193,7 @@ export const processTree = (rootPid: number | undefined): ReadonlyArray<ProcessR
   return rows
 }
 
-export const totalsOf = (processes: ReadonlyArray<ProcessRow>) => {
+const totalsOf = (processes: ReadonlyArray<ProcessRow>) => {
   const totals: Record<ProcessRole, number> = {
     main: 0,
     renderer: 0,

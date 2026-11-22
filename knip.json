@@ -1,19 +1,23 @@
 {
   "$schema": "https://unpkg.com/knip@6.45.1/schema.json",
   "ignore": [
-    ".agents/**",
+    ".agents/skills/!(verify-glass)/**",
     ".claude/**",
     "apps/desktop/src/renderer/components/ui/**",
     "apps/desktop/src/renderer/components/message-scroller/**",
     "tools/oxlint/anti-slop/**"
   ],
+  "ignoreBinaries": ["netstat"],
   "workspaces": {
     ".": {
-      "entry": ["examples/fake-sandboxes/{index.ts,claude.mjs}"]
+      "entry": [
+        "examples/fake-sandboxes/{index.ts,claude.mjs}",
+        ".agents/skills/verify-glass/scripts/{glass-verify.ts,fail-backend-start.cjs}"
+      ]
     },
     "apps/desktop": {
-      "entry": ["src/{main,preload,browserPreload}/index.ts"],
-      "project": ["src/**/*.{ts,tsx,css}", "test/**/*.{ts,tsx}", "e2e/**/*.ts"]
+      "entry": ["src/{main,preload,browserPreload}/index.ts", "e2e/background.cjs"],
+      "project": ["src/**/*.{ts,tsx,css}", "test/**/*.{ts,tsx}", "e2e/**/*.{ts,cjs}"]
     },
     "apps/server": {
       "entry": [
