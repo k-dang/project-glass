@@ -41,7 +41,7 @@ Read at pi commit `3e23dd9` (2026-11-13), pi-durable 1.5.2 on npm; Glass at `587
 
 - pi CLI spawned as `pi --mode rpc --session-id <id>` in the agent host
   (`apps/server/src/agentHost/piRpc.ts`), using the user's own `pi` (`SettingsStore.ts`).
-- Glass's tools reach pi through the backend MCP endpoint and a per-start credential (ADR 0013,
+- Glass's tools reach pi through the backend MCP endpoint and a per-start credential (ADR 0015,
   `apps/server/src/agentHost/piGlassTools.ts`, `apps/server/src/mcp/McpCredentials.ts`).
 - Global-specific code is about 700 lines; about 4,900 lines are shared with Agents
   (`ThreadTurns`, `Transcripts`, `HostAgents`, `piAdapter`/`piRpc`/`piTurn`).

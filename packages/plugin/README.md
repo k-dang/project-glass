@@ -1,6 +1,6 @@
 # @glass/plugin
 
-The types a Plugin implements to add a kind of Sandbox to Glass (ADR 0010). The contract lives in
+The types a Plugin implements to add a kind of Sandbox to Glass (ADR 0011). The contract lives in
 [`src/index.ts`](src/index.ts) and uses Promises and `AbortSignal`, so a Plugin needs no Effect.
 
 ![How Glass runs Threads locally and in Sandboxes made by provider Plugins](agent-host.svg)

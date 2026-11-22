@@ -9,10 +9,23 @@ or pi, keeps a journal of numbered events, and serves Effect RPC over WebSocket.
 
 The host ships as one self-contained bundle. For local Threads, the backend spawns the bundle detached
 and records its port, token and fingerprint in `agent-host.json` in the data directory. On the next launch,
-Glass reattaches to a host with the same fingerprint (ADR 0014). For a Sandbox Thread, Glass hands the
+Glass reattaches to a host with the same fingerprint (ADR 0016). For a Sandbox Thread, Glass hands the
 provider's `create` the bundle's path, port 7310, and an environment carrying `GLASS_HOST_TOKEN`. The provider
-copies the bundle into the Sandbox and starts it (ADR 0010). From then on, local and Sandbox Threads differ only in where their
+copies the bundle into the Sandbox and starts it (ADR 0011). From then on, local and Sandbox Threads differ only in where their
 host runs (ADR 0007).
+
+## When a host is gone or outdated
+
+A local host rereads its record every `RECORD_CHECK_INTERVAL` and stops if the record is gone or
+names another host while no backend follows its journal. At launch, a host that refuses the
+connection is gone; one slow to answer is busy with its Turns, not dead. The host writes its logs
+to the backend log file itself, because a pipe through the backend would break once the backend
+quits.
+
+When a Sandbox's host speaks another protocol, Glass saves that a replacement is under way before
+it ends the old host, so one that fails part-way is tried again, even after a relaunch. Calls to a
+provider stay bounded: Glass stops retrying a Sandbox it can't reach until the user or a relaunch
+starts over (ADR 0012).
 
 ## How agents reach Glass's tools
 
@@ -24,7 +37,7 @@ The backend defines Glass's tools once. It answers them on two paths:
   and Outside agents, with an OAuth token.
 - **Through the host**: every Work Thread calls the MCP endpoint its host serves on loopback. The
   host defines no tools of its own there. It forwards each call over the WebSocket connection Glass
-  already holds to it, so a Sandbox opens no new way into this device (ADR 0013).
+  already holds to it, so a Sandbox opens no new way into this device (ADR 0015).
 
 ## One relayed call
 

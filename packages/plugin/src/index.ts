@@ -1,4 +1,4 @@
-/** What a Plugin adds to Glass: a kind of Sandbox to start Threads in (ADR 0010). */
+/** What a Plugin adds to Glass: a kind of Sandbox to start Threads in. */
 export interface SandboxProvider {
   /** What the user sees for this kind of Sandbox, a plural such as "Acme Sandboxes". */
   readonly name: string

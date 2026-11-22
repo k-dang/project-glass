@@ -1,6 +1,6 @@
 # Vercel Sandboxes
 
-A Sandbox provider Plugin (ADR 0010) that runs pi Threads in
+A Sandbox provider Plugin (ADR 0011) that runs pi Threads in
 [Vercel Sandboxes](https://vercel.com/docs/sandbox). Each Thread gets its own persistent Sandbox
 in a Vercel project named `glass-sandboxes`, which the Plugin creates on first use.
 

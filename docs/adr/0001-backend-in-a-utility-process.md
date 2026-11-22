@@ -14,7 +14,7 @@ and an origin check: crash isolation from the windows without a full server life
 - **Independent server or daemon now**: deferred. Because the backend never imports `electron`
   and takes its config from the environment, promoting it is a hosting change. Do it when another
   client appears. Agents outlive the app and run off-machine in the agent host instead (ADR 0007,
-  ADR 0014).
+  ADR 0016).
 
 ## Consequences
 

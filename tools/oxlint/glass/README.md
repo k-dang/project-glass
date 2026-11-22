@@ -54,7 +54,7 @@ code cannot use those fixtures as an import bridge.
 `effect/Effect`, local aliases and destructuring declarations are all caught. These run with an empty
 context, so their logs go to Effect's console logger instead of the JSON `lineLogger` in
 `apps/server/src/wideEvents.ts` and lose the unit's trace ID. The server's stdout is piped into
-`backend.log`, so they write the plain-text lines that ADR 0012 forbids. Use
+`backend.log`, so they write the plain-text lines that ADR 0014 forbids. Use
 `FiberSet.makeRuntime()` or `makeRuntimePromise()` inside a scope, or `Effect.runForkWith(context)`
 with a captured context; the `*With` runners are allowed.
 

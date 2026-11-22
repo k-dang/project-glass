@@ -17,7 +17,7 @@ const argumentsIn = (value: Json): ReadonlyArray<string> =>
         )
       : []
 
-it("stays under the argument length endpoint security tools kill processes for (ADR 0004)", () => {
+it("stays under the argument length endpoint security tools kill processes for", () => {
   const recorded = readdirSync(recordings, { recursive: true, encoding: "utf8" })
     .filter((path) => path.endsWith(".json"))
     .flatMap((path) =>
