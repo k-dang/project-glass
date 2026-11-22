@@ -3,6 +3,7 @@ import { Schema } from "effect"
 export class BrowserPageRequest extends Schema.Class<BrowserPageRequest>("BrowserPageRequest")({
   id: Schema.String,
   threadId: Schema.String,
+  restoreLastPage: Schema.Boolean,
 }) {}
 
 export const BrowserPageReady = Schema.TaggedStruct("BrowserPageReady", { endpoint: Schema.String })

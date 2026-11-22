@@ -130,8 +130,8 @@ export class BrowserPages extends Context.Service<
           ),
       )
 
-      const endpointFor = (threadId: string) => {
-        const request = new BrowserPageRequest({ id: randomUUID(), threadId })
+      const endpointFor = (threadId: string, restoreLastPage: boolean) => {
+        const request = new BrowserPageRequest({ id: randomUUID(), threadId, restoreLastPage })
 
         return waits.wait(request, request.id, ANSWER_TIMEOUT).pipe(
           Effect.orDie,
@@ -202,11 +202,17 @@ export class BrowserPages extends Context.Service<
         })
 
       // WARNING: Each call asks the window again, which holds the page for the agent's running Turn even when the connection outlived an earlier Turn.
-      const connected = (threadId: string) =>
-        endpointFor(threadId).pipe(Effect.flatMap((endpoint) => connectionTo(threadId, endpoint)))
+      const connected = (threadId: string, restoreLastPage: boolean) =>
+        endpointFor(threadId, restoreLastPage).pipe(
+          Effect.flatMap((endpoint) => connectionTo(threadId, endpoint)),
+        )
 
-      const onPage = <A>(threadId: string, act: (connection: Connection) => Promise<A>) =>
-        connected(threadId).pipe(
+      const onPage = <A>(
+        threadId: string,
+        act: (connection: Connection) => Promise<A>,
+        restoreLastPage = true,
+      ) =>
+        connected(threadId, restoreLastPage).pipe(
           Effect.flatMap((connection) =>
             Effect.tryPromise({ try: () => act(connection), catch: (cause) => failure(cause) }),
           ),
@@ -216,11 +222,15 @@ export class BrowserPages extends Context.Service<
         requests: waits.watch(),
         answer: (id, answer) => waits.resolve(id, answer).pipe(Effect.asVoid),
         open: (threadId, url) =>
-          onPage(threadId, async ({ page }) => {
-            if (url !== undefined) await page.goto(url, { waitUntil: "load" })
+          onPage(
+            threadId,
+            async ({ page }) => {
+              if (url !== undefined) await page.goto(url, { waitUntil: "load" })
 
-            return shown(page)
-          }),
+              return shown(page)
+            },
+            url === undefined,
+          ),
         read: (threadId) =>
           onPage(threadId, async ({ page }) => {
             const snapshot = await page.ariaSnapshot({ mode: "ai" })

@@ -20,6 +20,7 @@ const browserPageRequestsAtom = backendRuntime
 export const answerBrowserPageRequests = (registry: AtomRegistry.AtomRegistry) => {
   const runtime = backendRuntimeOf(registry)
   const answered = new Set<string>()
+  const restorations = new WeakMap<HTMLWebViewElement, Promise<void>>()
 
   const reply = (id: string, answer: BrowserPageAnswer) =>
     void runtime.runPromiseExit(
@@ -34,18 +35,22 @@ export const answerBrowserPageRequests = (registry: AtomRegistry.AtomRegistry) =
       for (const id of answered)
         if (!requests.value.some((request) => request.id === id)) answered.delete(id)
 
-      for (const { id, threadId } of requests.value) {
+      for (const { id, threadId, restoreLastPage } of requests.value) {
         if (answered.has(id)) continue
 
         answered.add(id)
 
-        const restoring = liveBrowserPage(threadId) === null ? remembered(threadId) : null
+        const last = liveBrowserPage(threadId) === null ? remembered(threadId) : null
         const view = holdBrowserPage(threadId, "agent", BROWSER_PARTITION)
+        const ready = browserPageReady(threadId)
 
-        void browserPageReady(threadId)
-          .then(() =>
-            restoring === null ? undefined : view.loadURL(restoring).catch(() => undefined),
+        if (last !== null && restoreLastPage)
+          restorations.set(
+            view,
+            ready.then(() => view.loadURL(last).catch(() => undefined)),
           )
+
+        void (restoreLastPage ? (restorations.get(view) ?? ready) : ready)
           .then(() => window.glass.browserRelay(view.getWebContentsId()))
           .then(
             (endpoint) => reply(id, BrowserPageReady.make({ endpoint })),

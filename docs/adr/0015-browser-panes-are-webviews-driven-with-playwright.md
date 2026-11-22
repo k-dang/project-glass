@@ -11,8 +11,8 @@ the few browser-level `Target.*` and `Browser.*` commands Playwright sends for i
 forwards the rest. It reaches Browser pane pages only, never Glass's own window, which holds the
 backend's secret.
 
-Opening DevTools on a page takes its one debugger, so the agent's browser tools fail while
-DevTools is open, and the relay attaches again when it closes.
+DevTools can stay open on a page while its agent drives it; DevTools doesn't take the debugger
+the relay holds.
 
 ## Considered options
 

@@ -4,7 +4,7 @@ import { randomBytes } from "node:crypto"
 import { type RawData, type WebSocket, WebSocketServer } from "ws"
 import { relayTo } from "./cdpRelay"
 
-const DEVTOOLS_OPEN = 4000
+const ATTACH_REFUSED = 4000
 
 const TargetInfo = Schema.Struct({ targetInfo: Schema.Struct({ targetId: Schema.String }) })
 
@@ -25,7 +25,7 @@ const connect = (pane: WebContents, socket: WebSocket, replaced: () => boolean) 
   try {
     if (!debuggee.isAttached()) debuggee.attach("1.3")
   } catch {
-    socket.close(DEVTOOLS_OPEN, "DevTools is open on this page")
+    socket.close(ATTACH_REFUSED, "Another debugger is attached to this page")
 
     return
   }

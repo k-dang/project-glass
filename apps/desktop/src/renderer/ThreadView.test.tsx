@@ -2033,9 +2033,13 @@ it("drops an unsaved Feedback note's editor when the page loads again, as its pa
   )
 })
 
-it("opens the Thread's Browser pane for its agent on its last page, answers with the page's relay, and lets go when the Turn ends", async () => {
-  const answers: Array<BrowserPageAnswer> = []
+const pageRequest = (id: string, restoreLastPage: boolean) =>
+  new BrowserPageRequest({ id, threadId: thread.id, restoreLastPage })
+
+it("opens the Thread's Browser pane for its agent, answers once its last page loads unless the agent names another, and lets go when the Turn ends", async () => {
+  const answers = new Map<string, BrowserPageAnswer>()
   const loaded: Array<string> = []
+  const lastPageLoaded = Promise.withResolvers<void>()
   localStorage.setItem(`glass.browserPane.${thread.id}`, "http://localhost:3000/settings")
   const turnEnded = Deferred.makeUnsafe<void>()
 
@@ -2051,10 +2055,12 @@ it("opens the Thread's Browser pane for its agent on its last page, answers with
         Stream.concat(Stream.fromEffect(Deferred.await(turnEnded).pipe(Effect.as([])))),
       ),
     WatchBrowserPageRequests: () =>
-      Stream.make([new BrowserPageRequest({ id: "request-1", threadId: thread.id })]).pipe(
-        Stream.concat(Stream.never),
-      ),
-    AnswerBrowserPageRequest: ({ answer }) => Effect.sync(() => void answers.push(answer)),
+      Stream.make([
+        pageRequest("open", true),
+        pageRequest("read", true),
+        pageRequest("open-address", false),
+      ]).pipe(Stream.concat(Stream.never)),
+    AnswerBrowserPageRequest: ({ id, answer }) => Effect.sync(() => void answers.set(id, answer)),
   })
 
   await screen.findByRole("complementary", { name: "Browser" })
@@ -2063,14 +2069,23 @@ it("opens the Thread's Browser pane for its agent on its last page, answers with
   Object.assign(page, {
     getWebContentsId: () => 7,
     getURL: () => "about:blank",
-    loadURL: (url: string) => Promise.resolve(void loaded.push(url)),
+    loadURL: (url: string) => {
+      loaded.push(url)
+
+      return lastPageLoaded.promise
+    },
   })
   page.dispatchEvent(new Event("dom-ready"))
 
-  await waitFor(() =>
-    expect(answers).toEqual([BrowserPageReady.make({ endpoint: "ws://relay/7" })]),
-  )
+  const ready = BrowserPageReady.make({ endpoint: "ws://relay/7" })
+
+  await waitFor(() => expect([...answers]).toEqual([["open-address", ready]]))
   expect(loaded).toEqual(["http://localhost:3000/settings"])
+
+  lastPageLoaded.resolve()
+
+  await waitFor(() => expect(answers.size).toBe(3))
+  expect([answers.get("open"), answers.get("read")]).toEqual([ready, ready])
 
   await userEvent.click(screen.getByRole("button", { name: "Close the Browser" }))
   expect(document.querySelector("webview")).toBe(page)
