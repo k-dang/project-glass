@@ -221,7 +221,11 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
   }
 
   const onResult = (result: SDKResultMessage) => {
-    if (state.stopping !== null) return end(state.stopping)
+    if (state.stopping !== null) {
+      showSteers(state.steers)
+
+      return end(state.stopping)
+    }
 
     const ending = endingOf(result)
     const earlierRunFailure = state.earlierRunFailure ?? (isFailure(result) ? ending : null)

@@ -35,7 +35,7 @@ import { migrationLoader } from "./Migrations"
 import { ToDos } from "./ToDos"
 import { Transcripts } from "./Transcripts"
 import { wideEvents } from "./wideEvents"
-import { HostThreadError, type SteersNotTakenIn } from "./agentHost/protocol"
+import { HostThreadError, notRunning, type SteersNotTakenIn } from "./agentHost/protocol"
 
 type StopRequest = Parameters<ThreadHost["StopTurn"]>[0]
 
@@ -1390,4 +1390,24 @@ it.effect("keeps a part that arrives after StopTurn times out", () =>
       ])
     }),
   ).pipe(Effect.provide(layer)),
+)
+
+it.effect("queues a Steer the host refuses, as it does once the Turn is stopping", () =>
+  Effect.gen(function* () {
+    const desk = yield* scripted({
+      "agent-a": { running: true, steer: () => Effect.fail(notRunning) },
+    })
+
+    const thread = desk.threads.get("agent-a")
+    assert.isDefined(thread)
+
+    yield* desk.turns.send("agent-a", sent("Build it"))
+    yield* desk.turns.steer(thread, sent("nudge"))
+
+    const { queued } = yield* desk.transcripts.read("agent-a")
+    assert.deepStrictEqual(
+      queued.map(({ message }) => message),
+      ["nudge"],
+    )
+  }).pipe(Effect.provide(layer)),
 )

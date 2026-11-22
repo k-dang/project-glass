@@ -123,15 +123,20 @@ export const runTurns = Effect.fnUntraced(function* <
     stopped: Effect.sync(() => exited),
     steer: (steer: Steer) =>
       Effect.sync(() => {
-        if (state === null) return false
+        if (state === null || state.stopping !== null) return false
         state = { ...state, steers: [...state.steers, steer] }
 
         return true
       }),
     dropSteer: (id: string) =>
       Effect.sync(() => {
-        if (state !== null)
-          state = { ...state, steers: state.steers.filter((steer) => steer.id !== id) }
+        if (state === null) return false
+
+        const kept = state.steers.filter((steer) => steer.id !== id)
+        const dropped = kept.length < state.steers.length
+        state = { ...state, steers: kept }
+
+        return dropped
       }),
     stop: (turnId: string, ending: StopEnding) =>
       Effect.sync(() => {
