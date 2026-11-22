@@ -68,14 +68,14 @@ const staleFailure = (identity: AgentRunnerIdentity | null) =>
 const fromAgentFailure = ({ reason, message, runner }: AgentFailure) =>
   checkoutRunFailure(agentFailureReasons[reason], message, runner)
 
-export interface CheckoutTask<A> {
+interface CheckoutTask<A> {
   readonly instructions: string
   readonly prompt: string
   readonly answer: Schema.Decoder<A>
   readonly tools: AgentTools
 }
 
-export interface CheckoutRun<I, A> {
+interface CheckoutRun<I, A> {
   readonly pr: PullRequestRef
   readonly revision: Revision
   readonly subject: string
@@ -85,12 +85,12 @@ export interface CheckoutRun<I, A> {
   readonly ready?: Effect.Effect<void>
 }
 
-export interface CheckoutAnswer<I, A> {
+interface CheckoutAnswer<I, A> {
   readonly input: I
   readonly answer: A
 }
 
-export interface CheckoutCopy<I> {
+interface CheckoutCopy<I> {
   readonly pr: PullRequestRef
   readonly revision: Revision
   readonly subject: string
@@ -98,7 +98,7 @@ export interface CheckoutCopy<I> {
   readonly read: CheckoutRun<I, unknown>["read"]
 }
 
-export interface CheckoutRunner {
+interface CheckoutRunner {
   readonly identity: AgentRunnerIdentity
   readonly run: <I, A>(
     run: CheckoutRun<I, A>,

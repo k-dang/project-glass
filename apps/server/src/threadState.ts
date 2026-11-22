@@ -25,7 +25,7 @@ export type ThreadWrite =
   | { readonly type: "prepend"; readonly messages: ReadonlyArray<QueuedMessage> }
   | { readonly type: "dequeue"; readonly queuedId: string }
 
-export type StepOutcome =
+type StepOutcome =
   | { readonly type: "started" | "queued" | "busy" | "unchanged" }
   | { readonly type: "canceled"; readonly feedback: ReadonlyArray<FeedbackNote> }
 

@@ -10,7 +10,8 @@ import { toast } from "@/components/ui/toast"
 import { Backend, type BackendError, backendRuntime, backendRuntimeOf } from "./backend"
 import { problemOf, problemText } from "./problems"
 import { watched } from "./watched"
-import { reviewingRevisionAtom } from "./workspaceEvents"
+
+export const reviewingRevisionAtom = Atom.make(0).pipe(Atom.keepAlive)
 
 export const savedQueueAtom = backendRuntime
   .atom((get) => {

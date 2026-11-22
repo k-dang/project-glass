@@ -76,7 +76,6 @@ import { LocalPlacement } from "./LocalPlacement"
 import { type RepositoryRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
-import { forgetStartedWork } from "./startedWorkRows"
 import { ToDos } from "./ToDos"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
@@ -128,7 +127,7 @@ type Purpose = Data.TaggedEnum<{
 
 const Purpose = Data.taggedEnum<Purpose>()
 
-export interface NewReviewThread {
+interface NewReviewThread {
   readonly name: string
   readonly repository: FollowedRepository
   readonly revision: Revision
@@ -968,7 +967,8 @@ export class Threads extends Context.Service<
             yield* turns.removeUnsent(threadId)
             yield* notes.removeAll(threadNotes(threadId))
             yield* skillPacks.releaseThread(threadId)
-            yield* forgetStartedWork(sql, threadId)
+            yield* sql`DELETE FROM started_thread WHERE thread_id = ${threadId} OR started_by = ${threadId}`
+            yield* sql`DELETE FROM started_agent_review WHERE started_by = ${threadId}`
             yield* toDos.unlinkThread(threadId)
             yield* sql`DELETE FROM thread WHERE id = ${threadId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))

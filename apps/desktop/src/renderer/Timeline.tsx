@@ -3,7 +3,7 @@ import { cn } from "cn"
 import { CircleCheck, FileDiff, type LucideIcon, MessageSquare, Undo2 } from "lucide-react"
 import { GitHubHtml } from "./GitHubHtml"
 import { Comment, Time } from "./ReviewThreads"
-import { type Reactions } from "./useReactions"
+import type { Reactions } from "./workspaceFeedback"
 
 const states: Record<
   ReviewState,

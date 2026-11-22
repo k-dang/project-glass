@@ -53,11 +53,9 @@ export interface ClaimedThread {
   readonly connectedHost: Effect.Effect<Option.Option<ThreadHost>>
 }
 
-export type ClaimThread = (
-  threadId: string,
-) => Effect.Effect<Option.Option<ClaimedThread>, ThreadError>
+type ClaimThread = (threadId: string) => Effect.Effect<Option.Option<ClaimedThread>, ThreadError>
 
-export interface Served {
+interface Served {
   readonly claim: ClaimThread
   readonly lost: Stream.Stream<ReadonlyArray<string>>
   readonly interrupted: Effect.Effect<ReadonlyArray<string>>

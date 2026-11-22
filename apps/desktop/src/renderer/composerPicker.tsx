@@ -24,7 +24,7 @@ export interface Range {
   readonly to: number
 }
 
-export interface PickerSource<T> {
+interface PickerSource<T> {
   readonly label: string
   readonly typed: (caret: Caret, doc: ProseMirrorNode) => string | undefined
   readonly choices: (typed: string) => ReadonlyArray<T>

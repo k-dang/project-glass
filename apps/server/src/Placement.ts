@@ -36,7 +36,7 @@ export interface PlacedThread {
   readonly forReview: boolean
 }
 
-export interface Placed {
+interface Placed {
   readonly branch: string
   readonly folder: string
   readonly discard: Effect.Effect<void>

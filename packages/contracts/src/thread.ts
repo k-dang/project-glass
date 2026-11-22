@@ -10,7 +10,7 @@ export const AgentHarness = Schema.Literals(agentHarnesses)
 
 export type AgentHarness = typeof AgentHarness.Type
 
-export const LocalPlace = Schema.TaggedStruct("local", {})
+const LocalPlace = Schema.TaggedStruct("local", {})
 
 export const SandboxPlace = Schema.TaggedStruct("sandbox", { providerId: Schema.String })
 
@@ -58,7 +58,7 @@ export type PermissionMode = typeof PermissionMode.Type
 
 export const defaultPermissionMode: PermissionMode = "auto"
 
-export interface AgentCapabilities {
+interface AgentCapabilities {
   readonly permissionModes: ReadonlyArray<PermissionMode>
 }
 
@@ -255,12 +255,12 @@ export const withContextOf = <Context extends TurnContext>({
   context,
 }: SentMessage & { readonly context: Context | null }) => ({ message, images, context })
 
-export const AcceptedMessage = Schema.Struct({
+const AcceptedMessage = Schema.Struct({
   ...MessageWithContext.fields,
   feedback: Schema.Array(FeedbackNote),
 })
 
-export type AcceptedMessage = typeof AcceptedMessage.Type
+type AcceptedMessage = typeof AcceptedMessage.Type
 
 export const TextPart = Schema.TaggedStruct("Text", { text: Schema.String })
 

@@ -101,7 +101,7 @@ const inSandboxOf = ({ id, name, harnesses }: SandboxProviderInfo): PlaceOptions
   harnesses,
 })
 
-export const defaultPlace = (
+const defaultPlace = (
   newest: Thread | undefined,
   providers: ReadonlyArray<SandboxProviderInfo>,
   hasCheckouts: boolean,

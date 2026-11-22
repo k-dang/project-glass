@@ -68,7 +68,7 @@ const encodePart = Schema.encodeSync(Schema.fromJsonString(TurnPart))
 
 const encodeEnd = Schema.encodeSync(Schema.fromJsonString(TurnEnd))
 
-export const ImagesJson = Schema.fromJsonString(Schema.Array(Image))
+const ImagesJson = Schema.fromJsonString(Schema.Array(Image))
 
 export const encodeImages = Schema.encodeSync(ImagesJson)
 
@@ -180,7 +180,7 @@ export interface WaitingRequest {
 
 export type WaitingByThread = ReadonlyMap<string, Arr.NonEmptyReadonlyArray<WaitingRequest>>
 
-export type UnseenByThread = ReadonlyMap<string, TurnEnd>
+type UnseenByThread = ReadonlyMap<string, TurnEnd>
 
 export type StartedTurn = typeof TurnStarted.Type & { readonly threadId: string }
 

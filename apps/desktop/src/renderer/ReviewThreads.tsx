@@ -21,9 +21,9 @@ import { plural } from "./plural"
 import { submitOnShortcut } from "./submitShortcut"
 import { problemText } from "./problems"
 import { CommentReactions } from "./Reactions"
-import { type Reactions } from "./useReactions"
 import { type ReplyStore, usePublishedReplies, useRepliesLocked, useReply } from "./useReplies"
-import { type Resolutions, type ResolutionView, useResolution } from "./useResolutions"
+import type { WriteView } from "./keyedWrites"
+import type { Reactions, Resolutions } from "./workspaceFeedback"
 
 const timeFormat = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" })
 
@@ -164,7 +164,7 @@ export function ReviewThread(props: {
   reactions: Reactions
 }) {
   const { id, comments } = props.reviewThread
-  const resolution = useResolution(props.resolutions, id)
+  const resolution = useAtomValue(props.resolutions.viewAtom(id))
   const resolved = resolution.confirmed ?? props.reviewThread.resolved
   const { location, name, aside, context } = reviewThreadPlace(props.reviewThread)
   const [opened, setOpened] = useState(false)
@@ -251,7 +251,7 @@ function ResolutionControl(props: {
   reviewThreadId: string
   name: string
   resolved: boolean
-  view: ResolutionView
+  view: WriteView<boolean, boolean>
 }) {
   const locked = useAtomValue(props.store.lockedAtom)
   const sending = props.view.feedback?.type === "sending" ? props.view.feedback : null

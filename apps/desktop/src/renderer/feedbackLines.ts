@@ -9,7 +9,7 @@ import {
   sideOf,
 } from "./changesView"
 
-export type FeedbackTarget = Pick<LineNote, "side" | "start" | "end" | "code">
+type FeedbackTarget = Pick<LineNote, "side" | "start" | "end" | "code">
 
 export const feedbackTarget = (
   fileDiff: FileDiffMetadata,
