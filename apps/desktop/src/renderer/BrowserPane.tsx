@@ -31,7 +31,6 @@ import { addressOf, type BrowserPolicy, pageOf, webAddress } from "./browserAddr
 import {
   browserPageReady,
   liveBrowserPage,
-  remember,
   remembered,
   showBrowserPage,
   usePaneBrowserPage,
@@ -135,8 +134,6 @@ export const BrowserPane = memo(function BrowserPane(props: {
       setTyped(shown ?? "")
       setPick(false)
       setHistory({ back: view.canGoBack(), forward: view.canGoForward() })
-
-      if (shown !== null) remember(threadId, shown)
     }
 
     const onNavigate = (event: { readonly url: string }) => navigated(event.url)

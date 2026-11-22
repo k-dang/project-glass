@@ -89,6 +89,8 @@ const attachPage = () => {
     send: (_channel: string, state: PageState) => Promise.resolve(void toPage.push(state)),
     canGoBack: () => false,
     canGoForward: () => false,
+    getURL: () => "about:blank",
+    getTitle: () => "",
   })
   page.dispatchEvent(new Event("dom-ready"))
 

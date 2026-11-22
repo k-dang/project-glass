@@ -23,8 +23,9 @@ const rememberedKey = (threadId: string) => `glass.browserPane.${threadId}`
 
 export const remembered = (threadId: string) => localStorage.getItem(rememberedKey(threadId))
 
-export const remember = (threadId: string, address: string) =>
-  localStorage.setItem(rememberedKey(threadId), address)
+const remember = (threadId: string, url: string) => {
+  if (url !== "about:blank") localStorage.setItem(rememberedKey(threadId), url)
+}
 
 const pages = new Map<string, LivePage>()
 
@@ -129,6 +130,11 @@ export const holdBrowserPage = (threadId: string, holder: PageHolder, partition:
     }
 
     view.addEventListener("dom-ready", onReady)
+  })
+
+  view.addEventListener("did-navigate", ({ url }) => remember(threadId, url))
+  view.addEventListener("did-navigate-in-page", ({ url, isMainFrame }) => {
+    if (isMainFrame) remember(threadId, url)
   })
 
   pages.set(threadId, {
