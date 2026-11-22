@@ -38,7 +38,7 @@ export const threadsPanelOpenAtom = Atom.make(true)
 
 export const threadDetailsPinnedAtom = Atom.make(true).pipe(Atom.keepAlive)
 
-export const settledOpenAtom = Atom.make(true).pipe(Atom.keepAlive)
+export const settledOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
 
 export const ThreadSearch = Schema.Struct({
   view: Schema.optional(Schema.Literal("changes")),

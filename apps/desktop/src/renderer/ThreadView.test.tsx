@@ -260,7 +260,7 @@ it("marks a Thread in the Threads panel as working while its Turn runs", async (
   ).toBeTruthy()
 })
 
-it("lists Settled Threads apart from the ones still going, in a section that collapses", async () => {
+it("lists Settled Threads apart from the ones still going, in a section that starts collapsed", async () => {
   const broughtBack: Array<string> = []
 
   mount(
@@ -273,18 +273,22 @@ it("lists Settled Threads apart from the ones still going, in a section that col
 
   const settled = await screen.findByRole("region", { name: "Settled" })
 
-  expect(within(settled).getByRole("link", { name: thread.name })).toBeTruthy()
+  expect(within(settled).queryByRole("link")).toBeNull()
   expect(screen.queryByRole("region", { name: "Local" })).toBeNull()
 
   const user = userEvent.setup()
   const toggle = within(settled).getByRole("button", { name: "Settled 1" })
   await user.click(toggle)
+  expect(await within(settled).findByRole("link", { name: thread.name })).toBeTruthy()
+
+  await user.click(toggle)
   await waitFor(() => expect(within(settled).queryByRole("link")).toBeNull())
 
   await user.click(toggle)
-  expect(await within(settled).findByRole("link", { name: thread.name })).toBeTruthy()
 
-  await user.click(within(settled).getByRole("button", { name: `Bring back ${thread.name}` }))
+  await user.click(
+    await within(settled).findByRole("button", { name: `Bring back ${thread.name}` }),
+  )
   await waitFor(() => expect(broughtBack).toEqual([thread.id]))
 })
 
