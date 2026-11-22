@@ -9,10 +9,11 @@ import {
   type SandboxReach,
   SandboxStatus,
   TurnCutOff,
+  TurnInterrupted,
 } from "@glass/contracts"
 import type { SandboxHost, SandboxProvider, SandboxRequest, SandboxState } from "@glass/plugin"
 import {
-  type Cause,
+  Cause,
   Context,
   DateTime,
   Deferred,
@@ -33,6 +34,7 @@ import {
 } from "effect"
 import { SqlClient } from "effect/sql"
 import { Socket } from "effect/socket"
+import { RpcClientError } from "effect/rpc"
 import { newHostToken } from "./agentHost/protocol"
 import { placeholderBranch } from "./BranchNames"
 import { GitHubClient } from "./github/GitHubClient"
@@ -86,6 +88,7 @@ const decodeStored = Schema.decodeUnknownEffect(
       sandbox: RecordJson,
       journalHost: Schema.NullOr(Schema.String),
       journalSaved: Schema.Int,
+      journalTurn: Schema.NullOr(Schema.String),
     }),
   ),
 )
@@ -94,6 +97,14 @@ const decodeModels = Schema.decodeUnknownEffect(AgentModels)
 
 const unreachable = () =>
   new ThreadError({ message: "Glass couldn't reach the Thread's Sandbox. Try again." })
+
+const closedConnection = () =>
+  new RpcClientError.RpcClientError({
+    reason: new Socket.SocketCloseError({
+      code: 1001,
+      closeReason: "Glass let go of this connection to the agent host",
+    }),
+  })
 
 const goneFailure = (reach: GoneReach) => new ThreadError({ message: goneExplanation(reach) })
 
@@ -148,13 +159,19 @@ const goneRecord = (record: typeof Building.Type | typeof Ready.Type, now: DateT
 interface HostLink {
   position: JournalPosition | null
   turnOnLostHost: string | null
+  takenTurn: string | null
   readonly connectLock: Semaphore.Semaphore
   readonly recordLock: Semaphore.Semaphore
 }
 
-const newLink = (position: JournalPosition | null, turnOnLostHost: string | null): HostLink => ({
+const newLink = (
+  position: JournalPosition | null,
+  turnOnLostHost: string | null,
+  takenTurn: string | null,
+): HostLink => ({
   position,
   turnOnLostHost,
+  takenTurn,
   connectLock: Semaphore.makeUnsafe(1),
   recordLock: Semaphore.makeUnsafe(1),
 })
@@ -232,7 +249,7 @@ export class Sandboxes extends Context.Service<
 
       const stored = yield* sql`
         SELECT id, sandbox_provider AS provider, sandbox, journal_host AS journalHost,
-          journal_saved AS journalSaved
+          journal_saved AS journalSaved, journal_turn AS journalTurn
         FROM thread WHERE sandbox IS NOT NULL
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
@@ -245,12 +262,13 @@ export class Sandboxes extends Context.Service<
 
       const links = new Map<string, HostLink>()
 
-      for (const { id, journalHost, journalSaved } of stored)
+      for (const { id, journalHost, journalSaved, journalTurn } of stored)
         links.set(
           id,
           newLink(
             journalHost === null ? null : { host: journalHost, saved: journalSaved },
             yield* runningTurn(id),
+            journalTurn,
           ),
         )
 
@@ -259,7 +277,7 @@ export class Sandboxes extends Context.Service<
 
         if (found !== undefined) return found
 
-        const link = newLink(null, null)
+        const link = newLink(null, null, null)
         links.set(threadId, link)
 
         return link
@@ -357,11 +375,6 @@ export class Sandboxes extends Context.Service<
 
           if (link.position?.host === host) return link.position
 
-          if (link.position !== null && link.turnOnLostHost !== null) {
-            yield* Effect.logWarning("A Thread's Sandbox has a new agent host", threadId)
-            yield* transcripts.endTurn(TurnCutOff.make({}), threadId, link.turnOnLostHost)
-          }
-
           yield* sql`
             UPDATE thread SET journal_host = ${host}, journal_saved = 0
             WHERE id = ${threadId}
@@ -373,6 +386,46 @@ export class Sandboxes extends Context.Service<
 
           return link.position
         }).pipe(Effect.uninterruptible)
+
+      const takeTurn = (threadId: string, turnId: string) =>
+        Effect.suspend(() => {
+          const link = linkOf(threadId)
+
+          if (link.takenTurn === turnId) return Effect.void
+
+          link.takenTurn = turnId
+
+          return sql`UPDATE thread SET journal_turn = ${turnId} WHERE id = ${threadId}`.pipe(
+            Effect.asVoid,
+            Effect.catch((cause) =>
+              Effect.logWarning("Couldn't save which Turn a Sandbox's agent host took", cause),
+            ),
+          )
+        })
+
+      const placeLostTurn = (threadId: string, client: HostClient) =>
+        Effect.gen(function* () {
+          const link = linkOf(threadId)
+          const lostTurn = link.turnOnLostHost
+
+          if (lostTurn === null) return
+
+          const carried = yield* client.UnacknowledgedTurns()
+
+          if (carried.some((turn) => turn.threadId === threadId && turn.turnId === lostTurn)) {
+            yield* takeTurn(threadId, lostTurn)
+
+            return
+          }
+
+          yield* Effect.logWarning("A Thread's Sandbox agent host doesn't have its Turn", threadId)
+          yield* transcripts.endTurn(
+            lostTurn === link.takenTurn ? TurnCutOff.make({}) : TurnInterrupted.make({}),
+            threadId,
+            lostTurn,
+          )
+          link.turnOnLostHost = null
+        })
 
       const refuseIfGone = (threadId: string) =>
         knownOf(threadId).pipe(
@@ -535,6 +588,7 @@ export class Sandboxes extends Context.Service<
               if (yield* replacingHost)
                 yield* updateReady(threadId, (ready) => ({ ...ready, replacingHost: false }))
 
+              yield* placeLostTurn(threadId, client)
               const position = yield* followFrom(threadId, host)
 
               const following = yield* followHost(client, position, {
@@ -545,23 +599,55 @@ export class Sandboxes extends Context.Service<
                 calls: scope,
               })
 
+              let open = true
+
+              const whileOpen = <A, E, R>(
+                call: Effect.Effect<A, E, R>,
+              ): Effect.Effect<A, E | RpcClientError.RpcClientError, R> =>
+                open
+                  ? call.pipe(
+                      Effect.catchCause(
+                        (cause): Effect.Effect<never, E | RpcClientError.RpcClientError> =>
+                          !open && Cause.hasInterruptsOnly(cause)
+                            ? Effect.fail(closedConnection())
+                            : Effect.failCause(cause),
+                      ),
+                    )
+                  : Effect.fail(closedConnection())
+
+              const connected: HostClient = {
+                ...client,
+                StartThread: (input, options) => whileOpen(client.StartThread(input, options)),
+                StartTurn: (input, options) =>
+                  whileOpen(client.StartTurn(input, options)).pipe(
+                    Effect.flatMap((started) =>
+                      open
+                        ? takeTurn(threadId, input.turnId).pipe(Effect.as(started))
+                        : Effect.fail(closedConnection()),
+                    ),
+                  ),
+              }
+
               yield* Effect.acquireRelease(
-                recover(threadId, opened, () => ({ phase: "reachable", client })),
+                recover(threadId, opened, () => ({ phase: "reachable", client: connected })),
                 () =>
-                  runningTurn(threadId).pipe(
+                  Effect.sync(() => {
+                    open = false
+                  }).pipe(
+                    Effect.andThen(runningTurn(threadId)),
                     Effect.map((running) => {
-                      link.turnOnLostHost = running
+                      link.turnOnLostHost = running === link.takenTurn ? running : null
                     }),
                     Effect.andThen(
                       recover(threadId, opened, (before) =>
-                        before.phase === "reachable" && before.client === client
+                        before.phase === "reachable" && before.client === connected
                           ? { phase: "connecting", reach: "reachable" }
                           : before,
                       ),
                     ),
                   ),
               )
-              yield* Deferred.succeed(opened, client)
+              yield* Deferred.succeed(opened, connected)
               yield* following
             }).pipe(Effect.scoped)
 

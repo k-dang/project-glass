@@ -16,6 +16,7 @@ import {
   TurnDone,
   type TurnEnding,
   TurnEnded,
+  TurnInterrupted,
   TurnStopped,
 } from "@glass/contracts"
 import { DateTime, Deferred, Duration, Effect, Fiber, Option, Predicate, Stream } from "effect"
@@ -652,6 +653,91 @@ it.effect("runs a message sent after Glass relaunches on its Sandbox's replaceme
 
     assert.equal(failedReason(yield* f.transcript(thread.id, settled(2), threads)), "Done")
   }),
+)
+
+const sendingHeld = Effect.fnUntraced(function* (f: Fixture) {
+  const thread = yield* f.create(null, "pi", sandbox, true)
+  yield* end(yield* f.started)
+  yield* f.transcript(thread.id, settled(1))
+
+  const reading = yield* f.holdLocalSkills
+  yield* f.threads.send(thread.id, say("Again"))
+  yield* reading.reached
+
+  return { thread, release: reading.release }
+})
+
+it.effect(
+  "interrupts a Sandbox Thread's message that Glass quit while sending, once Glass relaunches",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadServicesFixture
+      const { thread } = yield* sendingHeld(f)
+
+      const { threads } = yield* f.restart
+      const [, interrupted] = (yield* f.transcript(thread.id, settled(2), threads)).turns
+
+      assert.deepStrictEqual(interrupted?.ended?.ending, TurnInterrupted.make({}))
+    }),
+)
+
+it.effect(
+  "fails a message Glass was still sending when its Sandbox got a new agent host, without cutting it off",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadServicesFixture
+      const { thread, release } = yield* sendingHeld(f)
+
+      yield* f.sandboxes.restartHost(thread.id)
+      yield* eventually(
+        Effect.gen(function* () {
+          yield* TestClock.adjust("1 second")
+          assert.isAbove(f.sandboxes.connections(thread.id), 0)
+        }),
+      )
+      yield* f.threads.reachSandbox(thread.id)
+      yield* release
+
+      assert.equal(
+        failedReason(yield* f.transcript(thread.id, settled(2))),
+        "Glass lost the process that runs Threads. Try again.",
+      )
+    }),
+)
+
+it.effect(
+  "fails a message whose delivery was waiting on the agent host when its Sandbox got a new one",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadServicesFixture
+      yield* f.holdStart
+      const thread = yield* createSandboxed(f)
+      yield* eventually(Effect.sync(() => assert.deepStrictEqual(f.starts, [thread.id])))
+
+      yield* f.sandboxes.restartHost(thread.id)
+
+      assert.equal(
+        failedReason(yield* afterRetries(f, thread.id, settled(1))),
+        "Glass lost the process that runs Threads. Try again.",
+      )
+    }),
+)
+
+it.effect(
+  "cuts off a Turn its Sandbox's agent host ran, when the host changed while Glass was closed",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadServicesFixture
+      const thread = yield* createSandboxed(f)
+      yield* reply(yield* f.started, ["one"])
+      yield* f.transcript(thread.id, ({ turns }) => texts(turns[0]).length === 1)
+
+      const { threads } = yield* f.restartAfter(f.sandboxes.restartHost(thread.id))
+      const [cutOff] = (yield* f.transcript(thread.id, settled(1), threads)).turns
+
+      assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
+      assert.deepStrictEqual(texts(cutOff), ["one"])
+    }),
 )
 
 const tookTooLong = (action: string) =>
