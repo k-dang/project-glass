@@ -37,12 +37,21 @@ const IGNORED = new Set([
   "Browser.setDownloadBehavior",
 ])
 
+const PAGE_IGNORED = new Set([
+  "Runtime.runIfWaitingForDebugger",
+  "Emulation.setFocusEmulationEnabled",
+])
+
+interface Reply {
+  readonly result: Schema.Json
+  readonly followedBy?: Schema.JsonObject
+}
+
 export const relayTo = (page: RelayedPage, write: (message: string) => void) => {
   const browserSessions = new Set<string>()
   let attached = false
   let sessions = 0
   let runtimeReset: Promise<Schema.Json> | undefined
-  let announcement: string | null = null
 
   let targetId: Promise<string> | undefined
 
@@ -56,54 +65,60 @@ export const relayTo = (page: RelayedPage, write: (message: string) => void) => 
     browserContextId: BROWSER_CONTEXT_ID,
   })
 
-  const browserCommand = async (command: Command): Promise<Schema.Json> => {
-    if (IGNORED.has(command.method)) return {}
+  const browserCommand = async (command: Command): Promise<Reply> => {
+    if (IGNORED.has(command.method)) return { result: {} }
 
     switch (command.method) {
       case "Browser.getVersion":
         return {
-          protocolVersion: "1.3",
-          product: "Electron",
-          revision: "",
-          userAgent: page.userAgent(),
-          jsVersion: "",
+          result: {
+            protocolVersion: "1.3",
+            product: "Electron",
+            revision: "",
+            userAgent: page.userAgent(),
+            jsVersion: "",
+          },
         }
       case "Target.getTargetInfo":
         return {
-          targetInfo: {
-            targetId: "browser",
-            type: "browser",
-            title: "",
-            url: "",
-            attached: true,
-            canAccessOpener: false,
+          result: {
+            targetInfo: {
+              targetId: "browser",
+              type: "browser",
+              title: "",
+              url: "",
+              attached: true,
+              canAccessOpener: false,
+            },
           },
         }
       case "Target.getBrowserContexts":
-        return { browserContextIds: [] }
+        return { result: { browserContextIds: [] } }
       case "Target.getTargets":
-        return { targetInfos: [await targetInfo()] }
+        return { result: { targetInfos: [await targetInfo()] } }
       case "Target.attachToBrowserTarget": {
         const sessionId = `glass-browser-${++sessions}`
         browserSessions.add(sessionId)
 
-        return { sessionId }
+        return { result: { sessionId } }
       }
 
       case "Target.setAutoAttach": {
-        if (attached) return {}
+        if (attached) return { result: {} }
 
         attached = true
-        announcement = JSON.stringify({
-          method: "Target.attachedToTarget",
-          params: {
-            sessionId: PAGE_SESSION_ID,
-            targetInfo: await targetInfo(),
-            waitingForDebugger: false,
-          },
-        })
 
-        return {}
+        return {
+          result: {},
+          followedBy: {
+            method: "Target.attachedToTarget",
+            params: {
+              sessionId: PAGE_SESSION_ID,
+              targetInfo: await targetInfo(),
+              waitingForDebugger: false,
+            },
+          },
+        }
       }
 
       default:
@@ -111,23 +126,19 @@ export const relayTo = (page: RelayedPage, write: (message: string) => void) => 
     }
   }
 
-  const pageCommand = (command: Command): Promise<Schema.Json> => {
+  const pageCommand = async (command: Command): Promise<Reply> => {
     const child = command.sessionId === PAGE_SESSION_ID ? undefined : command.sessionId
     const params = command.params ?? {}
 
-    if (child === undefined && command.method === "Runtime.runIfWaitingForDebugger")
-      return Promise.resolve({})
-
-    if (command.method === "Emulation.setFocusEmulationEnabled") return Promise.resolve({})
+    if (child === undefined && PAGE_IGNORED.has(command.method)) return { result: {} }
 
     // WARNING: The debugger keeps Runtime enabled from an earlier connection, and enabling it again reports no existing contexts, which Playwright waits for.
     if (child === undefined && command.method === "Runtime.enable") {
       runtimeReset ??= page.send("Runtime.disable", {}, undefined).catch(() => null)
-
-      return runtimeReset.then(() => page.send(command.method, params, undefined))
+      await runtimeReset
     }
 
-    return page.send(command.method, params, child)
+    return { result: await page.send(command.method, params, child) }
   }
 
   return {
@@ -143,12 +154,10 @@ export const relayTo = (page: RelayedPage, write: (message: string) => void) => 
       const route = command.sessionId === undefined ? {} : { sessionId: command.sessionId }
 
       void (toBrowser ? browserCommand(command) : pageCommand(command)).then(
-        (result) => {
+        ({ result, followedBy }) => {
           write(JSON.stringify({ id: command.id, result, ...route }))
 
-          if (announcement !== null) write(announcement)
-
-          announcement = null
+          if (followedBy !== undefined) write(JSON.stringify(followedBy))
         },
         (cause: Error) =>
           write(

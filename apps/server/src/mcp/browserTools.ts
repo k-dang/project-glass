@@ -1,11 +1,12 @@
-import { Effect, Layer, Option, Predicate, Schema } from "effect"
-import { McpSchema, McpServer } from "effect/ai"
+import { Context, Effect, Layer, Option, Predicate, Schema } from "effect"
+import { McpSchema, McpServer, Tool, Toolkit } from "effect/ai"
 import { failedToolCall } from "../agentHost/protocol"
-import { BrowserPages, BrowserUnavailable } from "../BrowserPages"
+import { BrowserPages, BrowserUnavailable, PageLogEntry, ShownPage } from "../BrowserPages"
+import { GlassToolFailure } from "./glassTools"
 import { McpCaller } from "./McpCredentials"
 import { forThreadsOnThisDevice } from "./toolAudience"
 
-export const callingThread = Effect.serviceOption(McpCaller).pipe(
+const callingThread = Effect.serviceOption(McpCaller).pipe(
   Effect.flatMap((caller) =>
     Option.isSome(caller) && Predicate.isTagged(caller.value, "Thread")
       ? Effect.succeed(caller.value.threadId)
@@ -15,9 +16,76 @@ export const callingThread = Effect.serviceOption(McpCaller).pipe(
   ),
 )
 
-const ScreenshotInput = Schema.Struct({ fullPage: Schema.optional(Schema.Boolean) })
+const readsOnly = Context.make(Tool.Readonly, true).pipe(
+  Context.add(Tool.Destructive, false),
+  Context.add(Tool.OpenWorld, false),
+  Context.merge(forThreadsOnThisDevice),
+)
 
-const decodeScreenshotInput = Schema.decodeUnknownEffect(ScreenshotInput)
+const OpenBrowser = Tool.make("open_browser", {
+  description:
+    "Opens a page in your Thread's Browser pane, the browser the user sees beside your Thread, and waits for it to load. Pass a full http or https address, such as your dev server's http://localhost:3000/. Without one, it opens the pane on the page it last showed. Returns the page's address and title. Then read_browser lists what's on it, screenshot_browser shows it, and browser_console lists its errors.",
+  parameters: Schema.Struct({
+    url: Schema.optional(
+      Schema.Trimmed.check(Schema.isPattern(/^https?:\/\//i)).annotate({
+        description: "The http or https address to open.",
+      }),
+    ),
+  }),
+  success: ShownPage,
+  failure: GlassToolFailure,
+}).annotateMerge(
+  Context.make(Tool.Readonly, false).pipe(
+    Context.add(Tool.Destructive, false),
+    Context.add(Tool.Idempotent, false),
+    Context.add(Tool.OpenWorld, false),
+    Context.merge(forThreadsOnThisDevice),
+  ),
+)
+
+const ReadBrowser = Tool.make("read_browser", {
+  description:
+    "Reads the page in your Thread's Browser pane: its address, title, and an accessibility snapshot of what's on it, as roles, names and text. open_browser opens a page first.",
+  success: Schema.Struct({ ...ShownPage.fields, snapshot: Schema.String }),
+  failure: GlassToolFailure,
+}).annotateMerge(readsOnly)
+
+const BrowserConsole = Tool.make("browser_console", {
+  description:
+    "Lists the console errors and warnings, uncaught page errors, and failed or HTTP 4xx/5xx requests of the page in your Thread's Browser pane since your browser tools last connected to it, oldest first.",
+  success: Schema.Struct({ entries: Schema.Array(PageLogEntry) }),
+  failure: GlassToolFailure,
+}).annotateMerge(readsOnly)
+
+const BrowserTools = Toolkit.make(OpenBrowser, ReadBrowser, BrowserConsole)
+
+const toolFailure = ({ message }: BrowserUnavailable) => new GlassToolFailure({ message })
+
+const BrowserToolHandlers = BrowserTools.toLayer(
+  Effect.gen(function* () {
+    const pages = yield* BrowserPages
+
+    return BrowserTools.of({
+      open_browser: ({ url }) =>
+        callingThread.pipe(
+          Effect.flatMap((threadId) => pages.open(threadId, url)),
+          Effect.mapError(toolFailure),
+        ),
+      read_browser: () =>
+        callingThread.pipe(Effect.flatMap(pages.read), Effect.mapError(toolFailure)),
+      browser_console: () =>
+        callingThread.pipe(
+          Effect.flatMap(pages.consoleLog),
+          Effect.map((entries) => ({ entries })),
+          Effect.mapError(toolFailure),
+        ),
+    })
+  }),
+)
+
+const decodeScreenshotInput = Schema.decodeUnknownEffect(
+  Schema.Struct({ fullPage: Schema.optional(Schema.Boolean) }),
+)
 
 const screenshotTool = new McpSchema.Tool({
   name: "screenshot_browser",
@@ -36,7 +104,7 @@ const screenshotTool = new McpSchema.Tool({
   annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: false },
 })
 
-export const ScreenshotBrowser = Layer.effectDiscard(
+const ScreenshotBrowser = Layer.effectDiscard(
   Effect.gen(function* () {
     const server = yield* McpServer.McpServer
     const pages = yield* BrowserPages
@@ -52,17 +120,11 @@ export const ScreenshotBrowser = Layer.effectDiscard(
             ),
           )
 
-          const threadId = yield* callingThread
-
-          const shot = yield* pages.use(threadId, async (page) => ({
-            png: await page.screenshot({ fullPage: fullPage === true }),
-            url: page.url(),
-            title: await page.title(),
-          }))
+          const shot = yield* pages.screenshot(yield* callingThread, fullPage === true)
 
           return new McpSchema.CallToolResult({
             content: [
-              { type: "image", data: new Uint8Array(shot.png), mimeType: "image/png" },
+              { type: "image", data: shot.png, mimeType: "image/png" },
               { type: "text", text: `${shot.title || "Untitled"} at ${shot.url}` },
             ],
           })
@@ -70,3 +132,8 @@ export const ScreenshotBrowser = Layer.effectDiscard(
     })
   }),
 ).pipe(Layer.provide(McpServer.McpServer.layer))
+
+export const BrowserMcpTools = Layer.mergeAll(
+  McpServer.toolkit(BrowserTools).pipe(Layer.provide(BrowserToolHandlers)),
+  ScreenshotBrowser,
+)

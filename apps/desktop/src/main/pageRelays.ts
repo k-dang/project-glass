@@ -19,7 +19,7 @@ const textOf = (data: RawData) =>
       ? Buffer.concat(data).toString("utf8")
       : Buffer.from(data).toString("utf8")
 
-const connect = (pane: WebContents, socket: WebSocket) => {
+const connect = (pane: WebContents, socket: WebSocket, replaced: () => boolean) => {
   const { debugger: debuggee } = pane
 
   try {
@@ -60,7 +60,7 @@ const connect = (pane: WebContents, socket: WebSocket) => {
     debuggee.off("message", onEvent)
     debuggee.off("detach", onDetach)
 
-    if (!pane.isDestroyed() && debuggee.isAttached()) debuggee.detach()
+    if (!replaced() && !pane.isDestroyed() && debuggee.isAttached()) debuggee.detach()
   })
 }
 
@@ -70,14 +70,18 @@ const open = (pane: WebContents, forget: () => void) =>
     const server = new WebSocketServer({ host: "127.0.0.1", port: 0, path: `/${secret}` })
     let current: WebSocket | null = null
 
-    server.once("error", reject)
+    server.once("error", (cause) => {
+      forget()
+      reject(cause)
+    })
     server.once("listening", () =>
       resolve(`ws://127.0.0.1:${decodeAddress(server.address()).port}/${secret}`),
     )
     server.on("connection", (socket) => {
-      current?.close()
+      const previous = current
       current = socket
-      connect(pane, socket)
+      previous?.close()
+      connect(pane, socket, () => current !== socket)
     })
     pane.once("destroyed", () => {
       forget()

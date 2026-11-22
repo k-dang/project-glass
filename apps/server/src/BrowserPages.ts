@@ -1,5 +1,5 @@
 import { type BrowserPageAnswer, BrowserPageRefused, BrowserPageRequest } from "@glass/contracts"
-import { Context, Duration, Effect, Layer, Match, Schema, Semaphore, Stream } from "effect"
+import { Context, Deferred, Duration, Effect, Exit, Layer, Match, Schema, Stream } from "effect"
 import { randomUUID } from "node:crypto"
 import type { Browser, Page } from "playwright-core"
 import { inboxWaitsOf } from "./inboxWaits"
@@ -9,11 +9,17 @@ export class BrowserUnavailable extends Schema.TaggedError<BrowserUnavailable>()
   { message: Schema.String },
 ) {}
 
-export interface PageLogEntry {
-  readonly at: string
-  readonly kind: "console error" | "console warning" | "page error" | "request failed"
-  readonly text: string
-}
+export const PageLogEntry = Schema.Struct({
+  at: Schema.String,
+  kind: Schema.Literals(["console error", "console warning", "page error", "request failed"]),
+  text: Schema.String,
+})
+
+export type PageLogEntry = typeof PageLogEntry.Type
+
+export const ShownPage = Schema.Struct({ url: Schema.String, title: Schema.String })
+
+export type ShownPage = typeof ShownPage.Type
 
 interface Connection {
   readonly browser: Browser
@@ -25,12 +31,16 @@ const ANSWER_TIMEOUT = Duration.seconds(20)
 
 const MAX_LOG = 200
 
+const MAX_SNAPSHOT_CHARS = 40_000
+
 const ELECTRON_WARNING = "%cElectron Security Warning"
 
-const firstLine = (cause: Error) => cause.message.split("\n")[0] ?? cause.message
+const failure = (cause: unknown, prefix = "") =>
+  new BrowserUnavailable({
+    message: `${prefix}${cause instanceof Error ? (cause.message.split("\n")[0] ?? cause.message) : String(cause)}`,
+  })
 
-const live = (connection: Connection | undefined): connection is Connection =>
-  connection !== undefined && connection.browser.isConnected() && !connection.page.isClosed()
+const live = ({ browser, page }: Connection) => browser.isConnected() && !page.isClosed()
 
 const logged = (connection: Connection) => {
   const add = (kind: PageLogEntry["kind"], text: string) => {
@@ -60,15 +70,30 @@ const logged = (connection: Connection) => {
   })
 }
 
+const shown = async (page: Page): Promise<ShownPage> => ({
+  url: page.url(),
+  title: await page.title(),
+})
+
 export class BrowserPages extends Context.Service<
   BrowserPages,
   {
     readonly requests: Stream.Stream<ReadonlyArray<BrowserPageRequest>>
     readonly answer: (id: string, answer: BrowserPageAnswer) => Effect.Effect<void>
-    readonly use: <A>(
+    readonly open: (
       threadId: string,
-      act: (page: Page, log: ReadonlyArray<PageLogEntry>) => Promise<A>,
-    ) => Effect.Effect<A, BrowserUnavailable>
+      url: string | undefined,
+    ) => Effect.Effect<ShownPage, BrowserUnavailable>
+    readonly read: (
+      threadId: string,
+    ) => Effect.Effect<ShownPage & { readonly snapshot: string }, BrowserUnavailable>
+    readonly screenshot: (
+      threadId: string,
+      fullPage: boolean,
+    ) => Effect.Effect<ShownPage & { readonly png: Uint8Array }, BrowserUnavailable>
+    readonly consoleLog: (
+      threadId: string,
+    ) => Effect.Effect<ReadonlyArray<PageLogEntry>, BrowserUnavailable>
   }
 >()("@glass/server/BrowserPages") {
   static readonly layer = Layer.effect(
@@ -83,8 +108,8 @@ export class BrowserPages extends Context.Service<
         cancelled: BrowserPageRefused.make({ message: "Glass is shutting down." }),
       })
 
-      const connections = new Map<string, Connection>()
-      const connecting = yield* Semaphore.make(1)
+      const connections = new Map<string, Deferred.Deferred<Connection, BrowserUnavailable>>()
+      const browsers = new Set<Browser>()
 
       yield* Effect.addFinalizer(() =>
         waits
@@ -92,7 +117,7 @@ export class BrowserPages extends Context.Service<
           .pipe(
             Effect.andThen(
               Effect.promise(() =>
-                Promise.allSettled([...connections.values()].map(({ browser }) => browser.close())),
+                Promise.allSettled([...browsers].map((browser) => browser.close())),
               ),
             ),
           ),
@@ -112,7 +137,7 @@ export class BrowserPages extends Context.Service<
         )
       }
 
-      const connect = (threadId: string, endpoint: string) =>
+      const connect = (endpoint: string) =>
         Effect.tryPromise({
           try: async () => {
             const { chromium } = await import("playwright-core")
@@ -125,51 +150,81 @@ export class BrowserPages extends Context.Service<
               throw new Error("The Browser pane has no page.")
             }
 
+            browsers.add(browser)
+            browser.on("disconnected", () => browsers.delete(browser))
+
             const connection = { browser, page, log: [] }
             logged(connection)
-            connections.set(threadId, connection)
 
             return connection
           },
-          catch: (cause) =>
-            new BrowserUnavailable({
-              message: `Glass couldn't reach this Thread's Browser pane: ${cause instanceof Error ? firstLine(cause) : String(cause)}`,
-            }),
+          catch: (cause) => failure(cause, "Glass couldn't reach this Thread's Browser pane: "),
         })
 
-      const connected = (threadId: string) => {
-        const known = connections.get(threadId)
+      const connected = (threadId: string): Effect.Effect<Connection, BrowserUnavailable> =>
+        Effect.suspend(() => {
+          const known = connections.get(threadId)
 
-        if (live(known)) return Effect.succeed(known)
+          if (known !== undefined)
+            return Deferred.await(known).pipe(
+              Effect.exit,
+              Effect.flatMap((exit) => {
+                if (Exit.isSuccess(exit) && live(exit.value)) return Effect.succeed(exit.value)
 
-        return connecting.withPermits(1)(
-          Effect.suspend(() => {
-            const settled = connections.get(threadId)
+                if (connections.get(threadId) === known) connections.delete(threadId)
 
-            return live(settled)
-              ? Effect.succeed(settled)
-              : endpointFor(threadId).pipe(
-                  Effect.flatMap((endpoint) => connect(threadId, endpoint)),
-                )
-          }),
+                return connected(threadId)
+              }),
+            )
+
+          const opening = Deferred.makeUnsafe<Connection, BrowserUnavailable>()
+          connections.set(threadId, opening)
+
+          return endpointFor(threadId).pipe(
+            Effect.flatMap(connect),
+            Effect.onExit((exit) => {
+              if (Exit.isFailure(exit) && connections.get(threadId) === opening)
+                connections.delete(threadId)
+
+              return Deferred.done(opening, exit)
+            }),
+          )
+        })
+
+      const onPage = <A>(threadId: string, act: (connection: Connection) => Promise<A>) =>
+        connected(threadId).pipe(
+          Effect.flatMap((connection) =>
+            Effect.tryPromise({ try: () => act(connection), catch: (cause) => failure(cause) }),
+          ),
         )
-      }
 
       return BrowserPages.of({
         requests: waits.watch(),
         answer: (id, answer) => waits.resolve(id, answer).pipe(Effect.asVoid),
-        use: (threadId, act) =>
-          connected(threadId).pipe(
-            Effect.flatMap(({ page, log }) =>
-              Effect.tryPromise({
-                try: () => act(page, log),
-                catch: (cause) =>
-                  new BrowserUnavailable({
-                    message: cause instanceof Error ? firstLine(cause) : String(cause),
-                  }),
-              }),
-            ),
-          ),
+        open: (threadId, url) =>
+          onPage(threadId, async ({ page }) => {
+            if (url !== undefined) await page.goto(url, { waitUntil: "load" })
+
+            return shown(page)
+          }),
+        read: (threadId) =>
+          onPage(threadId, async ({ page }) => {
+            const snapshot = await page.locator("body").ariaSnapshot()
+
+            return {
+              ...(await shown(page)),
+              snapshot:
+                snapshot.length > MAX_SNAPSHOT_CHARS
+                  ? `${snapshot.slice(0, MAX_SNAPSHOT_CHARS)}… (cut short)`
+                  : snapshot,
+            }
+          }),
+        screenshot: (threadId, fullPage) =>
+          onPage(threadId, async ({ page }) => ({
+            png: new Uint8Array(await page.screenshot({ fullPage })),
+            ...(await shown(page)),
+          })),
+        consoleLog: (threadId) => onPage(threadId, ({ log }) => Promise.resolve([...log])),
       })
     }),
   )
