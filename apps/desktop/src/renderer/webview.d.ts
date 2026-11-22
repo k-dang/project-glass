@@ -19,6 +19,7 @@ interface HTMLWebViewElement {
   goForward(): void
   reload(): void
   stop(): void
+  isWaitingForResponse(): boolean
   openDevTools(): void
   send(channel: string, ...args: ReadonlyArray<unknown>): Promise<void>
   addEventListener<K extends keyof WebviewEventMap>(

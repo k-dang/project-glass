@@ -1,4 +1,6 @@
 import { Option, Schema } from "effect"
+import type { KeyboardInputEvent } from "electron"
+import { electronKeysOf, electronTextOf } from "./cdpKeys"
 
 type JsonObject = Schema.JsonObject
 
@@ -8,6 +10,7 @@ interface RelayedPage {
     params: JsonObject,
     sessionId: string | undefined,
   ) => Promise<Schema.Json>
+  readonly key: (key: KeyboardInputEvent) => void
   readonly targetId: () => Promise<string>
   readonly url: () => string
   readonly title: () => string
@@ -52,6 +55,7 @@ export const relayTo = (page: RelayedPage, write: (message: string) => void) => 
   let attached = false
   let sessions = 0
   let runtimeReset: Promise<Schema.Json> | undefined
+  let inputs = 0
 
   let targetId: Promise<string> | undefined
 
@@ -126,6 +130,32 @@ export const relayTo = (page: RelayedPage, write: (message: string) => void) => 
     }
   }
 
+  // WARNING: CDP sends a page's key events to whatever holds focus in Glass's window, such as its Message box, so keys and text go through the page's own input instead, which also follows focus into the page's frames.
+  const input = async (
+    method: string,
+    params: JsonObject,
+    child: string | undefined,
+  ): Promise<Schema.Json> => {
+    inputs++
+
+    try {
+      switch (method) {
+        case "Input.dispatchKeyEvent":
+          for (const key of electronKeysOf(params)) page.key(key)
+
+          return {}
+        case "Input.insertText":
+          for (const key of electronTextOf(params)) page.key(key)
+
+          return {}
+        default:
+          return await page.send(method, params, child)
+      }
+    } finally {
+      inputs--
+    }
+  }
+
   const pageCommand = async (command: Command): Promise<Reply> => {
     const child = command.sessionId === PAGE_SESSION_ID ? undefined : command.sessionId
     const params = command.params ?? {}
@@ -138,10 +168,13 @@ export const relayTo = (page: RelayedPage, write: (message: string) => void) => 
       await runtimeReset
     }
 
-    return { result: await page.send(command.method, params, child) }
+    const send = command.method.startsWith("Input.") ? input : page.send
+
+    return { result: await send(command.method, params, child) }
   }
 
   return {
+    sendingInput: () => inputs > 0,
     receive: (raw: string) => {
       const decoded = commandOf(raw)
 

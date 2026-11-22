@@ -260,6 +260,12 @@ this device; Threads in a Sandbox share sign-ins only with each other, and their
 this device.
 _Avoid_: Preview, webview, browser tab
 
+**Taking over the browser**:
+The user clicking or typing in the page of a Thread's Browser pane while its agent uses it. Until
+the user hands it back or sends the Thread their next message, the agent can still read the page
+but can't open another or act on it.
+_Avoid_: Pausing the agent, locking the browser
+
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn.
 

@@ -61,20 +61,29 @@ const slowReply = `Working through it one step at a time. ${Array.from(
 const decodeToolArguments = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))
 
 const glassToolReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> | undefined => {
-  const called = /^call:(\S+) (.+)$/.exec(lastUserText(input))
+  const calls = [...lastUserText(input).matchAll(/^call:(\S+) (.+)$/gm)]
 
-  if (called === null) return undefined
+  if (calls.length === 0) return undefined
 
-  const last = input.messages.at(-1)
+  const asked = input.messages.findLastIndex(({ role }) => role === "user")
+  const results = input.messages.slice(asked + 1).filter(({ role }) => role === "tool")
+  const next = calls[results.length]
 
-  if (last?.role === "tool") return [{ text: `The fake model saw: ${textOf(last).slice(0, 200)}` }]
+  if (next === undefined)
+    return [
+      {
+        text: results
+          .map((result) => `The fake model saw: ${textOf(result).slice(0, 200)}`)
+          .join("\n\n"),
+      },
+    ]
 
   return [
     {
       toolCall: {
         id: `demo-glass-${input.messages.length}`,
-        name: `${GLASS_MCP_PREFIX}${called[1]}`,
-        arguments: decodeToolArguments(called[2]),
+        name: `${GLASS_MCP_PREFIX}${next[1]}`,
+        arguments: decodeToolArguments(next[2]),
       },
     },
   ]

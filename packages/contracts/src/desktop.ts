@@ -43,6 +43,7 @@ export interface DesktopBridge {
   readonly bringToFront: () => Promise<void>
   readonly dogfoodReports: DogfoodReportsBridge
   readonly browserRelay: (webContentsId: number) => Promise<string>
+  readonly onBrowserUserInput: (listener: (webContentsId: number) => void) => void
 }
 
 export interface DogfoodReportsBridge {
@@ -94,6 +95,8 @@ export const BROWSER_PARTITION = "persist:glass-browser"
 export const SANDBOX_BROWSER_PARTITION = "persist:glass-browser-sandbox"
 
 export const BROWSER_RELAY_CHANNEL = "glass:browser-relay"
+
+export const BROWSER_USER_INPUT_CHANNEL = "glass:browser-user-input"
 
 export const PAGE_EVENT_CHANNEL = "glass:page-event"
 

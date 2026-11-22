@@ -80,7 +80,7 @@ const MAX_TEXT_CHARS = 4_000
 
 const MAX_DIFF_CHARS = 60_000
 
-const readOnly = Context.make(Tool.Readonly, true).pipe(
+export const readOnly = Context.make(Tool.Readonly, true).pipe(
   Context.add(Tool.Destructive, false),
   Context.add(Tool.OpenWorld, false),
 )
@@ -223,7 +223,7 @@ const ListThreadOptions = Tool.make("list_thread_options", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const action = Context.make(Tool.Readonly, false).pipe(
+export const acting = Context.make(Tool.Readonly, false).pipe(
   Context.add(Tool.Destructive, false),
   Context.add(Tool.Idempotent, false),
   Context.add(Tool.OpenWorld, false),
@@ -254,7 +254,7 @@ const CreateThread = Tool.make("create_thread", {
   }),
   success: Schema.Struct({ thread: Thread }),
   failure: GlassToolFailure,
-}).annotateMerge(action)
+}).annotateMerge(acting)
 
 const SendThreadMessage = Tool.make("send_thread_message", {
   description:
@@ -272,7 +272,7 @@ const SendThreadMessage = Tool.make("send_thread_message", {
     }),
   }),
   failure: GlassToolFailure,
-}).annotateMerge(action)
+}).annotateMerge(acting)
 
 const ReadAgentReview = Tool.make("read_agent_review", {
   description:
@@ -310,7 +310,7 @@ const AskUser = Tool.make("ask_user", {
   }),
   success: AskUserResult,
   failure: GlassToolFailure,
-}).annotateMerge(action)
+}).annotateMerge(acting)
 
 const CheckIn = Tool.make("check_in", {
   description:
@@ -347,7 +347,7 @@ const CheckIn = Tool.make("check_in", {
   }),
   success: CheckInResult,
   failure: GlassToolFailure,
-}).annotateMerge(action)
+}).annotateMerge(acting)
 
 const StartAgentReview = Tool.make("start_agent_review", {
   description:
@@ -360,7 +360,7 @@ const StartAgentReview = Tool.make("start_agent_review", {
   }),
   success: AgentReviewState,
   failure: GlassToolFailure,
-}).annotateMerge(action)
+}).annotateMerge(acting)
 
 export const GlassTools = Toolkit.make(
   ListPullRequests,

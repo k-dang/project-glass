@@ -17,15 +17,49 @@ const browserPageRequestsAtom = backendRuntime
   .atom(Stream.unwrap(Backend.useSync((backend) => backend.WatchBrowserPageRequests())))
   .pipe(Atom.keepAlive)
 
+export const browserControlAtom = backendRuntime
+  .atom(Stream.unwrap(Backend.useSync((backend) => backend.WatchBrowserControl())))
+  .pipe(Atom.keepAlive)
+
 export const answerBrowserPageRequests = (registry: AtomRegistry.AtomRegistry) => {
   const runtime = backendRuntimeOf(registry)
   const answered = new Set<string>()
   const restorations = new WeakMap<HTMLWebViewElement, Promise<void>>()
+  const relayed = new Map<number, string>()
+  let hearingInput = false
 
   const reply = (id: string, answer: BrowserPageAnswer) =>
     void runtime.runPromiseExit(
       Backend.use((backend) => backend.AnswerBrowserPageRequest({ id, answer })),
     )
+
+  const takeOver = (webContentsId: number) => {
+    const threadId = relayed.get(webContentsId)
+
+    if (threadId === undefined || !agentHeldThreads().includes(threadId)) return
+
+    const controls = AsyncResult.getOrElse(registry.get(browserControlAtom), () => [])
+
+    if (controls.some((control) => control.threadId === threadId && control.userTookOver)) return
+
+    const view = liveBrowserPage(threadId)
+
+    if (view?.isWaitingForResponse() === true) view.stop()
+
+    void runtime.runPromiseExit(Backend.use((backend) => backend.TakeOverBrowser({ threadId })))
+  }
+
+  const relayOf = (threadId: string, view: HTMLWebViewElement) => {
+    const webContentsId = view.getWebContentsId()
+    relayed.set(webContentsId, threadId)
+
+    if (!hearingInput) {
+      hearingInput = true
+      window.glass.onBrowserUserInput(takeOver)
+    }
+
+    return window.glass.browserRelay(webContentsId)
+  }
 
   registry.subscribe(
     browserPageRequestsAtom,
@@ -51,7 +85,7 @@ export const answerBrowserPageRequests = (registry: AtomRegistry.AtomRegistry) =
           )
 
         void (restoreLastPage ? (restorations.get(view) ?? ready) : ready)
-          .then(() => window.glass.browserRelay(view.getWebContentsId()))
+          .then(() => relayOf(threadId, view))
           .then(
             (endpoint) => reply(id, BrowserPageReady.make({ endpoint })),
             (cause: Error) => reply(id, BrowserPageRefused.make({ message: cause.message })),

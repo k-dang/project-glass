@@ -1,3 +1,4 @@
+import { BROWSER_USER_INPUT_CHANNEL } from "@glass/contracts/desktop"
 import { Schema } from "effect"
 import type { WebContents } from "electron"
 import { randomBytes } from "node:crypto"
@@ -11,6 +12,8 @@ const TargetInfo = Schema.Struct({ targetInfo: Schema.Struct({ targetId: Schema.
 const decodeTargetInfo = Schema.decodeUnknownPromise(TargetInfo)
 
 const decodeAddress = Schema.decodeUnknownSync(Schema.Struct({ port: Schema.Number }))
+
+const TAKES_OVER: ReadonlySet<string> = new Set(["mouseDown", "rawKeyDown", "keyDown"])
 
 const textOf = (data: RawData) =>
   Buffer.isBuffer(data)
@@ -34,6 +37,7 @@ const connect = (pane: WebContents, socket: WebSocket, replaced: () => boolean) 
     {
       send: (method, params, sessionId): Promise<Schema.Json> =>
         debuggee.sendCommand(method, params, sessionId),
+      key: (key) => pane.sendInputEvent(key),
       targetId: async () =>
         (await decodeTargetInfo(await debuggee.sendCommand("Target.getTargetInfo"))).targetInfo
           .targetId,
@@ -53,12 +57,20 @@ const connect = (pane: WebContents, socket: WebSocket, replaced: () => boolean) 
 
   const onDetach = () => socket.close()
 
+  // WARNING: Electron reports the agent's input like the user's, so input reported while a relayed Input command waits for its answer, including during sendInputEvent, is the agent's.
+  const onInput = (_event: Electron.Event, input: Electron.InputEvent) => {
+    if (TAKES_OVER.has(input.type) && !relay.sendingInput())
+      pane.hostWebContents?.send(BROWSER_USER_INPUT_CHANNEL, pane.id)
+  }
+
   debuggee.on("message", onEvent)
   debuggee.on("detach", onDetach)
+  pane.on("input-event", onInput)
   socket.on("message", (data) => relay.receive(textOf(data)))
   socket.once("close", () => {
     debuggee.off("message", onEvent)
     debuggee.off("detach", onDetach)
+    pane.off("input-event", onInput)
 
     if (!replaced() && !pane.isDestroyed() && debuggee.isAttached()) debuggee.detach()
   })
