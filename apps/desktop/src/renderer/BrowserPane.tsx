@@ -131,7 +131,8 @@ export const BrowserPane = memo(function BrowserPane(props: {
   const [requested, setRequested] = useState<{ readonly address: string } | null>(null)
   const [blocked, setBlocked] = useState<string | null>(null)
   const [address, setAddress] = useState<string | null>(null)
-  const [typed, setTyped] = useState(start ?? "")
+  const [barAddress, setBarAddress] = useState(start ?? "")
+  const [draft, setDraft] = useState<string | null>(null)
   const [title, setTitle] = useState("")
   const [history, setHistory] = useState({ back: false, forward: false })
   const [loading, setLoading] = useState(false)
@@ -145,13 +146,15 @@ export const BrowserPane = memo(function BrowserPane(props: {
   }, [start])
 
   const open = (next: string) => {
-    setTyped(next)
+    setBarAddress(next)
+    setDraft(null)
 
     if (policy.allows(next)) {
       setBlocked(null)
       setRequested({ address: next })
     } else {
       setBlocked(next)
+      setPick(false)
     }
   }
 
@@ -176,7 +179,7 @@ export const BrowserPane = memo(function BrowserPane(props: {
       const shown = url === "about:blank" ? null : url
 
       setAddress(shown)
-      setTyped(shown ?? "")
+      setBarAddress(shown ?? "")
       setPick(false)
       setHistory({ back: view.canGoBack(), forward: view.canGoForward() })
     }
@@ -250,7 +253,7 @@ export const BrowserPane = memo(function BrowserPane(props: {
   const go = (event: FormEvent) => {
     event.preventDefault()
 
-    const next = addressOf(typed)
+    const next = addressOf(draft ?? barAddress)
 
     if (next !== null) open(next)
   }
@@ -356,8 +359,9 @@ export const BrowserPane = memo(function BrowserPane(props: {
               }
               spellCheck={false}
               ref={addressInput}
-              value={typed}
-              onChange={(event) => setTyped(event.target.value)}
+              value={draft ?? barAddress}
+              onChange={(event) => setDraft(event.target.value)}
+              onBlur={() => setDraft(null)}
             />
           </form>
           <Toggle
