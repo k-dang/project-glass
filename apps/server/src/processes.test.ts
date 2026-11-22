@@ -5,7 +5,7 @@ import { ChildProcessSpawner } from "effect/process"
 import { writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { isolatedHome } from "../test/harness"
-import { launchCommand, sdkExecutable } from "./processes"
+import { argumentLength, launchCommand, sdkExecutable } from "./processes"
 
 const installShim = (folder: string, name: string, target: string, runner = "") =>
   Effect.promise(() =>
@@ -52,6 +52,23 @@ it.live.skipIf(process.platform !== "win32")(
 
       assert.deepStrictEqual(JSON.parse(output), args)
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+)
+
+it.live("measures an argument as the launched process receives it", () =>
+  Effect.gen(function* () {
+    const folder = yield* isolatedHome
+    yield* installShim(folder, "claude", "cli.js")
+    const argument = '{"a":1}'
+
+    assert.deepStrictEqual(
+      [
+        argumentLength("claude", argument, { platform: "linux", env: {} }),
+        argumentLength("claude.exe", argument, windowsHost(folder)),
+        argumentLength("claude", argument, windowsHost(folder)),
+      ],
+      [7, '"{\\"a\\":1}"'.length, '^^^"{\\^^^"a\\^^^":1}^^^"'.length],
+    )
+  }),
 )
 
 it.live("follows an npm shim on the Windows PATH to the file the Claude SDK runs", () =>

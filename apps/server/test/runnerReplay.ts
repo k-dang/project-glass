@@ -6,7 +6,7 @@ import { mkdirSync, readFileSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { AgentFailure } from "../src/agentFailure"
-import { AgentRunners } from "../src/agentRunners"
+import { AgentRunners, argumentLimit } from "../src/agentRunners"
 import type { AgentTools } from "../src/agentTools"
 import { AgentCommands } from "../src/SettingsStore"
 import { counter } from "./counter"
@@ -30,16 +30,17 @@ export interface RunnerScenario {
   readonly tools?: AgentTools
   readonly recordEnv?: Readonly<Record<string, string | undefined>>
   readonly piModelId?: string
+  readonly answer?: Schema.Decoder<typeof Summary.Type>
 }
 
 export const scenarioTask = (
-  { instructions, tools = "read-only" }: RunnerScenario,
+  { instructions, tools = "read-only", answer = Summary }: RunnerScenario,
   checkout: string,
 ) => ({
   subject: "Agent review",
   instructions,
   prompt: "PR material: none. This is a test of the answer format.",
-  answer: Summary,
+  answer,
   tools,
   checkout,
 })
@@ -50,6 +51,9 @@ const signedOut = {
   ANTHROPIC_AUTH_TOKEN: undefined,
   CLAUDE_CODE_OAUTH_TOKEN: undefined,
 }
+
+const longerThanArguments = (sentence: string) =>
+  sentence.repeat(Math.ceil(argumentLimit / sentence.length))
 
 const replyFine = 'Reply with exactly this JSON and nothing else: {"summary":"Fine."}'
 
@@ -69,6 +73,16 @@ export const runnerScenarios: ReadonlyArray<RunnerScenario> = [
     name: "claude-answer",
     harness: "claude-code",
     instructions: replyFine,
+  },
+  {
+    name: "claude-long-schema",
+    harness: "claude-code",
+    instructions: replyFine,
+    answer: Schema.Struct({
+      summary: Schema.String.annotate({
+        description: longerThanArguments("A one-sentence summary of the pull request. "),
+      }),
+    }),
   },
   {
     name: "claude-read-only",
