@@ -1,0 +1,3 @@
+{
+  "RanTurnsEndCutOff": "A Turn the agent host accepted, but whose acceptance Glass never got or never saved, ends as an undelivered message or as Interrupted instead of Cut off when that host goes away."
+}

@@ -1,0 +1,8 @@
+{
+  "ReplacingKeptInMemory": "DownHostGetsReplaced",
+  "ReleaseKeepsOldTurn": "LostHostTurnsEnd",
+  "NewHostKeepsLostTurn": "LostHostTurnsEnd",
+  "SameHostKeepsLostTurn": "RunningTurnIsOnFollowedHost",
+  "CutsOffUntakenTurn": "CutOffTurnsRan",
+  "TakenForgottenOnRestart": "RanTurnsEndCutOff"
+}

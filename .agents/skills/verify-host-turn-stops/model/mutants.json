@@ -1,0 +1,7 @@
+{
+  "NoOverBudgetGate": "OneOverBudgetStopPerTurn",
+  "StopReturnsEverySteer": "NoSteerTwice",
+  "EndDropsStopSteers": "ReturnedSteersComeBack",
+  "EndHidesStopSteers": "NoSteerLost",
+  "ExitHidesSteers": "NoSteerLost"
+}
