@@ -44,6 +44,7 @@ import { sentFrom } from "./UserMessage"
 import { threadColumn } from "./threadColumn"
 import { ThreadChanges } from "./ThreadChanges"
 import { ThreadDetailsAction, ThreadFrame } from "./ThreadFrame"
+import { ThreadName } from "./ThreadName"
 import { PullRequestPanes, useThreadPullRequest } from "./ThreadPullRequest"
 import { PullRequestPane } from "./PullRequestPane"
 import { PreloadPullRequest } from "./preloadPullRequest"
@@ -247,13 +248,15 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
                   className="truncate text-muted-foreground hover:text-foreground"
                   onClick={() => onTabChange("chat")}
                 >
-                  {thread.name}
+                  <ThreadName name={thread.name} />
                 </button>
                 <span className="text-muted-foreground/50">/</span>
                 <h1 className="font-medium">Changes</h1>
               </>
             ) : (
-              <h1 className="truncate font-medium">{thread.name}</h1>
+              <h1 className="truncate font-medium">
+                <ThreadName name={thread.name} />
+              </h1>
             )
           }
           pinnable={tab === "chat" && pane === null}

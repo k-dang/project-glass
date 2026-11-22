@@ -155,7 +155,7 @@ export function NewThread(props: { repository: string | undefined }) {
         providers={providers}
         followed={followed}
         repository={props.repository}
-        newest={Option.getOrElse(AsyncResult.value(threads), () => []).findLast(
+        newest={Option.getOrElse(AsyncResult.value(threads), () => []).find(
           (thread) => !thread.forReview,
         )}
       />
@@ -402,6 +402,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       void navigate({
         to: "/threads/$threadId",
         params: { threadId: exit.value.id },
+        viewTransition: { types: ["start-thread"] },
       })
     else setStarting(null)
 
