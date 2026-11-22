@@ -1,6 +1,6 @@
 ---
 name: verify-sandbox-host-link
-description: Model-check how Glass follows a Sandbox's agent host across dropped connections, new hosts, host replacement, and Glass restarts (HostLink position, turnOnLostHost and takenTurn, Ready.replacingHost, journal_host, journal_turn). Use when a change touches follow, connect, followFrom, placeLostTurn, the connection release or its StartThread and StartTurn wrapper, replaceHost, or how Sandbox Threads resume in apps/server/src/Sandboxes.ts.
+description: Model-check how Glass follows a Sandbox's agent host across dropped connections, new hosts, host replacement, and Glass restarts (HostLink position, turnOnLostHost and takenTurn, Ready.replacingHost, journal_host, journal_turn). Use when a change touches follow, connect, followFrom, placeLostTurn, the connection release, whileOpen, takeTurn, replaceHost, or how Sandbox Threads resume in apps/server/src/Sandboxes.ts.
 ---
 
 # Verify the Sandbox host link

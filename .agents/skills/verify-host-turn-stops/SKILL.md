@@ -1,6 +1,6 @@
 ---
 name: verify-host-turn-stops
-description: Model-check how the agent host stops a Claude Code Turn, from you or over the journal budget, and what happens to its steers (overBudgetStop in HostThreads, stopping and steers in turnLoop, interruptAll in claudeAdapter). Use when a change touches HostThreads report or stopTurn, turnLoop stop, steer or dropSteer, claudeAdapter stopTurn or steer, claudeTurn onResult, Exited or takeIn, or ThreadTurns stop or trySteer.
+description: Model-check how the agent host stops a Claude Code Turn, from you or over the journal budget, and what happens to its Steers (overBudgetStop in HostThreads, stopping and steers in turnLoop, interruptAll in claudeAdapter). Use when a change touches HostThreads report or stopTurn, turnLoop stop, steer or dropSteer, claudeAdapter stopTurn or steer, claudeTurn onResult, Exited or takeIn, or ThreadTurns stop or trySteer.
 ---
 
 # Verify how the agent host stops a Turn
