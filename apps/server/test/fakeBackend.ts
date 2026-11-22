@@ -23,7 +23,13 @@ import {
   startDemoClaude,
   startDemoPi,
 } from "./demoThread"
-import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
+import {
+  DEMO_GATEWAY_REPOSITORY,
+  DEMO_REPOSITORY,
+  seedDemoPullRequests,
+  seedMergedPullRequest,
+  settledPullRequests,
+} from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
 import { fakeAgentRunners } from "./fakeAgentRunners"
@@ -170,6 +176,9 @@ const main = Effect.gen(function* () {
     ).pipe(
       Effect.catchCause((cause) => Effect.logWarning("Couldn't start the demo Threads", cause)),
     )
+
+  // WARNING: Glass links a merged PR only when it was opened after its Thread, so these follow the demo Threads.
+  for (const pr of settledPullRequests) seedMergedPullRequest(github, pr)
 
   return yield* Effect.never
 })
