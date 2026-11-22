@@ -1,49 +1,26 @@
 # Glass
 
-A desktop work hub for reviewing GitHub pull requests and working with coding agents.
+**Review code at the speed agents write it.**
+
+Agents now write more code than anyone can read line by line. Glass is a desktop app that puts
+your pull requests and your coding agents in one place, and helps you spend your attention where
+it counts.
 
 ![A PR workspace with its Agent review](docs/images/agent-review.png)
 
-## What it does
-
-### Review pull requests
-
-The PR lists gather pull requests from your Followed repositories: **Needs review**, **My PRs**,
-**Reviewing**, and a **Queue** of PRs to review next. Each PR opens in a PR workspace pinned to
-one Revision, with its description, changed files, diffs, and Review threads. Drafts are saved
-to your pending GitHub review until you finish it.
-
-![The Needs review list](docs/images/reviews.png)
-
-### Read a Tour, get an Agent review
-
-A **Tour** is an agent-written reading order for a PR: why the change exists, a diagram or
-Before / after, then Chapters ordered from the part that matters most to the glue.
-
-![Reading a Tour](docs/images/tour.png)
-
-An **Agent review** ranks the few Hotspots worth your closest read and marks the Low-attention
-files. It stays on this device, read beside the diff, and never posts to GitHub. Ask about any
-line of the diff, or send a Follow-up and add the Suggested drafts you agree with.
-
-### Work with agents in Threads
-
-A **Thread** is your lasting work with one agent, run by Claude Code or pi in a worktree on this
-device or a Sandbox. Glass names its branch, links the Thread's PR, and brings Permission requests
-and Questions to you. The Global chat works through Glass's own tools from any Area.
-
-![A Thread waiting on a Permission request](docs/images/thread.png)
-
-### See what needs you
-
-The **Inbox** lists the Threads, Questions, Check-ins, and PRs waiting on you, grouped by why
-they wait. Outside agents, such as Claude Code in a terminal, can connect over MCP to ask you a
-question or check in on their changes ([outside agents](docs/user/outside-agents.md)).
-
-![A question from an outside agent in the Inbox](docs/images/inbox.png)
-
-The Dashboard picks up where you left off, To-dos keep track of what you mean to do, and the
-Activity log records what you did.
+- **Know where to look.** An Agent review ranks the few Hotspots worth your closest read and
+  marks the files you can skim. It stays on your machine, never posts to GitHub, and never
+  approves anything for you.
+- **Read a PR in the right order.** A Tour explains why the change exists, draws it as a diagram
+  or a Before / after, then walks you through it from the part that matters most to the glue.
+- **Ask, don't guess.** Ask about any line of the diff and get a private answer beside it. Keep
+  the agent's suggested comments you agree with, and post them as your own GitHub review.
+- **Run agents without losing track.** Start Claude Code or pi in Threads, each in its own
+  worktree or Sandbox. Glass names the branch, links the PR, and brings their questions and
+  permission requests to you.
+- **One Inbox for everything waiting on you.** Reviews, agent questions, permission requests, and
+  Check-ins from agents running in your terminal ([outside agents](docs/user/outside-agents.md)),
+  grouped by why they wait.
 
 ## Layout
 
