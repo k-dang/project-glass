@@ -1,5 +1,6 @@
 import { useAtomValue } from "@effect/atom-react"
 import type { ThreadPullRequest, ThreadPullRequestState, PullRequestRef } from "@glass/contracts"
+import { mergeProps } from "@base-ui/react/merge-props"
 import { useNavigate } from "@tanstack/react-router"
 import { cn } from "cn"
 import { Match, Option } from "effect"
@@ -8,6 +9,7 @@ import { AsyncResult } from "effect/reactivity"
 import { buttonVariants } from "@/components/ui/button"
 import { TooltipHint } from "@/components/ui/tooltip"
 import { threadPullRequestsAtom } from "./threadsArea"
+import { usePreloadOnHover } from "./preloadPullRequest"
 import { checksLabels, closedLabel, mergedLabel, StatusIcon, type StatusLabel } from "./status"
 
 export const PullRequestPanes = createContext<((pullRequest: PullRequestRef) => void) | null>(null)
@@ -41,10 +43,11 @@ export function PullRequestLink({
 }: ComponentProps<"a"> & { href: string; pullRequest: PullRequestRef }) {
   const navigate = useNavigate()
   const openPane = use(PullRequestPanes)
+  const preloadOnHover = usePreloadOnHover(pullRequest)
 
   return (
     <a
-      {...props}
+      {...mergeProps<"a">(props, preloadOnHover)}
       href={href}
       rel="noreferrer"
       target="_blank"

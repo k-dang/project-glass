@@ -51,6 +51,7 @@ import {
   QueuedMessageStarted,
   UnsentFeedback,
   WaitingRequests,
+  GitHubUnavailable,
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -396,30 +397,30 @@ it("opens a Follow-up Thread and keeps it out of the Threads list", async () => 
   expect(screen.getByRole("link", { name: thread.name })).toBeTruthy()
 })
 
+const filedPullRequest = (pullRequestUrl: string) =>
+  TranscriptSnapshot.make({
+    turns: [
+      {
+        id: "turn-1",
+        message: "File the PR",
+        images: [],
+        context: null,
+        feedback: [],
+        sentAt,
+        parts: [TextPart.make({ text: `I filed the PR: ${pullRequestUrl}` })],
+        ended: { at: sentAt, ending: TurnDone.make({}) },
+      },
+    ],
+    queued: [],
+    status: null,
+  })
+
 it("opens a PR the agent links to in a pane beside the chat, with its diffs and its review", async () => {
   const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/42"
 
   const user = mount({
     LoadPullRequest: () => Effect.succeed(workspace([], { files: [changedFile("greet.ts")] })),
-    WatchTranscript: () =>
-      Stream.make(
-        TranscriptSnapshot.make({
-          turns: [
-            {
-              id: "turn-1",
-              message: "File the PR",
-              images: [],
-              context: null,
-              feedback: [],
-              sentAt,
-              parts: [TextPart.make({ text: `I filed the PR: ${pullRequestUrl}` })],
-              ended: { at: sentAt, ending: TurnDone.make({}) },
-            },
-          ],
-          queued: [],
-          status: null,
-        }),
-      ),
+    WatchTranscript: () => Stream.make(filedPullRequest(pullRequestUrl)),
   })
 
   const link = await screen.findByRole("link", { name: pullRequestUrl })
@@ -452,25 +453,7 @@ it("shows the PR as merged after merging it from the pane", async () => {
           : workspace([], { pullRequest: { state: "merged" } })
       }),
     MergePullRequest: () => Effect.void,
-    WatchTranscript: () =>
-      Stream.make(
-        TranscriptSnapshot.make({
-          turns: [
-            {
-              id: "turn-1",
-              message: "File the PR",
-              images: [],
-              context: null,
-              feedback: [],
-              sentAt,
-              parts: [TextPart.make({ text: `I filed the PR: ${pullRequestUrl}` })],
-              ended: { at: sentAt, ending: TurnDone.make({}) },
-            },
-          ],
-          queued: [],
-          status: null,
-        }),
-      ),
+    WatchTranscript: () => Stream.make(filedPullRequest(pullRequestUrl)),
   })
 
   await user.click(await screen.findByRole("link", { name: pullRequestUrl }))
@@ -554,6 +537,34 @@ it("shows the Skill packs and commits a Thread was created with, and its Local s
   expect(await screen.findByText("team @ ae5650f · Local skills")).toBeTruthy()
 })
 
+it("starts loading a PR the agent links to on hover and opens its pane from that load", async () => {
+  const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/42"
+  const loads: Array<PullRequestRef> = []
+
+  const user = mount({
+    LoadPullRequest: ({ pullRequest }) => {
+      loads.push(pullRequest)
+
+      return Effect.succeed(workspace())
+    },
+    WatchTranscript: () => Stream.make(filedPullRequest(pullRequestUrl)),
+  })
+
+  const link = await screen.findByRole("link", { name: pullRequestUrl })
+  await user.hover(link)
+  await waitFor(() =>
+    expect(loads).toEqual([
+      new PullRequestRef({ owner: "octo-org", repo: "hello-world", number: 42 }),
+    ]),
+  )
+
+  await user.click(link)
+
+  const pane = await screen.findByRole("complementary", { name: "Pull request" })
+  expect(await within(pane).findByText("Greet the world")).toBeTruthy()
+  expect(loads).toHaveLength(1)
+})
+
 const threadPullRequest = (state: ThreadPullRequestState) =>
   new ThreadPullRequest({
     threadId: thread.id,
@@ -565,9 +576,14 @@ const threadPullRequest = (state: ThreadPullRequestState) =>
 
 it("links the Thread's PR from its header, its details, and its row in the list", async () => {
   const pullRequest = threadPullRequest(PullRequestOpen.make({ checks: "passing" }))
+  const loads: Array<PullRequestRef> = []
 
   const user = mount({
-    LoadPullRequest: () => Effect.succeed(workspace()),
+    LoadPullRequest: (payload) => {
+      loads.push(payload.pullRequest)
+
+      return Effect.succeed(workspace())
+    },
     WatchThreads: () => Stream.make([thread]),
     WatchThreadPullRequests: () => Stream.make([pullRequest]),
     WatchTranscript: () =>
@@ -576,6 +592,7 @@ it("links the Thread's PR from its header, its details, and its row in the list"
 
   const headerLink = await screen.findByRole("link", { name: "Open PR #264, checks passing" })
   expect(headerLink.getAttribute("href")).toBe(pullRequest.url)
+  await waitFor(() => expect(loads).toEqual([pullRequest.ref]))
   expect(
     screen.getByRole("link", { name: thread.name, description: /PR #264, checks passing/ }),
   ).toBeTruthy()
@@ -586,6 +603,32 @@ it("links the Thread's PR from its header, its details, and its row in the list"
   expect(detailsLink.getAttribute("href")).toBe(pullRequest.url)
 
   await user.click(detailsLink)
+
+  const pane = await screen.findByRole("complementary", { name: "Pull request" })
+  expect(await within(pane).findByText("Greet the world")).toBeTruthy()
+  expect(loads).toHaveLength(1)
+})
+
+it("loads the Thread's PR again when its pane opens after the early load failed", async () => {
+  const pullRequest = threadPullRequest(PullRequestOpen.make({ checks: "passing" }))
+  let loads = 0
+
+  const user = mount({
+    LoadPullRequest: () => {
+      loads += 1
+
+      return loads === 1
+        ? Effect.fail(new GitHubUnavailable({ message: "Try again later." }))
+        : Effect.succeed(workspace())
+    },
+    WatchThreads: () => Stream.make([thread]),
+    WatchThreadPullRequests: () => Stream.make([pullRequest]),
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+  })
+
+  await waitFor(() => expect(loads).toBe(1))
+  await user.click(await screen.findByRole("link", { name: "Open PR #264, checks passing" }))
 
   const pane = await screen.findByRole("complementary", { name: "Pull request" })
   expect(await within(pane).findByText("Greet the world")).toBeTruthy()
