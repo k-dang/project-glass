@@ -9,7 +9,7 @@ import { thread } from "./thread"
 import { testLayer } from "./testBackend"
 import { RegistryProvider } from "./registry"
 
-export const piModels = new AgentModels({
+const piModels = new AgentModels({
   defaultModel: { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] },
   models: [
     { id: "glass-test/gpt-test", name: "gpt-test", efforts: [] },
@@ -17,7 +17,7 @@ export const piModels = new AgentModels({
   ],
 })
 
-export const claudeModels = new AgentModels({
+const claudeModels = new AgentModels({
   defaultModel: { id: "default", name: "Opus 5.5", efforts: ["low", "medium", "high"] },
   models: [{ id: "sonnet", name: "Sonnet 5.5", efforts: ["low", "high"] }],
 })

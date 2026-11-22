@@ -22,7 +22,7 @@ const listWindows = (root: string) =>
     }).stdout,
   )
 
-export const parsePs = (output: string, root: string): ReadonlyArray<CheckoutProcess> =>
+const parsePs = (output: string, root: string): ReadonlyArray<CheckoutProcess> =>
   output.split("\n").flatMap((line) => {
     const match = /^\s*(\d+)\s+(.*)$/.exec(line)
     const command = match?.[2] ?? ""

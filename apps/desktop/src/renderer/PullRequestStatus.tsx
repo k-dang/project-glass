@@ -80,7 +80,7 @@ const checkStates: Record<CheckState, StatusLabel> = {
 
 const checkOrder: ReadonlyArray<CheckState> = ["failed", "running", "passed", "skipped"]
 
-export const isOpen = (pullRequest: PullRequest) =>
+const isOpen = (pullRequest: PullRequest) =>
   pullRequest.state === "open" || pullRequest.state === "draft"
 
 export const closedAs = (pullRequest: PullRequest) =>

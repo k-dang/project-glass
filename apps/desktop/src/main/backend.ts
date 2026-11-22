@@ -34,7 +34,7 @@ const stopBackend = (backend: UtilityProcess, exitCode: Promise<number>) =>
     Effect.asVoid,
   )
 
-export const startBackend = Effect.fn("startBackend")(function* (options: {
+const startBackend = Effect.fn("startBackend")(function* (options: {
   readonly entry: string
   readonly rendererOrigin: string
   readonly logFile: string

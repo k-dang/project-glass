@@ -2,8 +2,8 @@ import { Effect } from "effect"
 import { AtomRegistry } from "effect/reactivity"
 import { expect, it, vi } from "vite-plus/test"
 import { eventually } from "../../test/eventually"
-import { Backend, backendRuntime } from "./backend"
-import { createKeyedWrites } from "./keyedWrites"
+import { backendRuntime } from "./backend"
+import { createResolutions } from "./workspaceFeedback"
 import { type Held, hold, next, testRegistry } from "../../test/testBackend"
 
 it("lets a write finish after its store is disposed, then releases its atom state", async () => {
@@ -23,9 +23,7 @@ it("lets a write finish after its store is disposed, then releases its atom stat
     await Effect.runPromise(AtomRegistry.getResult(registry, backendRuntime))
     const baseline = registry.getNodes().size
 
-    const writes = createKeyedWrites(registry, (reviewThreadId, resolved: boolean) =>
-      Backend.use((backend) => backend.SetReviewThreadResolved({ reviewThreadId, resolved })),
-    )
+    const writes = createResolutions(registry)
 
     writes.set("T1", true)
     const call = await next(calls)
