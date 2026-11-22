@@ -10,8 +10,9 @@ import {
 } from "@glass/contracts"
 import { PAGE_EVENT_CHANNEL, PAGE_STATE_CHANNEL } from "@glass/contracts/desktop"
 import { Option, Schema } from "effect"
-import { type RefObject, useEffect, useEffectEvent, useMemo, useState } from "react"
+import { useEffect, useEffectEvent, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
+import { useBrowserPageFrame } from "./browserPages"
 import { FeedbackEditor, pagePartLabel, withText } from "./FeedbackNotes"
 import { pageNoteEditingAtom } from "./threadsArea"
 import { useFeedbackNotes } from "./useFeedbackNotes"
@@ -50,10 +51,9 @@ export function PageNotes(props: {
   page: PageLocation
   pick: boolean
   loads: number
-  slot: RefObject<HTMLDivElement | null>
   onStopPicking: () => void
 }) {
-  const { view, threadId, page, pick, loads, slot } = props
+  const { view, threadId, page, pick, loads } = props
   const store = useFeedbackNotes(threadId)
   const [opened, setEditing] = useState<Editing | null>(null)
 
@@ -143,24 +143,7 @@ export function PageNotes(props: {
     }
   }, [view])
 
-  const [frame, setFrame] = useState<Frame | null>(null)
-
-  useEffect(() => {
-    if (!isEditing) return undefined
-
-    let following = requestAnimationFrame(function follow() {
-      const rect = slot.current?.getBoundingClientRect()
-
-      if (rect !== undefined)
-        setFrame((current) =>
-          current !== null && sameFrame(current, rect) ? current : frameOf(rect),
-        )
-
-      following = requestAnimationFrame(follow)
-    })
-
-    return () => cancelAnimationFrame(following)
-  }, [isEditing, slot])
+  const frame = useBrowserPageFrame(threadId)
 
   const save = async (current: Editing, text: string) => {
     const note =
@@ -195,18 +178,6 @@ export function PageNotes(props: {
     document.body,
   )
 }
-
-interface Frame {
-  readonly left: number
-  readonly top: number
-  readonly width: number
-  readonly height: number
-}
-
-const frameOf = ({ left, top, width, height }: Frame): Frame => ({ left, top, width, height })
-
-const sameFrame = (a: Frame, b: Frame) =>
-  a.left === b.left && a.top === b.top && a.width === b.width && a.height === b.height
 
 const placement = (rect: PageRect, area: { readonly width: number; readonly height: number }) => {
   const width = Math.min(editorWidth, area.width - gap * 2)

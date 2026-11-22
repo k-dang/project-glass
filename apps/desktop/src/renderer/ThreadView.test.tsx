@@ -70,8 +70,15 @@ import { threadFileAddress } from "./browserAddress"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 
-const attachPage = (_pane: HTMLElement) => {
+const attachPage = () => {
   const page = document.querySelector("webview")!
+
+  const laidOut = vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockReturnValue(new DOMRect(0, 0, 800, 600))
+
+  onTestFinished(() => laidOut.mockRestore())
+
   const loaded: Array<string> = []
   const toPage: Array<PageState> = []
   let reloads = 0
@@ -1854,8 +1861,8 @@ it("links the files a Turn named once it ends, and opens HTML in the Browser pan
   expect(within(transcript).queryByRole("button", { name: "notes.md" })).toBeNull()
   expect(asked).toContainEqual(["docs/explainer.html", "notes.md"])
 
-  const pane = await screen.findByRole("complementary", { name: "Browser" })
-  const { page, loaded } = attachPage(pane)
+  await screen.findByRole("complementary", { name: "Browser" })
+  const { page, loaded } = attachPage()
 
   expect(page.getAttribute("partition")).toBe(BROWSER_PARTITION)
   await waitFor(() => expect(loaded).toEqual([threadFileAddress(thread.id, "docs/explainer.html")]))
@@ -1969,9 +1976,7 @@ it("reloads an HTML file in the Browser pane when the next Turn ends, as the age
 
   await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
 
-  const { navigate, reloads } = attachPage(
-    await screen.findByRole("complementary", { name: "Browser" }),
-  )
+  const { navigate, reloads } = attachPage()
 
   navigate(threadFileAddress(thread.id, "docs/plan.html"))
   expect(reloads()).toBe(0)
@@ -2002,8 +2007,8 @@ it("drops an unsaved Feedback note's editor when the page loads again, as its pa
 
   await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
 
-  const pane = await screen.findByRole("complementary", { name: "Browser" })
-  const { navigate, fromPage, toPage } = attachPage(pane)
+  await screen.findByRole("complementary", { name: "Browser" })
+  const { navigate, fromPage, toPage } = attachPage()
   navigate(threadFileAddress(thread.id, "docs/plan.html"))
   fromPage({ type: "ready" })
   await waitFor(() => expect(toPage).not.toHaveLength(0))
@@ -2093,7 +2098,7 @@ it("opens a Turn's link to this device in a local Thread's Browser pane", async 
 
   await user.click(await screen.findByRole("link", { name: "the app" }))
 
-  const { loaded } = attachPage(await screen.findByRole("complementary", { name: "Browser" }))
+  const { loaded } = attachPage()
 
   await waitFor(() => expect(loaded).toEqual(["http://localhost:3000/settings"]))
 })
@@ -2144,8 +2149,8 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
 
   await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
 
-  const pane = await screen.findByRole("complementary", { name: "Browser" })
-  const { toPage, navigate, fromPage } = attachPage(pane)
+  await screen.findByRole("complementary", { name: "Browser" })
+  const { toPage, navigate, fromPage } = attachPage()
   navigate(threadFileAddress(thread.id, "docs/plan.html"))
 
   const part = PageText.make({

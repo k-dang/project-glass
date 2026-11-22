@@ -31,6 +31,7 @@ const PAGE_SESSION_ID = "glass-browser-pane-page"
 
 const IGNORED = new Set([
   "Target.setDiscoverTargets",
+  "Target.detachFromTarget",
   "Browser.grantPermissions",
   "Browser.resetPermissions",
   "Browser.setDownloadBehavior",
@@ -43,8 +44,10 @@ export const relayTo = (page: RelayedPage, write: (message: string) => void) => 
   let runtimeReset: Promise<Schema.Json> | undefined
   let announcement: string | null = null
 
+  let targetId: Promise<string> | undefined
+
   const targetInfo = async (): Promise<JsonObject> => ({
-    targetId: await page.targetId(),
+    targetId: await (targetId ??= page.targetId()),
     type: "page",
     title: page.title(),
     url: page.url(),
@@ -87,8 +90,6 @@ export const relayTo = (page: RelayedPage, write: (message: string) => void) => 
         return { sessionId }
       }
 
-      case "Target.detachFromTarget":
-        return {}
       case "Target.setAutoAttach": {
         if (attached) return {}
 

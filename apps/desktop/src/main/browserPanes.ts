@@ -89,13 +89,15 @@ export const setUpBrowserPanes = (options: {
   for (const browser of browsers) setUp(browser)
 
   // WARNING: Relays load Effect, which would delay the window if imported before it shows.
-  const relays = import("./pageRelays").then(({ pageRelays }) => pageRelays())
+  let relays: Promise<ReturnType<typeof import("./pageRelays").pageRelays>> | undefined
 
   ipcMain.handle(BROWSER_RELAY_CHANNEL, async (event, webContentsId: number) => {
     const pane = webContents.fromId(webContentsId)
 
     if (pane?.hostWebContents !== event.sender || pane.session !== local)
       throw new Error("Only a local Thread's Browser pane can be driven")
+
+    relays ??= import("./pageRelays").then(({ pageRelays }) => pageRelays())
 
     return (await relays)(pane)
   })

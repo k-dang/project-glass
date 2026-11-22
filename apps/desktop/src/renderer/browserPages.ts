@@ -2,12 +2,19 @@ import { useEffect, useSyncExternalStore } from "react"
 
 export type PageHolder = "pane" | "agent"
 
+export interface PageFrame {
+  readonly left: number
+  readonly top: number
+  readonly width: number
+  readonly height: number
+}
+
 interface LivePage {
   readonly view: HTMLWebViewElement
   readonly holders: Set<PageHolder>
   readonly ready: Promise<void>
   slot: HTMLElement | null
-  size: { readonly width: number; readonly height: number }
+  frame: PageFrame | null
 }
 
 const OFFSCREEN = -100_000
@@ -34,33 +41,54 @@ const layerElement = () => {
   return layer
 }
 
-const place = ({ view, slot, size }: LivePage) => {
+const frameOf = (slot: HTMLElement | null): PageFrame | null => {
   const rect = slot?.isConnected === true ? slot.getBoundingClientRect() : null
-  const shown = rect !== null && rect.width > 0 && rect.height > 0
-  const { left, top, width, height } = shown ? rect : { left: OFFSCREEN, top: 0, ...size }
 
-  view.style.left = `${left}px`
-  view.style.top = `${top}px`
-  view.style.width = `${width}px`
-  view.style.height = `${height}px`
+  return rect === null || rect.width === 0 || rect.height === 0
+    ? null
+    : { left: rect.left, top: rect.top, width: rect.width, height: rect.height }
+}
 
-  return shown ? { width, height } : null
+const sameFrame = (a: PageFrame | null, b: PageFrame | null) =>
+  a === b ||
+  (a !== null &&
+    b !== null &&
+    a.left === b.left &&
+    a.top === b.top &&
+    a.width === b.width &&
+    a.height === b.height)
+
+const place = (page: LivePage) => {
+  const frame = frameOf(page.slot)
+
+  if (sameFrame(frame, page.frame)) return false
+
+  page.frame = frame
+
+  if (frame === null) {
+    page.view.style.left = `${OFFSCREEN}px`
+
+    return true
+  }
+
+  page.view.style.left = `${frame.left}px`
+  page.view.style.top = `${frame.top}px`
+  page.view.style.width = `${frame.width}px`
+  page.view.style.height = `${frame.height}px`
+
+  return true
 }
 
 const placeAll = () => {
-  if (pages.size === 0) {
-    placing = false
+  let moved = false
 
-    return
-  }
+  for (const page of pages.values()) moved = place(page) || moved
 
-  for (const page of pages.values()) {
-    const shown = place(page)
+  if (moved) changed()
 
-    if (shown !== null) page.size = shown
-  }
+  placing = [...pages.values()].some(({ slot }) => slot !== null)
 
-  requestAnimationFrame(placeAll)
+  if (placing) requestAnimationFrame(placeAll)
 }
 
 const keepPlacing = () => {
@@ -85,7 +113,7 @@ export const holdBrowserPage = (threadId: string, holder: PageHolder, partition:
   const view: HTMLWebViewElement = document.createElement("webview")
   view.setAttribute("partition", partition)
   view.setAttribute("src", "about:blank")
-  view.style.cssText = `position:absolute;pointer-events:auto;background:white;left:${OFFSCREEN}px`
+  view.style.cssText = `position:absolute;pointer-events:auto;background:white;left:${OFFSCREEN}px;top:0;width:1280px;height:800px`
 
   const ready = new Promise<void>((resolve) => {
     const onReady = () => {
@@ -101,10 +129,9 @@ export const holdBrowserPage = (threadId: string, holder: PageHolder, partition:
     holders: new Set([holder]),
     ready,
     slot: null,
-    size: { width: 1280, height: 800 },
+    frame: null,
   })
   layerElement().append(view)
-  keepPlacing()
   changed()
 
   return view
@@ -129,7 +156,10 @@ export const browserPageReady = (threadId: string) =>
 export const showBrowserPage = (threadId: string, slot: HTMLElement | null) => {
   const page = pages.get(threadId)
 
-  if (page !== undefined) page.slot = slot
+  if (page === undefined) return
+
+  page.slot = slot
+  keepPlacing()
 }
 
 export const liveBrowserPage = (threadId: string) => pages.get(threadId)?.view ?? null
@@ -144,6 +174,9 @@ const subscribe = (listener: () => void) => {
     listeners.delete(listener)
   }
 }
+
+export const useBrowserPageFrame = (threadId: string) =>
+  useSyncExternalStore(subscribe, () => pages.get(threadId)?.frame ?? null)
 
 export const useAgentHoldsBrowserPage = (threadId: string) =>
   useSyncExternalStore(subscribe, () => pages.get(threadId)?.holders.has("agent") ?? false)

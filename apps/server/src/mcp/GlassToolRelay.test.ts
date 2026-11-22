@@ -151,7 +151,7 @@ it.effect(
 )
 
 it.effect(
-  "offers a host on this device its tools for this device, and a Sandbox's host none of them",
+  "offers and runs a tool for this device only for a host on this device, never a Sandbox's",
   () =>
     Effect.gen(function* () {
       const context = yield* Layer.build(
@@ -186,5 +186,12 @@ it.effect(
       assert.deepStrictEqual(yield* offered(ToolCallOrigin.Sandbox({ threadId: "sandboxed" })), [
         "anywhere",
       ])
+
+      const fromSandbox = yield* glassToolRelay.answer(
+        ToolCallOrigin.Sandbox({ threadId: "sandboxed" }),
+        { callId: "call", threadId: "sandboxed", name: "this_device", arguments: {} },
+      )
+
+      assert.isTrue(fromSandbox.isError)
     }),
 )

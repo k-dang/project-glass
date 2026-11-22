@@ -49,8 +49,8 @@ import {
 } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import type { Page } from "playwright-core"
-import { BrowserPages } from "../BrowserPages"
-import { callingThreadOnThisDevice } from "./browserTools"
+import { BrowserPages, type PageLogEntry } from "../BrowserPages"
+import { callingThread } from "./browserTools"
 import { forThreadsOnThisDevice } from "./toolAudience"
 import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
@@ -609,8 +609,8 @@ export const GlassToolHandlers = GlassTools.toLayer(
         })
     })
 
-    const inBrowser = <A>(act: (page: Page) => Promise<A>) =>
-      callingThreadOnThisDevice(threads).pipe(
+    const inBrowser = <A>(act: (page: Page, log: ReadonlyArray<PageLogEntry>) => Promise<A>) =>
+      callingThread.pipe(
         Effect.flatMap((threadId) => browserPages.use(threadId, act)),
         Effect.mapError(({ message }) => new GlassToolFailure({ message })),
       )
@@ -793,13 +793,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
           title: await page.title(),
           snapshot: truncated(await page.locator("body").ariaSnapshot(), MAX_SNAPSHOT_CHARS),
         })),
-      browser_console: () =>
-        callingThreadOnThisDevice(threads).pipe(
-          Effect.flatMap((threadId) =>
-            browserPages.use(threadId, (_page, log) => Promise.resolve({ entries: [...log] })),
-          ),
-          Effect.mapError(({ message }) => new GlassToolFailure({ message })),
-        ),
+      browser_console: () => inBrowser((_page, log) => Promise.resolve({ entries: [...log] })),
     })
   }),
 )
