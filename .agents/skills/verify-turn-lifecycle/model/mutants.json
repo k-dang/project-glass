@@ -1,0 +1,8 @@
+{
+  "SendIgnoresRunningTurn": "OneRunningTurn",
+  "PartsWrittenAfterFailure": "NoPartsAfterFailure",
+  "RetriedTurnsCutOff": "RetriedTurnsSurviveLoss",
+  "RestartKeepsLostTurns": "OrdinaryTurnsEnd",
+  "StopKeepsRetrying": "StoppedTurnsEnd",
+  "FinalEndingsOverwritable": "FinalEndingsStay"
+}
