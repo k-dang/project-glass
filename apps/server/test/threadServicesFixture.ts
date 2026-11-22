@@ -88,6 +88,12 @@ export const threadServicesFixture = Effect.gen(function* () {
   const starts: Array<string> = []
   const exits = new Map<string, Deferred.Deferred<void>>()
   let starting: Deferred.Deferred<void> | null = null
+
+  let readingSkills: {
+    readonly reached: Deferred.Deferred<void>
+    readonly done: Deferred.Deferred<void>
+  } | null = null
+
   let leftOnStop: ReadonlyArray<MessageWithContext> = []
   let nextAnswer: Effect.Effect<void, HostThreadError | RequestNotWaiting> = Effect.void
   let nextName = 0
@@ -240,7 +246,18 @@ export const threadServicesFixture = Effect.gen(function* () {
             ),
           ),
           Layer.provide(SkillPacks.layer.pipe(Layer.provide(Layer.mock(GitHubClient)({})))),
-          Layer.provide(Layer.mock(LocalSkills)({})),
+          Layer.provide(
+            Layer.mock(LocalSkills)({
+              source: () =>
+                Effect.suspend(() =>
+                  readingSkills === null
+                    ? Effect.void
+                    : Deferred.succeed(readingSkills.reached, undefined).pipe(
+                        Effect.andThen(Deferred.await(readingSkills.done)),
+                      ),
+                ).pipe(Effect.as(Option.none())),
+            }),
+          ),
           Layer.provide(ThreadTurns.layer),
           Layer.provide(FeedbackNotes.layer),
           Layer.provideMerge(Transcripts.layer),
@@ -339,6 +356,15 @@ export const threadServicesFixture = Effect.gen(function* () {
         starting = gate
       }),
     ),
+    holdLocalSkills: Effect.gen(function* () {
+      const held = { reached: yield* Deferred.make<void>(), done: yield* Deferred.make<void>() }
+      readingSkills = held
+
+      return {
+        reached: Deferred.await(held.reached),
+        release: Deferred.succeed(held.done, undefined).pipe(Effect.asVoid),
+      }
+    }),
     releaseStart: Effect.suspend(() =>
       starting === null ? Effect.void : Deferred.succeed(starting, undefined).pipe(Effect.asVoid),
     ),
@@ -357,6 +383,7 @@ export const threadServicesFixture = Effect.gen(function* () {
       permissionMode: TurnSettings["permissionMode"] = null,
       harness: "claude-code" | "pi" = "claude-code",
       place: ThreadPlace = localPlace,
+      localSkills = false,
     ) =>
       running.threads.create({
         repository: new FollowedRepository({ owner: "glass-test", repo: "greeter" }),
@@ -364,7 +391,7 @@ export const threadServicesFixture = Effect.gen(function* () {
         message: "Start",
         images: [],
         skillPacks: [],
-        localSkills: false,
+        localSkills,
         harness,
         model: null,
         effort: null,

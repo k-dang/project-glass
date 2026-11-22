@@ -9,6 +9,7 @@ import {
   type SandboxReach,
   SandboxStatus,
   TurnCutOff,
+  TurnInterrupted,
 } from "@glass/contracts"
 import type { SandboxHost, SandboxProvider, SandboxRequest, SandboxState } from "@glass/plugin"
 import {
@@ -33,6 +34,7 @@ import {
 } from "effect"
 import { SqlClient } from "effect/sql"
 import { Socket } from "effect/socket"
+import { RpcClientError } from "effect/rpc"
 import { newHostToken } from "./agentHost/protocol"
 import { placeholderBranch } from "./BranchNames"
 import { GitHubClient } from "./github/GitHubClient"
@@ -95,6 +97,14 @@ const decodeModels = Schema.decodeUnknownEffect(AgentModels)
 const unreachable = () =>
   new ThreadError({ message: "Glass couldn't reach the Thread's Sandbox. Try again." })
 
+const closedConnection = () =>
+  new RpcClientError.RpcClientError({
+    reason: new Socket.SocketCloseError({
+      code: 1001,
+      closeReason: "Glass let go of this connection to the agent host",
+    }),
+  })
+
 const goneFailure = (reach: GoneReach) => new ThreadError({ message: goneExplanation(reach) })
 
 const storageFailure = () =>
@@ -148,6 +158,7 @@ const goneRecord = (record: typeof Building.Type | typeof Ready.Type, now: DateT
 interface HostLink {
   position: JournalPosition | null
   turnOnLostHost: string | null
+  takenTurn: string | null
   readonly connectLock: Semaphore.Semaphore
   readonly recordLock: Semaphore.Semaphore
 }
@@ -155,6 +166,7 @@ interface HostLink {
 const newLink = (position: JournalPosition | null, turnOnLostHost: string | null): HostLink => ({
   position,
   turnOnLostHost,
+  takenTurn: null,
   connectLock: Semaphore.makeUnsafe(1),
   recordLock: Semaphore.makeUnsafe(1),
 })
@@ -357,11 +369,6 @@ export class Sandboxes extends Context.Service<
 
           if (link.position?.host === host) return link.position
 
-          if (link.position !== null && link.turnOnLostHost !== null) {
-            yield* Effect.logWarning("A Thread's Sandbox has a new agent host", threadId)
-            yield* transcripts.endTurn(TurnCutOff.make({}), threadId, link.turnOnLostHost)
-          }
-
           yield* sql`
             UPDATE thread SET journal_host = ${host}, journal_saved = 0
             WHERE id = ${threadId}
@@ -373,6 +380,30 @@ export class Sandboxes extends Context.Service<
 
           return link.position
         }).pipe(Effect.uninterruptible)
+
+      const placeLostTurn = (threadId: string, client: HostClient) =>
+        Effect.gen(function* () {
+          const link = linkOf(threadId)
+          const lostTurn = link.turnOnLostHost
+
+          if (lostTurn === null) return
+
+          const carried = yield* client.UnacknowledgedTurns()
+
+          if (carried.some((turn) => turn.threadId === threadId && turn.turnId === lostTurn)) {
+            link.takenTurn = lostTurn
+
+            return
+          }
+
+          yield* Effect.logWarning("A Thread's Sandbox agent host doesn't have its Turn", threadId)
+          yield* transcripts.endTurn(
+            lostTurn === link.takenTurn ? TurnCutOff.make({}) : TurnInterrupted.make({}),
+            threadId,
+            lostTurn,
+          )
+          link.turnOnLostHost = null
+        })
 
       const refuseIfGone = (threadId: string) =>
         knownOf(threadId).pipe(
@@ -535,6 +566,7 @@ export class Sandboxes extends Context.Service<
               if (yield* replacingHost)
                 yield* updateReady(threadId, (ready) => ({ ...ready, replacingHost: false }))
 
+              yield* placeLostTurn(threadId, client)
               const position = yield* followFrom(threadId, host)
 
               const following = yield* followHost(client, position, {
@@ -545,23 +577,46 @@ export class Sandboxes extends Context.Service<
                 calls: scope,
               })
 
+              let open = true
+
+              const connected: HostClient = {
+                ...client,
+                StartThread: (input, options) =>
+                  open ? client.StartThread(input, options) : Effect.fail(closedConnection()),
+                StartTurn: (input, options) =>
+                  open
+                    ? client.StartTurn(input, options).pipe(
+                        Effect.flatMap((started) => {
+                          if (!open) return Effect.fail(closedConnection())
+
+                          link.takenTurn = input.turnId
+
+                          return Effect.succeed(started)
+                        }),
+                      )
+                    : Effect.fail(closedConnection()),
+              }
+
               yield* Effect.acquireRelease(
-                recover(threadId, opened, () => ({ phase: "reachable", client })),
+                recover(threadId, opened, () => ({ phase: "reachable", client: connected })),
                 () =>
-                  runningTurn(threadId).pipe(
+                  Effect.sync(() => {
+                    open = false
+                  }).pipe(
+                    Effect.andThen(runningTurn(threadId)),
                     Effect.map((running) => {
-                      link.turnOnLostHost = running
+                      link.turnOnLostHost = running === link.takenTurn ? running : null
                     }),
                     Effect.andThen(
                       recover(threadId, opened, (before) =>
-                        before.phase === "reachable" && before.client === client
+                        before.phase === "reachable" && before.client === connected
                           ? { phase: "connecting", reach: "reachable" }
                           : before,
                       ),
                     ),
                   ),
               )
-              yield* Deferred.succeed(opened, client)
+              yield* Deferred.succeed(opened, connected)
               yield* following
             }).pipe(Effect.scoped)
 

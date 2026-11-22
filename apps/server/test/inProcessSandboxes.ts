@@ -343,6 +343,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
           Effect.andThen(Effect.promise(() => serveHost(threadId, running.token, kind))),
         )
       }),
+    connections: (threadId: string) => hosts.get(threadId)?.sockets.size ?? 0,
     reclaim,
     setGone: (threadId: string, isGone: boolean) => {
       if (isGone) gone.add(threadId)
