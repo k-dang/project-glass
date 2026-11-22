@@ -45,6 +45,7 @@ import { ThreadChanges } from "./ThreadChanges"
 import { ThreadDetailsAction, ThreadFrame } from "./ThreadFrame"
 import { PullRequestPanes, useThreadPullRequest } from "./ThreadPullRequest"
 import { PullRequestPane } from "./PullRequestPane"
+import { PreloadPullRequest } from "./preloadPullRequest"
 import {
   QueueItem,
   QueueItemAction,
@@ -191,6 +192,9 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
   return (
     <ThreadAtomsContext value={atoms}>
       <PullRequestPanes value={openPullRequestPane}>
+        {pullRequest !== undefined && (
+          <PreloadPullRequest key={referenceKey(pullRequest.ref)} pullRequest={pullRequest.ref} />
+        )}
         <ThreadFrame
           label={thread.name}
           heading={
