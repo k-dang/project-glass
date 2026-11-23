@@ -22,7 +22,7 @@ export interface Appearance {
   readonly layout: Layout
 }
 
-export type ResourceProcess = "Main" | "Renderer" | "Backend" | "GPU / other"
+export type ResourceProcess = "Main" | "Renderer" | "Backend" | "GPU" | "Other"
 
 interface ResourceMeasurement {
   readonly cpuPercent: number

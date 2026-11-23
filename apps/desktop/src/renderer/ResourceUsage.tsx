@@ -295,8 +295,8 @@ function ResourceUsagePanel(props: { usage: Usage | null }) {
         </table>
       )}
       <p className="text-[10px] leading-relaxed text-muted-foreground">
-        CPU is a share of this computer’s total capacity. RAM can include memory shared between
-        processes. External agents aren’t included.
+        CPU is a share of this computer’s total capacity. RAM leaves out memory shared between
+        processes on Windows, but can include it elsewhere. External agents aren’t included.
       </p>
     </>
   )
