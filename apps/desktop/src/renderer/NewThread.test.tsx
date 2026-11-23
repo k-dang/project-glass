@@ -394,6 +394,40 @@ it("shows the first message at once while the Thread starts", async () => {
   await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
 })
 
+it("stays on the Thread you went to while the one you started was starting", async () => {
+  const started = Deferred.makeUnsafe<void>()
+  const watched: Array<string> = []
+  const other = new Thread({ ...threadFields, id: "agent-2", name: "agent/quiet-heron" })
+
+  const user = mount(
+    {
+      ...listedOnCreate([], [other], Deferred.await(started)),
+      ListLocalCheckouts: () =>
+        Effect.succeed([
+          new LocalCheckout({ repository: thread.repository, path: "/src/greeter" }),
+        ]),
+      ...branchesAt({}),
+      WatchTranscript: ({ threadId }) => {
+        watched.push(threadId)
+
+        return Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null }))
+      },
+    },
+    "/threads/new",
+  )
+
+  await findDraft()
+  await send(user, "Fix the bug")
+  await user.click(await screen.findByRole("link", { name: /agent\/quiet-heron/ }))
+  await waitFor(() => expect(window.location.hash).toBe(`#/threads/${other.id}`))
+
+  Deferred.doneUnsafe(started, Exit.void)
+
+  expect(await screen.findByRole("link", { name: /agent\/swift-otter/ })).toBeTruthy()
+  await eventually(() => expect(watched).toContain(thread.id))
+  expect(window.location.hash).toBe(`#/threads/${other.id}`)
+})
+
 it("keeps local branch, harness, model, effort, and unsent work when exploring a Sandbox", async () => {
   const created: Array<NewThread> = []
 
