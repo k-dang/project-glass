@@ -297,7 +297,7 @@ export const preloadAtom = Atom.family((ref: PullRequestRef) =>
 
     return loadShared(ref, get.registry).pipe(
       Effect.tap(() => Effect.sync(() => setAgingSince(get.registry, ref, null))),
-      Effect.map((open) => open.workspace),
+      Effect.map((open) => ({ workspace: open.workspace, reactions: open.feedback.reactions })),
     )
   }),
 )

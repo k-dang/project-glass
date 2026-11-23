@@ -21,7 +21,9 @@ import { plural } from "./plural"
 import { ChecksChip, ConflictsChip, ReviewersChip } from "./PullRequestStatus"
 import { preloadAtom, reloadPreloaded } from "./reviewsArea"
 import { SidePanel } from "./SidePanel"
+import { Timeline } from "./Timeline"
 import { useFullFiles } from "./useFullFiles"
+import type { Reactions } from "./workspaceFeedback"
 
 const paneWidthAtom = Atom.make(560).pipe(Atom.keepAlive)
 
@@ -33,7 +35,7 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
   const navigate = useNavigate()
   const problem = settledProblem(result)
   const loaded = Option.getOrNull(AsyncResult.value(result))
-  const pullRequest = useLiveStatus(loaded?.pullRequest ?? null)
+  const pullRequest = useLiveStatus(loaded?.workspace.pullRequest ?? null)
 
   return (
     <SidePanel
@@ -61,7 +63,7 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
             <MergePullRequest
               key={pullRequest.id}
               pullRequest={pullRequest}
-              revision={loaded.revision}
+              revision={loaded.workspace.revision}
               onReload={reload}
             />
           )}
@@ -83,7 +85,11 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
       onClose={props.onClose}
     >
       {loaded !== null && pullRequest !== null ? (
-        <LoadedPullRequest workspace={loaded} pullRequest={pullRequest} />
+        <LoadedPullRequest
+          workspace={loaded.workspace}
+          reactions={loaded.reactions}
+          pullRequest={pullRequest}
+        />
       ) : problem !== null ? (
         <div className="px-5 py-4">
           <ProblemAlert problem={problem} action={{ label: "Try again", run: reload }} />
@@ -99,9 +105,13 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
   )
 }
 
-function LoadedPullRequest(props: { workspace: PullRequestWorkspace; pullRequest: PullRequest }) {
+function LoadedPullRequest(props: {
+  workspace: PullRequestWorkspace
+  reactions: Reactions
+  pullRequest: PullRequest
+}) {
   const { pullRequest } = props
-  const { files } = props.workspace
+  const { files, timeline } = props.workspace
 
   return (
     <>
@@ -141,6 +151,7 @@ function LoadedPullRequest(props: { workspace: PullRequestWorkspace; pullRequest
             <ConflictsChip pullRequest={pullRequest} />
           </div>
           <DescriptionBody html={pullRequest.descriptionHtml} />
+          <Timeline items={timeline} reactions={props.reactions} />
         </TabsContent>
         <TabsContent value="code" className="flex min-h-0 min-w-0 flex-col">
           <PaneChanges workspace={props.workspace} />

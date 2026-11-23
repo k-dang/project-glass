@@ -28,6 +28,7 @@ import {
   type PageState,
   PageText,
   PartSet,
+  PublishedComment,
   PullRequestRef,
   PullRequestMerged,
   PullRequestOpen,
@@ -465,11 +466,26 @@ const filedPullRequest = (pullRequestUrl: string) =>
     status: null,
   })
 
-it("opens a PR the agent links to in a pane beside the chat, with its diffs and its review", async () => {
+it("opens a PR the agent links to in a pane beside the chat, with its comments, its diffs and its review", async () => {
   const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/42"
 
   const user = mount({
-    LoadPullRequest: () => Effect.succeed(workspace([], { files: [changedFile("greet.ts")] })),
+    LoadPullRequest: () =>
+      Effect.succeed(
+        workspace([], {
+          files: [changedFile("greet.ts")],
+          timeline: [
+            new PublishedComment({
+              id: "C1",
+              author: "hubot",
+              avatarUrl: null,
+              bodyHtml: "<p>Ship it after the rename.</p>",
+              createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+              reactions: [],
+            }),
+          ],
+        }),
+      ),
     WatchTranscript: () => Stream.make(filedPullRequest(pullRequestUrl)),
   })
 
@@ -480,6 +496,7 @@ it("opens a PR the agent links to in a pane beside the chat, with its diffs and 
   const pane = await screen.findByRole("complementary", { name: "Pull request" })
   expect(await within(pane).findByText("Greet the world")).toBeTruthy()
   expect(window.location.hash).toBe(threadHash)
+  expect(within(pane).getByText("Ship it after the rename.")).toBeTruthy()
 
   await user.click(within(pane).getByRole("tab", { name: "Code" }))
   expect(await within(pane).findByRole("button", { name: "Hide greet.ts" })).toBeTruthy()
