@@ -69,6 +69,7 @@ import { changedFile, workspace } from "../../test/workspace"
 import { modelOption, mount, pixel } from "../../test/threadApp"
 import { BROWSER_PARTITION, PAGE_EVENT_CHANNEL } from "@glass/contracts/desktop"
 import { threadFileAddress } from "./browserAddress"
+import { agentHeldThreads, releaseBrowserPage } from "./browserPages"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
 
@@ -115,6 +116,8 @@ const attachPage = () => {
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+
+  for (const threadId of agentHeldThreads()) releaseBrowserPage(threadId, "agent")
 })
 
 it("shows the Thread under Local and its Turn's parts as they stream", async () => {
