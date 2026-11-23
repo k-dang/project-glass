@@ -87,8 +87,8 @@ _Avoid_: Default engine, runner (in UI copy), generator, provider
 
 **Agent review**:
 An agent-written critique of one Revision of a PR, kept on this device for the user alone and
-read beside the diff. Unlike a GitHub review, it is never published and never approves or
-requests changes.
+read in a side panel of the PR workspace. Unlike a GitHub review, it is never published and never
+approves or requests changes.
 _Avoid_: AI review, code review, critique
 
 **Agent review engine**:

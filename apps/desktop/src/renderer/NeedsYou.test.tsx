@@ -732,7 +732,7 @@ const reviewHandlers: Partial<Handlers> = {
   WatchAgentReview: () => Stream.make({ review: reviewOf(revision), job: { status: "idle" } }),
 }
 
-it("opens Changes and the Agent review when the pull request is still loading", async () => {
+it("opens the Agent review when the pull request is still loading", async () => {
   const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, PullRequestWorkspace, never>> =
     []
 
@@ -748,10 +748,8 @@ it("opens Changes and the Agent review when the pull request is still loading", 
 
   ;(await next(opened)).answer(loadedWorkspace())
 
-  await waitFor(() =>
-    expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true"),
-  )
-  expect(screen.getByRole("complementary", { name: "Agent review" })).toBeTruthy()
+  expect(await screen.findByRole("complementary", { name: "Agent review" })).toBeTruthy()
+  expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true")
 })
 
 it("moves through a group with the arrow keys, Home and End, opening each item", async () => {

@@ -29,13 +29,13 @@ const mount = (overrides: Parameters<typeof controls>[0]) => {
   }
 }
 
-it("shows only the review's opening and reads the rest beside the diff", async () => {
+it("shows only the review's opening and reads the rest in full", async () => {
   const f = mount({ review: reviewOf(revision) })
   const card = within(f.card!)
 
   expect(card.getByText("The greeting changes a letter callers match on.")).toBeDefined()
   expect(card.queryByText("Callers expect the old letter")).toBeNull()
-  await userEvent.click(card.getByRole("button", { name: "Read beside the diff" }))
+  await userEvent.click(card.getByRole("button", { name: "Read the full review" }))
   expect(f.onRead).toHaveBeenCalledOnce()
 })
 
