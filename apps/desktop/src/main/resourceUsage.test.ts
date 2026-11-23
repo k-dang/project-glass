@@ -26,9 +26,21 @@ it("totals all app processes without renormalizing CPU or using peak memory", ()
       { name: "Main", cpuPercent: 1, memoryBytes: 1024 ** 2 },
       { name: "Renderer", cpuPercent: 5, memoryBytes: 5 * 1024 ** 2 },
       { name: "Backend", cpuPercent: 4, memoryBytes: 4 * 1024 ** 2 },
-      { name: "GPU / other", cpuPercent: 11, memoryBytes: 11 * 1024 ** 2 },
+      { name: "GPU", cpuPercent: 6, memoryBytes: 6 * 1024 ** 2 },
+      { name: "Other", cpuPercent: 5, memoryBytes: 5 * 1024 ** 2 },
     ],
   })
+})
+
+it("counts a process's private memory when Electron reports it", () => {
+  const usage = summarizeResourceUsage([
+    {
+      ...metric("Tab", 0, 4096),
+      memory: { workingSetSize: 4096, peakWorkingSetSize: 0, privateBytes: 1024 },
+    },
+  ])
+
+  expect(usage.memoryBytes).toBe(1024 ** 2)
 })
 
 it("reports missing memory as unavailable instead of showing an incomplete total", () => {
