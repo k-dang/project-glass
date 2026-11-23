@@ -7,7 +7,7 @@ function QueueList({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
       data-slot="queue-list"
-      className={cn("flex max-h-40 flex-col overflow-y-auto rounded-lg border py-1", className)}
+      className={cn("flex max-h-40 flex-col overflow-y-auto rounded-lg border p-1", className)}
       {...props}
     />
   )
@@ -18,7 +18,7 @@ function QueueItem({ className, ...props }: React.ComponentProps<"li">) {
     <li
       data-slot="queue-item"
       className={cn(
-        "group flex flex-col gap-1 px-3 py-1 text-sm transition-colors hover:bg-muted",
+        "group flex flex-col gap-1 rounded-md px-2 py-1 text-sm transition-colors hover:bg-muted/60",
         className,
       )}
       {...props}
