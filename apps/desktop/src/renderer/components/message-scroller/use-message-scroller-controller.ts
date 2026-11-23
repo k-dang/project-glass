@@ -535,10 +535,20 @@ function useMessageScrollerController({
     }
   }, [setTailSpacerHeight])
 
-  const handleResize = React.useCallback(() => {
-    if (modeRef.current === "following-bottom" && autoScrollRef.current) {
-      scrollToEnd({ behavior: "auto" })
+  const followEndBeforePaint = React.useCallback(() => {
+    if (
+      modeRef.current !== "following-bottom" ||
+      !autoScrollRef.current ||
+      spacerHeightRef.current > 0
+    ) {
+      return false
+    }
 
+    return scrollToEnd({ behavior: "auto" })
+  }, [scrollToEnd])
+
+  const handleResize = React.useCallback(() => {
+    if (followEndBeforePaint()) {
       return
     }
 
@@ -566,6 +576,7 @@ function useMessageScrollerController({
     scheduleVisibilitySync()
   }, [
     drainReleasedSpacer,
+    followEndBeforePaint,
     reanchorToAnchoredMessage,
     scheduleStateCommit,
     scheduleVisibilitySync,
@@ -707,6 +718,7 @@ function useMessageScrollerController({
 
   const context = React.useMemo<MessageScrollerContextValue>(
     () => ({
+      followEndBeforePaint,
       handleContentChange,
       handleResize,
       holdPosition,
@@ -728,6 +740,7 @@ function useMessageScrollerController({
       visibilityStore,
     }),
     [
+      followEndBeforePaint,
       handleContentChange,
       handleResize,
       holdPosition,
