@@ -58,7 +58,7 @@ it("merges in one click, then hides Merge and reloads the PR", async () => {
 
   await user.click(screen.getByRole("button", { name: "Merge" }))
 
-  await screen.findByText("Merged")
+  await screen.findByText("Merged #42")
   expect(merge).toHaveBeenCalledWith(
     { pullRequestId: pullRequestFields.id, revision, action },
     expect.anything(),
@@ -84,7 +84,7 @@ it("offers Merge again once GitHub drops the merge it took", async () => {
   const { user, changeAction } = mount(action, () => Effect.void)
 
   await user.click(screen.getByRole("button", { name: "Merge when ready" }))
-  await screen.findByText("Auto-merge on")
+  await screen.findByText("Auto-merge on #42")
   changeAction(null)
   changeAction(action)
 
@@ -97,7 +97,7 @@ it("names what GitHub would do on the button", async () => {
 
   await user.click(screen.getByRole("button", { name: "Add to merge queue" }))
 
-  await screen.findByText("Added to merge queue")
+  await screen.findByText("Added to merge queue #42")
   expect(merge.mock.calls[0]?.[0].action).toEqual(AddToMergeQueue.make({}))
 })
 

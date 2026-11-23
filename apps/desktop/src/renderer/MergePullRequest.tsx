@@ -96,7 +96,7 @@ export function MergePullRequest(props: {
     }
 
     setSent(JSON.stringify(action))
-    toast.add({ type: "success", title: done, description: pullRequest.title })
+    toast.add({ type: "success", title: `${done} #${pullRequest.ref.number}` })
     props.onReload()
   }
 
