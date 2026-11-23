@@ -1,11 +1,11 @@
-import { useEffect, useRef } from "react"
+import { useLayoutEffect, useRef } from "react"
 import { fadeIn } from "./fadeIn"
 
 export function ThreadName(props: { name: string; className?: string }) {
   const ref = useRef<HTMLSpanElement>(null)
   const shown = useRef(props.name)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (shown.current === props.name || ref.current === null) return
 
     shown.current = props.name
