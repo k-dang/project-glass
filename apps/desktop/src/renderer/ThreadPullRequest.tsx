@@ -7,7 +7,6 @@ import { Match, Option } from "effect"
 import { type ComponentProps, createContext, use } from "react"
 import { AsyncResult } from "effect/reactivity"
 import { buttonVariants } from "@/components/ui/button"
-import { TooltipHint } from "@/components/ui/tooltip"
 import { threadPullRequestsAtom } from "./threadsArea"
 import { usePreloadOnHover } from "./preloadPullRequest"
 import { checksLabels, closedLabel, mergedLabel, StatusIcon, type StatusLabel } from "./status"
@@ -74,20 +73,18 @@ export function ThreadPullRequestLink(props: { pullRequest: ThreadPullRequest })
   const { pullRequest } = props
 
   return (
-    <TooltipHint content={pullRequest.title} side="bottom">
-      <PullRequestLink
-        href={pullRequest.url}
-        pullRequest={pullRequest.ref}
-        aria-label={`Open ${pullRequestLabel(pullRequest)}`}
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "sm" }),
-          "shrink-0 gap-1.5 tabular-nums",
-        )}
-      >
-        <PullRequestStatusIcon state={pullRequest.state} className="size-3.5" />#
-        {pullRequest.ref.number}
-      </PullRequestLink>
-    </TooltipHint>
+    <PullRequestLink
+      href={pullRequest.url}
+      pullRequest={pullRequest.ref}
+      aria-label={`Open ${pullRequestLabel(pullRequest)}`}
+      className={cn(
+        buttonVariants({ variant: "ghost", size: "sm" }),
+        "shrink-0 gap-1.5 tabular-nums",
+      )}
+    >
+      <PullRequestStatusIcon state={pullRequest.state} className="size-3.5" />#
+      {pullRequest.ref.number}
+    </PullRequestLink>
   )
 }
 
