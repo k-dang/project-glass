@@ -1936,6 +1936,15 @@ it("shows a Turn's Markdown images and links to Windows paths in the Thread's fo
 
   await waitFor(() => expect(image.getAttribute("src")).toBe("data:image/png;base64,shot2"))
 
+  await user.click(within(transcript).getByRole("button", { name: "The picker" }))
+
+  const viewer = await screen.findByRole("dialog", { name: "The picker" })
+  expect(within(viewer).getByRole("img").getAttribute("src")).toBe("data:image/png;base64,shot2")
+  expect(screen.queryByRole("complementary", { name: "File" })).toBeNull()
+
+  await user.keyboard("{Escape}")
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+
   await user.click(await within(transcript).findByRole("button", { name: "the log" }))
 
   const pane = await screen.findByRole("complementary", { name: "File" })

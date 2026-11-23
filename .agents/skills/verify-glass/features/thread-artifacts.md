@@ -6,7 +6,7 @@ An agent's files and drawings open beside its Thread. Paths the agent names in i
 
 - Browser pane: an HTML page, with Feedback notes (see [page-notes](./page-notes.md)).
 - File pane: Markdown rendered, an image, code or text, "Binary file not shown", and "File too large to show".
-- Inline image in a reply, which opens in the File pane on click.
+- Inline image in a reply, which opens in the image viewer on click.
 - Diagram cards: existing behavior, a proposed design, and a refused version ("Glass couldn't draw this version, so the last one stays."), plus a Mermaid block drawn inline in the chat.
 - Attached images: a thumbnail above the user's message that opens the image viewer.
 
@@ -23,7 +23,8 @@ On the fake backend, the seeded pi Thread `demo/artifacts` covers every sub-feat
    - `bucket.ts`: `wait --text "refillBucket"`.
    - `limits.bin`: `wait --text "Binary file not shown"`.
    - `poller.log`: `wait --text "File too large to show"`.
-   - `chart.svg`, then the inline image `Requests per minute`: screenshot the chart in the File pane.
+   - `chart.svg`: screenshot the chart in the File pane.
+   - The inline image `Requests per minute`: screenshot the chart in the image viewer, then `press --key Escape`.
 3. Click the first diagram card's `Open`. Screenshot: the Message flow pane.
 4. `scroll --by=-2000 --x 800 --y 400`, click `Open attachment 1`. Screenshot: the image viewer.
 

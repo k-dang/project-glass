@@ -14,11 +14,13 @@ import {
   useRef,
   useState,
 } from "react"
+import { DialogTrigger } from "@ui-sdk/react/dialog"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
 import { fileName } from "./fileName"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
+import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { imageSrc } from "./pastedImages"
 import { FileContentsView } from "./RepositoryBrowser"
 import { SidePanel } from "./SidePanel"
@@ -228,30 +230,32 @@ function LoadedImage(props: { links: FileLinksValue; path: string; alt: string }
   const atom = threadFileAtom(new FileKey({ threadId: links.threadId, path }))
   const result = useAtomValue(atom)
   const file = AsyncResult.isFailure(result) ? null : Option.getOrNull(AsyncResult.value(result))
+  const [viewer] = useState(createImageViewer)
 
   useRereadWhenTurnEnds(atom, links.lastEnded)
 
   if (file?._tag !== "ImageFile") return <ImageAlt text={props.alt} />
 
-  const image = (
-    <img
-      src={imageSrc(file.mediaType, file.data)}
-      alt={props.alt}
-      className="max-h-96 max-w-full rounded-md border"
-    />
-  )
+  const src = imageSrc(file.mediaType, file.data)
+  const image = <img src={src} alt={props.alt} className="max-h-96 max-w-full rounded-md border" />
 
   return insideLink ? (
     image
   ) : (
-    <button
-      type="button"
-      title={`Open ${path}`}
-      className="block cursor-pointer"
-      onClick={() => links.open(path)}
-    >
-      {image}
-    </button>
+    <>
+      <DialogTrigger
+        controller={viewer}
+        payload={{
+          images: [{ src, name: props.alt }],
+          index: 0,
+        }}
+        title={path}
+        className="block cursor-zoom-in"
+      >
+        {image}
+      </DialogTrigger>
+      <ImageViewer controller={viewer} />
+    </>
   )
 }
 
