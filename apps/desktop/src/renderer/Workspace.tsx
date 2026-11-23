@@ -160,8 +160,6 @@ export function Workspace(props: {
     setPendingReview(null)
 
     if (!reviewOpen) setReviewOpen(true)
-
-    setView((previous) => (previous.tab === "changes" ? previous : { ...previous, tab: "changes" }))
   }
 
   const fullFiles = useFullFiles(pullRequest.ref, revision)
@@ -345,7 +343,7 @@ export function Workspace(props: {
 
   const showInReview = (rank: number) => {
     setHotspotFocus({ rank })
-    readAgentReview()
+    setReviewOpen(true)
   }
 
   const showAll = (next: CollapseChoices["all"]) => {
@@ -367,16 +365,6 @@ export function Workspace(props: {
     if (next === "changes") returnToCurrent(tourShown !== null)
   }
 
-  const readAgentReview = () => {
-    flushSync(() => {
-      setReviewOpen(true)
-      setView((previous) => ({ ...previous, tab: "changes" }))
-    })
-
-    returnToCurrent(tourShown !== null)
-  }
-
-  const reviewShown = inChanges && reviewOpen
   const layoutKnown = tour.known && agentReview.known
 
   const agentWork = (
@@ -385,7 +373,7 @@ export function Workspace(props: {
       reading={reading}
       review={agentReview}
       onReadTour={startReading}
-      onReadReview={readAgentReview}
+      onReadReview={() => setReviewOpen(true)}
     />
   )
 
@@ -401,11 +389,11 @@ export function Workspace(props: {
     },
     agentReview.review !== null && {
       id: "agent-review",
-      title: reviewShown ? "Close the Agent review" : "Open the Agent review",
+      title: reviewOpen ? "Close the Agent review" : "Open the Agent review",
       group: "Pull request",
       icon: Sparkles,
       shortcut: { key: "d", mod: true, allowInEditable: true },
-      run: () => (reviewShown ? setReviewOpen(false) : readAgentReview()),
+      run: () => setReviewOpen((open) => !open),
     },
   ])
 
@@ -574,7 +562,7 @@ export function Workspace(props: {
               <div className="flex flex-col gap-8 px-6 py-8">
                 <AgentReviewCard
                   controls={agentReview}
-                  onRead={readAgentReview}
+                  onRead={() => setReviewOpen(true)}
                   onReadHotspot={showInReview}
                 />
                 <Description html={pullRequest.descriptionHtml} />
@@ -654,7 +642,19 @@ export function Workspace(props: {
               )
             )}
           </TabsContent>
-          {reviewShown && agentReview.review !== null && (
+          <TabsContent value="files" keepMounted className="flex min-w-0">
+            {browsed && (
+              <RepositoryBrowser
+                key={revisionKey}
+                pullRequest={pullRequest.ref}
+                revision={revision}
+                changedFiles={files}
+                path={repositoryFile}
+                onSelect={(path) => setView((previous) => ({ ...previous, repositoryFile: path }))}
+              />
+            )}
+          </TabsContent>
+          {reviewOpen && agentReview.review !== null && (
             <AgentReviewSidePanel onClose={() => setReviewOpen(false)}>
               <AgentReviewPanel
                 review={agentReview.review}
@@ -671,18 +671,6 @@ export function Workspace(props: {
               />
             </AgentReviewSidePanel>
           )}
-          <TabsContent value="files" keepMounted className="flex min-w-0">
-            {browsed && (
-              <RepositoryBrowser
-                key={revisionKey}
-                pullRequest={pullRequest.ref}
-                revision={revision}
-                changedFiles={files}
-                path={repositoryFile}
-                onSelect={(path) => setView((previous) => ({ ...previous, repositoryFile: path }))}
-              />
-            )}
-          </TabsContent>
         </div>
       )}
     </Tabs>

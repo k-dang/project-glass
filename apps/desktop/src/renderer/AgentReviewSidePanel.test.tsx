@@ -22,16 +22,16 @@ const files = [changedFile("greet.ts")]
 
 const sidePanel = () => screen.queryByRole("complementary", { name: "Agent review" })
 
-it("reads the whole Agent review in a panel right of the diff, until it is closed", async () => {
+it("reads the whole Agent review in a side panel without leaving Overview, until it is closed", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: reviewOf(revision), job: { status: "idle" } },
   })
 
   const card = await screen.findByRole("region", { name: "Agent review" })
-  await f.user.click(within(card).getByRole("button", { name: "Read beside the diff" }))
+  await f.user.click(within(card).getByRole("button", { name: "Read the full review" }))
 
-  expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true")
+  expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true")
   const panel = await screen.findByRole("complementary", { name: "Agent review" })
   expect(within(panel).getByText("Callers expect the old letter")).toBeDefined()
 
@@ -47,7 +47,7 @@ it("opens and closes the Agent review with Mod+D, even from its composer", async
 
   await screen.findByRole("region", { name: "Agent review" })
   await f.user.keyboard("{Control>}d{/Control}")
-  expect(screen.getByRole("tab", { name: "Changes" }).getAttribute("aria-selected")).toBe("true")
+  expect(screen.getByRole("tab", { name: "Overview" }).getAttribute("aria-selected")).toBe("true")
   expect(sidePanel()).not.toBeNull()
 
   await f.user.click(screen.getByRole("textbox", { name: "Follow up" }))
@@ -55,7 +55,7 @@ it("opens and closes the Agent review with Mod+D, even from its composer", async
   expect(sidePanel()).toBeNull()
 })
 
-it("keeps the Tour order while reading the Agent review", async () => {
+it("keeps the Tour order and place while reading the Agent review", async () => {
   const f = mountTourWorkspace({
     files,
     initial: {
@@ -74,6 +74,9 @@ it("keeps the Tour order while reading the Agent review", async () => {
   await openTourOrder(f.user)
   const tourOrder = screen.getByRole("button", { name: "Tour" })
   expect(tourOrder.getAttribute("aria-pressed")).toBe("true")
+  const chapters = screen.getByLabelText("Tour Chapters")
+  await new Promise(requestAnimationFrame)
+  chapters.scrollTop = 500
 
   await f.user.click(screen.getByRole("button", { name: "Agent work" }))
   await f.user.click(
@@ -81,8 +84,10 @@ it("keeps the Tour order while reading the Agent review", async () => {
       name: "Read",
     }),
   )
+  await new Promise(requestAnimationFrame)
   expect(sidePanel()).not.toBeNull()
   expect(tourOrder.getAttribute("aria-pressed")).toBe("true")
+  expect(chapters.scrollTop).toBe(500)
 })
 
 it("marks an outdated Agent review and still reads it", async () => {
@@ -139,18 +144,18 @@ const followUps: ReadonlyArray<Turn> = [
   },
 ]
 
-const readBesideTheDiff = async (f: ReturnType<typeof mountTourWorkspace>) => {
+const readFullReview = async (f: ReturnType<typeof mountTourWorkspace>) => {
   const card = await screen.findByRole("region", { name: "Agent review" })
-  await f.user.click(within(card).getByRole("button", { name: "Read beside the diff" }))
+  await f.user.click(within(card).getByRole("button", { name: "Read the full review" }))
 }
 
-it("follows up on the Agent review from beside the diff, on the workspace's Revision", async () => {
+it("follows up on the Agent review from its side panel, on the workspace's Revision", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: reviewOf(revision), job: { status: "idle" } },
   })
 
-  await readBesideTheDiff(f)
+  await readFullReview(f)
   await f.user.type(screen.getByRole("textbox", { name: "Follow up" }), "Is this blocking?{Enter}")
 
   await waitFor(() => expect(f.followUp).toHaveBeenCalledOnce())
@@ -174,7 +179,7 @@ it("keeps a refused follow-up in the composer and says why", async () => {
     ),
   )
 
-  await readBesideTheDiff(f)
+  await readFullReview(f)
   const composer = screen.getByRole("textbox", { name: "Follow up" })
   await f.user.type(composer, "Is this blocking?{Enter}")
 
@@ -192,7 +197,7 @@ for (const accepted of [true, false])
     const reply = Deferred.makeUnsafe<void, AgentReviewFailure>()
     f.followUp.mockImplementation(() => Deferred.await(reply))
 
-    await readBesideTheDiff(f)
+    await readFullReview(f)
     const composer = screen.getByRole("textbox", { name: "Follow up" })
     await f.user.type(composer, "Is this blocking?{Enter}")
 
@@ -242,7 +247,7 @@ it("prevents Retry and Send from overlapping while a retry is being accepted", a
 
   const reply = Deferred.makeUnsafe<void>()
   f.followUp.mockImplementation(() => Deferred.await(reply))
-  await readBesideTheDiff(f)
+  await readFullReview(f)
   await f.user.click(screen.getByRole("button", { name: "Retry" }))
 
   expect(screen.queryByRole("button", { name: "Retry" })).toBeNull()
@@ -263,7 +268,7 @@ it("sends a suggestion's prompt as the first Follow-up", async () => {
     agentReview: { review: reviewOf(revision), job: { status: "idle" } },
   })
 
-  await readBesideTheDiff(f)
+  await readFullReview(f)
   await f.user.click(screen.getByRole("button", { name: "Draft PR comments" }))
 
   await waitFor(() => expect(f.followUp).toHaveBeenCalledOnce())
@@ -277,7 +282,7 @@ it("sends later Follow-ups and suggestions to the review's Thread", async () => 
     reviewThreadTurns: followUps,
   })
 
-  await readBesideTheDiff(f)
+  await readFullReview(f)
   await f.user.type(
     await screen.findByRole("textbox", { name: "Follow up" }),
     "And the other caller?{Enter}",
@@ -306,7 +311,7 @@ it("adds a suggested Draft as the user edited it", async () => {
     reviewThreadTurns: followUps,
   })
 
-  await readBesideTheDiff(f)
+  await readFullReview(f)
 
   const suggested = await screen.findByRole("region", {
     name: "Suggested draft on greet.ts line +2",
@@ -340,7 +345,7 @@ it("only reads the Follow-ups of an outdated Agent review", async () => {
     reviewThreadTurns: followUps,
   })
 
-  await readBesideTheDiff(f)
+  await readFullReview(f)
 
   expect(await screen.findByText(/Here is one for/)).toBeDefined()
   expect(

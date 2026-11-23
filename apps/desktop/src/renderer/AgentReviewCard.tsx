@@ -1,5 +1,5 @@
 import { splitLead } from "@glass/contracts"
-import { Clock, LoaderCircle, PanelLeft, ScanSearch } from "lucide-react"
+import { Clock, LoaderCircle, PanelRight, ScanSearch } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card"
@@ -110,8 +110,8 @@ export function AgentReviewCard(props: {
       {review !== null && (
         <CardFooter>
           <Button size="sm" onClick={onRead}>
-            <PanelLeft aria-hidden />
-            Read beside the diff
+            <PanelRight aria-hidden />
+            Read the full review
           </Button>
         </CardFooter>
       )}
