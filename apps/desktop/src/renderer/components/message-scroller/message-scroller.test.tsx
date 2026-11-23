@@ -315,6 +315,25 @@ describe("MessageScroller", () => {
     })
   })
 
+  it("follows the end before the next frame paints when content above grows", async () => {
+    const rendered = await renderTestScroller({
+      autoScroll: true,
+      messages: [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+      ],
+    })
+
+    expect(rendered.viewport().scrollTop).toBe(140)
+
+    rendered.message("message-1").dataset.testHeight = "200"
+
+    await triggerResize(rendered.content(), 0)
+
+    expect(rendered.viewport().scrollTop).toBe(260)
+  })
+
   it("holds a newly appended anchor at the reading line while the reply streams with autoScroll", async () => {
     const rendered = await renderTestScroller({
       autoScroll: true,
@@ -1095,14 +1114,14 @@ async function renderTestScrollerWithParent(options: TestScrollerOptions): Promi
   return rendered
 }
 
-async function triggerResize(element: Element) {
+async function triggerResize(element: Element, frames?: number) {
   await act(async () => {
     resizeObservers.forEach((observer) => {
       if (observer.has(element)) {
         observer.trigger()
       }
     })
-    await flushAnimationFrames()
+    await flushAnimationFrames(frames)
   })
 }
 

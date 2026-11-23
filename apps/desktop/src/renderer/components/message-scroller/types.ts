@@ -167,6 +167,7 @@ type MessageScrollerRegisterMessage = (
 
 // Internal context wiring the parts together. Not part of the public API.
 type MessageScrollerContextValue = {
+  followEndBeforePaint: () => boolean
   handleContentChange: () => void
   handleResize: () => void
   holdPosition: () => void

@@ -150,6 +150,7 @@ function MessageScrollerViewport({
   ...props
 }: MessageScrollerViewportProps) {
   const {
+    followEndBeforePaint,
     handleResize,
     preserveScrollOnPrependRef,
     setViewportElement,
@@ -207,6 +208,11 @@ function MessageScrollerViewport({
 
     const observer = new ResizeObserver(() => {
       window.cancelAnimationFrame(frame)
+
+      if (followEndBeforePaint()) {
+        return
+      }
+
       frame = window.requestAnimationFrame(handleResize)
     })
 
@@ -216,7 +222,7 @@ function MessageScrollerViewport({
       window.cancelAnimationFrame(frame)
       observer.disconnect()
     }
-  }, [handleResize, viewportRef])
+  }, [followEndBeforePaint, handleResize, viewportRef])
 
   return (
     <div
@@ -244,8 +250,13 @@ function MessageScrollerContent({
   spacerClassName,
   ...props
 }: MessageScrollerContentProps) {
-  const { handleContentChange, handleResize, setContentElement, setSpacerElement } =
-    useMessageScrollerContext()
+  const {
+    followEndBeforePaint,
+    handleContentChange,
+    handleResize,
+    setContentElement,
+    setSpacerElement,
+  } = useMessageScrollerContext()
 
   const contentRef = React.useRef<HTMLDivElement | null>(null)
 
@@ -294,6 +305,11 @@ function MessageScrollerContent({
 
     const observer = new ResizeObserver(() => {
       window.cancelAnimationFrame(frame)
+
+      if (followEndBeforePaint()) {
+        return
+      }
+
       frame = window.requestAnimationFrame(handleResize)
     })
 
@@ -303,7 +319,7 @@ function MessageScrollerContent({
       window.cancelAnimationFrame(frame)
       observer.disconnect()
     }
-  }, [handleResize])
+  }, [followEndBeforePaint, handleResize])
 
   return (
     <div
