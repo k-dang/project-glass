@@ -89,6 +89,7 @@ export const workspace = (
     readonly viewedPaths?: ReadonlyArray<string>
     readonly revision?: Revision
     readonly pullRequest?: Partial<ConstructorParameters<typeof PullRequest>[0]>
+    readonly timeline?: PullRequestWorkspace["timeline"]
   } = {},
 ) =>
   new PullRequestWorkspace({
@@ -100,6 +101,6 @@ export const workspace = (
     viewedPaths: changes.viewedPaths ?? [],
     lineReviewThreads: [],
     outdatedReviewThreads: [],
-    timeline: [],
+    timeline: changes.timeline ?? [],
     drafts,
   })
