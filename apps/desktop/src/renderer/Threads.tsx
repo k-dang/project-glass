@@ -33,11 +33,11 @@ import {
 import { cn } from "cn"
 import {
   createContext,
-  type ReactNode,
   type RefObject,
   use,
   useContext,
   useEffect,
+  useLayoutEffect,
   useId,
   useRef,
   useState,
@@ -70,6 +70,7 @@ import { harnessNames } from "./harnesses"
 import { ConfirmationDialog } from "./ConfirmationDialog"
 import { ThreadName } from "./ThreadName"
 import { fadeIn } from "./fadeIn"
+import { useShift } from "./useShift"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { useActions } from "./actions"
@@ -269,9 +270,9 @@ function useArrival<E extends HTMLElement>(animates: boolean) {
   const mounted = use(ListMounted)
   const ref = useRef<E>(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (animates && mounted.current && ref.current !== null)
-      fadeIn(ref.current, { translate: "0 0.375rem" }, 200)
+      fadeIn(ref.current, { translate: "0 -0.375rem" }, 200)
   }, [animates, mounted])
 
   return ref
@@ -285,6 +286,8 @@ function ThreadNav(props: {
   const { settledIds, now } = props
   const shown = props.list.filter((thread) => !thread.forReview)
   const mounted = useRef(false)
+  const nav = useRef<HTMLElement>(null)
+  useShift(nav)
 
   useEffect(() => {
     mounted.current = true
@@ -302,10 +305,10 @@ function ThreadNav(props: {
       {shown.length === 0 ? (
         <p className="px-2 text-sm text-muted-foreground">No Threads yet.</p>
       ) : (
-        <nav aria-label="Threads list" className="flex min-h-full flex-col gap-4">
+        <nav ref={nav} aria-label="Threads list" className="flex min-h-full flex-col gap-4">
           {groupThreads(going).map(({ machine, threads: onMachine }) => (
             <section key={machine} aria-label={groupNames[machine]} className="flex flex-col gap-1">
-              <GroupHeading>{groupNames[machine]}</GroupHeading>
+              <GroupHeading name={groupNames[machine]} />
               <ThreadRows threads={onMachine} now={now} settled={false} />
             </section>
           ))}
@@ -316,15 +319,16 @@ function ThreadNav(props: {
   )
 }
 
-function GroupHeading(props: { children: ReactNode }) {
+function GroupHeading(props: { name: string }) {
   const ref = useArrival<HTMLHeadingElement>(true)
 
   return (
     <h2
       ref={ref}
+      data-shift-key={`group:${props.name}`}
       className="px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
     >
-      {props.children}
+      {props.name}
     </h2>
   )
 }
@@ -366,7 +370,7 @@ function SettledSection(props: { threads: ReadonlyArray<Thread>; now: Date }) {
       aria-label="Settled"
       className="mt-auto flex flex-col gap-1"
     >
-      <div className="group/settled flex items-center pr-1">
+      <div data-shift-key="settled" className="group/settled flex items-center pr-1">
         <h2 className="min-w-0 flex-1">
           <CollapsibleTrigger className="group/trigger flex w-full items-center gap-1 rounded-sm px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
             Settled
@@ -496,7 +500,7 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
   }
 
   return (
-    <li ref={arrival} className="group/row relative">
+    <li ref={arrival} data-shift-key={thread.id} className="group/row relative">
       <Link
         to="/threads/$threadId"
         params={{ threadId: thread.id }}
