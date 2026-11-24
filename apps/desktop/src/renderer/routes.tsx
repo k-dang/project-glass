@@ -37,8 +37,6 @@ const CheckInPage = lazyRouteComponent(() => import("./CheckInPage"), "CheckInPa
 
 const ThreadsLayout = lazyRouteComponent(() => import("./Threads"), "ThreadsLayout")
 
-const ThreadView = lazyRouteComponent(() => import("./ThreadView"), "ThreadView")
-
 const Inbox = lazyRouteComponent(() => import("./Inbox"), "Inbox")
 
 const NewThread = lazyRouteComponent(() => import("./NewThread"), "NewThread")
@@ -188,8 +186,6 @@ const threadRoute = createRoute({
   getParentRoute: () => threadsRoute,
   path: "$threadId",
   validateSearch: Schema.toStandardSchemaV1(ThreadSearch),
-  loader: preloadLazyPage(ThreadView),
-  component: ThreadPage,
 })
 
 const settingsRoute = createRoute({
@@ -283,20 +279,6 @@ function NewThreadPage() {
   const { repository } = newThreadRoute.useSearch()
 
   return <NewThread repository={repository} />
-}
-
-function ThreadPage() {
-  const { threadId } = threadRoute.useParams()
-  const { view } = threadRoute.useSearch()
-  const navigate = threadRoute.useNavigate()
-
-  return (
-    <ThreadView
-      threadId={threadId}
-      tab={view ?? "chat"}
-      onTabChange={(tab) => void navigate({ search: tab === "changes" ? { view: tab } : {} })}
-    />
-  )
 }
 
 function ToDosPage() {

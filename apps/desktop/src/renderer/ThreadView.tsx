@@ -1,6 +1,7 @@
 import {
   RegistryContext,
   useAtom,
+  useAtomMount,
   useAtomRefresh,
   useAtomSet,
   useAtomValue,
@@ -26,8 +27,19 @@ import {
 import { cn } from "cn"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { ArrowUp, Activity, FileDiff, Globe, MessageCircle, Workflow, X } from "lucide-react"
 import {
+  ArrowUp,
+  Activity as ActivityIcon,
+  FileDiff,
+  Globe,
+  MessageCircle,
+  Workflow,
+  X,
+} from "lucide-react"
+import {
+  Activity,
+  Fragment,
+  memo,
   type ReactNode,
   useCallback,
   useContext,
@@ -60,6 +72,7 @@ import {
 import {
   type ThreadTab,
   threadsAtom,
+  transcriptAtom,
   changeModelAtom,
   changePermissionModeAtom,
   writtenAtom,
@@ -103,6 +116,13 @@ interface ThreadTabs {
 
 const SAVE_DELAY_MS = 400
 
+const KEPT_THREADS = 4
+
+interface KeptThread {
+  readonly id: string
+  readonly tab: ThreadTab
+}
+
 const lastSent = (
   turns: ReadonlyArray<Turn>,
   queued: ReadonlyArray<QueuedMessage>,
@@ -114,34 +134,70 @@ const lastSent = (
   return last === undefined || isNothingUnsent(last) ? null : sentOf(last)
 }
 
-export function ThreadView(props: { threadId: string } & ThreadTabs) {
-  const threads = useAtomValue(threadsAtom)
+function useKeptThreads(shown: KeptThread | null, listed: ReadonlyArray<Thread>) {
+  const [kept, setKept] = useState<ReadonlyArray<KeptThread>>([])
 
-  const thread = Option.getOrNull(AsyncResult.value(threads))?.find(
-    ({ id }) => id === props.threadId,
-  )
-
-  if (thread === undefined)
-    return (
-      <ThreadFrame
-        label="Thread"
-        heading={<h1 className="truncate font-medium">Thread</h1>}
-        details={null}
-      >
-        {AsyncResult.isSuccess(threads) && (
-          <p className="p-6 text-sm text-muted-foreground">
-            This Thread is gone. Pick another Thread or start a new one.
-          </p>
-        )}
-      </ThreadFrame>
+  if (shown !== null && (kept[0]?.id !== shown.id || kept[0].tab !== shown.tab))
+    setKept(
+      [
+        shown,
+        ...kept.filter(({ id }) => id !== shown.id && listed.some((thread) => thread.id === id)),
+      ].slice(0, KEPT_THREADS),
     )
 
+  return kept
+}
+
+export function ThreadViews(props: { threadId: string | null } & ThreadTabs) {
+  const { threadId, tab, onTabChange } = props
+  const threads = useAtomValue(threadsAtom)
+  const listed = Option.getOrElse(AsyncResult.value(threads), () => [])
+  const listedShown = threadId !== null && listed.some(({ id }) => id === threadId)
+  const kept = useKeptThreads(listedShown ? { id: threadId, tab } : null, listed)
+
   return (
-    <OpenThread key={thread.id} thread={thread} tab={props.tab} onTabChange={props.onTabChange} />
+    <>
+      {threadId !== null && !listedShown && (
+        <ThreadFrame
+          label="Thread"
+          heading={<h1 className="truncate font-medium">Thread</h1>}
+          details={null}
+        >
+          {AsyncResult.isSuccess(threads) && (
+            <p className="p-6 text-sm text-muted-foreground">
+              This Thread is gone. Pick another Thread or start a new one.
+            </p>
+          )}
+        </ThreadFrame>
+      )}
+      {kept
+        // WARNING: sorting by recency would move a kept Thread's DOM on a switch, losing its scroll position.
+        .toSorted((a, b) => a.id.localeCompare(b.id))
+        .flatMap(({ id, tab: keptTab }) => {
+          const thread = listed.find((listedThread) => listedThread.id === id)
+
+          return thread === undefined
+            ? []
+            : [
+                <Fragment key={id}>
+                  <KeepTranscript threadId={id} />
+                  <Activity mode={id === threadId ? "visible" : "hidden"}>
+                    <OpenThread thread={thread} tab={keptTab} onTabChange={onTabChange} />
+                  </Activity>
+                </Fragment>,
+              ]
+        })}
+    </>
   )
 }
 
-function OpenThread(props: { thread: Thread } & ThreadTabs) {
+function KeepTranscript(props: { threadId: string }) {
+  useAtomMount(transcriptAtom(props.threadId))
+
+  return null
+}
+
+const OpenThread = memo(function OpenThread(props: { thread: Thread } & ThreadTabs) {
   const { thread, tab, onTabChange } = props
   const atoms = useMemo(() => threadAtoms(thread.id), [thread.id])
   const loaded = AsyncResult.value(useAtomValue(atoms.transcript))
@@ -165,6 +221,15 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
 
   const agentHoldsPage = useAgentHoldsBrowserPage(thread.id)
   const [seenAgentHold, setSeenAgentHold] = useState(false)
+
+  // WARNING: BrowserPane's effects would load an old address over its page when shown again, so hiding the Thread closes it, as leaving a Thread always did.
+  useEffect(
+    () => () => {
+      setPane((current) => (current?.kind === "browser" ? null : current))
+      setSeenAgentHold(false)
+    },
+    [],
+  )
 
   if (agentHoldsPage !== seenAgentHold) {
     setSeenAgentHold(agentHoldsPage)
@@ -350,7 +415,7 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
       </PullRequestPanes>
     </ThreadAtomsContext>
   )
-}
+})
 
 export function TranscriptProblem() {
   const atoms = useThreadAtoms()
@@ -480,7 +545,7 @@ function AgentStatuses(props: { statuses: ReadonlyArray<string> }) {
       >
         {props.statuses.map((status) => (
           <span key={status} className="flex items-center gap-1.5">
-            <Activity aria-hidden className="size-3" />
+            <ActivityIcon aria-hidden className="size-3" />
             {status}
           </span>
         ))}

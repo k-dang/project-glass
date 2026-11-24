@@ -14,11 +14,11 @@ import { Text } from "@tiptap/extension-text"
 import { Placeholder, UndoRedo } from "@tiptap/extensions"
 import { Selection, TextSelection } from "@tiptap/pm/state"
 import { type EditorView } from "@tiptap/pm/view"
-import { EditorContent, useEditor } from "@tiptap/react"
+import { type Content, Editor, EditorContent, type EditorEvents } from "@tiptap/react"
 import { DialogTrigger } from "@ui-sdk/react/dialog"
 import { Predicate } from "effect"
 import { ArrowUp, LoaderCircle, Paperclip, Square, X } from "lucide-react"
-import { memo, type ReactNode, useLayoutEffect, useRef, useState } from "react"
+import { memo, type ReactNode, useEffectEvent, useLayoutEffect, useRef, useState } from "react"
 import { BorderBeam } from "@/components/border-beam/BorderBeam"
 import { InputGroup, InputGroupAddon, InputGroupButton } from "@/components/ui/input-group"
 import { Suggestion, Suggestions } from "@/components/ui/suggestion"
@@ -97,7 +97,37 @@ const takeText = (view: EditorView, data: DataTransfer | null, from: number, to 
   return true
 }
 
-export function MessageBox(props: {
+const composerEditor = (content: Content) =>
+  new Editor({
+    extensions,
+    content,
+    onCreate: ({ editor }) => {
+      const { tr, doc } = editor.state
+      editor.view.dispatch(tr.setSelection(Selection.atEnd(doc)).setMeta("addToHistory", false))
+    },
+  })
+
+function useComposerEditor(
+  content: () => Content,
+  onUpdate: (event: EditorEvents["update"]) => void,
+) {
+  const [editor, setEditor] = useState<Editor | null>(null)
+  const initialContent = useEffectEvent(content)
+  const updated = useEffectEvent(onUpdate)
+
+  useLayoutEffect(() => {
+    const created = composerEditor(initialContent())
+    created.on("update", (event) => updated(event))
+    // oxlint-disable-next-line react/set-state-in-effect -- An editor made during render would leak when React discards that render, and it has to show before paint.
+    setEditor(created)
+
+    return () => created.destroy()
+  }, [])
+
+  return editor
+}
+
+type MessageBoxProps = {
   composed: SentMessage
   setComposed: (update: (current: SentMessage) => SentMessage) => void
   label: string
@@ -119,27 +149,28 @@ export function MessageBox(props: {
   pickers?: ReactNode
   suggestions?: ReadonlyArray<ComposerSuggestion>
   children?: ReactNode
-}) {
-  const { composed, setComposed } = props
+}
+
+export function MessageBox(props: MessageBoxProps) {
+  const { setComposed } = props
+
+  const editor = useComposerEditor(
+    () => toContent(props.composed.message),
+    ({ editor: updated }) => {
+      const message = toMessage(updated.state.doc.content)
+      setComposed((current) => ({ ...current, message }))
+    },
+  )
+
+  return editor !== null && <ComposerBox {...props} editor={editor} />
+}
+
+function ComposerBox(props: MessageBoxProps & { editor: Editor }) {
+  const { composed, setComposed, editor } = props
   const sending = useRef(false)
   const fileInput = useRef<HTMLInputElement>(null)
   const [viewer] = useState(createImageViewer)
   const [awaiting, setAwaiting] = useState(false)
-
-  const [content] = useState(() => toContent(composed.message))
-
-  const editor = useEditor({
-    extensions,
-    content,
-    onCreate: ({ editor: created }) => {
-      const { tr, doc } = created.state
-      created.view.dispatch(tr.setSelection(Selection.atEnd(doc)).setMeta("addToHistory", false))
-    },
-    onUpdate: (event) => {
-      const message = toMessage(event.editor.state.doc.content)
-      setComposed((current) => ({ ...current, message }))
-    },
-  })
 
   const mentions = useMentionPicker(editor, !props.textOnly, props.files ?? noFiles)
   const commands = useCommandPicker(editor, props.commands ?? noCommands)
