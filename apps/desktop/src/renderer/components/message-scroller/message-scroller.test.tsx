@@ -798,6 +798,37 @@ describe("MessageScroller", () => {
     expect(rendered.button().dataset.active).toBe("true")
   })
 
+  it("anchors a new turn when the reader wheeled at the end without leaving it", async () => {
+    const rendered = await renderTestScroller({
+      autoScroll: true,
+      messages: [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+      ],
+    })
+
+    expect(rendered.viewport().scrollTop).toBe(140)
+
+    // Wheeling down at the end scrolls nothing, so no scroll event follows.
+    await act(async () => {
+      rendered.viewport().dispatchEvent(new WheelEvent("wheel", { bubbles: true }))
+      await flushAnimationFrames()
+    })
+
+    await rendered.rerender(
+      [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+        { id: "message-4", height: 40, scrollAnchor: true },
+      ],
+      { autoScroll: true },
+    )
+
+    expect(rendered.message("message-4").getBoundingClientRect().top).toBe(64)
+  })
+
   it("releases follow-bottom on a bare scroll-away so later resizes do not snap back", async () => {
     const rendered = await renderTestScroller({
       autoScroll: true,
