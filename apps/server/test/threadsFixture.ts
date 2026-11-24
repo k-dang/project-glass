@@ -14,7 +14,7 @@ import {
   localPlace,
   type Turn,
 } from "@glass/contracts"
-import { Effect, Exit, Option, Predicate, type Schema, Scope, Stream } from "effect"
+import { Effect, Exit, Option, Predicate, Schema, Scope, Stream } from "effect"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -266,3 +266,13 @@ export const glassCalls = (turn: Turn | undefined) =>
   turn?.parts.flatMap((part) =>
     Predicate.isTagged(part, "ToolCall") ? [{ status: part.status, output: part.output }] : [],
   )
+
+const decodeResult = Schema.decodeUnknownSync(
+  Schema.fromJsonString(Schema.Tuple([Schema.Struct({ text: Schema.String })])),
+)
+
+export const calledBy = (turn: Turn | undefined) => {
+  const [called] = glassCalls(turn) ?? []
+
+  return { status: called?.status, text: decodeResult(called?.output)[0].text }
+}

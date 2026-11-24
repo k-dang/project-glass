@@ -13,9 +13,9 @@ import {
 } from "@glass/contracts"
 import { Effect, Option, Predicate, Schema, Stream } from "effect"
 import {
+  calledBy,
   glassCall,
   threadsFixture,
-  glassCalls,
   holding,
   repository,
   settled,
@@ -345,16 +345,6 @@ describe("Glass's Agent review tools over MCP", () => {
     }),
   )
 })
-
-const decodeResult = Schema.decodeUnknownSync(
-  Schema.fromJsonString(Schema.Tuple([Schema.Struct({ text: Schema.String })])),
-)
-
-const calledBy = (turn: Turn | undefined) => {
-  const [called] = glassCalls(turn) ?? []
-
-  return { status: called?.status, text: decodeResult(called?.output)[0].text }
-}
 
 const callsIn = (turns: ReadonlyArray<Turn>) =>
   turns.filter(({ message }) => message.startsWith("call:"))

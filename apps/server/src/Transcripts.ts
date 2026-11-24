@@ -1216,6 +1216,7 @@ export class Transcripts extends Context.Service<
               `
               yield* sql`DELETE FROM thread_turn WHERE thread_id = ${threadId}`
               yield* sql`DELETE FROM thread_queued_message WHERE thread_id = ${threadId}`
+              yield* sql`DELETE FROM visualization WHERE thread_id = ${threadId}`
             }).pipe(sql.withTransaction),
           )
           statuses.delete(threadId)

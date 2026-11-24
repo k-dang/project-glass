@@ -13,6 +13,16 @@ import { checksLabels, closedLabel, mergedLabel, StatusIcon, type StatusLabel } 
 
 export const PullRequestPanes = createContext<((pullRequest: PullRequestRef) => void) | null>(null)
 
+export const useOpenPullRequest = () => {
+  const navigate = useNavigate()
+  const openPane = use(PullRequestPanes)
+
+  return (pullRequest: PullRequestRef) =>
+    openPane === null
+      ? void navigate({ to: "/reviews/$owner/$repo/$number", params: pullRequest })
+      : openPane(pullRequest)
+}
+
 export const useThreadPullRequest = (threadId: string) =>
   Option.getOrUndefined(AsyncResult.value(useAtomValue(threadPullRequestsAtom)))?.get(threadId)
 
@@ -40,8 +50,7 @@ export function PullRequestLink({
   children,
   ...props
 }: ComponentProps<"a"> & { href: string; pullRequest: PullRequestRef }) {
-  const navigate = useNavigate()
-  const openPane = use(PullRequestPanes)
+  const openPullRequest = useOpenPullRequest()
   const preloadOnHover = usePreloadOnHover(pullRequest)
 
   return (
@@ -58,10 +67,7 @@ export function PullRequestLink({
         if (opensInBrowser) return
 
         event.preventDefault()
-
-        if (openPane !== null) return openPane(pullRequest)
-
-        void navigate({ to: "/reviews/$owner/$repo/$number", params: pullRequest })
+        openPullRequest(pullRequest)
       }}
     >
       {children}

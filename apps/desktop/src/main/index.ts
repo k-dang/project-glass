@@ -14,6 +14,7 @@ import {
   RESOURCE_USAGE_CHANNEL,
   SET_APPEARANCE_CHANNEL,
   THREAD_FILE_SCHEME,
+  VISUALIZATION_SCHEME,
   type Appearance,
 } from "@glass/contracts/desktop"
 import type { Theme } from "@glass/contracts"
@@ -33,7 +34,7 @@ import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import { join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
-import { setUpBrowserPanes } from "./browserPanes"
+import { keepVisualizationsOffThisDevice, setUpBrowserPanes } from "./browserPanes"
 import { dogfoodReportWriter } from "./dogfoodReports"
 import { summarizeResourceUsage } from "./resourceUsage"
 
@@ -71,6 +72,7 @@ const CONTENT_SECURITY_POLICY = [
   "img-src 'self' data: https://github.com https://*.githubusercontent.com",
   "media-src https://github.com https://*.githubusercontent.com",
   "connect-src ws://127.0.0.1:*",
+  `frame-src ${VISUALIZATION_SCHEME}:`,
   "object-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
@@ -82,6 +84,7 @@ protocol.registerSchemesAsPrivileged([
     scheme: THREAD_FILE_SCHEME,
     privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
   },
+  { scheme: VISUALIZATION_SCHEME, privileges: { standard: true, secure: true } },
 ])
 
 const serveRenderer = () =>
@@ -348,6 +351,19 @@ void app.whenReady().then(() => {
 
       return fetch(threadFileUrl(endpoint, threadId, pathname))
     },
+  })
+  keepVisualizationsOffThisDevice()
+  protocol.handle(VISUALIZATION_SCHEME, async (request) => {
+    const [{ visualizationUrl }, endpoint] = await Promise.all([
+      import("./backend"),
+      backendReady.promise,
+    ])
+
+    try {
+      return await fetch(visualizationUrl(endpoint, new URL(request.url).hostname))
+    } catch {
+      return new Response("Glass's backend isn't answering", { status: 503 })
+    }
   })
   createWindow()
   app.on("activate", () => {

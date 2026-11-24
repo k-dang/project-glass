@@ -104,6 +104,8 @@ export const PAGE_STATE_CHANNEL = "glass:page-state"
 
 export const THREAD_FILE_SCHEME = "glass-file"
 
+export const VISUALIZATION_SCHEME = "glass-visualization"
+
 const LOOPBACK_HOST =
   /^(?:localhost|.+\.localhost|127\.\d+\.\d+\.\d+|0\.0\.0\.0|\[::1?\]|\[::ffff:7f[\da-f]{2}:[\da-f]{1,4}\])$/i
 

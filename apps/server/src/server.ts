@@ -15,6 +15,8 @@ import { Checkouts } from "./Checkouts"
 import { CompleteToDosOnMerge } from "./CompleteToDosOnMerge"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { ThreadFileRoutes } from "./threadFilesHttp"
+import { VisualizationRoutes } from "./visualizationsHttp"
+import { Visualizations } from "./Visualizations"
 import { Threads } from "./Threads"
 import { ThreadTurns } from "./ThreadTurns"
 import { FeedbackNotes } from "./FeedbackNotes"
@@ -63,6 +65,7 @@ const RendererRoutes = Layer.mergeAll(
   RpcServer.layerHttp({ group: GlassRpcs, path: RPC_PATH, protocol: "websocket" }),
   HttpRouter.add("GET", "/health", HttpServerResponse.empty()),
   ThreadFileRoutes,
+  VisualizationRoutes,
 ).pipe(Layer.provide(RendererAccess.layer))
 
 // WARNING: server.close only drops the connections idle when it is called. One still answering stays open until its client lets go, so drop each as its response ends.
@@ -138,7 +141,7 @@ const services = (
       Layer.provide(Tours.layer),
       Layer.provide(AgentReviews.layer),
       Layer.provide(Asks.layer),
-      Layer.provideMerge(ThreadsLive),
+      Layer.provideMerge(Visualizations.layer.pipe(Layer.provideMerge(ThreadsLive))),
       Layer.provideMerge(SkillPacks.layer),
       Layer.provideMerge(LocalSkills.layer),
       Layer.provide(Plugins.layer),
