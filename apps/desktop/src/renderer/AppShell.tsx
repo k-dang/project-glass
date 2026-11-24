@@ -49,7 +49,7 @@ import {
   TitleStripResourceUsage,
   titleStripResourceUsageAtom,
 } from "./ResourceUsage"
-import { ShellPanelSlot } from "./shellPanelSlot"
+import { ShellPanelSlot, ShellTitleSlot } from "./shellPanelSlot"
 import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog"
 import { useAppearance } from "./theme"
 
@@ -250,6 +250,12 @@ function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
     Object.assign(document.createElement("div"), { className: "contents" }),
   )
 
+  const [titleSlot] = useState(() =>
+    Object.assign(document.createElement("div"), {
+      className: "flex min-w-0 flex-1 items-center gap-2 pl-2 pr-3 text-sm",
+    }),
+  )
+
   return (
     <div className="flex min-h-0 flex-1 bg-chrome">
       <aside className="flex w-14 shrink-0 flex-col items-center gap-2 pb-3">
@@ -272,10 +278,18 @@ function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="title-strip title-strip-clear-controls flex shrink-0 items-center pl-[max(0px,calc(env(titlebar-area-x,0px)-3.5rem))]">
           <HistoryNav />
+          <div
+            ref={(node) => {
+              if (node !== null && titleSlot.parentNode !== node) node.append(titleSlot)
+            }}
+            className="contents"
+          />
           {showsResourceUsage && <TitleStripResourceUsage />}
         </div>
         <div className="mr-2 mb-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
-          <ShellPanelSlot value={panelSlot}>{props.children}</ShellPanelSlot>
+          <ShellPanelSlot value={panelSlot}>
+            <ShellTitleSlot value={titleSlot}>{props.children}</ShellTitleSlot>
+          </ShellPanelSlot>
         </div>
       </div>
     </div>

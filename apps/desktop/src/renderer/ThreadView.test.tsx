@@ -823,6 +823,23 @@ it("keeps a Thread as the user left it when they come back to it from another Th
   expect(composer.textContent).toBe("Half a thought")
 })
 
+it("names the shown Thread in the Inset title strip, never one kept in the background", async () => {
+  localStorage.setItem("glass.layout", "inset")
+  onTestFinished(() => localStorage.removeItem("glass.layout"))
+  const other = new Thread({ ...threadFields, id: "agent-2", name: "agent/calm-heron" })
+  const user = mount({ WatchThreads: () => Stream.make([thread, other]) })
+  await screen.findByRole("heading", { name: thread.name })
+
+  await user.click(screen.getByRole("link", { name: other.name }))
+  await screen.findByRole("heading", { name: other.name })
+  expect(screen.queryByRole("heading", { name: thread.name })).toBeNull()
+  expect(
+    within(screen.getByRole("region", { name: other.name })).queryByRole("heading", {
+      name: other.name,
+    }),
+  ).toBeNull()
+})
+
 it("floats a Thread's details over its chat on a wide window, until the user hides them", async () => {
   const { happyDOM } = window
   const width = window.innerWidth
