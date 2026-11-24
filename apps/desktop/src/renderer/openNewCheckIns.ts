@@ -1,7 +1,7 @@
 import { CheckIn } from "@glass/contracts"
 import { Schema } from "effect"
 import { AsyncResult, type AtomRegistry } from "effect/reactivity"
-import { watchedNeedsYouAtom } from "./needsYou"
+import { watchedInboxAtom } from "./inboxArea"
 
 export const openNewCheckIns = (
   registry: AtomRegistry.AtomRegistry,
@@ -10,11 +10,11 @@ export const openNewCheckIns = (
   let known: ReadonlySet<string> | null = null
 
   registry.subscribe(
-    watchedNeedsYouAtom,
-    (needsYou) => {
-      if (!AsyncResult.isSuccess(needsYou)) return
+    watchedInboxAtom,
+    (inbox) => {
+      if (!AsyncResult.isSuccess(inbox)) return
 
-      const ids = needsYou.value.filter(Schema.is(CheckIn)).map(({ id }) => id)
+      const ids = inbox.value.filter(Schema.is(CheckIn)).map(({ id }) => id)
       const arrived = known === null ? [] : ids.filter((id) => !known?.has(id))
       known = new Set(ids)
 

@@ -1,41 +1,41 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   AllowRequest,
-  type NeedsYouGroup,
-  type NeedsYouItem,
-  needsYouGroupOf,
-  needsYouGroups,
+  type InboxGroup,
+  type InboxItem,
+  inboxGroupOf,
+  inboxGroups,
 } from "@glass/contracts"
 import { cn } from "cn"
-import { Match, Option } from "effect"
+import { Match } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { Listbox, ListboxItem, ListboxItemIcon } from "@ui-sdk/react/listbox"
 import { ChevronDown, Inbox as InboxIcon } from "lucide-react"
 import { type ReactNode, useEffect, useState } from "react"
 import { ThreadRequest, answerRequestAtom } from "./threadsArea"
+import { InboxHeadingCount } from "./InboxCount"
 import { InboxDetail } from "./InboxDetail"
 import {
   contextOf,
   firstPermission,
   groupLooks,
   type InboxAction,
+  inboxItemKey,
   inboxKeys,
   ItemIcon,
   Reasons,
+  reviewDoneOf,
   titleOf,
+  turnSeenOf,
   Waited,
 } from "./inboxItem"
 import {
   markDoneAtom,
   markTurnSeenAtom,
-  needsYouCount,
-  needsYouKey,
-  type NeedsYouResult,
-  needsYouStreamAtom,
-  reviewDoneOf,
-  turnSeenOf,
-  watchedNeedsYouAtom,
-} from "./needsYou"
+  type InboxResult,
+  inboxStreamAtom,
+  watchedInboxAtom,
+} from "./inboxArea"
 import { ProblemAlert } from "./ProblemAlert"
 import { streamProblem } from "./problems"
 import { readAgentReviewOnOpenAtom } from "./reviewsArea"
@@ -81,25 +81,15 @@ export function useMinuteClock() {
   return now
 }
 
-function InboxCount(props: { status: NeedsYouResult }) {
-  const count = needsYouCount(props.status)
-
-  if (Option.isNone(count)) return null
-
-  return <span className="font-normal text-muted-foreground">{count.value}</span>
-}
-
 interface GroupRows {
-  readonly group: NeedsYouGroup
-  readonly rows: ReadonlyArray<NeedsYouItem>
+  readonly group: InboxGroup
+  readonly rows: ReadonlyArray<InboxItem>
 }
 
-function InboxRows(props: { status: NeedsYouResult; onRetry: () => void; children: ReactNode }) {
+function InboxRows(props: { status: InboxResult; onRetry: () => void; children: ReactNode }) {
   return AsyncResult.match(props.status, {
     onInitial: () => (
-      <output className="block px-4 py-3 text-sm text-muted-foreground">
-        Loading what needs you…
-      </output>
+      <output className="block px-4 py-3 text-sm text-muted-foreground">Loading…</output>
     ),
     onFailure: ({ cause }) => (
       <div className="px-4 py-3">
@@ -121,10 +111,10 @@ function InboxRows(props: { status: NeedsYouResult; onRetry: () => void; childre
 function InboxGroups(props: {
   groups: ReadonlyArray<GroupRows>
   selectedKey: string | null
-  folded: ReadonlySet<NeedsYouGroup>
+  folded: ReadonlySet<InboxGroup>
   now: Date
   onPick: (key: string) => void
-  onFold: (group: NeedsYouGroup) => void
+  onFold: (group: InboxGroup) => void
 }) {
   return props.groups.map(({ group, rows }) => {
     const open = !props.folded.has(group)
@@ -159,7 +149,7 @@ function InboxGroups(props: {
             className="px-2 outline-none"
           >
             {rows.map((item) => (
-              <InboxRow key={needsYouKey(item)} item={item} now={props.now} />
+              <InboxRow key={inboxItemKey(item)} item={item} now={props.now} />
             ))}
           </Listbox>
         )}
@@ -168,13 +158,13 @@ function InboxGroups(props: {
   })
 }
 
-function InboxRow(props: { item: NeedsYouItem; now: Date }) {
+function InboxRow(props: { item: InboxItem; now: Date }) {
   const { item } = props
   const title = titleOf(item)
 
   return (
     <ListboxItem
-      value={needsYouKey(item)}
+      value={inboxItemKey(item)}
       className="grid cursor-default grid-cols-[1rem_minmax(0,1fr)_auto] gap-x-3 gap-y-1 rounded-md px-2 py-2 text-sm outline-none hover:bg-muted/30 focus-visible:ring-2 focus-visible:ring-ring data-[selected]:bg-accent data-[selected]:focus-visible:ring-0"
     >
       <ListboxItemIcon className="row-span-2 mt-0.5">
@@ -195,8 +185,8 @@ function InboxRow(props: { item: NeedsYouItem; now: Date }) {
 }
 
 function InboxPane(props: {
-  status: NeedsYouResult
-  selected: NeedsYouItem | null
+  status: InboxResult
+  selected: InboxItem | null
   actions: ReadonlyArray<InboxAction>
   now: Date
   onReadReview: (pullRequest: string) => void
@@ -218,7 +208,7 @@ function InboxPane(props: {
         </div>
       ) : (
         <InboxDetail
-          key={needsYouKey(props.selected)}
+          key={inboxItemKey(props.selected)}
           item={props.selected}
           now={props.now}
           actions={props.actions}
@@ -228,7 +218,7 @@ function InboxPane(props: {
   })
 }
 
-function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxAction> {
+function useInboxActions(selected: InboxItem | null): ReadonlyArray<InboxAction> {
   const markDone = useAtomSet(markDoneAtom)
   const markTurnSeen = useAtomSet(markTurnSeenAtom)
   const permission = selected === null ? null : firstPermission(selected)
@@ -269,24 +259,24 @@ function useInboxActions(selected: NeedsYouItem | null): ReadonlyArray<InboxActi
 }
 
 export function Inbox() {
-  const status = useAtomValue(watchedNeedsYouAtom)
+  const status = useAtomValue(watchedInboxAtom)
   const now = useMinuteClock()
-  const retry = useAtomRefresh(needsYouStreamAtom)
+  const retry = useAtomRefresh(inboxStreamAtom)
 
   const markReview = useAtomSet(readAgentReviewOnOpenAtom)
-  const [folded, setFolded] = useState<ReadonlySet<NeedsYouGroup>>(new Set())
+  const [folded, setFolded] = useState<ReadonlySet<InboxGroup>>(new Set())
 
   const items = AsyncResult.isSuccess(status) ? status.value : []
 
-  const groups = needsYouGroups.flatMap((group): ReadonlyArray<GroupRows> => {
-    const rows = items.filter((item) => needsYouGroupOf(item) === group)
+  const groups = inboxGroups.flatMap((group): ReadonlyArray<GroupRows> => {
+    const rows = items.filter((item) => inboxGroupOf(item) === group)
 
     return rows.length === 0 ? [] : [{ group, rows }]
   })
 
   const flat = groups.flatMap(({ group, rows }) => (folded.has(group) ? [] : rows))
 
-  const keys = flat.map(needsYouKey)
+  const keys = flat.map(inboxItemKey)
   const order = keys.join("\n")
   const [picked, setPicked] = useAtom(pickedAtom)
 
@@ -303,10 +293,10 @@ export function Inbox() {
   }
 
   const selectedKey = nextRemaining(seen.order === order ? seen.keys : keys, picked, keys)
-  const selected = flat.find((item) => needsYouKey(item) === selectedKey) ?? null
+  const selected = flat.find((item) => inboxItemKey(item) === selectedKey) ?? null
   const actions = useInboxActions(selected)
 
-  const fold = (group: NeedsYouGroup) =>
+  const fold = (group: InboxGroup) =>
     setFolded((last) => {
       const next = new Set(last)
 
@@ -328,7 +318,7 @@ export function Inbox() {
       <div className="flex w-96 shrink-0 flex-col border-r">
         <header className="border-b px-4 py-3">
           <h1 className="text-base font-semibold">
-            Inbox <InboxCount status={status} />
+            Inbox <InboxHeadingCount />
           </h1>
         </header>
         <div className="relative min-h-0 flex-1 overflow-y-auto">

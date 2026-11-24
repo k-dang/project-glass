@@ -18,7 +18,7 @@ What one person needs from a team tool, such as review requests from his teams, 
 ### Many inputs, one list
 
 Work reaches Glass from more than GitHub: issues from a tracker such as Linear belong in the Inbox beside PRs, Check-ins, and To-dos.
-Each new input lands in the existing Needs you list and starts work the existing way, such as a Thread, rather than bringing its own screen.
+Each new input lands in the existing Inbox and starts work the existing way, such as a Thread, rather than bringing its own screen.
 Glass is an interface over other sources of truth, such as GitHub and Linear, never a replacement for them; it keeps only what no other source holds, such as To-dos, Agent reviews, and Threads.
 State stays on the machine it was made on; Glass does not sync between machines.
 

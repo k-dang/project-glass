@@ -4,7 +4,7 @@ import {
   AllowRequest,
   Thread,
   ThreadChanges,
-  ThreadNeedsYou,
+  InboxThread,
   ThreadPullRequest,
   type ThreadPullRequestState,
   DRAW_DIAGRAM_TOOL,
@@ -334,9 +334,9 @@ it("says in the Threads panel how a Turn that finished unseen ended", async () =
 
   mount(
     {
-      WatchNeedsYou: () =>
+      WatchInbox: () =>
         Stream.make([
-          ThreadNeedsYou.make({
+          InboxThread.make({
             thread,
             reasons: [TurnFinished.make({ ended })],
             since: ended.at,
@@ -1317,9 +1317,9 @@ it("marks a Thread waiting on a Permission request, and denies it with a reason 
   const answers: Array<{ requestId: string; answer: RequestAnswer }> = []
 
   const user = mount({
-    WatchNeedsYou: () =>
+    WatchInbox: () =>
       Stream.make([
-        ThreadNeedsYou.make({
+        InboxThread.make({
           thread,
           reasons: [WaitingRequests.make({ requests: [bashRequest] })],
           since: sentAt,

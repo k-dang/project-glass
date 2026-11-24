@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import {
   Thread,
-  ThreadNeedsYou,
+  InboxThread,
   AgentReviewFinished,
   AllowRequest,
   AwaitingReply,
@@ -15,13 +15,13 @@ import {
   LineNote,
   emptyTranscript,
   GitHubConnection,
-  type NeedsYou,
+  type InboxItems,
   OutsideChoice,
   OutsideQuestion,
   OutsideText,
   PermissionRequestPart,
   PullRequest,
-  PullRequestNeedsYou,
+  InboxPullRequest,
   PullRequestRef,
   PullRequestSummary,
   PullRequestWorkspace,
@@ -61,7 +61,7 @@ const bashRequest = PermissionRequestPart.make({
   reason: null,
 })
 
-const waitingThread = ThreadNeedsYou.make({
+const waitingThread = InboxThread.make({
   thread,
   reasons: [WaitingRequests.make({ requests: [bashRequest] })],
   since: ago({ days: 2 }),
@@ -69,7 +69,7 @@ const waitingThread = ThreadNeedsYou.make({
 
 const laterRequest = PermissionRequestPart.make({ ...bashRequest, requestId: "bash-2" })
 
-const laterThread = ThreadNeedsYou.make({
+const laterThread = InboxThread.make({
   thread: new Thread({
     ...threadFields,
     id: "agent-2",
@@ -119,7 +119,7 @@ const summary = (
   })
 
 const finished = (pullRequest: PullRequestSummary, writtenAt: DateTime.Utc) =>
-  PullRequestNeedsYou.make({
+  InboxPullRequest.make({
     pullRequest,
     reasons: [
       AgentReviewFinished.make({
@@ -142,13 +142,13 @@ const finishedDraft = finished(
   ago({ minutes: 12 }),
 )
 
-const needsYouRef = (items: NeedsYou) => Effect.runSync(SubscriptionRef.make(items))
+const inboxRef = (items: InboxItems) => Effect.runSync(SubscriptionRef.make(items))
 
-const setNeedsYou = (needsYou: SubscriptionRef.SubscriptionRef<NeedsYou>, items: NeedsYou) =>
-  Effect.runPromise(SubscriptionRef.set(needsYou, items))
+const setInbox = (inbox: SubscriptionRef.SubscriptionRef<InboxItems>, items: InboxItems) =>
+  Effect.runPromise(SubscriptionRef.set(inbox, items))
 
 const mount = (
-  needsYou: SubscriptionRef.SubscriptionRef<NeedsYou>,
+  inbox: SubscriptionRef.SubscriptionRef<InboxItems>,
   handlers: Partial<Handlers> = {},
   path = "/inbox",
 ) => {
@@ -162,7 +162,7 @@ const mount = (
           testLayer({
             GetConnection: () =>
               Effect.succeed(new GitHubConnection({ login: "kevin", tokenSource: "gh" })),
-            WatchNeedsYou: () => SubscriptionRef.changes(needsYou),
+            WatchInbox: () => SubscriptionRef.changes(inbox),
             WatchTranscript: ({ threadId }) =>
               Stream.make(TranscriptSnapshot.make(transcripts.get(threadId) ?? emptyTranscript)),
             ...handlers,
@@ -195,10 +195,10 @@ afterEach(() => {
 })
 
 it("says nothing needs you in the Inbox, and the Dashboard only links to that count", async () => {
-  const user = mount(needsYouRef([]), {}, "/")
+  const user = mount(inboxRef([]), {}, "/")
 
   const dashboard = await screen.findByRole("main", { name: "Dashboard" })
-  const link = within(dashboard).getByRole("link", { name: "Needs you 0" })
+  const link = within(dashboard).getByRole("link", { name: "Inbox: 0 waiting" })
   expect(within(dashboard).queryByRole("region", { name: "Stopped on you" })).toBeNull()
 
   await user.click(link)
@@ -208,31 +208,31 @@ it("says nothing needs you in the Inbox, and the Dashboard only links to that co
   expect(screen.getAllByText("Nothing needs you right now.").length).toBeGreaterThan(0)
 })
 
-it("keeps a loading or failed Needs you off the empty Inbox", async () => {
-  const user = mount(needsYouRef([]), { WatchNeedsYou: () => Stream.never }, "/")
+it("keeps a loading Inbox from reading as empty", async () => {
+  const user = mount(inboxRef([]), { WatchInbox: () => Stream.never }, "/")
 
   const dashboard = await screen.findByRole("main", { name: "Dashboard" })
-  expect(within(dashboard).getByRole("link", { name: "Needs you" })).toBeTruthy()
-  expect(within(dashboard).queryByRole("link", { name: "Needs you 0" })).toBeNull()
-  expect(screen.queryByRole("link", { name: "Inbox", description: /need you/ })).toBeNull()
+  expect(within(dashboard).getByRole("link", { name: "Open Inbox" })).toBeTruthy()
+  expect(within(dashboard).queryByRole("link", { name: "Inbox: 0 waiting" })).toBeNull()
+  expect(screen.queryByRole("link", { name: "Inbox", description: /waiting/ })).toBeNull()
 
   await user.click(screen.getByRole("link", { name: "Inbox" }))
 
-  expect(await screen.findByText("Loading what needs you…")).toBeTruthy()
+  expect(await screen.findByText("Loading…")).toBeTruthy()
   expect(screen.queryByText("Nothing needs you right now.")).toBeNull()
   expect(screen.getByRole("heading", { name: "Inbox" }).textContent).not.toContain("0")
 })
 
-it("shows a failed Needs you as a failure, not an empty Inbox", async () => {
+it("shows a failed Inbox as a failure, not as empty", async () => {
   const user = mount(
-    needsYouRef([]),
-    { WatchNeedsYou: () => Stream.failCause(Cause.die("Needs you dropped")) },
+    inboxRef([]),
+    { WatchInbox: () => Stream.failCause(Cause.die("Inbox dropped")) },
     "/",
   )
 
   const dashboard = await screen.findByRole("main", { name: "Dashboard" })
-  expect(within(dashboard).queryByRole("link", { name: "Needs you 0" })).toBeNull()
-  expect(within(dashboard).getByRole("link", { name: "Needs you" })).toBeTruthy()
+  expect(within(dashboard).queryByRole("link", { name: "Inbox: 0 waiting" })).toBeNull()
+  expect(within(dashboard).getByRole("link", { name: "Open Inbox" })).toBeTruthy()
 
   await user.click(screen.getByRole("link", { name: "Inbox" }))
 
@@ -248,7 +248,7 @@ it("advances the wait while the Inbox stays open", async () => {
 
   const fresh = finished(summary(ref, "Retry flaky upload", false, openedAt), openedAt)
 
-  mount(needsYouRef([fresh]))
+  mount(inboxRef([fresh]))
 
   expect(await screen.findByText(/Updated now/)).toBeTruthy()
   expect(waitLabels().some((text) => text.includes("now"))).toBe(true)
@@ -262,7 +262,7 @@ it("advances the wait while the Inbox stays open", async () => {
 })
 
 it("groups Threads and finished reviews, and labels a draft", async () => {
-  mount(needsYouRef([waitingThread, finishedReview, finishedDraft]))
+  mount(inboxRef([waitingThread, finishedReview, finishedDraft]))
 
   const stopped = await screen.findByRole("region", { name: "Stopped on you" })
   const reviews = screen.getByRole("region", { name: "Agent reviews to read" })
@@ -276,8 +276,8 @@ it("groups Threads and finished reviews, and labels a draft", async () => {
 
 it("puts a Thread whose Turn finished unseen under Threads that finished, saying how it ended", async () => {
   const user = mount(
-    needsYouRef([
-      ThreadNeedsYou.make({
+    inboxRef([
+      InboxThread.make({
         thread,
         reasons: [
           TurnFinished.make({
@@ -313,8 +313,8 @@ it("works a finished Thread from the Inbox: reads its latest reply, replies, or 
   const seen: Array<{ threadId: string; endedAt: DateTime.Utc }> = []
 
   const user = mount(
-    needsYouRef([
-      ThreadNeedsYou.make({
+    inboxRef([
+      InboxThread.make({
         thread,
         reasons: [TurnFinished.make({ ended: { at: endedAt, ending: TurnDone.make({}) } })],
         since: endedAt,
@@ -362,10 +362,10 @@ it("works a finished Thread from the Inbox: reads its latest reply, replies, or 
 })
 
 it("answers a permission in the detail pane and selects the next item when that one leaves", async () => {
-  const needsYou = needsYouRef([waitingThread, laterThread])
+  const inbox = inboxRef([waitingThread, laterThread])
   const answers: Array<{ threadId: string; requestId: string; answer: RequestAnswer }> = []
 
-  const user = mount(needsYou, {
+  const user = mount(inbox, {
     AnswerRequest: (payload) => Effect.sync(() => void answers.push(payload)),
   })
 
@@ -376,7 +376,7 @@ it("answers a permission in the detail pane and selects the next item when that 
     { threadId: thread.id, requestId: "bash-1", answer: AllowRequest.make({}) },
   ])
 
-  await setNeedsYou(needsYou, [laterThread])
+  await setInbox(inbox, [laterThread])
 
   expect(await screen.findByRole("heading", { name: "agent/quiet-lynx" })).toBeTruthy()
   expect(screen.queryByRole("option", { name: /agent\/swift-otter/ })).toBeNull()
@@ -392,9 +392,9 @@ const outsideQuestion = OutsideQuestion.make({
 
 it("answers an outside question in Stopped on you", async () => {
   const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
-  const needsYou = needsYouRef([outsideQuestion, finishedReview])
+  const inbox = inboxRef([outsideQuestion, finishedReview])
 
-  const user = mount(needsYou, {
+  const user = mount(inbox, {
     AnswerOutsideQuestion: (payload) => Effect.sync(() => void answers.push(payload)),
   })
 
@@ -409,7 +409,7 @@ it("answers an outside question in Stopped on you", async () => {
 
   expect(answers).toEqual([{ id: "ask-1", answer: OutsideChoice.make({ choice: "Ship it" }) }])
 
-  await setNeedsYou(needsYou, [finishedReview])
+  await setInbox(inbox, [finishedReview])
   expect(await screen.findByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
   expect(screen.queryByRole("option", { name: /Ship the retry change/ })).toBeNull()
 })
@@ -436,7 +436,7 @@ it("opens a Check-in's changes on their own page and approves them, with the not
     text: "Rename B",
   })
 
-  const user = mount(needsYouRef([checkIn]), {
+  const user = mount(inboxRef([checkIn]), {
     GetCheckInChanges: () =>
       Effect.succeed(
         new CheckInChanges({ id: "read-1", baseRef: "main", files: [changedFile("greet.ts")] }),
@@ -479,9 +479,9 @@ it("brings Glass to the front on a new Check-in's page, but leaves waiting ones 
   vi.stubGlobal("glass", { bringToFront })
 
   const waiting = checkInOf("check-1", "Retry three times")
-  const needsYou = needsYouRef([waiting])
+  const inbox = inboxRef([waiting])
 
-  mount(needsYou, {
+  mount(inbox, {
     GetCheckInChanges: () =>
       Effect.succeed(
         new CheckInChanges({ id: "read-2", baseRef: "main", files: [changedFile("greet.ts")] }),
@@ -493,7 +493,7 @@ it("brings Glass to the front on a new Check-in's page, but leaves waiting ones 
   expect(within(stopped).getByRole("option", { name: /Retry three times/ })).toBeTruthy()
   expect(bringToFront).not.toHaveBeenCalled()
 
-  await setNeedsYou(needsYou, [waiting, checkInOf("check-2", "Back off longer")])
+  await setInbox(inbox, [waiting, checkInOf("check-2", "Back off longer")])
 
   const page = within(await screen.findByRole("main", { name: "Check-in" }))
   expect(await page.findByText("Back off longer")).toBeTruthy()
@@ -511,9 +511,9 @@ it("starts the next outside question with an empty answer", async () => {
     choices: ["Merge today", "Wait for CI"],
   })
 
-  const needsYou = needsYouRef([typed, chosen])
+  const inbox = inboxRef([typed, chosen])
 
-  const user = mount(needsYou, {
+  const user = mount(inbox, {
     AnswerOutsideQuestion: (payload) => Effect.sync(() => void answers.push(payload)),
   })
 
@@ -525,7 +525,7 @@ it("starts the next outside question with an empty answer", async () => {
   await user.click(
     within(articleOf("Ship the retry change?")).getByRole("button", { name: "Send" }),
   )
-  await setNeedsYou(needsYou, [chosen])
+  await setInbox(inbox, [chosen])
 
   await screen.findByRole("heading", { name: "Merge it today?" })
   const pane = within(articleOf("Merge it today?"))
@@ -542,7 +542,7 @@ it("starts the next outside question with an empty answer", async () => {
 it("allows the selected permission with a", async () => {
   const answers: Array<{ threadId: string; requestId: string; answer: RequestAnswer }> = []
 
-  const user = mount(needsYouRef([waitingThread, finishedReview]), {
+  const user = mount(inboxRef([waitingThread, finishedReview]), {
     AnswerRequest: (payload) => Effect.sync(() => void answers.push(payload)),
   })
 
@@ -558,7 +558,7 @@ it("allows the selected permission with a", async () => {
 it("goes Back from an opened item to the Inbox with that item still selected", async () => {
   const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
 
-  const user = mount(needsYouRef([waitingThread, finishedReview]), {
+  const user = mount(inboxRef([waitingThread, finishedReview]), {
     LoadPullRequest: hold(opened),
   })
 
@@ -579,7 +579,7 @@ it("goes Back from an opened item to the Inbox with that item still selected", a
 it("marks a finished Agent review done with Done or e, naming the review it saw", async () => {
   const done: Array<{ readonly pullRequest: PullRequestRef; readonly writtenAt: DateTime.Utc }> = []
 
-  const user = mount(needsYouRef([finishedReview, finishedDraft]), {
+  const user = mount(inboxRef([finishedReview, finishedDraft]), {
     MarkAgentReviewDone: (payload) => Effect.sync(() => void done.push(payload)),
   })
 
@@ -602,8 +602,8 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
   const readyRef = new PullRequestRef({ owner: "octo-org", repo: "glass", number: 52 })
 
   const user = mount(
-    needsYouRef([
-      PullRequestNeedsYou.make({
+    inboxRef([
+      InboxPullRequest.make({
         pullRequest: summary(mineRef, "Cache the diff", false, ago({ hours: 2 })),
         reasons: [
           ChangesRequested.make({}),
@@ -616,7 +616,7 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
         ],
         since: ago({ hours: 2 }),
       }),
-      PullRequestNeedsYou.make({
+      InboxPullRequest.make({
         pullRequest: summary(readyRef, "Trim the log", false, ago({ hours: 1 })),
         reasons: [ReadyToMerge.make({})],
         since: ago({ hours: 1 }),
@@ -651,7 +651,7 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
 it("opens the pull request and offers its finished Agent review", async () => {
   const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, never, never>> = []
 
-  const user = mount(needsYouRef([finishedReview, finishedDraft]), {
+  const user = mount(inboxRef([finishedReview, finishedDraft]), {
     LoadPullRequest: hold(opened),
   })
 
@@ -672,37 +672,37 @@ it("opens the pull request and offers its finished Agent review", async () => {
   expect(window.location.hash).toBe("#/reviews/octo-org/glass/42")
 })
 
-it("counts what needs you on the Inbox link from another area", async () => {
-  const needsYou = needsYouRef([waitingThread, finishedReview])
+it("counts what waits in the Inbox on its link from another area", async () => {
+  const inbox = inboxRef([waitingThread, finishedReview])
 
-  mount(needsYou, {}, "/to-dos")
+  mount(inbox, {}, "/to-dos")
 
-  expect(await screen.findByRole("link", { name: "Inbox", description: "2 need you" })).toBeTruthy()
-  expect(screen.queryByRole("link", { name: "Dashboard", description: /need you/ })).toBeNull()
+  expect(await screen.findByRole("link", { name: "Inbox", description: "2 waiting" })).toBeTruthy()
+  expect(screen.queryByRole("link", { name: "Dashboard", description: /waiting/ })).toBeNull()
 
-  await setNeedsYou(needsYou, [])
+  await setInbox(inbox, [])
 
   await waitFor(() =>
-    expect(screen.queryByRole("link", { name: "Inbox", description: /need you/ })).toBeNull(),
+    expect(screen.queryByRole("link", { name: "Inbox", description: /waiting/ })).toBeNull(),
   )
   expect(screen.getByRole("link", { name: "Inbox" }).textContent).toBe("")
 })
 
-it("dots the Threads link while a Thread needs you", async () => {
-  const needsYou = needsYouRef([finishedReview])
+it("dots the Threads link while a Thread is in the Inbox", async () => {
+  const inbox = inboxRef([finishedReview])
 
-  mount(needsYou, {}, "/to-dos")
+  mount(inbox, {}, "/to-dos")
 
-  await screen.findByRole("link", { name: "Inbox", description: "1 need you" })
+  await screen.findByRole("link", { name: "Inbox", description: "1 waiting" })
   expect(screen.getByRole("link", { name: "Threads" }).textContent).toBe("")
 
-  await setNeedsYou(needsYou, [waitingThread, finishedReview])
+  await setInbox(inbox, [waitingThread, finishedReview])
 
   expect(
-    await screen.findByRole("link", { name: "Threads", description: "Needs you" }),
+    await screen.findByRole("link", { name: "Threads", description: "In your Inbox" }),
   ).toBeTruthy()
 
-  await setNeedsYou(needsYou, [finishedReview])
+  await setInbox(inbox, [finishedReview])
 
   await waitFor(() => expect(screen.getByRole("link", { name: "Threads" }).textContent).toBe(""))
 })
@@ -736,7 +736,7 @@ it("opens the Agent review when the pull request is still loading", async () => 
   const opened: Array<Held<{ readonly pullRequest: PullRequestRef }, PullRequestWorkspace, never>> =
     []
 
-  const user = mount(needsYouRef([finishedReview]), {
+  const user = mount(inboxRef([finishedReview]), {
     LoadPullRequest: hold(opened),
     ...reviewHandlers,
   })
@@ -753,7 +753,7 @@ it("opens the Agent review when the pull request is still loading", async () => 
 })
 
 it("moves through a group with the arrow keys, Home and End, opening each item", async () => {
-  const user = mount(needsYouRef([finishedReview, finishedDraft]))
+  const user = mount(inboxRef([finishedReview, finishedDraft]))
 
   const reviews = within(await screen.findByRole("listbox", { name: "Agent reviews to read" }))
   const first = reviews.getByRole("option", { name: /Retry flaky upload/ })
@@ -781,7 +781,7 @@ it("runs e on the selected item even when another title starts with E", async ()
     ago({ hours: 2 }),
   )
 
-  const user = mount(needsYouRef([finishedReview, ensure]), {
+  const user = mount(inboxRef([finishedReview, ensure]), {
     MarkAgentReviewDone: (payload) => Effect.sync(() => void done.push(payload)),
   })
 
@@ -793,7 +793,7 @@ it("runs e on the selected item even when another title starts with E", async ()
 
 it("keeps e from jumping to a title starting with E when the selected item has no done", async () => {
   const ensure = OutsideQuestion.make({ ...outsideQuestion, id: "ask-e", question: "Ensure it?" })
-  const user = mount(needsYouRef([waitingThread, ensure]))
+  const user = mount(inboxRef([waitingThread, ensure]))
 
   const waiting = await screen.findByRole("option", { name: /agent\/swift-otter/ })
   await user.click(waiting)

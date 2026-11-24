@@ -32,7 +32,7 @@ export * from "./pageMessages"
 
 export * from "./followedRepository"
 
-export * from "./needsYou"
+export * from "./inbox"
 
 export * from "./outsideAgent"
 

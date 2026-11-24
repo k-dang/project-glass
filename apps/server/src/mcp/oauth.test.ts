@@ -1,6 +1,6 @@
 import { assert, describe, it } from "@effect/vitest"
 import { GlobalChatCaller } from "./McpCredentials"
-import { AskUserAnswered, AskUserResult, type NeedsYou, OutsideText } from "@glass/contracts"
+import { AskUserAnswered, AskUserResult, type InboxItems, OutsideText } from "@glass/contracts"
 import { Effect, Fiber, Option, Predicate, Redacted, Schema, Stream } from "effect"
 import { createHash, randomBytes } from "node:crypto"
 import { request as httpRequest } from "node:http"
@@ -9,7 +9,7 @@ import { join } from "node:path"
 import { isolatedHome, startBackend } from "../../test/harness"
 import { connectMcp, initialize, mcpPost, toolResult } from "../../test/mcpClient"
 
-const outside = (items: NeedsYou) =>
+const outside = (items: InboxItems) =>
   items.filter((item) => Predicate.isTagged(item, "OutsideQuestion"))
 
 const askResult = Schema.decodeUnknownSync(AskUserResult)
@@ -248,7 +248,7 @@ describe("MCP OAuth", () => {
 
       const inFlight = yield* Effect.forkChild(call.response)
 
-      const shown = yield* client.WatchNeedsYou().pipe(
+      const shown = yield* client.WatchInbox().pipe(
         Stream.filter((items) =>
           outside(items).some((item) => item.question === "May I land the retry change?"),
         ),
