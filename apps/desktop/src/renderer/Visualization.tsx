@@ -102,6 +102,7 @@ function VisualizationFrame(props: VisualizationProps) {
 
 export const Visualization = memo(function Visualization(props: VisualizationProps) {
   const [expanded, setExpanded] = useState(false)
+  const dialog = useRef<HTMLDivElement>(null)
 
   return (
     <div className="group/visualization relative">
@@ -116,7 +117,11 @@ export const Visualization = memo(function Visualization(props: VisualizationPro
         <Maximize2 />
       </Button>
       <Dialog open={expanded} onOpenChange={setExpanded}>
-        <DialogContent className="flex max-h-[calc(100vh-4rem)] flex-col gap-3 sm:max-w-5xl">
+        <DialogContent
+          ref={dialog}
+          initialFocus={dialog}
+          className="flex max-h-[calc(100vh-4rem)] flex-col gap-3 sm:max-w-5xl"
+        >
           <DialogTitle>{props.title}</DialogTitle>
           <div className="min-h-0 overflow-y-auto">
             <VisualizationFrame id={props.id} title={props.title} />

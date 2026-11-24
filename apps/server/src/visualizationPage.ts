@@ -80,7 +80,7 @@ const CHART_COLORS = [
 
 const BASE_CSS =
   `:root{color-scheme:light dark;${CHART_COLORS.map(([light, dark], index) => `--chart-${index + 1}:light-dark(${light},${dark});`).join("")}}` +
-  "html{box-sizing:border-box;padding:8px;background:var(--background);color:var(--foreground);font-family:var(--font-ui,system-ui,sans-serif);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;scrollbar-width:none}" +
+  "html{box-sizing:border-box;padding:8px;color:var(--foreground);font-family:var(--font-ui,system-ui,sans-serif);font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased;scrollbar-width:none}" +
   "body{margin:0}code,kbd,pre,samp{font-family:var(--font-code,ui-monospace,monospace)}"
 
 const THEME_STYLE_ID = "glass-visualization-theme"
@@ -139,7 +139,7 @@ export const PAGE_CONTENT_SECURITY_POLICY = [
 ].join("; ")
 
 export const PAGE_GUIDE = [
-  "The page shows inline in the Thread at the reply's width, on the Thread's background with an 8px gutter.",
+  "The page shows inline at the reply's width, on the transcript's own background, with an 8px gutter.",
   "Leave html and body with no background, border, banner title, or side padding. A box that needs its own background gets 16px padding and var(--radius) corners.",
   "Let content set the height: vh units are refused, and height:100% on html or body loops. Give charts fixed pixel heights.",
   `Use the theme's CSS variables, not fixed colors: ${VISUALIZATION_THEME_VARIABLES.join(", ")}, and --chart-1 to --chart-${CHART_COLORS.length}.`,
