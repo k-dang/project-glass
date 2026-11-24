@@ -61,6 +61,7 @@ const hostThatStarts = (
   AnswerRequest: unused("AnswerRequest"),
   Steer: unused("Steer"),
   StopTurn: unused("StopTurn"),
+  StopBackgroundTask: unused("StopBackgroundTask"),
 })
 
 const scriptedHost = (
@@ -85,6 +86,7 @@ const scriptedHost = (
   AnswerRequest: unused("AnswerRequest"),
   Steer: () => (script.steer ?? unused("Steer"))(),
   StopTurn: (request) => (script.stopTurn?.(request) ?? Effect.succeed(null)).pipe(Effect.orDie),
+  StopBackgroundTask: unused("StopBackgroundTask"),
 })
 
 const layer = ThreadTurns.layer.pipe(

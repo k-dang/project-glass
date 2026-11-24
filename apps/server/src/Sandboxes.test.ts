@@ -314,6 +314,19 @@ it.live("deletes a Sandbox still being made when Glass quits, and makes a new on
   }),
 )
 
+it.live("stops one background task of a Thread's agent in its Sandbox, after its Turn ended", () =>
+  Effect.gen(function* () {
+    const f = yield* threadServicesFixture
+    const thread = yield* createSandboxed(f)
+    yield* end(yield* f.started)
+    yield* f.transcript(thread.id, settled(1))
+
+    yield* f.threads.stopBackgroundTask(thread.id, "task-1")
+
+    assert.deepStrictEqual(f.taskStops, [{ threadId: thread.id, taskId: "task-1" }])
+  }),
+)
+
 it.live("Steers and stops a Thread's Turns in its Sandbox, and shows its changes there", () =>
   Effect.gen(function* () {
     const f = yield* threadServicesFixture

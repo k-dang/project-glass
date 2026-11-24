@@ -81,6 +81,7 @@ export const threadServicesFixture = Effect.gen(function* () {
   const started = yield* Queue.unbounded<Started>()
   const answers: Array<{ readonly requestId: string; readonly answer: RequestAnswer }> = []
   const stops: Array<string> = []
+  const taskStops: Array<{ readonly threadId: string; readonly taskId: string }> = []
   const steers: Array<{ readonly threadId: string; readonly message: string }> = []
   const changesAsked: Array<{ readonly folder: string; readonly baseRef: string }> = []
   let changed: ReadonlyArray<ChangedFile> = []
@@ -130,6 +131,10 @@ export const threadServicesFixture = Effect.gen(function* () {
           steer: ({ message }) =>
             Effect.sync(() => {
               steers.push({ threadId: thread, message })
+            }),
+          stopBackgroundTask: (taskId) =>
+            Effect.sync(() => {
+              taskStops.push({ threadId: thread, taskId })
             }),
           stopTurn: () =>
             Effect.sync(() => {
@@ -326,6 +331,7 @@ export const threadServicesFixture = Effect.gen(function* () {
     ...running,
     answers,
     stops,
+    taskStops,
     starts,
     steers,
     sandboxes,

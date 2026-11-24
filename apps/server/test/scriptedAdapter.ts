@@ -252,6 +252,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
             }),
           steer: (message) =>
             turn === null ? notRunning : Effect.sync(() => void turn!.steers.push(message)),
+          stopBackgroundTask: () => Effect.void,
           stopTurn: (turnId, ending) =>
             Effect.gen(function* () {
               if (turn === null || turn.id !== turnId) return null

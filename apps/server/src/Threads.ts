@@ -255,6 +255,10 @@ export class Threads extends Context.Service<
       noteId: string,
     ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
     readonly stop: (threadId: string) => Effect.Effect<void, ThreadNotFound | ThreadError>
+    readonly stopBackgroundTask: (
+      threadId: string,
+      taskId: string,
+    ) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly reachSandbox: (threadId: string) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly unsent: (threadId: string) => Effect.Effect<SentMessage, ThreadNotFound | ThreadError>
     readonly saveUnsent: (
@@ -792,6 +796,13 @@ export class Threads extends Context.Service<
         yield* turns.stop(threadOf(yield* find(threadId)))
       })
 
+      const stopBackgroundTask = Effect.fn("Threads.stopBackgroundTask")(function* (
+        threadId: string,
+        taskId: string,
+      ) {
+        yield* turns.stopBackgroundTask(threadOf(yield* find(threadId)), taskId)
+      })
+
       const unsent = Effect.fn("Threads.unsent")(function* (threadId: string) {
         yield* find(threadId)
 
@@ -1048,6 +1059,7 @@ export class Threads extends Context.Service<
           ),
         sendQueued,
         stop,
+        stopBackgroundTask,
         reachSandbox: (threadId) => prepareHostOf(threadId).pipe(Effect.asVoid),
         unsent,
         saveUnsent,

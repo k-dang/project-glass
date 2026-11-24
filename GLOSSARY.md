@@ -240,8 +240,8 @@ when background work reports back.
 _Avoid_: Run, execution, exchange
 
 **Agent status**:
-A short line about what a Thread's agent has going besides its Turn, such as background
-subagents or commands.
+A short line about what a Thread's agent has going besides its Turn, such as a background
+subagent or command, which the user can stop from that line.
 _Avoid_: Extension status, widget, banner
 
 **Diagram**:

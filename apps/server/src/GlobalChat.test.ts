@@ -321,6 +321,7 @@ const stallableHost = (calls: {
             AnswerRequest: () => Effect.die("This test does not call AnswerRequest"),
             Steer: () => Effect.die("This test does not call Steer"),
             StopTurn: () => calls.stopTurn(),
+            StopBackgroundTask: () => Effect.die("This test does not call StopBackgroundTask"),
             StopThread: () => calls.stopThread?.() ?? Effect.void,
             GetChanges: () => Effect.die("This test does not call GetChanges"),
             HasUncommittedChanges: () =>

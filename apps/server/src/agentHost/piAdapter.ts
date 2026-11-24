@@ -573,6 +573,8 @@ export const piAdapter = (command: string) =>
 
             return yield* new HostThreadError({ message: "pi didn't take the message in." })
           }),
+          stopBackgroundTask: () =>
+            Effect.fail(new HostThreadError({ message: "pi has no background tasks to stop." })),
           stopTurn: (turnId, ending) =>
             Effect.gen(function* () {
               const steers = yield* turns.stop(turnId, ending)

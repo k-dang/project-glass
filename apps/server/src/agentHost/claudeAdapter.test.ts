@@ -22,6 +22,7 @@ it.live("reports a failed SDK handshake as a host error and closes the query", (
       setPermissionMode: async () => {},
       applyFlagSettings: async () => {},
       interrupt: async () => undefined,
+      stopTask: async () => {},
     }
 
     const failed = yield* claudeAdapter("claude-test", {
@@ -57,6 +58,7 @@ it.live("gives a Work Thread Glass's tools and how to use them only when it has 
       setPermissionMode: async () => {},
       applyFlagSettings: async () => {},
       interrupt: async () => undefined,
+      stopTask: async () => {},
     }
 
     const adapter = claudeAdapter("claude-test", {
@@ -126,6 +128,7 @@ const stoppableTurn = Effect.fnUntraced(function* () {
     // SAFETY: Claude Code's interrupt answers with the queued messages it cancelled, which the SDK's types leave out.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above.
     interrupt: interrupt as unknown as ClaudeQuery["interrupt"],
+    stopTask: async () => {},
   }
 
   const session = yield* claudeAdapter("claude-test", {

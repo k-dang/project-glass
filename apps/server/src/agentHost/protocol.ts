@@ -56,7 +56,7 @@ export const JournalEntry = Schema.Struct({
 export type JournalEntry = typeof JournalEntry.Type
 
 // WARNING: Raise HOST_PROTOCOL when an AgentHostRpcs change breaks talking to a previous host; Sandboxes keep hosts running across upgrades.
-export const HOST_PROTOCOL = 3
+export const HOST_PROTOCOL = 4
 
 // WARNING: Glass asks hosts of every version for Hello, so its shape must never change.
 export const Hello = Rpc.make("Hello", {
@@ -221,6 +221,10 @@ export class AgentHostRpcs extends RpcGroup.make(
   Rpc.make("StopTurn", {
     payload: { threadId: Schema.String, turnId: Schema.String },
     success: Schema.NullOr(SteersNotTakenIn),
+  }),
+  Rpc.make("StopBackgroundTask", {
+    payload: { threadId: Schema.String, taskId: Schema.String },
+    error: HostThreadError,
   }),
   Rpc.make("StopThread", { payload: { threadId: Schema.String } }),
   Rpc.make("GetChanges", {

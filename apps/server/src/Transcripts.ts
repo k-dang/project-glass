@@ -324,8 +324,7 @@ export class Transcripts extends Context.Service<
         withThread(
           threadId,
           Effect.suspend(() => {
-            const cleared =
-              shown.agentStatuses.length === 0 && shown.backgroundToolCalls.length === 0
+            const cleared = shown.agentStatuses.length === 0 && shown.backgroundTasks.length === 0
 
             if (cleared && !agentStatuses.has(threadId)) return Effect.void
 
@@ -856,7 +855,7 @@ export class Transcripts extends Context.Service<
           queued: yield* queued(threadId),
           status: statuses.get(threadId) ?? null,
           agentStatuses: agentStatuses.get(threadId)?.agentStatuses ?? [],
-          backgroundToolCalls: agentStatuses.get(threadId)?.backgroundToolCalls ?? [],
+          backgroundTasks: agentStatuses.get(threadId)?.backgroundTasks ?? [],
         })
       })
 

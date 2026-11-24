@@ -540,6 +540,10 @@ export class GlassRpcs extends RpcGroup.make(
     payload: { threadId: Schema.String },
     error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
+  Rpc.make("StopBackgroundTask", {
+    payload: { threadId: Schema.String, taskId: Schema.String },
+    error: Schema.Union([ThreadNotFound, ThreadError]),
+  }),
   Rpc.make("ReachSandbox", {
     payload: { threadId: Schema.String },
     error: Schema.Union([ThreadNotFound, ThreadError]),

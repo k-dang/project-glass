@@ -17,7 +17,7 @@ import {
   type AgentCommand,
   type AgentModel,
   AgentModels,
-  type AgentStatusesChanged,
+  AgentStatusesChanged,
   QuestionPart,
   type QuestionReply,
   type RequestAnswer,
@@ -28,6 +28,7 @@ import {
   withContextOf,
 } from "@glass/contracts"
 import {
+  DateTime,
   Deferred,
   Effect,
   FiberSet,
@@ -98,6 +99,7 @@ export interface ClaudeQuery extends AsyncIterable<SDKMessage> {
   readonly setPermissionMode: Query["setPermissionMode"]
   readonly applyFlagSettings: Query["applyFlagSettings"]
   readonly interrupt: Query["interrupt"]
+  readonly stopTask: Query["stopTask"]
 }
 
 export interface ClaudeSdk {
@@ -293,8 +295,7 @@ const interruptAll = (session: ClaudeQuery) =>
     Effect.orElseSucceed((): ReadonlyArray<string> => []),
   )
 
-const sameStrings = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) =>
-  a.length === b.length && a.every((value, index) => value === b[index])
+const sameActivity = Schema.toEquivalence(AgentStatusesChanged)
 
 const control = (what: "model" | "effort" | "Permission mode", call: () => Promise<void>) =>
   Effect.tryPromise(call).pipe(
@@ -486,11 +487,7 @@ export const claudeAdapter = (
 
     const show = (activity: AgentStatusesChanged) =>
       Effect.suspend(() => {
-        if (
-          sameStrings(activity.agentStatuses, shown.agentStatuses) &&
-          sameStrings(activity.backgroundToolCalls, shown.backgroundToolCalls)
-        )
-          return Effect.void
+        if (sameActivity(activity, shown)) return Effect.void
 
         shown = activity
 
@@ -498,8 +495,8 @@ export const claudeAdapter = (
       })
 
     const follow = (message: SDKMessage) =>
-      Effect.suspend(() => {
-        const tracked = trackBackgroundTasks(background, message)
+      Effect.flatMap(DateTime.now, (now) => {
+        const tracked = trackBackgroundTasks(background, message, now)
         background = tracked.tasks
 
         const inputs = [
@@ -572,6 +569,16 @@ export const claudeAdapter = (
 
           return returned.map(withContextOf)
         }),
+      stopBackgroundTask: (taskId) =>
+        Effect.tryPromise(() => session.stopTask(taskId)).pipe(
+          Effect.tapError((cause) =>
+            Effect.logWarning("Claude Code refused to stop a background task", cause),
+          ),
+          Effect.mapError(
+            () =>
+              new HostThreadError({ message: "Claude Code couldn't stop that task. Try again." }),
+          ),
+        ),
       answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
         const asked = waiting.get(requestId)
 
