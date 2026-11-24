@@ -2,6 +2,7 @@
 import {
   ActivityPage,
   AllowRequest,
+  type BackgroundTask,
   Thread,
   ThreadChanges,
   InboxThread,
@@ -927,6 +928,13 @@ it("changes the open Thread's model from the composer, closing the picker", asyn
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
 })
 
+const backgroundTask = (
+  taskId: string,
+  kind: BackgroundTask["kind"],
+  description: string,
+  toolCallId: string,
+): BackgroundTask => ({ taskId, kind, description, toolCallId, startedAt: sentAt })
+
 const call = (toolCallId: string, name: string, parentToolCallId: string | null) =>
   ToolCallPart.make({
     toolCallId,
@@ -1015,8 +1023,7 @@ it("shows a replied Turn still running while its background work runs", async ()
         TranscriptSnapshot.make({
           queued: [],
           status: null,
-          agentStatuses: ["Running a command: Run the tests"],
-          backgroundToolCalls: ["bash-1"],
+          backgroundTasks: [backgroundTask("task-1", "command", "Run the tests", "bash-1")],
           turns: [
             {
               id: "turn-1",
@@ -1045,6 +1052,75 @@ it("shows a replied Turn still running while its background work runs", async ()
   expect(within(transcript).queryByText(/^Done in/)).toBeNull()
 })
 
+it("stops each background task from its own Agent status after the Turn ended", async () => {
+  const stops: Array<{ threadId: string; taskId: string }> = []
+  const stopped = Deferred.makeUnsafe<void>()
+
+  const user = mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          queued: [],
+          status: null,
+          backgroundTasks: [
+            backgroundTask("task-1", "command", "Run the tests", "bash-1"),
+            backgroundTask("task-2", "subagent", "Explore: Trace it", "agent-1"),
+          ],
+          turns: [
+            {
+              id: "turn-1",
+              message: "Test it",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+              parts: [call("bash-1", "Bash", null), call("agent-1", "Agent", null)],
+            },
+          ],
+        }),
+      ).pipe(
+        Stream.concat(
+          Stream.fromEffect(
+            Deferred.await(stopped).pipe(
+              Effect.as(
+                AgentStatusesChanged.make({
+                  agentStatuses: [],
+                  backgroundTasks: [
+                    backgroundTask("task-2", "subagent", "Explore: Trace it", "agent-1"),
+                  ],
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    StopBackgroundTask: (request) =>
+      Effect.sync(() => stops.push(request)).pipe(Effect.andThen(Deferred.await(stopped))),
+  })
+
+  const statuses = await screen.findByRole("list", { name: "Background tasks" })
+  const stopTests = within(statuses).getByRole("button", { name: "Stop Run the tests" })
+  const stopExplore = within(statuses).getByRole("button", { name: "Stop Explore: Trace it" })
+
+  await user.click(stopTests)
+  await user.click(stopExplore)
+
+  await waitFor(() =>
+    expect(stops).toEqual([
+      { threadId: thread.id, taskId: "task-1" },
+      { threadId: thread.id, taskId: "task-2" },
+    ]),
+  )
+  expect(stopTests.textContent).toBe("Stopping…")
+  expect(stopExplore.textContent).toBe("Stopping…")
+
+  Deferred.doneUnsafe(stopped, Exit.void)
+
+  await waitFor(() => expect(within(statuses).queryByText(/Run the tests/)).toBeNull())
+  expect(within(statuses).getByText("Running a subagent: Explore: Trace it")).toBeTruthy()
+})
+
 it("marks a tool call running in the background until its work ends, then continues its Turn with what ended", async () => {
   const ended = Deferred.makeUnsafe<void>()
 
@@ -1054,8 +1130,9 @@ it("marks a tool call running in the background until its work ends, then contin
         TranscriptSnapshot.make({
           queued: [],
           status: null,
-          agentStatuses: ["Running a subagent: general-purpose: Count"],
-          backgroundToolCalls: ["agent-1"],
+          backgroundTasks: [
+            backgroundTask("task-1", "subagent", "general-purpose: Count", "agent-1"),
+          ],
           turns: [
             {
               id: "turn-1",
@@ -1179,7 +1256,9 @@ it("folds subagents started together into one line counting how they stand", asy
         TranscriptSnapshot.make({
           queued: [],
           status: null,
-          backgroundToolCalls: ["agent-1"],
+          backgroundTasks: [
+            backgroundTask("task-1", "subagent", "general-purpose: Review", "agent-1"),
+          ],
           turns: [
             {
               id: "turn-1",

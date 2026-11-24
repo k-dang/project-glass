@@ -233,6 +233,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       SendQueuedMessage: ({ threadId, queuedMessageId }) =>
         threads.sendQueued(threadId, queuedMessageId).pipe(handingBack(threadId)),
       StopTurn: ({ threadId }) => threads.stop(threadId),
+      StopBackgroundTask: ({ threadId, taskId }) => threads.stopBackgroundTask(threadId, taskId),
       ReachSandbox: ({ threadId }) => threads.reachSandbox(threadId),
       GetUnsentMessage: ({ threadId }) => threads.unsent(threadId),
       SaveUnsentMessage: ({ threadId, message, images }) =>

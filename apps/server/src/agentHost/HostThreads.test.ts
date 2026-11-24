@@ -70,6 +70,7 @@ const session = (exit: Deferred.Deferred<void>): HarnessSession => ({
   startTurn: () => Effect.void,
   steer: () => Effect.void,
   stopTurn: () => Effect.succeed(null),
+  stopBackgroundTask: () => Effect.void,
   answer: () => Effect.void,
   closed: Deferred.await(exit),
   stopped: Deferred.isDone(exit),

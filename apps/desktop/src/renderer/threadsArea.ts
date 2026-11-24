@@ -397,6 +397,19 @@ export const stopTurnAtom = Atom.family((threadId: string) =>
   backendRuntime.fn(() => Backend.use((backend) => backend.StopTurn({ threadId }))),
 )
 
+export class ThreadBackgroundTask extends Data.Class<{
+  readonly threadId: string
+  readonly taskId: string
+}> {}
+
+export const stopBackgroundTaskAtom = Atom.family((task: ThreadBackgroundTask) =>
+  backendRuntime.fn(() =>
+    Backend.use((backend) =>
+      backend.StopBackgroundTask({ threadId: task.threadId, taskId: task.taskId }),
+    ),
+  ),
+)
+
 export const reachSandboxAtom = Atom.family((threadId: string) =>
   backendRuntime.fn(() => Backend.use((backend) => backend.ReachSandbox({ threadId }))),
 )

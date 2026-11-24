@@ -94,7 +94,15 @@ export const replyTo = (request: FakeAnthropicRequest): Reply => {
   const command = /`([^`]+)`/.exec(words)?.[1]
 
   if (command !== undefined)
-    return { type: "tool_use", name: "Bash", input: { command, description: `Run ${command}` } }
+    return {
+      type: "tool_use",
+      name: "Bash",
+      input: {
+        command,
+        description: `Run ${command}`,
+        ...(/\bin the background\b/i.test(words) && { run_in_background: true }),
+      },
+    }
 
   if (/\bask\b/i.test(words))
     return {

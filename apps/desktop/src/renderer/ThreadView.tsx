@@ -27,15 +27,7 @@ import {
 import { cn } from "cn"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import {
-  ArrowUp,
-  Activity as ActivityIcon,
-  FileDiff,
-  Globe,
-  MessageCircle,
-  Workflow,
-  X,
-} from "lucide-react"
+import { ArrowUp, FileDiff, Globe, MessageCircle, Workflow, X } from "lucide-react"
 import {
   Activity,
   Fragment,
@@ -50,6 +42,7 @@ import {
 } from "react"
 import { Button } from "@/components/ui/button"
 import { Kbd } from "@/components/ui/kbd"
+import { AgentStatuses } from "./AgentStatuses"
 import { Transcript } from "./Transcript"
 import { BackgroundToolCalls, ToolCallView } from "./TurnParts"
 import { sentFrom } from "./UserMessage"
@@ -440,10 +433,15 @@ export function ThreadChat(props: { thread: Thread; place: "thread" | "inbox" })
   const atoms = useThreadAtoms()
   const loadEarlier = useAtomSet(atoms.loadEarlier)
 
-  const { turns, earlierTurns, queued, status, agentStatuses, backgroundToolCalls } =
-    Option.getOrElse(AsyncResult.value(useAtomValue(atoms.transcript)), () => emptyTranscript)
+  const { turns, earlierTurns, queued, status, agentStatuses, backgroundTasks } = Option.getOrElse(
+    AsyncResult.value(useAtomValue(atoms.transcript)),
+    () => emptyTranscript,
+  )
 
-  const inBackground = useMemo(() => new Set(backgroundToolCalls), [backgroundToolCalls])
+  const inBackground = useMemo(
+    () => new Set(backgroundTasks.flatMap(({ toolCallId }) => toolCallId ?? [])),
+    [backgroundTasks],
+  )
 
   const reach = thread.sandbox?.reach
   const readOnly = isGone(reach) ? goneExplanation(reach) : null
@@ -459,7 +457,7 @@ export function ThreadChat(props: { thread: Thread; place: "thread" | "inbox" })
           latestOnly={props.place === "inbox"}
         />
       </BackgroundToolCalls>
-      <AgentStatuses statuses={agentStatuses} />
+      <AgentStatuses threadId={thread.id} statuses={agentStatuses} tasks={backgroundTasks} />
       {reach === "unreachable" && <UnreachableNotice threadId={thread.id} />}
       {readOnly !== null ? (
         <output
@@ -530,27 +528,6 @@ function WaitingNotice(props: { waiting: RequestPart }) {
         Show it
       </Button>
     </p>
-  )
-}
-
-function AgentStatuses(props: { statuses: ReadonlyArray<string> }) {
-  return (
-    props.statuses.length > 0 && (
-      <output
-        aria-label="Agent statuses"
-        className={cn(
-          threadColumn,
-          "flex w-full flex-wrap gap-x-4 gap-y-1 px-6 pt-2 text-xs text-muted-foreground",
-        )}
-      >
-        {props.statuses.map((status) => (
-          <span key={status} className="flex items-center gap-1.5">
-            <ActivityIcon aria-hidden className="size-3" />
-            {status}
-          </span>
-        ))}
-      </output>
-    )
   )
 }
 

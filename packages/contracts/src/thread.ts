@@ -229,6 +229,16 @@ export const BackgroundWork = Schema.Struct({
 
 export type BackgroundWork = typeof BackgroundWork.Type
 
+export const BackgroundTask = Schema.Struct({
+  taskId: Schema.String,
+  kind: BackgroundWork.fields.kind,
+  description: Schema.String,
+  toolCallId: Schema.NullOr(Schema.String),
+  startedAt: Schema.DateTimeUtcFromString,
+})
+
+export type BackgroundTask = typeof BackgroundTask.Type
+
 export const BackgroundWorkEnded = Schema.TaggedStruct("BackgroundWorkEnded", {
   work: Schema.NonEmptyArray(BackgroundWork),
 })
@@ -467,7 +477,7 @@ export const Transcript = Schema.Struct({
   agentStatuses: Schema.Array(Schema.String).pipe(
     Schema.withConstructorDefault(Effect.succeed([])),
   ),
-  backgroundToolCalls: Schema.Array(Schema.String).pipe(
+  backgroundTasks: Schema.Array(BackgroundTask).pipe(
     Schema.withConstructorDefault(Effect.succeed([])),
   ),
 })
@@ -480,7 +490,7 @@ export const emptyTranscript: Transcript = {
   queued: [],
   status: null,
   agentStatuses: [],
-  backgroundToolCalls: [],
+  backgroundTasks: [],
 }
 
 export const TranscriptSnapshot = Schema.TaggedStruct("Snapshot", Transcript.fields)
@@ -495,7 +505,7 @@ export const StatusChanged = Schema.TaggedStruct("StatusChanged", {
 
 export const AgentStatusesChanged = Schema.TaggedStruct("AgentStatusesChanged", {
   agentStatuses: Transcript.fields.agentStatuses,
-  backgroundToolCalls: Transcript.fields.backgroundToolCalls,
+  backgroundTasks: Transcript.fields.backgroundTasks,
 })
 
 export type AgentStatusesChanged = typeof AgentStatusesChanged.Type
@@ -598,13 +608,13 @@ export const applyTranscriptUpdate = (
   Match.value(update).pipe(
     Match.tag(
       "Snapshot",
-      ({ turns, earlierTurns, queued, status, agentStatuses, backgroundToolCalls }) => ({
+      ({ turns, earlierTurns, queued, status, agentStatuses, backgroundTasks }) => ({
         turns,
         earlierTurns,
         queued,
         status,
         agentStatuses,
-        backgroundToolCalls,
+        backgroundTasks,
       }),
     ),
     Match.tag("EarlierTurns", ({ before, turns, earlierTurns }) =>
@@ -614,10 +624,10 @@ export const applyTranscriptUpdate = (
     ),
     Match.tag("QueuedMessagesChanged", ({ queued }) => ({ ...transcript, queued })),
     Match.tag("StatusChanged", ({ status }) => ({ ...transcript, status })),
-    Match.tag("AgentStatusesChanged", ({ agentStatuses, backgroundToolCalls }) => ({
+    Match.tag("AgentStatusesChanged", ({ agentStatuses, backgroundTasks }) => ({
       ...transcript,
       agentStatuses,
-      backgroundToolCalls,
+      backgroundTasks,
     })),
     Match.orElse((event) => ({
       ...transcript,

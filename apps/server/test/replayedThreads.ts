@@ -49,7 +49,7 @@ const turnStates = (turn: Turn): ReadonlyArray<string> => [
 ]
 
 const uiStates = (events: ReadonlyArray<HostEvent>) => {
-  const { turns, agentStatuses, backgroundToolCalls } = events.reduce(
+  const { turns, agentStatuses, backgroundTasks } = events.reduce(
     applyTranscriptUpdate,
     emptyTranscript,
   )
@@ -57,7 +57,7 @@ const uiStates = (events: ReadonlyArray<HostEvent>) => {
   return new Set([
     ...turns.flatMap(turnStates),
     ...(agentStatuses.length > 0 ? ["agent statuses"] : []),
-    ...(backgroundToolCalls.length > 0 ? ["background tool calls"] : []),
+    ...(backgroundTasks.length > 0 ? ["background tasks"] : []),
   ])
 }
 

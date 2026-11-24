@@ -210,19 +210,20 @@ it.live(
           "When its result comes back, reply with exactly: PONG",
       )
 
-      const running = yield* f.untilActivity(
-        ({ backgroundToolCalls }) => backgroundToolCalls.length > 0,
+      const running = yield* f.untilActivity(({ backgroundTasks }) =>
+        backgroundTasks.some(({ toolCallId }) => toolCallId !== null),
       )
 
       const [started, woken] = yield* f.until(settled(2))
 
       assert.deepStrictEqual(yield* f.statuses, [])
 
-      assert.deepStrictEqual(running.agentStatuses, [
-        "Running a subagent: general-purpose: Write numbers 1 to 400",
-      ])
       assert.deepStrictEqual(
-        running.backgroundToolCalls,
+        running.backgroundTasks.map(({ kind, description }) => ({ kind, description })),
+        [{ kind: "subagent", description: "general-purpose: Write numbers 1 to 400" }],
+      )
+      assert.deepStrictEqual(
+        running.backgroundTasks.flatMap(({ toolCallId }) => toolCallId ?? []),
         started?.parts.flatMap((part) =>
           Predicate.isTagged(part, "ToolCall") && part.name === "Agent" ? [part.toolCallId] : [],
         ),

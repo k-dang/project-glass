@@ -23,6 +23,7 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
         threads.startTurn(threadId, turnId, message, { model, effort, permissionMode }),
       Steer: ({ threadId, ...message }) => threads.steer(threadId, message),
       StopTurn: ({ threadId, turnId }) => threads.stopTurn(threadId, turnId),
+      StopBackgroundTask: ({ threadId, taskId }) => threads.stopBackgroundTask(threadId, taskId),
       AnswerRequest: ({ threadId, requestId, answer }) =>
         threads.answer(threadId, requestId, answer),
       StopThread: ({ threadId }) => threads.stop(threadId),
