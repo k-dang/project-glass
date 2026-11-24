@@ -107,6 +107,30 @@ it("hides a Chapter diagram to give its diffs the room", async () => {
   ).toBe("false")
 })
 
+it("opens a Chapter diagram full size from its Chapter", async () => {
+  const [first, ...rest] = tour.chapters
+
+  const f = mount({
+    ...tour,
+    chapters: [{ ...first!, diagram: "flowchart TD\n  greet[Greet by name]" }, ...rest],
+  })
+
+  await openTourOrder(f.user)
+
+  await f.user.click(
+    await waitFor(() =>
+      within(chapter("Greet by name")).getByRole("button", {
+        name: "Expand diagram: Greet by name",
+      }),
+    ),
+  )
+
+  const dialog = await screen.findByRole("dialog", { name: "Greet by name" })
+  await waitFor(() =>
+    expect(dialog.querySelector(".pele-node")?.textContent).toBe("Greet by name"),
+  )
+})
+
 it("opens Changes in Path order, and remembers Tour order across workspace tabs", async () => {
   const f = mount()
   await f.user.click(await screen.findByRole("tab", { name: "Changes" }))

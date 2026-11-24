@@ -13,10 +13,10 @@ const sanitize = (svg: string) =>
 export function MermaidDiagram(props: {
   source: string
   onInvalid?: () => void
-  zoomable?: boolean
+  zoom?: "always" | "auto" | "off"
   className?: string
 }) {
-  const { source, onInvalid, zoomable = false } = props
+  const { source, onInvalid, zoom = "auto" } = props
 
   const draw = useCallback(
     (element: HTMLDivElement) => {
@@ -31,7 +31,7 @@ export function MermaidDiagram(props: {
           images: false,
           fontSize: 14,
           sanitize,
-          zoom: zoomable ? { always: true, controls: true } : "auto",
+          zoom: zoom === "always" ? { always: true, controls: true } : zoom === "auto" && "auto",
           onError: () => onInvalid?.(),
         })
       })
@@ -41,7 +41,7 @@ export function MermaidDiagram(props: {
         diagram?.destroy()
       }
     },
-    [source, onInvalid, zoomable],
+    [source, onInvalid, zoom],
   )
 
   return (
@@ -49,7 +49,7 @@ export function MermaidDiagram(props: {
       ref={draw}
       className={cn(
         "pele",
-        zoomable &&
+        zoom === "always" &&
           "overflow-hidden [--pele-zoom-bottom:0] [--pele-zoom-right:0] [--pele-zoom-top:auto] [&>svg]:max-h-full [&>svg]:w-auto",
         props.className,
       )}
