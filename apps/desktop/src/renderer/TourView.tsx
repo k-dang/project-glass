@@ -1,6 +1,14 @@
 import type { TourCodeTarget } from "@glass/contracts"
 import { cn } from "cn"
-import { Check, ChevronRight, ChevronUp } from "lucide-react"
+import {
+  Dialog,
+  DialogBackdrop,
+  DialogClose,
+  DialogContent,
+  DialogTitle,
+  DialogTrigger,
+} from "@ui-sdk/react/dialog"
+import { Check, ChevronRight, ChevronUp, X } from "lucide-react"
 import { useAtomValue } from "@effect/atom-react"
 import { DateTime } from "effect"
 import {
@@ -495,7 +503,7 @@ function ChapterDiagram(props: { source: string; title: string }) {
       onOpenChange={setOpen}
       render={<section />}
       aria-label={`Diagram: ${props.title}`}
-      className={cn("mb-3 flex min-h-0 shrink-0 flex-col border-b pb-2", open && "max-h-[45%]")}
+      className="mb-3 flex shrink-0 flex-col border-b pb-2"
     >
       <div className="flex items-center gap-3">
         <CollapsibleTrigger
@@ -510,12 +518,49 @@ function ChapterDiagram(props: { source: string; title: string }) {
         </CollapsibleTrigger>
         {open && <DiagramLegend />}
       </div>
-      <CollapsibleContent className="mt-2 min-h-0 overflow-auto">
-        <MermaidDiagram source={props.source} />
+      <CollapsibleContent className="mt-2">
+        <Dialog>
+          <DialogTrigger
+            aria-label={`Expand diagram: ${props.title}`}
+            className="block w-full cursor-zoom-in rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <MermaidDiagram
+              source={leftToRight(props.source)}
+              zoom="off"
+              className="flex justify-center [&>svg]:max-h-[40cqh] [&>svg]:max-w-full"
+            />
+          </DialogTrigger>
+          <DialogBackdrop className="fixed inset-0 isolate z-50 bg-black/10 backdrop-motion supports-backdrop-filter:backdrop-blur-xs" />
+          <DialogContent className="fixed inset-0 z-50 m-auto flex h-[90vh] w-[94vw] flex-col gap-4 rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 popup-motion outline-none">
+            <header className="flex items-center gap-3 pr-8">
+              <DialogTitle className="min-w-0 flex-1 truncate text-base leading-none font-medium">
+                {props.title}
+              </DialogTitle>
+              <DiagramLegend />
+            </header>
+            <MermaidDiagram
+              source={leftToRight(props.source)}
+              zoom="always"
+              className="min-h-0 flex-1 [&>svg]:mx-auto"
+            />
+            <DialogClose
+              aria-label="Close"
+              render={<Button variant="ghost" size="icon-sm" className="absolute top-2 right-2" />}
+            >
+              <X aria-hidden />
+            </DialogClose>
+          </DialogContent>
+        </Dialog>
       </CollapsibleContent>
     </Collapsible>
   )
 }
+
+const leftToRight = (source: string) =>
+  source.replace(
+    /^(\s*(?:flowchart|graph)\s+)(TD|TB|BT)\b/,
+    (_, head: string, direction: string) => head + (direction === "BT" ? "RL" : "LR"),
+  )
 
 function ChapterBeforeAfter(props: {
   beforeAfter: NonNullable<TourChapter["beforeAfter"]>
@@ -695,7 +740,7 @@ function ChapterCard(props: {
           </aside>
           <div
             className={cn(
-              "flex h-(--tour-card-height) min-h-0 min-w-0 flex-col border-l px-4.5 pt-4 pb-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:h-115 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0",
+              "@container-size flex h-(--tour-card-height) min-h-0 min-w-0 flex-col border-l px-4.5 pt-4 pb-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:h-115 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0",
             )}
           >
             {files.length > 0 && (
