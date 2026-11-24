@@ -719,41 +719,43 @@ it("tells the user the Thread's PR merged, in its header and its row in the list
   ).toBeTruthy()
 })
 
+const diagramTranscript = () =>
+  Stream.make(
+    TranscriptSnapshot.make({
+      queued: [],
+      status: null,
+      turns: [
+        {
+          id: "turn-1",
+          message: "Draw a diagram",
+          images: [],
+          context: null,
+          feedback: [],
+          sentAt,
+          ended: { at: sentAt, ending: TurnDone.make({}) },
+          parts: [
+            ToolCallPart.make({
+              toolCallId: "draw-1",
+              name: DRAW_DIAGRAM_TOOL,
+              inputSummary: "Component map",
+              input: JSON.stringify({
+                title: "Component map",
+                kind: "existing",
+                mermaid: "flowchart LR\n  A --> B",
+              }),
+              output: null,
+              status: "done",
+              parentToolCallId: null,
+            }),
+          ],
+        },
+      ],
+    }),
+  )
+
 it("opens a Diagram from the Thread's details, without scrolling back to its card", async () => {
   const user = mount({
-    WatchTranscript: () =>
-      Stream.make(
-        TranscriptSnapshot.make({
-          queued: [],
-          status: null,
-          turns: [
-            {
-              id: "turn-1",
-              message: "Draw a diagram",
-              images: [],
-              context: null,
-              feedback: [],
-              sentAt,
-              ended: { at: sentAt, ending: TurnDone.make({}) },
-              parts: [
-                ToolCallPart.make({
-                  toolCallId: "draw-1",
-                  name: DRAW_DIAGRAM_TOOL,
-                  inputSummary: "Component map",
-                  input: JSON.stringify({
-                    title: "Component map",
-                    kind: "existing",
-                    mermaid: "flowchart LR\n  A --> B",
-                  }),
-                  output: null,
-                  status: "done",
-                  parentToolCallId: null,
-                }),
-              ],
-            },
-          ],
-        }),
-      ),
+    WatchTranscript: diagramTranscript,
   })
 
   await user.click(await screen.findByRole("button", { name: "Details" }))
@@ -761,6 +763,39 @@ it("opens a Diagram from the Thread's details, without scrolling back to its car
 
   const pane = await screen.findByRole("complementary", { name: "Diagram" })
   expect(within(pane).getByText("Component map")).toBeTruthy()
+})
+
+it("keeps a Thread as the user left it when they come back to it from another Thread or a New Thread", async () => {
+  const other = new Thread({ ...threadFields, id: "agent-2", name: "agent/calm-heron" })
+
+  const user = mount({
+    WatchThreads: () => Stream.make([thread, other]),
+    WatchTranscript: diagramTranscript,
+  })
+
+  await user.type(
+    (await screen.findByRole("textbox", { name: "Message" })).firstElementChild!,
+    "Half",
+  )
+  await user.click(screen.getByRole("button", { name: "Details" }))
+  await user.click(await screen.findByRole("button", { name: "Component map" }))
+  await screen.findByRole("complementary", { name: "Diagram" })
+
+  await user.click(screen.getByRole("link", { name: other.name }))
+  await screen.findByRole("heading", { name: other.name })
+  expect(screen.queryByRole("complementary", { name: "Diagram" })).toBeNull()
+
+  await user.click(screen.getByRole("link", { name: thread.name }))
+  expect(await screen.findByRole("complementary", { name: "Diagram" })).toBeTruthy()
+
+  await user.click(screen.getByRole("link", { name: "New Thread" }))
+  await screen.findByRole("region", { name: "New Thread" })
+  await user.click(screen.getByRole("link", { name: thread.name }))
+  expect(await screen.findByRole("complementary", { name: "Diagram" })).toBeTruthy()
+
+  const composer = screen.getByRole("textbox", { name: "Message" })
+  await user.type(composer.firstElementChild!, " a thought")
+  expect(composer.textContent).toBe("Half a thought")
 })
 
 it("floats a Thread's details over its chat on a wide window, until the user hides them", async () => {
@@ -2225,6 +2260,26 @@ it("opens a Turn's link to this device in a local Thread's Browser pane", async 
   const { loaded } = attachPage()
 
   await waitFor(() => expect(loaded).toEqual(["http://localhost:3000/settings"]))
+})
+
+it("closes a Thread's Browser pane when the user leaves the Thread", async () => {
+  const other = new Thread({ ...threadFields, id: "agent-2", name: "agent/calm-heron" })
+
+  const user = mount({
+    ...appLinkTurn(thread.place),
+    WatchThreads: () => Stream.make([thread, other]),
+  })
+
+  await user.click(await screen.findByRole("link", { name: "the app" }))
+  const { loaded } = attachPage()
+  await waitFor(() => expect(loaded).toEqual(["http://localhost:3000/settings"]))
+
+  await user.click(screen.getByRole("link", { name: other.name }))
+  await screen.findByRole("heading", { name: other.name })
+  await user.click(screen.getByRole("link", { name: thread.name }))
+  await screen.findByRole("heading", { name: thread.name })
+
+  expect(screen.queryByRole("complementary", { name: "Browser" })).toBeNull()
 })
 
 it("shows a Sandbox Thread's Browser pane nothing from this device, not even an address it remembers", async () => {
