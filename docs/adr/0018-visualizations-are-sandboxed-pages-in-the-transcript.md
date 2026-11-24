@@ -25,9 +25,10 @@ hands link clicks to Glass.
   the reply, one page at a time, and the page there is live rather than as shown.
 - **A `srcdoc` or `blob:` frame**: no scheme to serve it, but such a frame inherits the window's
   Content Security Policy, which blocks the page's inline scripts.
-- **T3 Code's design**: headless Chrome measures each page at nine widths and screenshots it for the
-  agent, and pages are attachment files behind expiring URLs. Glass has one desktop client, so the
-  frame measures the live page and the copy lives in SQLite.
+- **Pages measured and previewed by a headless browser, kept as attachment files**: headless Chrome
+  measures each page at several widths and screenshots it for the agent, and pages are served behind
+  expiring URLs. Glass has one desktop client, so the frame measures the live page and the copy
+  lives in SQLite.
 
 ## Consequences
 
