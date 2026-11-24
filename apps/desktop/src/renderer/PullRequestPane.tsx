@@ -3,7 +3,7 @@ import type { PullRequest, PullRequestRef, PullRequestWorkspace } from "@glass/c
 import { useNavigate } from "@tanstack/react-router"
 import { Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { FileDiff, Maximize2 } from "lucide-react"
+import { FileDiff, Maximize2, RotateCw } from "lucide-react"
 import { useCallback, useContext, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -59,6 +59,17 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
       }
       actions={
         <>
+          <TooltipHint content="Reload">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Reload"
+              onClick={reload}
+              disabled={result.waiting}
+            >
+              <RotateCw className={result.waiting ? "animate-spin" : undefined} aria-hidden />
+            </Button>
+          </TooltipHint>
           {loaded !== null && pullRequest !== null && (
             <MergePullRequest
               key={pullRequest.id}

@@ -536,6 +536,30 @@ it("shows the PR as merged after merging it from the pane", async () => {
   expect(loads).toHaveLength(2)
 })
 
+it("shows the PR as it is on GitHub now after reloading the pane", async () => {
+  const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/42"
+  let loads = 0
+
+  const user = mount({
+    LoadPullRequest: () =>
+      Effect.sync(() => {
+        loads += 1
+
+        return workspace([], {
+          pullRequest: { title: loads === 1 ? "Greet the world" : "Greet everyone" },
+        })
+      }),
+    WatchTranscript: () => Stream.make(filedPullRequest(pullRequestUrl)),
+  })
+
+  await user.click(await screen.findByRole("link", { name: pullRequestUrl }))
+  const pane = await screen.findByRole("complementary", { name: "Pull request" })
+  expect(await within(pane).findByText("Greet the world")).toBeTruthy()
+  await user.click(within(pane).getByRole("button", { name: "Reload" }))
+
+  expect(await within(pane).findByText("Greet everyone")).toBeTruthy()
+})
+
 it("keeps the hidden panel recoverable across Thread navigation", async () => {
   const user = mount(
     {
