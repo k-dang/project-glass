@@ -99,7 +99,7 @@ import { browserPolicyOf, threadFileAddress } from "./browserAddress"
 import { useAgentHoldsBrowserPage } from "./browserPages"
 import { FileLinks, FilePane, isHtmlFile, lastEndedOf, useFileLinks } from "./ThreadFiles"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
-import { markTurnSeenAtom } from "./needsYou"
+import { markTurnSeenAtom } from "./inboxArea"
 import { useWindowFocused } from "./useWindowFocused"
 
 type SidePane =

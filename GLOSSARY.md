@@ -17,15 +17,16 @@ The search box opened with ⌘K or Ctrl+K from anywhere in Glass, for running an
 view offers, jumping to a PR or Thread by name, and starting a Thread from what was typed.
 _Avoid_: Command palette, quick open (a Command is something an Agent harness runs)
 
+**Inbox**:
+The Area listing the Threads, questions, Check-ins, and PRs waiting on the user now, grouped by
+why they wait.
+_Avoid_: Needs you
+
 ### Resuming work
 
 **Saved place**:
 The last piece of work the user was doing in an Area, with their place in it, kept on this device
 for them to continue.
-
-**Needs you**:
-The Threads, questions, Check-ins, and PRs waiting on the user now, listed in the Inbox and
-grouped by why they wait.
 
 ### Reviewing
 

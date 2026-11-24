@@ -1,14 +1,12 @@
 import { useAtomValue } from "@effect/atom-react"
 import { Link } from "@tanstack/react-router"
 import { Option } from "effect"
-import { needsYouCount, watchedNeedsYouAtom } from "./needsYou"
+import { inboxCountAtom } from "./inboxArea"
 
-export function NeedsYouSummary() {
-  const count = needsYouCount(useAtomValue(watchedNeedsYouAtom))
-
-  const label = Option.match(count, {
-    onNone: () => "Needs you",
-    onSome: (value) => `Needs you ${value}`,
+export function InboxSummary() {
+  const label = Option.match(useAtomValue(inboxCountAtom), {
+    onNone: () => "Open Inbox",
+    onSome: (count) => `Inbox: ${count} waiting`,
   })
 
   return (
@@ -18,24 +16,28 @@ export function NeedsYouSummary() {
     >
       <span className="font-medium">{label}</span>
       <span aria-hidden className="text-muted-foreground">
-        Inbox →
+        →
       </span>
     </Link>
   )
 }
 
-export function NeedsYouBadge(props: { id: string }) {
-  const count = needsYouCount(useAtomValue(watchedNeedsYouAtom))
+export function InboxHeadingCount() {
+  const count = useAtomValue(inboxCountAtom)
 
-  if (Option.isNone(count) || count.value === 0) return null
+  if (Option.isNone(count)) return null
 
+  return <span className="font-normal text-muted-foreground">{count.value}</span>
+}
+
+export function InboxBadge(props: { id: string; count: number }) {
   return (
     <span
       id={props.id}
       className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary px-1 text-[10px] font-medium text-primary-foreground tabular-nums"
     >
-      {count.value}
-      <span className="sr-only"> need you</span>
+      {props.count}
+      <span className="sr-only"> waiting</span>
     </span>
   )
 }

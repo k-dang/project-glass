@@ -17,7 +17,7 @@ import {
   LocalCheckout,
   MessageDelivery,
   MessageText,
-  NeedsYouItem,
+  InboxItems,
   type PullRequestAccessDenied,
   type PullRequestNotFound,
   type QueueError,
@@ -60,7 +60,7 @@ import { LocalCheckouts } from "../LocalCheckouts"
 import { AskProgress } from "./AskProgress"
 import { CHECK_IN_MAX_TIMEOUT_SECONDS, CHECK_IN_TIMEOUT_SECONDS, CheckIns } from "../CheckIns"
 import { McpCaller, type McpCallerIdentity, type OutsideAgentCaller } from "./McpCredentials"
-import { NeedsYou } from "../NeedsYou"
+import { Inbox } from "../Inbox"
 import { ASK_PROGRESS_SECONDS, ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../OutsideQuestions"
 import { Sandboxes } from "../Sandboxes"
 import { type Starter, StartedItem, StartedWork } from "../StartedWork"
@@ -133,10 +133,10 @@ const ListThreads = Tool.make("list_threads", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const ListNeedsYou = Tool.make("list_needs_you", {
+const ListInbox = Tool.make("list_inbox", {
   description:
-    "Lists what waits on the user in Glass now: Threads with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, Review threads awaiting their reply, or ready to merge. Threads and outside questions come first, then the longest waiting.",
-  success: Schema.Struct({ items: Schema.Array(NeedsYouItem) }),
+    "Lists the user's Glass Inbox: what waits on them now, in four groups in this order. Stopped on you: Threads with a Permission request or Question waiting, questions from an agent outside Glass, Check-ins, and the Global chat's own waiting requests. Agent reviews to read: queued PRs whose Agent review is finished. Your pull requests: the user's own PRs with changes requested, failing checks, Review threads awaiting their reply, or ready to merge. Threads that finished: Threads whose latest Turn ended since the user last looked. Within a group, the longest waiting comes first.",
+  success: Schema.Struct({ items: InboxItems }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
@@ -368,7 +368,7 @@ export const GlassTools = Toolkit.make(
   ListToDos,
   ListRecentActivity,
   ListThreads,
-  ListNeedsYou,
+  ListInbox,
   ListStartedWork,
   ReadThreadTranscript,
   ReadPullRequest,
@@ -528,7 +528,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const checkouts = yield* LocalCheckouts
     const sandboxes = yield* Sandboxes
     const agentReviews = yield* AgentReviews
-    const needsYou = yield* NeedsYou
+    const inbox = yield* Inbox
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const startedWork = yield* StartedWork
@@ -589,7 +589,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
           })),
           Effect.mapError(explained),
         ),
-      list_needs_you: () => first(needsYou.watch()).pipe(Effect.map((items) => ({ items }))),
+      list_inbox: () => first(inbox.watch()).pipe(Effect.map((items) => ({ items }))),
       list_started_work: () =>
         Effect.gen(function* () {
           const starter = starterOf(yield* McpCaller.current)

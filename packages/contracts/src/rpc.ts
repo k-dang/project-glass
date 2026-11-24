@@ -61,7 +61,7 @@ import { BrowserControl, BrowserPageAnswer, BrowserPageRequest } from "./browser
 import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { MergeAction, MergePullRequestError } from "./merge"
-import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./needsYou"
+import { InboxItems, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./inbox"
 import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
 import {
   LoadPullRequestError,
@@ -406,7 +406,7 @@ export class GlassRpcs extends RpcGroup.make(
     error: ThreadError,
     stream: true,
   }),
-  Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
+  Rpc.make("WatchInbox", { success: InboxItems, stream: true }),
   Rpc.make("MarkTurnSeen", {
     payload: TurnSeen,
     error: ThreadError,

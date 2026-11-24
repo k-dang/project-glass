@@ -1,14 +1,14 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   type CheckIn,
-  type ThreadNeedsYou,
-  type GlobalChatNeedsYou,
-  type NeedsYouItem,
+  type InboxThread,
+  type InboxGlobalChat,
+  type InboxItem,
   OutsideChoice,
   type OutsideQuestion,
   type OutsideQuestionAnswer,
   OutsideText,
-  type PullRequestNeedsYou,
+  type InboxPullRequest,
   referenceKey,
 } from "@glass/contracts"
 import { Link } from "@tanstack/react-router"
@@ -29,6 +29,8 @@ import { ThreadChat, TranscriptProblem } from "./ThreadView"
 import { globalChat, globalChatOpenAtom } from "./globalChat"
 import {
   contextOf,
+  failingChecksOf,
+  finishedAgentReviewOf,
   type InboxAction,
   ItemIcon,
   Reasons,
@@ -36,7 +38,6 @@ import {
   titleOf,
   Waited,
 } from "./inboxItem"
-import { failingChecksOf, finishedAgentReviewOf } from "./needsYou"
 import { settledProblem } from "./problems"
 import { ago } from "./PullRequestRow"
 import { CheckList } from "./PullRequestStatus"
@@ -50,7 +51,7 @@ interface DetailProps<Item> {
 }
 
 export function InboxDetail(
-  props: DetailProps<NeedsYouItem> & { onReadReview: (pullRequest: string) => void },
+  props: DetailProps<InboxItem> & { onReadReview: (pullRequest: string) => void },
 ) {
   const { now, actions } = props
 
@@ -107,7 +108,7 @@ function DetailFooter(props: { buttons?: ReactNode; actions: ReadonlyArray<Inbox
   )
 }
 
-function DetailHeader(props: { item: NeedsYouItem; now: Date; meta?: string }) {
+function DetailHeader(props: { item: InboxItem; now: Date; meta?: string }) {
   return (
     <header className="flex items-start gap-3">
       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-muted-foreground">
@@ -236,7 +237,7 @@ function CheckInDetail(props: DetailProps<CheckIn>) {
   )
 }
 
-function ThreadDetail(props: DetailProps<ThreadNeedsYou>) {
+function ThreadDetail(props: DetailProps<InboxThread>) {
   const { thread } = props.item
   const atoms = useMemo(() => threadAtoms(thread.id), [thread.id])
   const done = props.actions.find(({ key }) => key === "E")
@@ -273,7 +274,7 @@ function ThreadDetail(props: DetailProps<ThreadNeedsYou>) {
   )
 }
 
-function GlobalChatDetail(props: DetailProps<GlobalChatNeedsYou>) {
+function GlobalChatDetail(props: DetailProps<InboxGlobalChat>) {
   const open = useAtomSet(globalChatOpenAtom)
 
   return (
@@ -292,7 +293,7 @@ function GlobalChatDetail(props: DetailProps<GlobalChatNeedsYou>) {
 }
 
 function PullRequestDetail(
-  props: DetailProps<PullRequestNeedsYou> & { onReadReview: (pullRequest: string) => void },
+  props: DetailProps<InboxPullRequest> & { onReadReview: (pullRequest: string) => void },
 ) {
   const { pullRequest } = props.item
   const review = finishedAgentReviewOf(props.item)
@@ -349,7 +350,7 @@ function PullRequestDetail(
 
 const MAX_FAILING_SHOWN = 3
 
-function FailingChecks(props: { item: PullRequestNeedsYou }) {
+function FailingChecks(props: { item: InboxPullRequest }) {
   const headingId = useId()
   const failing = failingChecksOf(props.item)
 

@@ -11,7 +11,7 @@ import { GlobalChat } from "./GlobalChat"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
-import { NeedsYou } from "./NeedsYou"
+import { Inbox } from "./Inbox"
 import { OutsideAgents } from "./OutsideAgents"
 import { OutsideQuestions } from "./OutsideQuestions"
 import { CheckIns } from "./CheckIns"
@@ -51,7 +51,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const storage = yield* Storage
     const skillPacks = yield* SkillPacks
     const localSkills = yield* LocalSkills
-    const needsYou = yield* NeedsYou
+    const inbox = yield* Inbox
     const threadPullRequests = yield* ThreadPullRequests
     const settledThreads = yield* SettledThreads
     const outsideQuestions = yield* OutsideQuestions
@@ -205,7 +205,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       WatchThreadPullRequests: () => threadPullRequests.watch(),
       WatchSettledThreads: () => settledThreads.watch(),
       BringBackThread: ({ threadId }) => threads.bringBack(threadId),
-      WatchNeedsYou: () => needsYou.watch(),
+      WatchInbox: () => inbox.watch(),
       MarkTurnSeen: ({ threadId, endedAt }) => threads.markTurnSeen(threadId, endedAt),
       AnswerOutsideQuestion: ({ id, answer }) => outsideQuestions.answer(id, answer),
       GetCheckInChanges: ({ checkInId }) => checkIns.changes(checkInId),

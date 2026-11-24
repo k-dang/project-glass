@@ -154,7 +154,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         WatchSettledThreads: () => Stream.make([]),
         BringBackThread: unused,
         WatchThreadPullRequests: () => Stream.make([]),
-        WatchNeedsYou: () => Stream.make([]),
+        WatchInbox: () => Stream.make([]),
         MarkTurnSeen: () => Effect.void,
         WatchTranscript: unused,
         LoadEarlierTurns: unused,

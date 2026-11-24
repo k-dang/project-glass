@@ -1,25 +1,25 @@
 import {
   type CheckIn,
-  ThreadNeedsYou,
+  InboxThread,
   AgentReviewFinished,
   AwaitingReply,
   ChangesRequested,
   ChecksFailing,
   finishedReview,
   splitLead,
-  GlobalChatNeedsYou,
+  InboxGlobalChat,
   canRunQueueWork,
-  type NeedsYouItem,
-  NeedsYou as NeedsYouList,
+  type InboxItem,
+  InboxItems,
   type OutsideQuestion,
-  PullRequestNeedsYou,
+  InboxPullRequest,
   type PullRequestReason,
   type PullRequestSummary,
   type QueuedPullRequest,
   ReadyToMerge,
   referenceKey,
-  needsYouGroupOf,
-  needsYouGroups,
+  inboxGroupOf,
+  inboxGroups,
   TurnFinished,
   WaitingRequests,
 } from "@glass/contracts"
@@ -54,11 +54,9 @@ interface WaitingPullRequest {
   readonly since: DateTime.Utc
 }
 
-const order: Order.Order<NeedsYouItem> = Order.combine(
-  Order.mapInput(Order.Number, (item: NeedsYouItem) =>
-    needsYouGroups.indexOf(needsYouGroupOf(item)),
-  ),
-  Order.mapInput(DateTime.Order, (item: NeedsYouItem) => item.since),
+const order: Order.Order<InboxItem> = Order.combine(
+  Order.mapInput(Order.Number, (item: InboxItem) => inboxGroups.indexOf(inboxGroupOf(item))),
+  Order.mapInput(DateTime.Order, (item: InboxItem) => item.since),
 )
 
 const waitingOn = (requests: Arr.NonEmptyReadonlyArray<WaitingRequest>) => ({
@@ -72,7 +70,7 @@ const waitingOn = (requests: Arr.NonEmptyReadonlyArray<WaitingRequest>) => ({
 const waitingItem = ({ thread, requests }: WaitingThread) => {
   const { requests: parts, since } = waitingOn(requests)
 
-  return ThreadNeedsYou.make({
+  return InboxThread.make({
     thread,
     reasons: [WaitingRequests.make({ requests: parts })],
     since,
@@ -80,10 +78,10 @@ const waitingItem = ({ thread, requests }: WaitingThread) => {
 }
 
 const globalItem = (requests: ReadonlyArray<WaitingRequest>) =>
-  Arr.isReadonlyArrayNonEmpty(requests) ? [GlobalChatNeedsYou.make(waitingOn(requests))] : []
+  Arr.isReadonlyArrayNonEmpty(requests) ? [InboxGlobalChat.make(waitingOn(requests))] : []
 
 const finishedItem = ({ thread, ended }: FinishedThread) =>
-  ThreadNeedsYou.make({
+  InboxThread.make({
     thread,
     reasons: [TurnFinished.make({ ended })],
     since: ended.at,
@@ -92,7 +90,7 @@ const finishedItem = ({ thread, ended }: FinishedThread) =>
 const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
   Object.values(Arr.groupBy(waiting, ({ pullRequest }) => referenceKey(pullRequest.ref))).map(
     (group) =>
-      PullRequestNeedsYou.make({
+      InboxPullRequest.make({
         pullRequest: group[0].pullRequest,
         reasons: Arr.flatMap(group, ({ reasons }) => reasons),
         since: Arr.min(
@@ -111,7 +109,7 @@ interface Waiting {
   readonly global: ReadonlyArray<WaitingRequest>
 }
 
-const needsYouOf = (waiting: Waiting): ReadonlyArray<NeedsYouItem> =>
+const inboxOf = (waiting: Waiting): InboxItems =>
   Arr.sort(
     [
       ...waiting.threads.map(waitingItem),
@@ -176,14 +174,14 @@ const samePullRequests = (
     )
   })
 
-export class NeedsYou extends Context.Service<
-  NeedsYou,
+export class Inbox extends Context.Service<
+  Inbox,
   {
-    readonly watch: () => Stream.Stream<ReadonlyArray<NeedsYouItem>>
+    readonly watch: () => Stream.Stream<InboxItems>
   }
->()("@glass/server/NeedsYou") {
+>()("@glass/server/Inbox") {
   static readonly layer = Layer.effect(
-    NeedsYou,
+    Inbox,
     Effect.gen(function* () {
       const threads = yield* Threads
       const queue = yield* Queue
@@ -234,7 +232,7 @@ export class NeedsYou extends Context.Service<
           ),
           Stream.catch((cause) =>
             Stream.fromEffect(
-              Effect.logWarning("Couldn't read the Queue for Needs you", cause).pipe(
+              Effect.logWarning("Couldn't read the Queue for the Inbox", cause).pipe(
                 Effect.as<ReadonlyArray<WaitingPullRequest>>([]),
               ),
             ),
@@ -246,7 +244,7 @@ export class NeedsYou extends Context.Service<
         mirror.changes.pipe(Stream.map(yourPullRequests)),
       ).pipe(Stream.map(([finished, yours]) => [...finished, ...yours]))
 
-      return NeedsYou.of({
+      return Inbox.of({
         watch: () =>
           Stream.zipLatestAll(
             threads.watchWaiting(),
@@ -257,7 +255,7 @@ export class NeedsYou extends Context.Service<
             globalChat.waiting,
           ).pipe(
             Stream.map(([waiting, finished, pullRequests, asked, checkingIn, global]) =>
-              needsYouOf({
+              inboxOf({
                 threads: waiting,
                 finished,
                 pullRequests,
@@ -266,7 +264,7 @@ export class NeedsYou extends Context.Service<
                 global,
               }),
             ),
-            Stream.changesWith(Schema.toEquivalence(NeedsYouList)),
+            Stream.changesWith(Schema.toEquivalence(InboxItems)),
           ),
       })
     }),

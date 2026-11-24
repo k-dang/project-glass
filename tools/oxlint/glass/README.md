@@ -68,8 +68,8 @@ are deliberate bridges from React and Electron. Tests run Effects through `@effe
 ## Module casing
 
 [module-casing.ts](module-casing.ts) rejects a source file whose name, without its
-extension, differs only in case from a sibling's, such as `needsYou.ts` beside
-`NeedsYou.tsx`. Linux resolves each import to its own file, but macOS's case-insensitive
+extension, differs only in case from a sibling's, such as `inbox.ts` beside
+`Inbox.tsx`. Linux resolves each import to its own file, but macOS's case-insensitive
 file system can load the wrong one, so the renderer build failed only on macOS.
 
 ## Test waits

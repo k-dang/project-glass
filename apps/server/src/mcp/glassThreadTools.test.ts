@@ -4,7 +4,7 @@ import {
   Thread,
   AgentReviewState,
   isWaiting,
-  NeedsYou,
+  InboxItems,
   PullRequestRef,
   localPlace,
   SandboxPlace,
@@ -52,7 +52,7 @@ const onThisDevice = (message: string) => ({
 
 const decodeCreated = Schema.decodeUnknownSync(Schema.Struct({ thread: Thread }))
 
-const decodeNeedsYou = Schema.decodeUnknownSync(Schema.Struct({ items: NeedsYou }))
+const decodeInboxItems = Schema.decodeUnknownSync(Schema.Struct({ items: InboxItems }))
 
 const decodeStarted = Schema.decodeUnknownSync(Schema.Struct({ items: Schema.Array(StartedItem) }))
 
@@ -221,21 +221,21 @@ describe("Glass's Thread tools over MCP", () => {
     }),
   )
 
-  it.live("lists what needs the user, as Needs you shows it", () =>
+  it.live("lists what needs the user, as the Inbox shows it", () =>
     Effect.gen(function* () {
       const f = yield* startGlass
       const thread = yield* f.start("Please ask permission")
 
-      const shown = yield* f.client.WatchNeedsYou().pipe(
+      const shown = yield* f.client.WatchInbox().pipe(
         Stream.filter((items) => items.some((item) => Predicate.isTagged(item, "Thread"))),
         Stream.runHead,
         Effect.map(Option.getOrThrow),
       )
 
-      const result = yield* f.call("list_needs_you")
+      const result = yield* f.call("list_inbox")
 
       assert.isFalse(result.isError, toolText(result))
-      const { items } = decodeNeedsYou(result.structuredContent)
+      const { items } = decodeInboxItems(result.structuredContent)
       assert.deepStrictEqual(items, shown)
       assert.deepStrictEqual(
         items.map((item) => Predicate.isTagged(item, "Thread") && item.thread.id),

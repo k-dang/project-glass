@@ -38,7 +38,7 @@ import { McpOAuth } from "./mcp/McpOAuth"
 import { OAuthRoutes } from "./mcp/oauthHttp"
 import { GlassMcpTools, McpRoutes } from "./mcp/server"
 import { OutsideAgents } from "./OutsideAgents"
-import { NeedsYou } from "./NeedsYou"
+import { Inbox } from "./Inbox"
 import { OutsideQuestions } from "./OutsideQuestions"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
@@ -126,7 +126,7 @@ const services = (
 ) =>
   Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge)
     .pipe(
-      Layer.provide(NeedsYou.layer),
+      Layer.provide(Inbox.layer),
       Layer.provide(SettledThreads.layer.pipe(Layer.provideMerge(ThreadPullRequests.layer))),
       Layer.provide(StartedWork.layer),
       Layer.provide(PullRequestLists.layer),

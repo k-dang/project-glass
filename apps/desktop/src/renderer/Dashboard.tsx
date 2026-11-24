@@ -10,7 +10,7 @@ import { ThreadContinueCard } from "./ThreadContinueCard"
 import { ContinueCardLoading } from "./ContinueCard"
 import type { BackendError } from "./backend"
 import { Count, SectionLink } from "./Lists"
-import { NeedsYouSummary } from "./NeedsYouCount"
+import { InboxSummary } from "./InboxCount"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, streamProblem } from "./problems"
 import { repositoryLabeller } from "./PullRequestRow"
@@ -29,7 +29,7 @@ export function Dashboard() {
   return (
     <div className="page-content @container flex flex-col gap-8 py-6">
       <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-      <NeedsYouSummary />
+      <InboxSummary />
       <Continue />
       <ActivityChart />
       <div className="grid gap-8 @3xl:grid-cols-2">

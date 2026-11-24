@@ -7,7 +7,7 @@ import {
 } from "@effect/atom-react"
 import {
   type Thread,
-  type ThreadNeedsYou,
+  type InboxThread,
   isGone,
   isOutOfReach,
   type PlaceTag,
@@ -63,7 +63,7 @@ import {
   workingThreadsAtom,
 } from "./threadsArea"
 import { AgentHarnessIcon } from "./AgentHarnessIcon"
-import { threadsNeedingYouAtom } from "./needsYou"
+import { threadsInInboxAtom } from "./inboxArea"
 import { ThreadPullRequestBadge, useThreadPullRequest } from "./ThreadPullRequest"
 import { useMinuteClock } from "./Inbox"
 import { ago } from "./PullRequestRow"
@@ -96,7 +96,7 @@ const workingMarker: Marker = {
   tone: "text-sky-600 dark:text-sky-400",
 }
 
-const markerOf = ({ reasons }: ThreadNeedsYou): Marker => {
+const markerOf = ({ reasons }: InboxThread): Marker => {
   const reason = reasons.find(Predicate.isTagged("WaitingRequests")) ?? reasons[0]
 
   return Match.valueTags(reason, {
@@ -482,16 +482,17 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
   const pullRequestId = useId()
   const pullRequest = useThreadPullRequest(thread.id)
 
-  const needsYou = useAtomValue(threadsNeedingYouAtom).get(thread.id)
+  const inboxThread = useAtomValue(threadsInInboxAtom).get(thread.id)
 
   const working = Option.getOrElse(
     AsyncResult.value(useAtomValue(workingThreadsAtom)),
     () => noThreads,
   ).has(thread.id)
 
-  const showsWorking = needsYou === undefined && working
+  const showsWorking = inboxThread === undefined && working
 
-  const marker = needsYou !== undefined ? markerOf(needsYou) : showsWorking ? workingMarker : null
+  const marker =
+    inboxThread !== undefined ? markerOf(inboxThread) : showsWorking ? workingMarker : null
 
   const removeNow = () => {
     setConfirming(null)

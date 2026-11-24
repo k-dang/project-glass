@@ -4,7 +4,7 @@ import {
   AnswerQuestion,
   type AgentReviewState,
   isWaiting,
-  type NeedsYou,
+  type InboxItems,
   PullRequestRef,
   Revision,
 } from "@glass/contracts"
@@ -19,6 +19,7 @@ import { watchDeadlines } from "../test/deadlines"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, type FakePullRequestSeed, VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, startBackend, startSignedInBackend } from "../test/harness"
+import { inboxWhen } from "../test/inboxWhen"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
 
 type Client = Effect.Success<ReturnType<typeof startBackend>>["client"]
@@ -27,50 +28,47 @@ const scriptedHost = fileURLToPath(new URL("../dist-test/scriptedAgentHost.mjs",
 
 const answer = { markdown: "**Nothing stands out.** The greeting now takes a name." }
 
-const needsYou = (client: Client, until: (items: NeedsYou) => boolean) =>
-  client.WatchNeedsYou().pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
+const current = (client: Client) => inboxWhen(client, () => true)
 
-const current = (client: Client) => needsYou(client, () => true)
-
-const threadItems = (items: NeedsYou) =>
+const threadItems = (items: InboxItems) =>
   items.flatMap((item) => (Predicate.isTagged(item, "Thread") ? [item] : []))
 
-const pullRequestItems = (items: NeedsYou) =>
+const pullRequestItems = (items: InboxItems) =>
   items.flatMap((item) => (Predicate.isTagged(item, "PullRequest") ? [item] : []))
 
-const threadItem = (items: NeedsYou, threadId: string) =>
+const threadItem = (items: InboxItems, threadId: string) =>
   threadItems(items).find(({ thread }) => thread.id === threadId)
 
-const titles = (items: NeedsYou) =>
+const titles = (items: InboxItems) =>
   pullRequestItems(items).map(({ pullRequest }) => pullRequest.title)
 
-const itemOf = (items: NeedsYou, pr: FakePullRequest) =>
+const itemOf = (items: InboxItems, pr: FakePullRequest) =>
   pullRequestItems(items).find(({ pullRequest }) => pullRequest.url === pr.url)
 
-const reasonsOf = (items: NeedsYou, pr: FakePullRequest) =>
+const reasonsOf = (items: InboxItems, pr: FakePullRequest) =>
   itemOf(items, pr)?.reasons.map((reason) =>
     Predicate.isTagged(reason, "AwaitingReply")
       ? `AwaitingReply:${reason.reviewThreads}`
       : reason._tag,
   )
 
-const sinceOf = (items: NeedsYou, pr: FakePullRequest) => {
+const sinceOf = (items: InboxItems, pr: FakePullRequest) => {
   const found = pullRequestItems(items).find(({ pullRequest }) => pullRequest.url === pr.url)
 
   return found === undefined ? undefined : DateTime.formatIso(found.since)
 }
 
-const requestsOf = (items: NeedsYou, threadId: string) =>
+const requestsOf = (items: InboxItems, threadId: string) =>
   threadItem(items, threadId)?.reasons.flatMap((reason) =>
     Predicate.isTagged(reason, "WaitingRequests") ? reason.requests : [],
   ) ?? []
 
-const finishedOf = (items: NeedsYou, threadId: string) =>
+const finishedOf = (items: InboxItems, threadId: string) =>
   threadItem(items, threadId)?.reasons.flatMap((reason) =>
     Predicate.isTagged(reason, "TurnFinished") ? [reason] : [],
   )[0]
 
-const onlyFinished = (threadId: string) => (items: NeedsYou) =>
+const onlyFinished = (threadId: string) => (items: InboxItems) =>
   threadItem(items, threadId)
     ?.reasons.map(({ _tag }) => _tag)
     .join() === "TurnFinished"
@@ -147,7 +145,7 @@ it.live(
         turns.some(({ parts }) => parts.some(isWaiting)),
       )
 
-      const listed = yield* needsYou(
+      const listed = yield* inboxWhen(
         f.client,
         (items) => threadItem(items, thread.id) !== undefined,
       )
@@ -163,7 +161,7 @@ it.live(
         answer: AllowRequest.make({}),
       })
 
-      yield* needsYou(f.client, onlyFinished(thread.id))
+      yield* inboxWhen(f.client, onlyFinished(thread.id))
     }),
 )
 
@@ -172,7 +170,7 @@ it.live("lists a Thread while its Question waits, until the user answers it and 
     const f = yield* threadsFixture
     const thread = yield* f.start("Please ask a question")
 
-    const listed = yield* needsYou(f.client, (items) => threadItem(items, thread.id) !== undefined)
+    const listed = yield* inboxWhen(f.client, (items) => threadItem(items, thread.id) !== undefined)
 
     const [question] = requestsOf(listed, thread.id)
     assert.strictEqual(question?._tag, "Question")
@@ -183,7 +181,7 @@ it.live("lists a Thread while its Question waits, until the user answers it and 
       answer: AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
     })
 
-    yield* needsYou(f.client, onlyFinished(thread.id))
+    yield* inboxWhen(f.client, onlyFinished(thread.id))
   }),
 )
 
@@ -191,11 +189,11 @@ it.live("drops a waiting Thread once it is removed", () =>
   Effect.gen(function* () {
     const f = yield* threadsFixture
     const thread = yield* f.start("Please ask permission")
-    yield* needsYou(f.client, (items) => threadItem(items, thread.id) !== undefined)
+    yield* inboxWhen(f.client, (items) => threadItem(items, thread.id) !== undefined)
 
     yield* f.client.RemoveThread({ threadId: thread.id })
 
-    yield* needsYou(f.client, (items) => threadItem(items, thread.id) === undefined)
+    yield* inboxWhen(f.client, (items) => threadItem(items, thread.id) === undefined)
   }),
 )
 
@@ -206,14 +204,14 @@ it.live("lists a Thread whose Turn finished unseen, until the user sees that Tur
     const [turn] = yield* f.transcript(thread.id, settled(1))
     const ended = turn!.ended!
 
-    const listed = yield* needsYou(f.client, onlyFinished(thread.id))
+    const listed = yield* inboxWhen(f.client, onlyFinished(thread.id))
 
     assert.deepStrictEqual(finishedOf(listed, thread.id)?.ended, ended)
     assert.isTrue(DateTime.Equivalence(threadItem(listed, thread.id)!.since, ended.at))
 
     yield* f.client.MarkTurnSeen({ threadId: thread.id, endedAt: ended.at })
 
-    yield* needsYou(f.client, (items) => threadItem(items, thread.id) === undefined)
+    yield* inboxWhen(f.client, (items) => threadItem(items, thread.id) === undefined)
   }),
 )
 
@@ -225,13 +223,13 @@ it.live(
       const thread = yield* f.start()
       const [first] = yield* f.transcript(thread.id, settled(1))
       yield* f.client.MarkTurnSeen({ threadId: thread.id, endedAt: first!.ended!.at })
-      yield* needsYou(f.client, (items) => threadItem(items, thread.id) === undefined)
+      yield* inboxWhen(f.client, (items) => threadItem(items, thread.id) === undefined)
 
       yield* f.send(thread.id, "Say hello again")
       const turns = yield* f.transcript(thread.id, settled(2))
       yield* f.client.MarkTurnSeen({ threadId: thread.id, endedAt: first!.ended!.at })
 
-      const listed = yield* needsYou(f.client, onlyFinished(thread.id))
+      const listed = yield* inboxWhen(f.client, onlyFinished(thread.id))
       assert.deepStrictEqual(finishedOf(listed, thread.id)?.ended, turns[1]?.ended)
     }),
 )
@@ -257,12 +255,12 @@ it.live("keeps which finished Turns the user has seen when Glass opens again", (
     const [turn] = yield* f.transcript(seen.id, settled(1))
     yield* f.transcript(unseen.id, settled(1))
     yield* f.client.MarkTurnSeen({ threadId: seen.id, endedAt: turn!.ended!.at })
-    yield* needsYou(f.client, (items) => threadItem(items, seen.id) === undefined)
+    yield* inboxWhen(f.client, (items) => threadItem(items, seen.id) === undefined)
 
     yield* f.quit
     const relaunched = yield* f.launch
 
-    const listed = yield* needsYou(relaunched, onlyFinished(unseen.id))
+    const listed = yield* inboxWhen(relaunched, onlyFinished(unseen.id))
     assert.isUndefined(threadItem(listed, seen.id))
   }),
 )
@@ -271,7 +269,7 @@ it.live("lists a Sandbox Thread still waiting when Glass opens again", () =>
   Effect.gen(function* () {
     const f = yield* threadsFixture
     const thread = yield* f.startSandbox("Please ask permission")
-    yield* needsYou(f.client, (items) => threadItem(items, thread.id) !== undefined)
+    yield* inboxWhen(f.client, (items) => threadItem(items, thread.id) !== undefined)
 
     yield* f.quit
     const relaunched = yield* f.launch
@@ -297,7 +295,7 @@ it.live(
       yield* f.runners.release({ answer })
       const { review } = yield* f.reviewState(first, reviewed)
 
-      const listed = yield* needsYou(f.client, (items) => titles(items).includes("Greet"))
+      const listed = yield* inboxWhen(f.client, (items) => titles(items).includes("Greet"))
       assert.deepStrictEqual(reasonsOf(listed, first), ["AgentReviewFinished"])
       assert.strictEqual(
         sinceOf(listed, first),
@@ -324,7 +322,7 @@ it.live("drops a queued PR once it leaves the Queue or the user submits a Review
     yield* f.client.AddToQueue({ references: [ref(removed), ref(submitted)] })
     yield* f.review(removed)
     yield* f.review(submitted)
-    yield* needsYou(f.client, (items) => titles(items).length === 2)
+    yield* inboxWhen(f.client, (items) => titles(items).length === 2)
 
     yield* f.client.RemoveFromQueue({ reference: ref(removed) })
     assert.deepStrictEqual(titles(yield* current(f.client)), ["Wave"])
@@ -346,10 +344,10 @@ it.live("drops a PR the user marks done until its Agent review is written again"
     const pr = f.seed("Greet")
     yield* f.client.AddToQueue({ references: [ref(pr)] })
     const first = (yield* f.review(pr)).review!
-    yield* needsYou(f.client, (items) => titles(items).length === 1)
+    yield* inboxWhen(f.client, (items) => titles(items).length === 1)
 
     yield* f.client.MarkAgentReviewDone({ pullRequest: ref(pr), writtenAt: first.writtenAt })
-    yield* needsYou(f.client, (items) => titles(items).length === 0)
+    yield* inboxWhen(f.client, (items) => titles(items).length === 0)
 
     yield* f.client.StartAgentReview({ pullRequest: ref(pr), revision: revisionOf(pr) })
     yield* f.reviewState(
@@ -371,7 +369,7 @@ it.live("lists a queued draft with a finished Agent review, but not a closed or 
     yield* f.review(draft)
     yield* f.review(closed)
     yield* f.review(merged)
-    yield* needsYou(f.client, (items) => titles(items).length === 3)
+    yield* inboxWhen(f.client, (items) => titles(items).length === 3)
 
     closed.edit({ state: "CLOSED" })
     merged.edit({ state: "MERGED" })
@@ -394,7 +392,7 @@ it.live("lists a waiting Thread before a PR that has waited longer", () =>
       message: "Please ask permission",
     })
 
-    const listed = yield* needsYou(f.client, (items) => items.length === 2)
+    const listed = yield* inboxWhen(f.client, (items) => items.length === 2)
 
     assert.deepStrictEqual(
       listed.map(({ _tag }) => _tag),
@@ -448,7 +446,7 @@ it.live("lists the user's own PRs with what they wait on, until nothing does", (
     })
 
     yield* client.ListPullRequests()
-    const listed = yield* needsYou(client, (items) => reasonsOf(items, pr) !== undefined)
+    const listed = yield* inboxWhen(client, (items) => reasonsOf(items, pr) !== undefined)
     assert.deepStrictEqual(reasonsOf(listed, pr), [
       "ChangesRequested",
       "ChecksFailing",
@@ -466,12 +464,12 @@ it.live("lists the user's own PRs with what they wait on, until nothing does", (
     pr.checks = "SUCCESS"
     pr.setResolved(asked.id, true)
     yield* client.ListPullRequests()
-    const ready = yield* needsYou(client, (items) => reasonsOf(items, pr)?.[0] === "ReadyToMerge")
+    const ready = yield* inboxWhen(client, (items) => reasonsOf(items, pr)?.[0] === "ReadyToMerge")
     assert.deepStrictEqual(reasonsOf(ready, pr), ["ReadyToMerge"])
 
     pr.mergeable = "CONFLICTING"
     yield* client.ListPullRequests()
-    yield* needsYou(client, (items) => reasonsOf(items, pr) === undefined)
+    yield* inboxWhen(client, (items) => reasonsOf(items, pr) === undefined)
   }),
 )
 
@@ -487,12 +485,12 @@ it.live("drops the user's PRs once their repository is unfollowed", () =>
     })
 
     yield* client.ListPullRequests()
-    yield* needsYou(client, (items) => reasonsOf(items, pr) !== undefined)
+    yield* inboxWhen(client, (items) => reasonsOf(items, pr) !== undefined)
 
     yield* client.UnfollowRepository({ repository: followed! })
     yield* client.ListPullRequests()
 
-    yield* needsYou(client, (items) => reasonsOf(items, pr) === undefined)
+    yield* inboxWhen(client, (items) => reasonsOf(items, pr) === undefined)
   }),
 )
 
@@ -527,7 +525,7 @@ it.live(
       yield* f.review(pr)
 
       yield* f.client.ListPullRequests()
-      const listed = yield* needsYou(f.client, (items) => reasonsOf(items, pr)?.length === 2)
+      const listed = yield* inboxWhen(f.client, (items) => reasonsOf(items, pr)?.length === 2)
 
       assert.deepStrictEqual(titles(listed), ["Greet"])
       assert.deepStrictEqual(reasonsOf(listed, pr), ["AgentReviewFinished", "ChecksFailing"])
@@ -560,13 +558,13 @@ it.effect("refreshes the user's PRs once two minutes pass without a sync", () =>
 
     yield* deadlineSet
     yield* client.ListPullRequests()
-    yield* needsYou(client, (items) => reasonsOf(items, pr) !== undefined)
+    yield* inboxWhen(client, (items) => reasonsOf(items, pr) !== undefined)
     yield* deadlineSet
 
     pr.checks = "SUCCESS"
     yield* TestClock.adjust("2 minutes")
 
-    yield* needsYou(client, (items) => reasonsOf(items, pr) === undefined)
+    yield* inboxWhen(client, (items) => reasonsOf(items, pr) === undefined)
   }),
 )
 
@@ -579,7 +577,7 @@ it.live("lists the Global chat while its own Question waits, until the user answ
       context: null,
     })
 
-    const listed = yield* needsYou(f.client, (items) =>
+    const listed = yield* inboxWhen(f.client, (items) =>
       items.some(Predicate.isTagged("GlobalChat")),
     )
 
@@ -596,7 +594,7 @@ it.live("lists the Global chat while its own Question waits, until the user answ
       answer: AnswerQuestion.make({ answers: [{ chosen: [], text: "Only source files" }] }),
     })
 
-    yield* needsYou(f.client, (items) => !items.some(Predicate.isTagged("GlobalChat")))
+    yield* inboxWhen(f.client, (items) => !items.some(Predicate.isTagged("GlobalChat")))
   }),
 )
 
@@ -623,6 +621,6 @@ it.live(
       )
 
       assert.isFalse(review?.done)
-      yield* needsYou(f.client, (items) => titles(items).length === 0)
+      yield* inboxWhen(f.client, (items) => titles(items).length === 0)
     }),
 )

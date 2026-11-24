@@ -114,9 +114,9 @@ it.live(
       assert.deepStrictEqual(cutOff?.ended?.ending, TurnCutOff.make({}))
       assert.equal(cutOff?.parts.find(isRequestPart)?.status, "expired")
 
-      const needsYou = yield* f.client.WatchNeedsYou().pipe(Stream.runHead)
+      const inbox = yield* f.client.WatchInbox().pipe(Stream.runHead)
       assert.isFalse(
-        Option.getOrThrow(needsYou).some(
+        Option.getOrThrow(inbox).some(
           (item) =>
             Predicate.isTagged(item, "Thread") &&
             item.reasons.some(Predicate.isTagged("WaitingRequests")),

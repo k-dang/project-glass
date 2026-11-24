@@ -35,8 +35,8 @@ import { ConnectionAvatar } from "./ConnectionAvatar"
 import { ConnectionMenu } from "./ConnectionMenu"
 import { globalChatOpenAtom, globalUnseenAtom } from "./globalChat"
 import { HistoryNav } from "./HistoryNav"
-import { NeedsYouBadge } from "./NeedsYouCount"
-import { threadsNeedingYouAtom, needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
+import { InboxBadge } from "./InboxCount"
+import { inboxCountAtom, threadsInInboxAtom } from "./inboxArea"
 import {
   confirmLeave,
   discardPromptAtom,
@@ -288,10 +288,10 @@ function AreaRail(props: {
   onToggleChatting: () => void
   style: RailStyle
 }) {
-  const needsYouBadgeId = useId()
-  const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
-  const threadsNeedYouId = useId()
-  const threadsNeedYou = useAtomValue(threadsNeedingYouAtom).size > 0
+  const inboxBadgeId = useId()
+  const inboxWaiting = Option.getOrElse(useAtomValue(inboxCountAtom), () => 0)
+  const threadsInInboxId = useId()
+  const threadsInInbox = useAtomValue(threadsInInboxAtom).size > 0
   const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
   const unread = unseen !== null && !props.chatting
 
@@ -305,23 +305,25 @@ function AreaRail(props: {
               activeOptions={{ includeSearch: false }}
               aria-label={label}
               aria-describedby={
-                label === "Inbox" && Option.isSome(needsYouCount) && needsYouCount.value > 0
-                  ? needsYouBadgeId
-                  : label === "Threads" && threadsNeedYou
-                    ? threadsNeedYouId
+                label === "Inbox" && inboxWaiting > 0
+                  ? inboxBadgeId
+                  : label === "Threads" && threadsInInbox
+                    ? threadsInInboxId
                     : undefined
               }
               aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
               className={cn(props.style.link, label === props.style.bottomFrom && "mt-auto")}
             >
               <Icon className="size-4" aria-hidden />
-              {label === "Inbox" && <NeedsYouBadge id={needsYouBadgeId} />}
-              {label === "Threads" && threadsNeedYou && (
+              {label === "Inbox" && inboxWaiting > 0 && (
+                <InboxBadge id={inboxBadgeId} count={inboxWaiting} />
+              )}
+              {label === "Threads" && threadsInInbox && (
                 <span
-                  id={threadsNeedYouId}
+                  id={threadsInInboxId}
                   className="absolute top-1 right-1 size-2 rounded-full bg-primary"
                 >
-                  <span className="sr-only">Needs you</span>
+                  <span className="sr-only">In your Inbox</span>
                 </span>
               )}
             </Link>

@@ -50,21 +50,21 @@ export const PullRequestReason = Schema.Union([
 
 export type PullRequestReason = typeof PullRequestReason.Type
 
-export const ThreadNeedsYou = Schema.TaggedStruct("Thread", {
+export const InboxThread = Schema.TaggedStruct("Thread", {
   thread: Thread,
   reasons: Schema.NonEmptyArray(ThreadReason),
   since: Schema.DateTimeUtcFromString,
 })
 
-export type ThreadNeedsYou = typeof ThreadNeedsYou.Type
+export type InboxThread = typeof InboxThread.Type
 
-export const PullRequestNeedsYou = Schema.TaggedStruct("PullRequest", {
+export const InboxPullRequest = Schema.TaggedStruct("PullRequest", {
   pullRequest: PullRequestSummary,
   reasons: Schema.NonEmptyArray(PullRequestReason),
   since: Schema.DateTimeUtcFromString,
 })
 
-export type PullRequestNeedsYou = typeof PullRequestNeedsYou.Type
+export type InboxPullRequest = typeof InboxPullRequest.Type
 
 export const OutsideQuestion = Schema.TaggedStruct("OutsideQuestion", {
   id: Schema.String,
@@ -76,12 +76,12 @@ export const OutsideQuestion = Schema.TaggedStruct("OutsideQuestion", {
 
 export type OutsideQuestion = typeof OutsideQuestion.Type
 
-export const GlobalChatNeedsYou = Schema.TaggedStruct("GlobalChat", {
+export const InboxGlobalChat = Schema.TaggedStruct("GlobalChat", {
   requests: WaitingRequestParts,
   since: Schema.DateTimeUtcFromString,
 })
 
-export type GlobalChatNeedsYou = typeof GlobalChatNeedsYou.Type
+export type InboxGlobalChat = typeof InboxGlobalChat.Type
 
 export const OutsideChoice = Schema.TaggedStruct("Choice", {
   choice: Schema.String,
@@ -113,23 +113,25 @@ export const AskUserResult = Schema.Union([AskUserAnswered, AskUserTimedOut, Ask
 
 export type AskUserResult = typeof AskUserResult.Type
 
-export const NeedsYouItem = Schema.Union([
-  ThreadNeedsYou,
-  PullRequestNeedsYou,
+export const InboxItem = Schema.Union([
+  InboxThread,
+  InboxPullRequest,
   OutsideQuestion,
   CheckIn,
-  GlobalChatNeedsYou,
+  InboxGlobalChat,
 ])
 
-export type NeedsYouItem = typeof NeedsYouItem.Type
+export type InboxItem = typeof InboxItem.Type
 
-export const NeedsYou = Schema.Array(NeedsYouItem)
+export const InboxItems = Schema.Array(InboxItem)
 
-export const needsYouGroups = ["stopped", "reviews", "mine", "finished"] as const
+export type InboxItems = typeof InboxItems.Type
 
-export type NeedsYouGroup = (typeof needsYouGroups)[number]
+export const inboxGroups = ["stopped", "reviews", "mine", "finished"] as const
 
-export const needsYouGroupOf = (item: NeedsYouItem): NeedsYouGroup =>
+export type InboxGroup = (typeof inboxGroups)[number]
+
+export const inboxGroupOf = (item: InboxItem): InboxGroup =>
   Match.valueTags(item, {
     OutsideQuestion: () => "stopped" as const,
     CheckIn: () => "stopped" as const,
@@ -143,5 +145,3 @@ export const needsYouGroupOf = (item: NeedsYouItem): NeedsYouGroup =>
         ? ("reviews" as const)
         : ("mine" as const),
   })
-
-export type NeedsYou = typeof NeedsYou.Type
