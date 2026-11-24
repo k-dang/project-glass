@@ -126,9 +126,7 @@ it("opens a Chapter diagram full size from its Chapter", async () => {
   )
 
   const dialog = await screen.findByRole("dialog", { name: "Greet by name" })
-  await waitFor(() =>
-    expect(dialog.querySelector(".pele-node")?.textContent).toBe("Greet by name"),
-  )
+  await waitFor(() => expect(dialog.querySelector(".pele-node")?.textContent).toBe("Greet by name"))
 })
 
 it("opens Changes in Path order, and remembers Tour order across workspace tabs", async () => {
