@@ -495,7 +495,7 @@ function ChapterDiagram(props: { source: string; title: string }) {
       onOpenChange={setOpen}
       render={<section />}
       aria-label={`Diagram: ${props.title}`}
-      className={cn("mb-3 flex min-h-0 shrink-0 flex-col border-b pb-2", open && "max-h-[45%]")}
+      className="mb-3 flex shrink-0 flex-col border-b pb-2"
     >
       <div className="flex items-center gap-3">
         <CollapsibleTrigger
@@ -510,8 +510,8 @@ function ChapterDiagram(props: { source: string; title: string }) {
         </CollapsibleTrigger>
         {open && <DiagramLegend />}
       </div>
-      <CollapsibleContent className="mt-2 min-h-0 overflow-auto">
-        <MermaidDiagram source={props.source} />
+      <CollapsibleContent className="mt-2">
+        <MermaidDiagram source={props.source} zoomable className="[&>svg]:max-h-[40cqh]" />
       </CollapsibleContent>
     </Collapsible>
   )
@@ -695,7 +695,7 @@ function ChapterCard(props: {
           </aside>
           <div
             className={cn(
-              "flex h-(--tour-card-height) min-h-0 min-w-0 flex-col border-l px-4.5 pt-4 pb-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:h-115 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0",
+              "@container-size flex h-(--tour-card-height) min-h-0 min-w-0 flex-col border-l px-4.5 pt-4 pb-4.5 @max-[850px]/tour:p-3.5 @max-[700px]/tour:h-115 @max-[700px]/tour:border-t @max-[700px]/tour:border-l-0",
             )}
           >
             {files.length > 0 && (
