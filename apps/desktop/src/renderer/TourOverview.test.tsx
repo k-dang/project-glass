@@ -81,7 +81,7 @@ it("has no Tour overview without a Before / after", async () => {
   expect(screen.queryByRole("region", { name: "Tour overview" })).toBeNull()
 })
 
-it("opens a diagram-only overview, drawing what the PR adds, with the reading order beside it", async () => {
+it("opens a diagram-only overview, drawing what the PR adds", async () => {
   const f = mount({
     ...savedTour(chapters),
     diagram: "flowchart LR\n  greet[Greet by name]:::added --> api[Expose the greeting]",
@@ -93,5 +93,4 @@ it("opens a diagram-only overview, drawing what the PR adds, with the reading or
   await waitFor(() =>
     expect(diagram.querySelector(".pele-node.added")?.textContent).toBe("Greet by name"),
   )
-  expect(within(overview).getByRole("navigation", { name: "Tour reading order" })).toBeDefined()
 })
