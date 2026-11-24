@@ -833,11 +833,7 @@ it("names the shown Thread in the Inset title strip, never one kept in the backg
   await user.click(screen.getByRole("link", { name: other.name }))
   await screen.findByRole("heading", { name: other.name })
   expect(screen.queryByRole("heading", { name: thread.name })).toBeNull()
-  expect(
-    within(screen.getByRole("region", { name: other.name })).queryByRole("heading", {
-      name: other.name,
-    }),
-  ).toBeNull()
+  expect(screen.getByRole("heading", { name: other.name }).closest(".title-strip")).not.toBeNull()
 })
 
 it("floats a Thread's details over its chat on a wide window, until the user hides them", async () => {

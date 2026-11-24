@@ -224,7 +224,7 @@ export function TitleStripResourceUsage() {
         usage={usage}
         side="bottom"
         sideOffset={6}
-        className="h-7 rounded-md px-2 outline-none [app-region:no-drag] hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/5"
+        className="h-7 rounded-md px-2 outline-none @max-[10rem]:hidden hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/5"
       >
         <Reading
           kind="cpu"

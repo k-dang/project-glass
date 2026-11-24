@@ -547,6 +547,10 @@
   user-select: none;
 }
 
+.title-strip :is(a, button, input, select, textarea, [role="button"], [tabindex]) {
+  app-region: no-drag;
+}
+
 [data-layout="inset"] .title-strip {
   background: var(--chrome);
 }

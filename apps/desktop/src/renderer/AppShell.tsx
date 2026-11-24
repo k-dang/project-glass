@@ -49,7 +49,7 @@ import {
   TitleStripResourceUsage,
   titleStripResourceUsageAtom,
 } from "./ResourceUsage"
-import { ShellPanelSlot, ShellTitleSlot } from "./shellPanelSlot"
+import { ShellPanelSlot, ShellTitleSlot, useShellSlot } from "./shellSlots"
 import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog"
 import { useAppearance } from "./theme"
 
@@ -246,15 +246,8 @@ function ClassicFrame(props: { rail: ReactNode; children: ReactNode }) {
 function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
   const showsResourceUsage = useAtomValue(titleStripResourceUsageAtom)
 
-  const [panelSlot] = useState(() =>
-    Object.assign(document.createElement("div"), { className: "contents" }),
-  )
-
-  const [titleSlot] = useState(() =>
-    Object.assign(document.createElement("div"), {
-      className: "flex min-w-0 flex-1 items-center gap-2 pl-2 pr-3 text-sm",
-    }),
-  )
+  const [panelSlot, attachPanelSlot] = useShellSlot()
+  const [titleSlot, attachTitleSlot] = useShellSlot()
 
   return (
     <div className="flex min-h-0 flex-1 bg-chrome">
@@ -269,21 +262,11 @@ function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
         </div>
         {props.rail}
       </aside>
-      <div
-        ref={(node) => {
-          if (node !== null && panelSlot.parentNode !== node) node.append(panelSlot)
-        }}
-        className="contents"
-      />
+      <div ref={attachPanelSlot} className="contents" />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="title-strip title-strip-clear-controls flex shrink-0 items-center pl-[max(0px,calc(env(titlebar-area-x,0px)-3.5rem))]">
           <HistoryNav />
-          <div
-            ref={(node) => {
-              if (node !== null && titleSlot.parentNode !== node) node.append(titleSlot)
-            }}
-            className="contents"
-          />
+          <div ref={attachTitleSlot} className="contents" />
           {showsResourceUsage && <TitleStripResourceUsage />}
         </div>
         <div className="mr-2 mb-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
