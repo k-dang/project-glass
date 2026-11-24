@@ -248,6 +248,11 @@ A named Mermaid picture a Thread's agent draws beside the Thread when the user a
 one.
 _Avoid_: Artifact, chart, whiteboard
 
+**Visualization**:
+An HTML page a Thread's agent or the Global chat shows inline in its reply, such as a chart, table,
+or mockup, kept as it was when shown.
+_Avoid_: Artifact, render, HTML page, preview
+
 **File pane**:
 A file from a Thread's folder shown beside the Thread, opened from a path the agent
 named. An HTML file opens in the Browser pane instead.

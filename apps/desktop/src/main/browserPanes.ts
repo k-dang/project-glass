@@ -4,6 +4,7 @@ import {
   isLoopbackHost,
   SANDBOX_BROWSER_PARTITION,
   THREAD_FILE_SCHEME,
+  VISUALIZATION_SCHEME,
 } from "@glass/contracts/desktop"
 import { app, ipcMain, type Session, session, type WebContents, webContents } from "electron"
 
@@ -44,6 +45,16 @@ const reachesThisDevice = async (resolver: Session, address: string) => {
   } catch {
     return false
   }
+}
+
+export const keepVisualizationsOffThisDevice = () => {
+  const glass = session.defaultSession
+
+  glass.webRequest.onBeforeRequest({ urls: ["https://*/*"] }, (details, callback) => {
+    if (details.frame?.url.startsWith(`${VISUALIZATION_SCHEME}:`) !== true) return callback({})
+
+    void reachesThisDevice(glass, details.url).then((cancel) => callback({ cancel }))
+  })
 }
 
 const keepToPage = (event: { readonly url: string; preventDefault: () => void }) => {

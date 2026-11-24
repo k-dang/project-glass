@@ -13,6 +13,7 @@ import { AskProgress } from "./AskProgress"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
 import { GlassToolRelay } from "./GlassToolRelay"
 import { BrowserMcpTools } from "./browserTools"
+import { VisualizationToolHandlers, VisualizationTools } from "./visualizationTools"
 import { McpCaller, McpCredentials, OutsideAgentCaller } from "./McpCredentials"
 import { claimOpenedSession, glassMcpHttp, MCP_PATH, ownsSession, SESSION_HEADER } from "./mcpHttp"
 import { requestUrls } from "./McpOAuth"
@@ -145,6 +146,8 @@ export const GlassMcpTools = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(BrowserMcpTools),
+  Layer.provide(McpServer.toolkit(VisualizationTools)),
+  Layer.provide(VisualizationToolHandlers),
   Layer.provide(McpServer.toolkit(GlassTools)),
   Layer.provide(GlassToolHandlers),
 )

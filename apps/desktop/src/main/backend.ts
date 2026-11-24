@@ -1,4 +1,4 @@
-import { RPC_PATH, THREAD_FILES_PATH, TOKEN_PARAM } from "@glass/contracts"
+import { RPC_PATH, THREAD_FILES_PATH, TOKEN_PARAM, VISUALIZATIONS_PATH } from "@glass/contracts"
 import type { BackendEndpoint, BackendFailure } from "@glass/contracts/desktop"
 import { Cause, Deferred, Duration, Effect, Fiber, Option } from "effect"
 import { app, type UtilityProcess, utilityProcess } from "electron"
@@ -9,16 +9,19 @@ import { prependLoginShellPath } from "./loginShellPath"
 
 const STOP_DEADLINE = Duration.seconds(10)
 
-export const threadFileUrl = (endpoint: BackendEndpoint, threadId: string, pathname: string) => {
-  const url = new URL(
-    `${THREAD_FILES_PATH}/${encodeURIComponent(threadId)}${pathname}`,
-    endpoint.url.replace(/^ws/, "http"),
-  )
+const backendUrl = (endpoint: BackendEndpoint, path: string) => {
+  const url = new URL(path, endpoint.url.replace(/^ws/, "http"))
 
   url.searchParams.set(TOKEN_PARAM, endpoint.token)
 
   return url.href
 }
+
+export const threadFileUrl = (endpoint: BackendEndpoint, threadId: string, pathname: string) =>
+  backendUrl(endpoint, `${THREAD_FILES_PATH}/${encodeURIComponent(threadId)}${pathname}`)
+
+export const visualizationUrl = (endpoint: BackendEndpoint, id: string) =>
+  backendUrl(endpoint, `${VISUALIZATIONS_PATH}/${encodeURIComponent(id)}`)
 
 // WARNING: UtilityProcess.kill() SIGKILLs 2 s after its SIGTERM (Chromium EnsureProcessTerminated), cutting off the Agent host's shutdown.
 const stopBackend = (backend: UtilityProcess, exitCode: Promise<number>) =>
