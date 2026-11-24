@@ -115,6 +115,14 @@ describe("show_visualization", () => {
       const fromFile = yield* call(SHOW_VISUALIZATION_TOOL, { title: "Table", path: "table.html" })
       assert.isTrue(fromFile.isError)
       assert.include(toolText(fromFile), "Pass html instead")
+
+      const withImage = yield* call(SHOW_VISUALIZATION_TOOL, {
+        title: "Table",
+        html: `<!doctype html><img src="/tmp/chart.png">`,
+      })
+
+      assert.isTrue(withImage.isError)
+      assert.include(toolText(withImage), "/tmp/chart.png")
     }),
   )
 })

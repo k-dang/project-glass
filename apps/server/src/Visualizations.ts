@@ -110,7 +110,7 @@ export class Visualizations extends Context.Service<
           Thread: (thread) => Effect.succeed(thread.threadId),
           GlobalChat: () =>
             refuse(
-              "Only a Thread's agent can show local images, from its folder. Use https images instead.",
+              `Only a Thread's agent can show local images, from its folder. Glass found these in the page: ${references.map(({ path }) => path).join(", ")}. Use https images instead, or remove them.`,
             ),
         })
 
