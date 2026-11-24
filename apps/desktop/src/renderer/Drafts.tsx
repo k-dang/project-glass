@@ -162,7 +162,6 @@ function DraftActions(props: {
             disabled={disabled || empty}
             onClick={props.onAsk}
             aria-label={`Ask the agent about ${draftName(draft)}`}
-            title="Ask the agent instead. Only you see the answer; nothing goes to GitHub."
             className="mr-auto text-primary"
           >
             <Sparkles data-icon="inline-start" aria-hidden />
