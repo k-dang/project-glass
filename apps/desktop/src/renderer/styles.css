@@ -772,6 +772,44 @@
   padding: 0;
 }
 
+.thread-markdown-table {
+  overflow-x: auto;
+}
+
+.thread-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow-wrap: normal;
+}
+
+.thread-markdown :is(thead, tbody, tr) {
+  border: 0;
+  background: none;
+}
+
+.thread-markdown :is(th, td) {
+  max-width: 24rem;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+  white-space: normal;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+}
+
+.thread-markdown :is(th, td):first-child {
+  padding-inline-start: 0;
+}
+
+.thread-markdown :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.thread-markdown th {
+  font-weight: 600;
+}
+
 .thread-markdown li + li {
   margin-top: 0.25rem;
 }

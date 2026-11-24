@@ -378,6 +378,11 @@ function MarkdownImage(props: ComponentProps<typeof defaultComponents.img>) {
 const markdownComponents: Components = {
   a: MarkdownLink,
   img: MarkdownImage,
+  table: ({ node: _node, ...props }) => (
+    <div className="thread-markdown-table">
+      <table {...props} />
+    </div>
+  ),
   code: (props) => {
     const language = /language-(\S+)/.exec(props.className ?? "")?.[1] ?? ""
 
