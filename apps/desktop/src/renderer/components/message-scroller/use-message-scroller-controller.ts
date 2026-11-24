@@ -443,7 +443,20 @@ function useMessageScrollerController({
 
           handledScrollAnchorsRef.current.add(anchor)
 
-          if (autoScrollRef.current && modeRef.current === "free-scrolling") {
+          // A reader who scrolled away stays put. The mode alone can't tell: a
+          // wheel at the end scrolls nothing, so no scroll event re-arms
+          // following. They were at the end if the appended items start within
+          // the viewport.
+          const viewport = viewportRef.current
+          const firstAppended = items[previousItemCount]
+
+          const wasAtEnd =
+            !!viewport &&
+            !!firstAppended &&
+            getElementTop(firstAppended, viewport) - spacerGapRef.current <=
+              viewport.scrollTop + viewport.clientHeight + scrollEdgeThresholdRef.current
+
+          if (autoScrollRef.current && modeRef.current === "free-scrolling" && !wasAtEnd) {
             commitScrollState()
             scheduleVisibilitySync()
 
