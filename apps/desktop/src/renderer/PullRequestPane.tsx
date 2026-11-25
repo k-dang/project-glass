@@ -18,7 +18,7 @@ import { settledProblem } from "./problems"
 import { LineCounts } from "./LineCounts"
 import { useLiveStatus } from "./liveStatus"
 import { plural } from "./plural"
-import { ChecksChip, ConflictsChip, ReviewersChip } from "./PullRequestStatus"
+import { InlineStatusChips } from "./PullRequestStatus"
 import { preloadAtom, reloadPreloaded } from "./reviewsArea"
 import { SidePanel } from "./SidePanel"
 import { Timeline } from "./Timeline"
@@ -129,8 +129,12 @@ function LoadedPullRequest(props: {
       <div className="flex flex-col gap-2 border-b px-5 py-3 text-sm">
         <h3 className="truncate text-base font-semibold">{pullRequest.title}</h3>
         <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
-          <span className="min-w-0 truncate font-mono">
-            {pullRequest.baseBranch} ← {pullRequest.headBranch}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate font-mono">
+              {pullRequest.baseBranch} ← {pullRequest.headBranch}
+            </span>
+            <span aria-hidden>·</span>
+            <span className="shrink-0">by {pullRequest.author}</span>
           </span>
           <span className="ml-auto flex shrink-0 items-center gap-2 tabular-nums">
             <FileDiff aria-hidden className="size-3.5" />
@@ -148,19 +152,12 @@ function LoadedPullRequest(props: {
             <TabsTrigger value="summary">Summary</TabsTrigger>
             <TabsTrigger value="code">Code</TabsTrigger>
           </TabsList>
-          <span className="ml-auto">
-            <ChecksChip pullRequest={pullRequest} />
-          </span>
+          <InlineStatusChips pullRequest={pullRequest} />
         </div>
         <TabsContent
           value="summary"
           className="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 py-4"
         >
-          <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-            <span className="mr-1">by {pullRequest.author}</span>
-            <ReviewersChip pullRequest={pullRequest} />
-            <ConflictsChip pullRequest={pullRequest} />
-          </div>
           <DescriptionBody html={pullRequest.descriptionHtml} />
           <Timeline items={timeline} reactions={props.reactions} />
         </TabsContent>
