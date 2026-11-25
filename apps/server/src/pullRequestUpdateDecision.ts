@@ -14,7 +14,7 @@ import {
   type WaitingReviewThread,
 } from "@glass/contracts"
 import { Array as Arr, Data, Predicate, Record, Schema } from "effect"
-import type { SubscribedRead } from "./github/repositoryPullRequests"
+import type { SubscribedDetails } from "./github/repositoryPullRequests"
 
 export const GIVES_UP_AFTER = 3
 
@@ -57,7 +57,7 @@ export type PullRequestNow = Data.TaggedEnum<{
     readonly checks: Checks
     readonly failingChecks: ReadonlyArray<Check>
     readonly mergeConflict: boolean | null
-    readonly read: SubscribedRead
+    readonly details: SubscribedDetails
   }
   Ended: { readonly state: EndedState }
 }>
@@ -74,15 +74,15 @@ export interface Decision {
 
 const nothingStanding: Decision["standing"] = Record.map(noUpdates, () => null)
 
-type Kept = Exclude<keyof Told, "updates">
+type ToldKey = Exclude<keyof Told, "updates">
 
-interface Part<Key extends Kept> {
+interface ReasonNow<Key extends ToldKey> {
   readonly told: Told[Key]
   readonly reason: PullRequestUpdateReason | null
   readonly state: "holds" | "cleared" | "unsettled"
 }
 
-interface Decided<Key extends Kept> {
+interface ReasonDecision<Key extends ToldKey> {
   readonly told: Told[Key]
   readonly reason: PullRequestUpdateReason | null
   readonly updates: number
@@ -94,9 +94,9 @@ type Open = Extract<PullRequestNow, { _tag: "Open" }>
 const runOf = ({ name, url }: Pick<Check, "name" | "url">) => `${name}\n${url ?? ""}`
 
 const failingChecks = (
-  { checks: rollup, failingChecks: failing, read }: Open,
+  { checks: rollup, failingChecks: failing, details }: Open,
   told: Told,
-): Part<"failedRuns"> => {
+): ReasonNow<"failedRuns"> => {
   const checks = failing.map(({ name, url }) => ({ name, url }))
 
   if (!Arr.isReadonlyArrayNonEmpty(checks))
@@ -110,17 +110,19 @@ const failingChecks = (
   const before = told.failedRuns
 
   const another =
-    before === null || before.head !== read.head || runs.some((run) => !before.runs.includes(run))
+    before === null ||
+    before.head !== details.head ||
+    runs.some((run) => !before.runs.includes(run))
 
   return {
-    told: { head: read.head, runs },
-    reason: another ? FailingChecksReason.make({ head: read.head, checks }) : null,
+    told: { head: details.head, runs },
+    reason: another ? FailingChecksReason.make({ head: details.head, checks }) : null,
     state: "holds",
   }
 }
 
-const allowedThreads = ({ read }: Open) =>
-  read.reviewThreads.flatMap(({ id, path, line, comments }) => {
+const allowedThreads = ({ details }: Open) =>
+  details.reviewThreads.flatMap(({ id, path, line, comments }) => {
     const waiting = comments.at(-1)
 
     const allowed = comments.flatMap(({ hasWriteAccess, ...comment }) =>
@@ -137,13 +139,16 @@ const allowedThreads = ({ read }: Open) =>
       : []
   })
 
-export const heldBack = ({ reviewThreads, changesRequested: reviews }: SubscribedRead) => ({
+export const feedbackHeldBack = ({
+  reviewThreads,
+  changesRequested: reviews,
+}: SubscribedDetails) => ({
   reviewThreads: reviewThreads.filter(({ comments }) => comments.at(-1)?.hasWriteAccess !== true)
     .length,
   changesRequested: reviews.some(({ hasWriteAccess }) => !hasWriteAccess),
 })
 
-const reviewFeedback = (now: Open, told: Told): Part<"reviewComments"> => {
+const reviewFeedback = (now: Open, told: Told): ReasonNow<"reviewComments"> => {
   const allowed = allowedThreads(now)
   const waiting = allowed.map((thread) => thread.waiting)
   const reviewThreads = allowed.map((thread) => thread.reviewThread)
@@ -159,8 +164,8 @@ const reviewFeedback = (now: Open, told: Told): Part<"reviewComments"> => {
   }
 }
 
-const changesRequested = ({ read }: Open, told: Told): Part<"changesRequested"> => {
-  const allowed = read.changesRequested.filter(({ hasWriteAccess }) => hasWriteAccess)
+const changesRequested = ({ details }: Open, told: Told): ReasonNow<"changesRequested"> => {
+  const allowed = details.changesRequested.filter(({ hasWriteAccess }) => hasWriteAccess)
   const reviews = allowed.map(({ reviewId }) => reviewId)
   const reviewers = Arr.dedupe(allowed.map(({ author }) => author))
 
@@ -176,16 +181,17 @@ const changesRequested = ({ read }: Open, told: Told): Part<"changesRequested"> 
 }
 
 const mergeConflict = (
-  { mergeConflict: conflict, read }: Open,
+  { mergeConflict: conflict, details }: Open,
   told: Told,
-): Part<"conflictBase"> => {
+): ReasonNow<"conflictBase"> => {
   if (conflict === null) return { told: told.conflictBase, reason: null, state: "unsettled" }
 
   if (!conflict) return { told: null, reason: null, state: "cleared" }
 
   return {
-    told: read.base,
-    reason: told.conflictBase === read.base ? null : MergeConflictReason.make({ base: read.base }),
+    told: details.base,
+    reason:
+      told.conflictBase === details.base ? null : MergeConflictReason.make({ base: details.base }),
     state: "holds",
   }
 }
@@ -204,16 +210,16 @@ export const decide = (
         : [],
     }
 
-  const part = <Key extends Kept>(
+  const decideReason = <Key extends ToldKey>(
     reason: OpenReason,
     key: Key,
-    decided: (now: Open, told: Told) => Part<Key>,
-  ): Decided<Key> => {
+    standsNow: (now: Open, told: Told) => ReasonNow<Key>,
+  ): ReasonDecision<Key> => {
     const updates = told.updates[reason]
 
     if (!covered.includes(reason)) return { told: told[key], reason: null, updates, standing: null }
 
-    const found = decided(now, told)
+    const found = standsNow(now, told)
 
     if (found.reason === null)
       return {
@@ -229,10 +235,10 @@ export const decide = (
   }
 
   const decided = {
-    "failing-checks": part("failing-checks", "failedRuns", failingChecks),
-    "review-feedback": part("review-feedback", "reviewComments", reviewFeedback),
-    "changes-requested": part("changes-requested", "changesRequested", changesRequested),
-    "merge-conflict": part("merge-conflict", "conflictBase", mergeConflict),
+    "failing-checks": decideReason("failing-checks", "failedRuns", failingChecks),
+    "review-feedback": decideReason("review-feedback", "reviewComments", reviewFeedback),
+    "changes-requested": decideReason("changes-requested", "changesRequested", changesRequested),
+    "merge-conflict": decideReason("merge-conflict", "conflictBase", mergeConflict),
   } satisfies Record<OpenReason, unknown>
 
   return {

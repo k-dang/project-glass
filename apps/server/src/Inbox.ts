@@ -50,7 +50,7 @@ import {
   summaryOf,
 } from "./PullRequestMirror"
 import { type PullRequestStanding, PullRequestUpdates } from "./PullRequestUpdates"
-import { heldBack } from "./pullRequestUpdateDecision"
+import { feedbackHeldBack } from "./pullRequestUpdateDecision"
 import { Queue } from "./Queue"
 import type { WaitingRequest } from "./Transcripts"
 
@@ -140,11 +140,11 @@ const inboxOf = (waiting: Waiting): InboxItems =>
   )
 
 const reasonsOf = (
-  { attention, checks, subscribed, ref }: MirroredPullRequest,
+  { attention, checks, details, ref }: MirroredPullRequest,
   standings: ReadonlyArray<PullRequestStanding>,
 ) => {
   const reasons: Array<PullRequestReason> = []
-  const held = subscribed === null ? null : heldBack(subscribed)
+  const held = details === null ? null : feedbackHeldBack(details)
 
   const standingOn = (reason: OpenReason, holds: boolean) => {
     const standing = holds

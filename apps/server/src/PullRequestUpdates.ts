@@ -59,7 +59,7 @@ const subscribedNow = (
 
   const mirrored = mirroredPullRequest(mirror, pullRequest)
 
-  return mirrored?.attention == null || mirrored.subscribed === null
+  return mirrored?.attention == null || mirrored.details === null
     ? undefined
     : {
         pullRequest: mirrored.ref,
@@ -67,7 +67,7 @@ const subscribedNow = (
           checks: mirrored.checks,
           failingChecks: mirrored.attention.failingChecks,
           mergeConflict: mirrored.attention.mergeConflict,
-          read: mirrored.subscribed,
+          details: mirrored.details,
         }),
       }
 }
@@ -160,22 +160,28 @@ export class PullRequestUpdates extends Context.Service<
           Effect.gen(function* () {
             const { all, lastMessageTurn } = yield* decided(threadId)
 
-            const toldBy = (sends: boolean) =>
-              all.flatMap(({ state, pullRequest, before, decision }) => {
-                const tells = decision.reasons.length > 0
-                const ends = state.ended !== null && tells
+            const toldAnew = all.flatMap(({ state, pullRequest, before, decision }) => {
+              const tells = decision.reasons.length > 0
+              const ends = state.ended !== null && tells
 
-                return (sends || !tells) && (ends || !sameTold(decision.told, before))
-                  ? [
-                      {
+              return ends || !sameTold(decision.told, before)
+                ? [
+                    {
+                      tells,
+                      told: {
                         subscriptionId: state.subscription.id,
                         pullRequest,
                         told: decision.told,
                         ends,
                       },
-                    ]
-                  : []
-              })
+                    },
+                  ]
+                : []
+            })
+
+            const toldBySending = toldAnew.map(({ told }) => told)
+
+            const toldWithoutSending = toldAnew.flatMap(({ tells, told }) => (tells ? [] : [told]))
 
             const updated = yield* Effect.forEach(
               all,
@@ -197,13 +203,13 @@ export class PullRequestUpdates extends Context.Service<
             ).pipe(Effect.map(Arr.flatten))
 
             if (!Arr.isReadonlyArrayNonEmpty(updated)) {
-              yield* subscriptions.recordTold(toldBy(true), lastMessageTurn)
+              yield* subscriptions.recordTold(toldWithoutSending, lastMessageTurn)
 
               return
             }
 
             if ((yield* transcripts.runningPullRequestUpdates).length >= RUN_AT_ONCE) {
-              yield* subscriptions.recordTold(toldBy(false), lastMessageTurn)
+              yield* subscriptions.recordTold(toldWithoutSending, lastMessageTurn)
               yield* waits
 
               return
@@ -222,7 +228,7 @@ export class PullRequestUpdates extends Context.Service<
               },
               (turnId) =>
                 subscriptions
-                  .recordTold(toldBy(true), lastMessageTurn)
+                  .recordTold(toldBySending, lastMessageTurn)
                   .pipe(Effect.andThen(Ref.set(started, turnId))),
             ).pipe(
               Effect.onExit(
@@ -245,7 +251,7 @@ export class PullRequestUpdates extends Context.Service<
                       ).join(),
                     },
                   })
-                  yield* subscriptions.toldChanged
+                  yield* subscriptions.announceChange
                 }),
               ),
             )

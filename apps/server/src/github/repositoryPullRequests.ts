@@ -317,7 +317,7 @@ export const SUBSCRIBED_PULL_REQUESTS_QUERY = `query SubscribedPullRequests($ids
   }
 }`
 
-const authored = {
+const gitHubAuthorFields = {
   author: GitHubAuthor,
   authorAssociation: Schema.String,
 }
@@ -331,7 +331,7 @@ export const SubscribedPullRequestsData = Schema.Struct({
         baseRefOid: Schema.String,
         latestOpinionatedReviews: Schema.Struct({
           nodes: Schema.Array(
-            Schema.Struct({ id: Schema.String, state: ReviewState, ...authored }),
+            Schema.Struct({ id: Schema.String, state: ReviewState, ...gitHubAuthorFields }),
           ),
         }),
         reviewThreads: Schema.Struct({
@@ -347,7 +347,7 @@ export const SubscribedPullRequestsData = Schema.Struct({
                     id: Schema.String,
                     body: Schema.String,
                     viewerDidAuthor: Schema.Boolean,
-                    ...authored,
+                    ...gitHubAuthorFields,
                   }),
                 ),
               }),
@@ -359,9 +359,9 @@ export const SubscribedPullRequestsData = Schema.Struct({
   ),
 })
 
-const Authored = { author: Schema.String, hasWriteAccess: Schema.Boolean }
+const authorFields = { author: Schema.String, hasWriteAccess: Schema.Boolean }
 
-export const SubscribedRead = Schema.Struct({
+export const SubscribedDetails = Schema.Struct({
   head: Schema.String,
   base: Schema.String,
   reviewThreads: Schema.Array(
@@ -370,18 +370,18 @@ export const SubscribedRead = Schema.Struct({
       path: Schema.String,
       line: Schema.NullOr(Schema.Int),
       comments: Schema.Array(
-        Schema.Struct({ id: Schema.String, body: Schema.String, ...Authored }),
+        Schema.Struct({ id: Schema.String, body: Schema.String, ...authorFields }),
       ),
     }),
   ),
-  changesRequested: Schema.Array(Schema.Struct({ reviewId: Schema.String, ...Authored })),
+  changesRequested: Schema.Array(Schema.Struct({ reviewId: Schema.String, ...authorFields })),
 })
 
-export type SubscribedRead = typeof SubscribedRead.Type
+export type SubscribedDetails = typeof SubscribedDetails.Type
 
 export interface SubscribedPullRequest {
   readonly attention: Attention
-  readonly subscribed: SubscribedRead
+  readonly details: SubscribedDetails
 }
 
 // WARNING: GitHub's author association is the only sign of write access a PR's comments carry; owners, members and collaborators have it.
@@ -410,7 +410,7 @@ export const toSubscribedPullRequests = (
               node.id,
               {
                 attention: attentionOf(node),
-                subscribed: {
+                details: {
                   head: node.headRefOid,
                   base: node.baseRefOid,
                   reviewThreads: node.reviewThreads.nodes.filter(awaitsReply).map((thread) => ({

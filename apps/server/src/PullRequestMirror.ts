@@ -33,7 +33,7 @@ import {
   type CandidatesPage,
   type CheckObservation,
   type SubscribedPullRequest,
-  SubscribedRead,
+  SubscribedDetails,
 } from "./github/repositoryPullRequests"
 import { ServerConfig } from "./ServerConfig"
 
@@ -57,7 +57,7 @@ const MirroredPullRequest = Schema.Struct({
   ),
   checks: Checks,
   attention: Schema.NullOr(Attention),
-  subscribed: Schema.NullOr(SubscribedRead),
+  details: Schema.NullOr(SubscribedDetails),
   viewerIsAuthor: Schema.Boolean,
   viewerHasDrafts: Schema.Boolean,
   viewerHasSubmittedReview: Schema.Boolean,
@@ -240,7 +240,7 @@ export class PullRequestMirror extends Context.Service<
           ...fields,
           checks: known?.head === fields.head ? known.checks : "unavailable",
           attention: known?.attention ?? null,
-          subscribed: known?.subscribed ?? null,
+          details: known?.details ?? null,
           requestedUsers,
           requestedTeams,
         } satisfies MirroredPullRequest
@@ -365,7 +365,7 @@ export class PullRequestMirror extends Context.Service<
             }),
           )
 
-        const [result, attention, read] = yield* Effect.all(
+        const [result, attention, ofSubscribed] = yield* Effect.all(
           [latestChecks, latestAttention(others), latestSubscribed(subscribed)],
           { concurrency: "unbounded" },
         )
@@ -379,7 +379,7 @@ export class PullRequestMirror extends Context.Service<
             repositories: mirror.repositories.map((repository) => ({
               ...repository,
               pullRequests: repository.pullRequests.map((pr) => {
-                const latest = read.get(pr.id)?.attention ?? attention.get(pr.id)
+                const latest = ofSubscribed.get(pr.id)?.attention ?? attention.get(pr.id)
 
                 return {
                   ...pr,
@@ -392,8 +392,8 @@ export class PullRequestMirror extends Context.Service<
                           mergeConflict:
                             latest.mergeConflict ?? pr.attention?.mergeConflict ?? null,
                         },
-                  subscribed: subscribedIds.has(pr.id)
-                    ? (read.get(pr.id)?.subscribed ?? pr.subscribed)
+                  details: subscribedIds.has(pr.id)
+                    ? (ofSubscribed.get(pr.id)?.details ?? pr.details)
                     : null,
                 }
               }),

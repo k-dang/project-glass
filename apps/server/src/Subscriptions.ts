@@ -184,7 +184,7 @@ export class Subscriptions extends Context.Service<
       told: ReadonlyArray<ToldSubscription>,
       lastMessageTurn: string | null,
     ) => Effect.Effect<void, ThreadError>
-    readonly toldChanged: Effect.Effect<void>
+    readonly announceChange: Effect.Effect<void>
   }
 >()("@glass/server/Subscriptions") {
   static readonly layer = Layer.effect(
@@ -459,7 +459,7 @@ export class Subscriptions extends Context.Service<
                   `,
             { discard: true },
           ).pipe(Effect.catch(storageFailure)),
-        toldChanged: wrote,
+        announceChange: wrote,
       })
     }),
   )
