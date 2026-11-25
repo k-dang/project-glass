@@ -80,7 +80,10 @@ const startRelay = Effect.gen(function* () {
         signal: request.signal,
       })
     },
-    { resolveToken: Effect.succeed({ token: Redacted.make(VIEWER.token), source: "gh" as const }) },
+    {
+      resolveToken: Effect.succeed({ token: Redacted.make(VIEWER.token), source: "gh" as const }),
+      forgetToken: Effect.void,
+    },
   )
 
   return {

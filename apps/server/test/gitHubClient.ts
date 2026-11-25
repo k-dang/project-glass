@@ -8,6 +8,7 @@ export const clientWith = Effect.fnUntraced(function* (
   fetch: typeof globalThis.fetch,
   auth: GitHubAuth["Service"] = {
     resolveToken: Effect.succeed({ token: Redacted.make("test-token"), source: "gh" as const }),
+    forgetToken: Effect.void,
   },
 ) {
   const services = yield* Layer.build(
