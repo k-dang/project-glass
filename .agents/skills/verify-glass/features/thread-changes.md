@@ -1,6 +1,6 @@
 # Thread changes
 
-A local Thread's Changes view shows its worktree diff. The view keeps its Revision until Show latest, even when another Turn changes files. The user can leave Feedback notes on lines of it, kept beside their code across restarts. Each saved note goes straight onto the Thread's message, which sends the notes with their code as one message, or queues it while a Turn runs. After Show latest, earlier notes leave the Changes pane and stay on the message with their code. Canceling queued feedback returns its notes to the message.
+A local Thread's Changes view shows its worktree diff. The view keeps its Revision until Show latest, even when another Turn changes files. The user can leave Feedback notes on lines of it, kept beside their code across restarts. Each saved note goes straight onto the Thread's message, listed there collapsed under a count, which sends the notes with their code as one message, or queues it while a Turn runs. After Show latest, earlier notes leave the Changes pane and stay on the message with their code. Canceling queued feedback returns its notes to the message.
 
 ## Sub-features
 
@@ -23,16 +23,16 @@ Open a Thread and press Ctrl+D (⌘D on macOS), then D, to open the Changes pane
 
 Feedback notes, from step 3's Changes:
 
-1. `click --role StaticText --name "hello from the agent"`, `press --key ArrowDown --shift`, `wait --text "New line 1"`. Click `Add feedback`, `type --role textbox --name "Feedback on selected code" --text ...`, click `Add note`, and `wait` for the text. Snapshot: `article "Feedback on notes.txt New line 1"` under the line, and the same note in `region "Feedback attached to this message"` above Message. The pane has no file list or Feedback tab: files without notes start collapsed and notes sit under their lines.
+1. `click --role StaticText --name "hello from the agent"`, `press --key ArrowDown --shift`, `wait --text "New line 1"`. Click `Add feedback`, `type --role textbox --name "Feedback on selected code" --text ...`, click `Add note`, and `wait` for the text. Snapshot: `article "Feedback on notes.txt New line 1"` under the line, and `region "Feedback attached to this message"` above Message, collapsed to `1 Feedback note attached to this message`. The pane has no file list or Feedback tab: files without notes start collapsed and notes sit under their lines.
 2. Click `Edit`, type new text, click `Save changes`, `wait` for it.
 3. Run `kill-backend` four times, each once `doctor` shows Backend health OK again, then `wait --text "keeps stopping"` and click `Relaunch Glass`. Reopen the Thread's Changes: notes.txt starts expanded because it has a note, and the edited note is under its line, without an Older version label.
-4. Run step 4 above, then `Show latest`. The note leaves the Changes pane; `region "Feedback attached to this message"` still shows it with `hello from the agent` as its code. Click its `Remove`; the attachment disappears.
+4. Run step 4 above, then `Show latest`. The note leaves the Changes pane; clicking `DisclosureTriangle "1 Feedback note attached to this message"` above Message shows it with `hello from the agent` as its code. Click its `Remove`; the attachment disappears.
 
 Sending feedback, from a note added in Changes:
 
 1. `wait --text "attached to this message"`. Type an instruction in Message, screenshot, and click `Send`. `wait --text "1 Feedback note"`: the demo Thread's reply quotes the `<glass_feedback>` block it received, with the note's code, and the note is gone from Changes and from the message.
 2. Send `Please work slowly` (about 17s of reply), then at once add another note in Changes and click `Send`. `wait --text "Starts when the agent finishes"` and screenshot the Queued message. `wait --text "All done"`, then the queued feedback starts its own Turn.
-3. To cancel it in time, queue it behind two slow messages: send `Please work slowly`, then `Please work slowly again`, then add a note and click `Send`. Type something in Message and click `Cancel: Feedback on the Thread's changes`: the typed text stays. The note is back on the message and under its line in Changes; `Edit` it and click `Send`. The reply quotes the edited note.
+3. To cancel it in time, queue it behind two slow messages: send `Please work slowly`, then `Please work slowly again`, then add a note and click `Send`. Type something in Message and click `Cancel: Feedback notes without a message`: the typed text stays. The note is back on the message and under its line in Changes; `Edit` it and click `Send`. The reply quotes the edited note.
 
 ## Gotchas
 

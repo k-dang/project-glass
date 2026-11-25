@@ -155,48 +155,47 @@ export function AttachedFeedback(props: {
   const { editing, onEditingChange: setEditing } = props
 
   return (
-    <section
-      aria-label="Feedback attached to this message"
-      className="flex max-h-72 flex-col gap-2 overflow-y-auto py-1 text-left"
-    >
-      <p className="text-xs text-muted-foreground">
-        {plural(props.notes.length, "Feedback note")} attached to this message
-      </p>
-      <ul className="flex flex-col gap-2">
-        {props.notes.map((note) => (
-          <li key={note.id}>
-            {editing?.id === note.id ? (
-              <FeedbackEditor
-                place={viewOf(note).place}
-                about={viewOf(note).about}
-                olderCode={null}
-                saved
-                draft={editing.draft}
-                onDraftChange={(draft) => setEditing({ id: note.id, draft })}
-                onSave={async (text) => {
-                  const problem = await props.onSave(withText(note, text))
+    <section aria-label="Feedback attached to this message" className="py-1 text-left">
+      <details>
+        <summary className="cursor-pointer text-xs text-muted-foreground">
+          {plural(props.notes.length, "Feedback note")} attached to this message
+        </summary>
+        <ul className="flex max-h-72 flex-col gap-2 overflow-y-auto pt-2">
+          {props.notes.map((note) => (
+            <li key={note.id}>
+              {editing?.id === note.id ? (
+                <FeedbackEditor
+                  place={viewOf(note).place}
+                  about={viewOf(note).about}
+                  olderCode={null}
+                  saved
+                  draft={editing.draft}
+                  onDraftChange={(draft) => setEditing({ id: note.id, draft })}
+                  onSave={async (text) => {
+                    const problem = await props.onSave(withText(note, text))
 
-                  if (problem === null) setEditing(null)
+                    if (problem === null) setEditing(null)
 
-                  return problem
-                }}
-                onCancel={() => setEditing(null)}
-              />
-            ) : (
-              <FeedbackNoteCard
-                note={note}
-                snippet="current"
-                location={viewOf(note).location}
-                onShow={null}
-                onEdit={
-                  editing === null ? () => setEditing({ id: note.id, draft: note.text }) : null
-                }
-                onRemove={() => props.onRemove(note.id)}
-              />
-            )}
-          </li>
-        ))}
-      </ul>
+                    return problem
+                  }}
+                  onCancel={() => setEditing(null)}
+                />
+              ) : (
+                <FeedbackNoteCard
+                  note={note}
+                  snippet="current"
+                  location={viewOf(note).location}
+                  onShow={null}
+                  onEdit={
+                    editing === null ? () => setEditing({ id: note.id, draft: note.text }) : null
+                  }
+                  onRemove={() => props.onRemove(note.id)}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      </details>
     </section>
   )
 }

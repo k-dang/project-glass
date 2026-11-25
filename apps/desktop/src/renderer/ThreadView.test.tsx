@@ -2462,6 +2462,7 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
   await user.keyboard("{Control>}{Enter}{/Control}")
 
   const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
+  await user.click(within(attached).getByText("1 Feedback note attached to this message"))
   expect(within(attached).getByText("docs/plan.html · “refill of five per minute”")).toBeTruthy()
   expect(within(attached).getByText("Make this ten")).toBeTruthy()
 

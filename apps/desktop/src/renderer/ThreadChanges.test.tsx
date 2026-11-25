@@ -91,7 +91,15 @@ afterEach(() => {
   window.history.replaceState(null, "", "#/")
 })
 
-const attachment = () => screen.findByRole("region", { name: "Feedback attached to this message" })
+const openAttachment = async (user: ReturnType<typeof userEvent.setup>) => {
+  const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
+  const details = attached.querySelector("details")!
+  expect(details.open).toBe(false)
+  await user.click(within(attached).getByText(/attached to this message/))
+  expect(details.open).toBe(true)
+
+  return attached
+}
 
 it("edits and removes Feedback notes, listing older ones only on the composer with their code", async () => {
   const store = savedNotes(note("current", "read-2", "Rename B"), note("older", "read-1", "Drop B"))
@@ -108,7 +116,7 @@ it("edits and removes Feedback notes, listing older ones only on the composer wi
 
   expect(within(region).queryByText("Drop B")).toBeNull()
 
-  const attached = await attachment()
+  const attached = await openAttachment(user)
   const [, older] = within(attached).getAllByRole("article")
   expect(within(older!).getByText("Drop B")).toBeTruthy()
   expect(within(older!).getByText("B")).toBeTruthy()
@@ -274,7 +282,7 @@ it("attaches saved Feedback notes beside the unsent text and sends them as one m
         : Effect.sync(() => void sent.push({ message, feedback })),
   })
 
-  const attached = await attachment()
+  const attached = await openAttachment(user)
   expect(within(attached).getAllByRole("article")).toHaveLength(2)
   expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Also add docs")
 
@@ -373,7 +381,7 @@ it("returns a canceled Queued message's Feedback notes beside newer work once a 
         : store.handlers.SaveFeedbackNote({ threadId: thread.id, note: queuedNote }),
   })
 
-  const attached = await attachment()
+  const attached = await openAttachment(user)
 
   const queue = await screen.findByRole("region", { name: "Queued messages" })
   const cancelFeedback = "Cancel: Feedback notes without a message"
