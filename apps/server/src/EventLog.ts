@@ -10,7 +10,7 @@ import {
 import { Context, DateTime, Duration, Effect, Layer, Option, Predicate, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
-const KEPT_FOR = Duration.days(30)
+export const KEPT_FOR = Duration.days(30)
 
 const happensOnce = (event: Event) =>
   Predicate.isTagged(event, "PullRequestMerged") || Predicate.isTagged(event, "PullRequestClosed")

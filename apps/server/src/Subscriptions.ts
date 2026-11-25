@@ -13,7 +13,6 @@ import {
   DateTime,
   Effect,
   Layer,
-  Option,
   Predicate,
   Schema,
   Stream,
@@ -32,7 +31,7 @@ import {
   mirroredPullRequest,
   PullRequestMirror,
 } from "./PullRequestMirror"
-import { countedAfresh, nothingTold, Told } from "./pullRequestUpdateDecision"
+import { countedAfresh, EndedState, nothingTold, Told } from "./pullRequestUpdateDecision"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Transcripts } from "./Transcripts"
 
@@ -47,7 +46,7 @@ const ReasonsJson = Schema.fromJsonString(Schema.Array(SubscriptionReason))
 const encodeReasons = Schema.encodeSync(ReasonsJson)
 
 const Ended = Schema.Struct({
-  state: Schema.Literals(["merged", "closed"]),
+  state: EndedState,
   pullRequest: PullRequestRef,
 })
 
@@ -145,10 +144,14 @@ const refusedStarters = {
 
 const refuse = (message: string) => Effect.fail(new ThreadError({ message }))
 
-const refuseEnded = (pullRequest: string, state: "merged" | "closed") =>
+const refuseEnded = (pullRequest: string, state: EndedState) =>
   refuse(`${pullRequest} has already ${state}, so there's nothing left to tell your Thread about.`)
 
-const hasEnded = ({ state }: ThreadPullRequest) => !Predicate.isTagged(state, "Open")
+const endedStateOf = ({ state }: ThreadPullRequest): EndedState | null => {
+  if (Predicate.isTagged(state, "Open")) return null
+
+  return Predicate.isTagged(state, "Merged") ? "merged" : "closed"
+}
 
 const isMirrored = (mirror: Mirror, pullRequest: PullRequestRef) =>
   mirror.repositories.some(({ repository }) => isRepositoryOf(pullRequest)(repository))
@@ -217,14 +220,11 @@ export class Subscriptions extends Context.Service<
           .pipe(Effect.provideService(BackgroundGitHubRequest, true))
 
       const refuseOwnEnded = Effect.fnUntraced(function* (threadId: string) {
-        const listed = yield* threadPullRequests.watch().pipe(Stream.runHead)
-        const own = Option.getOrThrow(listed).find((candidate) => candidate.threadId === threadId)
+        const own = yield* threadPullRequests.ofThread(threadId)
+        const ended = own === undefined ? null : endedStateOf(own)
 
-        if (own !== undefined && hasEnded(own))
-          yield* refuseEnded(
-            `Your Thread's PR #${own.ref.number}`,
-            Predicate.isTagged(own.state, "Merged") ? "merged" : "closed",
-          )
+        if (own !== undefined && ended !== null)
+          yield* refuseEnded(`Your Thread's PR #${own.ref.number}`, ended)
       })
 
       const followedPullRequest = Effect.fnUntraced(function* (pullRequest: PullRequestRef) {
@@ -339,17 +339,17 @@ export class Subscriptions extends Context.Service<
       const endOwn = Effect.fnUntraced(function* (listed: ReadonlyArray<ThreadPullRequest>) {
         yield* Effect.forEach(
           listed,
-          (own) =>
-            Predicate.isTagged(own.state, "Open")
+          (own) => {
+            const state = endedStateOf(own)
+
+            return state === null
               ? Effect.void
               : stored(sql`owner IS NULL AND ended IS NULL AND thread_id = ${own.threadId}`).pipe(
                   Effect.flatMap((subscriptions) =>
-                    endTold(subscriptions, {
-                      state: Predicate.isTagged(own.state, "Merged") ? "merged" : "closed",
-                      pullRequest: own.ref,
-                    }),
+                    endTold(subscriptions, { state, pullRequest: own.ref }),
                   ),
-                ),
+                )
+          },
           { discard: true },
         )
       })

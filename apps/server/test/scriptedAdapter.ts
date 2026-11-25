@@ -1,5 +1,6 @@
 import {
   AgentModels,
+  isUpdate,
   PartSet,
   PermissionRequestPart,
   QuestionPart,
@@ -157,9 +158,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
 
         const run = (turnId: string, { message, prompt, context }: DeliveredTurn) =>
           Effect.gen(function* () {
-            const update =
-              Predicate.isTagged(context, "StartedWorkUpdate") ||
-              Predicate.isTagged(context, "PullRequestUpdate")
+            const update = isUpdate(context)
 
             const scripted = update ? scriptedUpdateCall.exec(prompt) : scriptedCall.exec(message)
 

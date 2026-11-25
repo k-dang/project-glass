@@ -100,6 +100,7 @@ export class ThreadPullRequests extends Context.Service<
   ThreadPullRequests,
   {
     readonly watch: () => Stream.Stream<ReadonlyArray<ThreadPullRequest>>
+    readonly ofThread: (threadId: string) => Effect.Effect<ThreadPullRequest | undefined>
   }
 >()("@glass/server/ThreadPullRequests") {
   static readonly layer = Layer.effect(
@@ -199,6 +200,10 @@ export class ThreadPullRequests extends Context.Service<
 
       return ThreadPullRequests.of({
         watch: () => SubscriptionRef.changes(listed).pipe(Stream.changesWith(sameList)),
+        ofThread: (threadId) =>
+          SubscriptionRef.get(listed).pipe(
+            Effect.map((current) => current.find((own) => own.threadId === threadId)),
+          ),
       })
     }),
   )

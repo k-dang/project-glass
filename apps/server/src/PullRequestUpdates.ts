@@ -43,16 +43,16 @@ const EVENTS_READ = 50
 
 const RUN_AT_ONCE = 3
 
-interface Subscribed {
+interface SubscribedNow {
   readonly pullRequest: PullRequestRef
   readonly now: PullRequestNow
 }
 
-const subscribedTo = (
+const subscribedNow = (
   { subscription, ended }: SubscriptionState,
   mirror: Mirror | undefined,
   own: ThreadPullRequest | undefined,
-): Subscribed | undefined => {
+): SubscribedNow | undefined => {
   if (ended !== null)
     return { pullRequest: ended.pullRequest, now: PullRequestNow.Ended({ state: ended.state }) }
 
@@ -141,12 +141,11 @@ export class PullRequestUpdates extends Context.Service<
       const decided = Effect.fnUntraced(function* (threadId: string) {
         const states = yield* subscriptions.states(threadId)
         const mirrored = yield* mirror.saved
-        const listed = yield* threadPullRequests.watch().pipe(Stream.runHead)
-        const own = Option.getOrThrow(listed).find((candidate) => candidate.threadId === threadId)
+        const own = yield* threadPullRequests.ofThread(threadId)
         const lastMessageTurn = yield* transcripts.lastMessageTurn(threadId)
 
         const all = states.flatMap((state) => {
-          const subscribed = subscribedTo(state, mirrored, own)
+          const subscribed = subscribedNow(state, mirrored, own)
 
           if (subscribed === undefined) return []
 

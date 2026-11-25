@@ -63,6 +63,10 @@ export const countedAfresh = (told: Told): Told => ({ ...told, updates: noUpdate
 
 export const sameTold = Schema.toEquivalence(Told)
 
+export const EndedState = Schema.Literals(["merged", "closed"])
+
+export type EndedState = typeof EndedState.Type
+
 export type PullRequestNow = Data.TaggedEnum<{
   Open: {
     readonly checks: Checks
@@ -70,7 +74,7 @@ export type PullRequestNow = Data.TaggedEnum<{
     readonly mergeConflict: boolean | null
     readonly read: SubscribedRead
   }
-  Ended: { readonly state: "merged" | "closed" }
+  Ended: { readonly state: EndedState }
 }>
 
 export const PullRequestNow = Data.taggedEnum<PullRequestNow>()

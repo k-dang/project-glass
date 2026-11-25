@@ -133,7 +133,7 @@ const SubscribedTo = Schema.Struct({
 
 const decodeSubscribedTo = Schema.decodeUnknownEffect(Schema.Array(SubscribedTo))
 
-const subscribedTo = (mirror: Mirror, subscription: typeof SubscribedTo.Type) => {
+const mirroredFor = (mirror: Mirror, subscription: typeof SubscribedTo.Type) => {
   const { owner, repo, number, threadOwner, threadRepo, branch } = subscription
 
   if (owner !== null && repo !== null && number !== null)
@@ -307,7 +307,7 @@ export class PullRequestMirror extends Context.Service<
           Effect.map((subscriptions) => [
             ...new Map(
               subscriptions.flatMap((subscription) => {
-                const pr = subscribedTo(mirror, subscription)
+                const pr = mirroredFor(mirror, subscription)
 
                 return pr === undefined ? [] : [[pr.id, pr] as const]
               }),

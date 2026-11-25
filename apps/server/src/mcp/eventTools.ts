@@ -1,7 +1,7 @@
 import { EventPage, PullRequestRef } from "@glass/contracts"
-import { Effect, Option, Schema, Stream } from "effect"
+import { Duration, Effect, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
-import { EventLog } from "../EventLog"
+import { EventLog, KEPT_FOR } from "../EventLog"
 import { Subscriptions } from "../Subscriptions"
 import { ThreadPullRequests } from "../ThreadPullRequests"
 import { Threads } from "../Threads"
@@ -10,8 +10,7 @@ import { GlassToolFailure, readOnly } from "./glassTools"
 const MAX_EVENTS = 100
 
 const ListRecentEvents = Tool.make("list_recent_events", {
-  description:
-    "Lists recent Events, newest first: what happened to PRs in the user's followed repositories that the user didn't do in Glass, such as a PR's checks failing or passing, review feedback waiting, changes requested, a merge conflict appearing or clearing, and a Thread's PR or a PR with a Subscription merging or closing. Glass keeps Events for 30 days.",
+  description: `Lists recent Events, newest first: what happened to PRs in the user's followed repositories that the user didn't do in Glass, such as a PR's checks failing or passing, review feedback waiting, changes requested, a merge conflict appearing or clearing, and a Thread's PR or a PR with a Subscription merging or closing. Glass keeps Events for ${Duration.toDays(KEPT_FOR)} days.`,
   parameters: Schema.Struct({
     limit: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: MAX_EVENTS })).annotate({
       description: `How many Events to list, at most ${MAX_EVENTS}.`,
@@ -54,8 +53,7 @@ export const EventToolHandlers = EventTools.toLayer(
         ),
       )
 
-      const listed = yield* threadPullRequests.watch().pipe(Stream.runHead)
-      const own = Option.getOrThrow(listed).find((pr) => pr.threadId === threadId)?.ref
+      const own = (yield* threadPullRequests.ofThread(threadId))?.ref
 
       const subscribed = yield* subscriptions
         .list(threadId)
