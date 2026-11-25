@@ -396,7 +396,7 @@ it("sends a message with Enter and clears the composer", async () => {
   expect(composer).toHaveProperty("textContent", "")
 })
 
-it("switches between Chat and Changes with Mod+D, even from the composer", async () => {
+it("picks a pane with Mod+D and a letter, even from the composer, and closes it with Mod+D", async () => {
   const user = mount({
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
@@ -405,11 +405,15 @@ it("switches between Chat and Changes with Mod+D, even from the composer", async
 
   await user.click(await screen.findByRole("textbox", { name: "Message" }))
   await user.keyboard("{Control>}d{/Control}")
-  await screen.findByRole("region", { name: "Changes" })
+  const picker = await screen.findByRole("complementary", { name: "Pane picker" })
+  expect(within(picker).queryByRole("button", { name: /Pull request/ })).toBeNull()
+
+  await user.keyboard("d")
+  await screen.findByRole("complementary", { name: "Changes" })
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy()
 
   await user.keyboard("{Meta>}d{/Meta}")
-  await screen.findByRole("textbox", { name: "Message" })
-  expect(screen.queryByRole("region", { name: "Changes" })).toBeNull()
+  await waitFor(() => expect(screen.queryByRole("complementary", { name: "Changes" })).toBeNull())
 })
 
 it("sends Markdown and HTML exactly as written", async () => {
@@ -851,11 +855,10 @@ it("floats a Thread's details over its chat on a wide window, until the user hid
   const details = await screen.findByRole("complementary", { name: "Details" })
   await user.click(within(details).getByRole("button", { name: /Changes/ }))
 
-  expect(await screen.findByRole("heading", { name: "Changes" })).toBeTruthy()
+  expect(await screen.findByRole("complementary", { name: "Changes" })).toBeTruthy()
   expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull()
 
-  await user.click(screen.getByRole("button", { name: "Details" }))
-  await user.click(await screen.findByRole("button", { name: /Back to Chat/ }))
+  await user.click(screen.getByRole("button", { name: "Close the Changes" }))
   await user.click(await screen.findByRole("button", { name: "Hide details" }))
 
   expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull()

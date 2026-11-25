@@ -25,24 +25,18 @@ import {
   nothingUnsent,
 } from "@glass/contracts"
 import { useNavigate } from "@tanstack/react-router"
-import { Data, Effect, Exit, Option, Predicate, Schema, Stream } from "effect"
+import { Data, Effect, Exit, Option, Predicate, Stream } from "effect"
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity"
 import { Cloud, Laptop, type LucideIcon } from "lucide-react"
 import { toast } from "@/components/ui/toast"
 import { Backend, type BackendError, backendRuntime, backendRuntimeOf } from "./backend"
 import { problemOf } from "./problems"
 
-export type ThreadTab = "chat" | "changes"
-
 export const threadsPanelOpenAtom = Atom.make(true)
 
 export const threadDetailsPinnedAtom = Atom.make(true).pipe(Atom.keepAlive)
 
 export const settledOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
-
-export const ThreadSearch = Schema.Struct({
-  view: Schema.optional(Schema.Literal("changes")),
-})
 
 export const placeKey = (place: ThreadPlace) =>
   Predicate.isTagged(place, "sandbox") ? `sandbox:${place.providerId}` : place._tag

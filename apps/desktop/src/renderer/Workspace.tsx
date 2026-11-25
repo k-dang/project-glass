@@ -587,7 +587,7 @@ export function Workspace(props: {
               all={all}
               onAllChange={showAll}
               tourOrder={reading === null ? null : { current: chosenOrder, onChange: showOrder }}
-              fullScreen={{ on: fullScreen, onChange: setFullScreen }}
+              expand={{ label: "Full screen", on: fullScreen, onChange: setFullScreen }}
               agentWork={fullScreen && agentWork}
             />
             {tourShown !== null ? (

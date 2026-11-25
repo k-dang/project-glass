@@ -121,8 +121,8 @@ function CheckInReview(props: { checkIn: CheckIn; onBack: () => void }) {
         <ChangesWithFeedback
           changes={shown}
           store={store}
-          sidebarTab={sidebarTab}
-          setSidebarTab={setSidebarTab}
+          sidebar={{ tab: sidebarTab, onTabChange: setSidebarTab }}
+          wide={null}
           footer={
             <AnswerBar
               checkInId={checkIn.id}

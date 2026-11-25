@@ -14,7 +14,7 @@ import {
   repositoryKey,
   type SandboxStatus,
 } from "@glass/contracts"
-import { Link, Outlet, useNavigate, useParams, useSearch } from "@tanstack/react-router"
+import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
 import { DateTime, Exit, Match, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import {
@@ -35,7 +35,6 @@ import {
   createContext,
   type RefObject,
   use,
-  useCallback,
   useContext,
   useEffect,
   useLayoutEffect,
@@ -59,7 +58,6 @@ import {
   removeSettledThreads,
   settledThreadsAtom,
   settledOpenAtom,
-  type ThreadTab,
   workingThreadsAtom,
 } from "./threadsArea"
 import { AgentHarnessIcon } from "./AgentHarnessIcon"
@@ -151,13 +149,6 @@ const panelToggleId = "threads-panel-toggle"
 export function ThreadsLayout() {
   const [panelOpen, setPanelOpen] = useAtom(threadsPanelOpenAtom)
   const threadId = useParams({ from: "/threads/$threadId", shouldThrow: false })?.threadId ?? null
-  const view = useSearch({ from: "/threads/$threadId", shouldThrow: false })?.view
-  const navigate = useNavigate({ from: "/threads/$threadId" })
-
-  const onTabChange = useCallback(
-    (tab: ThreadTab) => void navigate({ search: tab === "changes" ? { view: tab } : {} }),
-    [navigate],
-  )
 
   const panelSlot = use(ShellPanelSlot)
   const styles = panelSlot === null ? panelStyles.inline : panelStyles.beside
@@ -198,7 +189,7 @@ export function ThreadsLayout() {
     <main aria-label="Threads" className="flex min-h-0 flex-1">
       {panelSlot === null ? panel : createPortal(panel, panelSlot)}
       <div className="flex min-w-0 flex-1 flex-col">
-        <ThreadViews threadId={threadId} tab={view ?? "chat"} onTabChange={onTabChange} />
+        <ThreadViews threadId={threadId} />
         <Outlet />
       </div>
     </main>
