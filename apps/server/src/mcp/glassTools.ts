@@ -52,7 +52,8 @@ import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
 import { PullRequestMaterial, pullRequestMaterial } from "../agentReviewPrompt"
 import type { FileMaterial } from "../tourPrompt"
-import { Threads } from "../Threads"
+import { AgentSender, Threads } from "../Threads"
+import { Transcripts } from "../Transcripts"
 import { GitHubClient } from "../github/GitHubClient"
 import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
@@ -532,6 +533,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const startedWork = yield* StartedWork
+    const transcripts = yield* Transcripts
 
     const refuseUnofferedModel = Effect.fnUntraced(function* ({
       harness,
@@ -558,6 +560,20 @@ export const GlassToolHandlers = GlassTools.toLayer(
         Predicate.isTagged(caller, "Thread") ? Option.some(caller.threadId) : Option.none(),
       ),
     )
+
+    const sender = Effect.gen(function* () {
+      const caller = yield* McpCaller.current
+
+      if (Predicate.isTagged(caller, "OutsideAgent")) return AgentSender.OutsideAgent()
+
+      const session = Predicate.isTagged(caller, "Thread") ? caller.threadId : caller.sessionId
+      const starter = yield* transcripts.runningTurnStarter(session)
+      const turnForUser = starter === "user" || starter === "creator"
+
+      return Predicate.isTagged(caller, "Thread")
+        ? AgentSender.Thread({ id: caller.threadId, turnForUser })
+        : AgentSender.GlobalChat({ id: caller.globalChatId, turnForUser })
+    })
 
     return GlassTools.of({
       list_pull_requests: () =>
@@ -667,24 +683,19 @@ export const GlassToolHandlers = GlassTools.toLayer(
           yield* refuseUnofferedModel(input)
 
           const created = { ...input, skillPacks: [], localSkills: false, images: [] }
-          const parent = yield* callingThreadId
 
           const thread = yield* recordedFor(
-            Option.isSome(parent)
-              ? threads.createFrom(parent.value, created)
-              : threads.create({ ...created, permissionMode: null }),
+            threads.createFrom(yield* sender, created),
             (starter, since, { id }) => startedWork.linkThread(starter, id, since),
           )
 
           return { thread }
         }).pipe(Effect.mapError(explained)),
       send_thread_message: ({ threadId, message }) =>
-        callingThreadId.pipe(
-          Effect.flatMap((sender) =>
+        sender.pipe(
+          Effect.flatMap((from) =>
             recordedFor(
-              Option.isSome(sender)
-                ? threads.sendFrom(sender.value, threadId, { message, images: [] })
-                : threads.send(threadId, { message, images: [] }),
+              threads.sendFrom(from, threadId, { message, images: [] }),
               (starter, since) => startedWork.linkThread(starter, threadId, since),
             ),
           ),

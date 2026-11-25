@@ -569,7 +569,7 @@ it.live("refuses a Subscription asked for in a PR update", () =>
 
     assert.deepStrictEqual(calledBy(update), {
       status: "failed",
-      text: "Glass started this Turn, so it can't subscribe your Thread to a PR. Only a Turn the user's message started can.",
+      text: "Glass started this Turn, so it can't subscribe your Thread to a PR. Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can.",
     })
     assert.deepStrictEqual(subscription?.reasons, ["failing-checks"])
   }),
@@ -587,7 +587,7 @@ it.live("refuses a Subscription asked for in a Turn the Agent harness started by
 
     assert.deepStrictEqual(calledBy(unprompted), {
       status: "failed",
-      text: "The agent started this Turn by itself, so it can't subscribe your Thread to a PR. Only a Turn the user's message started can.",
+      text: "The agent started this Turn by itself, so it can't subscribe your Thread to a PR. Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can.",
     })
     assert.deepStrictEqual(yield* subscriptionsLeft(f, thread.id, 0), [])
   }),

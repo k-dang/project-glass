@@ -139,6 +139,8 @@ const named = ({ owner, repo, number }: PullRequestRef) => `${owner}/${repo}#${n
 const refusedStarters = {
   glass: "Glass started this Turn",
   harness: "The agent started this Turn by itself",
+  agent: "A message from another agent started this Turn",
+  none: "Your Thread has no Turn running",
 }
 
 const refuse = (message: string) => Effect.fail(new ThreadError({ message }))
@@ -248,11 +250,11 @@ export class Subscriptions extends Context.Service<
         threadId: string,
         input: NewSubscription,
       ) {
-        const starter = yield* transcripts.runningTurnStarter(threadId)
+        const starter = (yield* transcripts.runningTurnStarter(threadId)) ?? "none"
 
-        if (starter === "glass" || starter === "harness")
+        if (starter !== "user" && starter !== "creator")
           return yield* refuse(
-            `${refusedStarters[starter]}, so it can't subscribe your Thread to a PR. Only a Turn the user's message started can.`,
+            `${refusedStarters[starter]}, so it can't subscribe your Thread to a PR. Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can.`,
           )
 
         if (input.pullRequest === null) yield* refuseOwnEnded(threadId)

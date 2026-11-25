@@ -60,6 +60,7 @@ import { ActivityLog } from "./ActivityLog"
 import { firstFreeBranch } from "./BranchNames"
 import { threadBranchNaming } from "./threadBranchNaming"
 import { threadWith, decodeStored, sandboxProviderOf, toRow } from "./threadRows"
+import type { MessageSender } from "./threadState"
 import { type ClaimedThread, type ThreadHost, ThreadTurns } from "./ThreadTurns"
 import { threadNotes, FeedbackNotes } from "./FeedbackNotes"
 import {
@@ -91,6 +92,10 @@ const encodeBrief = Schema.encodeSync(BriefJson)
 
 const decodeBrief = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ brief: BriefJson })))
 
+const decodeCreators = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ createdBy: Schema.NullOr(Schema.String) })),
+)
+
 const decodeKeptGoing = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.String, keptGoingAt: Schema.DateTimeUtcFromString })),
 )
@@ -118,6 +123,38 @@ const couldNotSave = (cause: SqlError.SqlError) =>
   Effect.logWarning("Couldn't save a Thread", cause).pipe(
     Effect.andThen(Effect.fail(storageFailure())),
   )
+
+export type AgentSender = Data.TaggedEnum<{
+  Thread: { readonly id: string; readonly turnForUser: boolean }
+  GlobalChat: { readonly id: string; readonly turnForUser: boolean }
+  OutsideAgent: {}
+}>
+
+export const AgentSender = Data.taggedEnum<AgentSender>()
+
+const knownSender = AgentSender.$match({
+  Thread: (thread) => thread,
+  GlobalChat: (globalChat) => globalChat,
+  OutsideAgent: () => null,
+})
+
+const passingOnTheUsersWord = (sender: AgentSender) => {
+  const known = knownSender(sender)
+
+  return known?.turnForUser === true ? known.id : null
+}
+
+interface FirstMessageFrom {
+  readonly createdBy: string | null
+  readonly sentBy: MessageSender
+}
+
+const fromTheUser: FirstMessageFrom = { createdBy: null, sentBy: "user" }
+
+const fromCreator = (creator: AgentSender): FirstMessageFrom => ({
+  createdBy: knownSender(creator)?.id ?? null,
+  sentBy: passingOnTheUsersWord(creator) === null ? "agent" : "creator",
+})
 
 type Purpose = Data.TaggedEnum<{
   Work: { readonly packs: ReadonlyArray<string> }
@@ -212,7 +249,7 @@ export class Threads extends Context.Service<
     readonly placeOf: (threadId: string) => Effect.Effect<ThreadPlace, ThreadNotFound>
     readonly create: (input: NewThread) => Effect.Effect<Thread, InvalidLocalCheckout | ThreadError>
     readonly createFrom: (
-      parentId: string,
+      creator: AgentSender,
       input: Omit<NewThread, "permissionMode">,
     ) => Effect.Effect<Thread, ThreadNotFound | InvalidLocalCheckout | ThreadError>
     readonly createForReview: (input: NewReviewThread) => Effect.Effect<Thread, ThreadError>
@@ -225,7 +262,7 @@ export class Threads extends Context.Service<
       feedback?: ReadonlyArray<string>,
     ) => Effect.Effect<MessageDelivery, ThreadNotFound | RequestWaiting | ThreadError>
     readonly sendFrom: (
-      senderId: string,
+      sender: AgentSender,
       threadId: string,
       input: SentMessage,
     ) => Effect.Effect<MessageDelivery, ThreadNotFound | RequestWaiting | ThreadError>
@@ -554,7 +591,12 @@ export class Threads extends Context.Service<
         return true
       })
 
-      const insert = (placed: PlacedThread, first: MessageInput, purpose: Purpose) => {
+      const insert = (
+        placed: PlacedThread,
+        first: MessageInput,
+        purpose: Purpose,
+        from: FirstMessageFrom,
+      ) => {
         const { id, place, repository } = placed.thread
 
         const forget = SubscriptionRef.update(rows, (current) =>
@@ -588,6 +630,7 @@ export class Threads extends Context.Service<
                 folder: placed.folder,
                 created_at: DateTime.formatIso(thread.createdAt),
                 kept_going_at: DateTime.formatIso(thread.createdAt),
+                created_by: from.createdBy,
                 review_brief: Purpose.$match(purpose, {
                   Work: () => null,
                   Review: ({ brief }) => encodeBrief(brief),
@@ -601,7 +644,7 @@ export class Threads extends Context.Service<
 
               yield* SubscriptionRef.update(rows, (current) => [{ ...placed, thread }, ...current])
               yield* setKeptGoing(id, thread.createdAt)
-              yield* transcripts.startOrQueue(id, { ...first, context: null })
+              yield* transcripts.startOrQueue(id, { ...first, context: null }, from.sentBy)
 
               return thread
             }).pipe(sql.withTransaction),
@@ -646,12 +689,14 @@ export class Threads extends Context.Service<
           { thread, folder: input.checkout, forReview: true },
           { message: input.message, images: [] },
           Purpose.Review({ brief: input.review }),
+          { createdBy: null, sentBy: "agent" },
         )
       })
 
       const createWith = Effect.fnUntraced(function* (
         input: Omit<NewThread, "permissionMode">,
         permissionMode: PermissionMode | null,
+        from: FirstMessageFrom,
       ) {
         const { repository, baseBranch, harness, model, effort, place } = input
         const { message, images } = input
@@ -682,6 +727,7 @@ export class Threads extends Context.Service<
           { thread, folder, forReview: false },
           { message, images },
           Purpose.Work({ packs: input.skillPacks }),
+          from,
         ).pipe(Effect.onError(() => discard.pipe(Effect.andThen(naming.release(thread.id)))))
 
         yield* naming.name(thread.id, message)
@@ -704,14 +750,22 @@ export class Threads extends Context.Service<
         return yield* createWith(
           input,
           startingPermissionMode(input.place, input.harness, input.permissionMode),
+          fromTheUser,
         )
       })
 
       const createFrom = Effect.fn("Threads.createFrom")(function* (
-        parentId: string,
+        creator: AgentSender,
         input: Omit<NewThread, "permissionMode">,
       ) {
-        const parent = (yield* find(parentId)).thread
+        if (!Predicate.isTagged(creator, "Thread"))
+          return yield* createWith(
+            input,
+            startingPermissionMode(input.place, input.harness, null),
+            fromCreator(creator),
+          )
+
+        const parent = (yield* find(creator.id)).thread
 
         const permissionMode = startingPermissionMode(
           input.place,
@@ -730,7 +784,7 @@ export class Threads extends Context.Service<
           },
         )
 
-        return yield* createWith(input, permissionMode)
+        return yield* createWith(input, permissionMode, fromCreator(creator))
       })
 
       const refuseReviewFrom = Effect.fn("Threads.refuseReviewFrom")(function* (threadId: string) {
@@ -751,9 +805,10 @@ export class Threads extends Context.Service<
       const findWritable = (threadId: string) =>
         find(threadId).pipe(Effect.tap(() => sandboxes.refuseIfGone(threadId)))
 
-      const send = Effect.fn("Threads.send")(function* (
+      const sendBy = Effect.fnUntraced(function* (
         threadId: string,
         { message, images }: SentMessage,
+        sentBy: MessageSender,
         feedback: ReadonlyArray<string> = [],
       ) {
         yield* findWritable(threadId)
@@ -761,6 +816,7 @@ export class Threads extends Context.Service<
         const delivery = yield* turns.send(
           threadId,
           { message, images, context: null },
+          sentBy,
           notes.take(threadNotes(threadId), feedback),
         )
 
@@ -769,27 +825,47 @@ export class Threads extends Context.Service<
         return delivery
       })
 
+      const send = Effect.fn("Threads.send")(function* (
+        threadId: string,
+        input: SentMessage,
+        feedback?: ReadonlyArray<string>,
+      ) {
+        return yield* sendBy(threadId, input, "user", feedback)
+      })
+
+      const createdBy = (threadId: string) =>
+        sql`SELECT created_by AS createdBy FROM thread WHERE id = ${threadId}`.pipe(
+          Effect.flatMap(decodeCreators),
+          Effect.map(([row]) => row?.createdBy ?? null),
+          Effect.mapError(storageFailure),
+        )
+
       const sendFrom = Effect.fn("Threads.sendFrom")(function* (
-        senderId: string,
+        sender: AgentSender,
         threadId: string,
         input: SentMessage,
       ) {
-        if (senderId === threadId)
-          return yield* new ThreadError({
-            message: "A Thread can't send a message to itself.",
+        if (Predicate.isTagged(sender, "Thread")) {
+          if (sender.id === threadId)
+            return yield* new ThreadError({
+              message: "A Thread can't send a message to itself.",
+            })
+
+          yield* refuseReach((yield* find(sender.id)).thread, (yield* find(threadId)).thread, {
+            leavesSandbox:
+              "A Thread in a Sandbox can only message Threads in a Sandbox. Ask the user to message one on this device.",
+            asksLess:
+              "That Thread asks the user less than you do, so you can't send it a message. Ask the user to.",
           })
+        }
 
-        const sender = (yield* find(senderId)).thread
-        const target = (yield* find(threadId)).thread
+        const word = passingOnTheUsersWord(sender)
 
-        yield* refuseReach(sender, target, {
-          leavesSandbox:
-            "A Thread in a Sandbox can only message Threads in a Sandbox. Ask the user to message one on this device.",
-          asksLess:
-            "That Thread asks the user less than you do, so you can't send it a message. Ask the user to.",
-        })
-
-        return yield* send(threadId, input)
+        return yield* sendBy(
+          threadId,
+          input,
+          word !== null && word === (yield* createdBy(threadId)) ? "creator" : "agent",
+        )
       })
 
       const steer = Effect.fn("Threads.steer")(function* (threadId: string, input: MessageInput) {

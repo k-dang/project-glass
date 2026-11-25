@@ -30,6 +30,7 @@ import events from "./migrations/0028_events"
 import subscriptions from "./migrations/0029_subscriptions"
 import pullRequestUpdates from "./migrations/0030_pull_request_updates"
 import pullRequestUpdateLimits from "./migrations/0031_pull_request_update_limits"
+import messageSenders from "./migrations/0032_message_senders"
 
 const migrations = {
   "0001_baseline": baseline,
@@ -63,6 +64,7 @@ const migrations = {
   "0029_subscriptions": subscriptions,
   "0030_pull_request_updates": pullRequestUpdates,
   "0031_pull_request_update_limits": pullRequestUpdateLimits,
+  "0032_message_senders": messageSenders,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

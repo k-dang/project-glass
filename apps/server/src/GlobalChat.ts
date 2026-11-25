@@ -309,7 +309,8 @@ export class GlobalChat extends Context.Service<
         transcript: followSession(transcripts.watch),
         loadEarlier: (before) =>
           inSession((sessionId) => transcripts.loadEarlier(sessionId, before)),
-        send: (input) => inSession((sessionId) => turns.send(sessionId, input)).pipe(Effect.asVoid),
+        send: (input) =>
+          inSession((sessionId) => turns.send(sessionId, input, "user")).pipe(Effect.asVoid),
         steer: (input) => inThread((current) => turns.steer(current, input)),
         cancelQueued: (queuedId) =>
           inSession((sessionId) => transcripts.cancelQueued(sessionId, queuedId)),

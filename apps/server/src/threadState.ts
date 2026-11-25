@@ -1,28 +1,37 @@
 import type { FeedbackNote, QueuedMessage, TurnEnding, TurnMessage } from "@glass/contracts"
 import { Match, Predicate } from "effect"
 
+export type MessageSender = "user" | "creator" | "agent"
+
+export type TurnStarter = MessageSender | "glass" | "harness"
+
+export type SentQueuedMessage = QueuedMessage & { readonly sentBy: MessageSender }
+
 export interface ThreadState {
   readonly running: string | null
-  readonly queued: ReadonlyArray<QueuedMessage>
+  readonly queued: ReadonlyArray<SentQueuedMessage>
 }
 
 export type ThreadEvent =
-  | { readonly type: "send"; readonly message: QueuedMessage }
+  | { readonly type: "send"; readonly message: SentQueuedMessage }
   | { readonly type: "startIfIdle"; readonly message: StartingTurn }
   | { readonly type: "sendQueued" | "cancelQueued"; readonly queuedId: string }
   | {
       readonly type: "turnEnded"
       readonly ending: TurnEnding
-      readonly requeued: ReadonlyArray<QueuedMessage>
+      readonly requeued: ReadonlyArray<SentQueuedMessage>
     }
 
 export type StartingTurn = Omit<QueuedMessage, "context"> &
-  Pick<TurnMessage, "context"> & { readonly retriesDelivery: boolean }
+  Pick<TurnMessage, "context"> & {
+    readonly retriesDelivery: boolean
+    readonly startedBy: TurnStarter
+  }
 
 export type ThreadWrite =
   | { readonly type: "startTurn"; readonly message: StartingTurn }
-  | { readonly type: "enqueue"; readonly message: QueuedMessage }
-  | { readonly type: "prepend"; readonly messages: ReadonlyArray<QueuedMessage> }
+  | { readonly type: "enqueue"; readonly message: SentQueuedMessage }
+  | { readonly type: "prepend"; readonly messages: ReadonlyArray<SentQueuedMessage> }
   | { readonly type: "dequeue"; readonly queuedId: string }
 
 type StepOutcome =
@@ -36,12 +45,12 @@ export interface ThreadStep {
 
 const unchanged: ThreadStep = { outcome: { type: "unchanged" }, writes: [] }
 
-const startSent = (message: QueuedMessage): ThreadWrite => ({
+const startSent = ({ sentBy, ...message }: SentQueuedMessage): ThreadWrite => ({
   type: "startTurn",
-  message: { ...message, retriesDelivery: false },
+  message: { ...message, retriesDelivery: false, startedBy: sentBy },
 })
 
-const startQueued = (queued: QueuedMessage): ThreadStep => ({
+const startQueued = (queued: SentQueuedMessage): ThreadStep => ({
   outcome: { type: "started" },
   writes: [{ type: "dequeue", queuedId: queued.id }, startSent(queued)],
 })

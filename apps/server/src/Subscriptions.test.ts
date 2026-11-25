@@ -1,10 +1,15 @@
 import { assert, it } from "@effect/vitest"
 import { localPlace, Subscription } from "@glass/contracts"
 import { Effect, Option, Schema, Stream } from "effect"
-import { connectMcp, toolText } from "../test/mcpClient"
-import { calledBy, glassCall, repository, settled, threadsFixture } from "../test/threadsFixture"
+import {
+  calledBy,
+  glassCall,
+  repository,
+  sendGlobal,
+  settled,
+  threadsFixture,
+} from "../test/threadsFixture"
 import { greeterPullRequest, threadWithPullRequest } from "../test/threadWithPullRequest"
-import { GlobalChatCaller } from "./mcp/McpCredentials"
 
 type Fixture = Effect.Success<typeof threadsFixture>
 
@@ -160,6 +165,9 @@ it.live("lists a Thread's Subscriptions to its agent, which ends one by its id",
   }),
 )
 
+const onlyAllowed =
+  "Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can."
+
 const newThread = (message: string) => ({
   repository: { owner: repository.owner, repo: repository.repo },
   baseBranch: "main",
@@ -183,8 +191,55 @@ it.live("refuses a Subscription asked for in a Turn Glass started", () =>
     assert.equal(update?.context?._tag, "StartedWorkUpdate")
     assert.deepStrictEqual(calledBy(update), {
       status: "failed",
-      text: "Glass started this Turn, so it can't subscribe your Thread to a PR. Only a Turn the user's message started can.",
+      text: `Glass started this Turn, so it can't subscribe your Thread to a PR. ${onlyAllowed}`,
     })
+    assert.deepStrictEqual(yield* subscriptionsOf(f, thread.id, () => true), [])
+  }),
+)
+
+const keepGreen = subscribe({ note: "Keep it green" })
+
+const refusedAgentMessage = {
+  status: "failed" as const,
+  text: `A message from another agent started this Turn, so it can't subscribe your Thread to a PR. ${onlyAllowed}`,
+}
+
+it.live("refuses a Subscription a Thread's creator asks for from a Turn Glass started", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+
+    const creator = yield* f.start(
+      `${glassCall("create_thread", newThread("Say hello"))}\non-update:create_thread ${JSON.stringify(newThread(keepGreen))}`,
+    )
+
+    const created = yield* f.client.WatchThreads().pipe(
+      Stream.filter((all) => all.length === 3),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
+    )
+
+    const firstTurns = yield* Effect.forEach(
+      created.filter(({ id }) => id !== creator.id),
+      ({ id }) => f.transcript(id, settled(1)).pipe(Effect.map(([turn]) => ({ id, turn: turn! }))),
+    )
+
+    const asked = firstTurns.find(({ turn }) => turn.message === keepGreen)!
+
+    assert.deepStrictEqual(calledBy(asked.turn), refusedAgentMessage)
+    assert.deepStrictEqual(yield* subscriptionsOf(f, asked.id, () => true), [])
+  }),
+)
+
+it.live("refuses a Subscription a Thread that didn't create this one asks for", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    const thread = yield* f.start()
+    yield* f.transcript(thread.id, settled(1))
+
+    yield* f.start(glassCall("send_thread_message", { threadId: thread.id, message: keepGreen }))
+    const [, asked] = yield* f.transcript(thread.id, settled(2))
+
+    assert.deepStrictEqual(calledBy(asked), refusedAgentMessage)
     assert.deepStrictEqual(yield* subscriptionsOf(f, thread.id, () => true), [])
   }),
 )
@@ -264,21 +319,14 @@ it.live("subscribes a Thread the Global chat creates when the message creating i
     const f = yield* threadsFixture
     yield* f.client.LinkLocalCheckout({ path: f.clone.checkout })
 
-    const globalChat = yield* connectMcp(
-      f.baseUrl,
-      yield* f.mcpCredentials.issue(
-        GlobalChatCaller.make({ globalChatId: "global-chat", sessionId: "global-session" }),
-      ),
+    yield* sendGlobal(f.client, glassCall("create_thread", newThread(keepGreen)))
+
+    const [thread] = yield* f.client.WatchThreads().pipe(
+      Stream.filter((all) => all.length > 0),
+      Stream.runHead,
+      Effect.map(Option.getOrThrow),
     )
 
-    const created = yield* globalChat.call(
-      "create_thread",
-      newThread(subscribe({ note: "Keep it green" })),
-    )
-
-    const [thread] = yield* f.threads
-
-    assert.isFalse(created.isError, toolText(created))
     assert.deepStrictEqual(
       covered(yield* subscriptionsOf(f, thread!.id, (all) => all.length > 0)).map(
         ({ note }) => note,
