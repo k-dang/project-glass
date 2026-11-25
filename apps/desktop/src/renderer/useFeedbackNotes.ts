@@ -1,9 +1,14 @@
-import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
+import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import { type FeedbackNote, isLineNote, type LineNote } from "@glass/contracts"
 import { type Effect, Exit } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { useMemo } from "react"
-import { feedbackNotesAtom, pageNoteEditingAtom, writtenFeedbackAtom } from "./threadsArea"
+import { useEffect, useMemo } from "react"
+import {
+  feedbackNotesAtom,
+  type NoteEditor,
+  noteEditorsAtom,
+  writtenFeedbackAtom,
+} from "./threadsArea"
 import { Backend, type BackendError, useBackendRuntime } from "./backend"
 import { type Problem, problemOf } from "./problems"
 
@@ -18,7 +23,7 @@ interface NotesEditor<Note> {
 export type LineNotesEditor = NotesEditor<LineNote>
 
 export interface FeedbackNotesStore extends NotesEditor<FeedbackNote> {
-  readonly editingOnPage: boolean
+  readonly editingElsewhere: boolean
   readonly sent: (noteIds: ReadonlyArray<string>) => void
 }
 
@@ -57,7 +62,7 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
   const listed = useAtomValue(feedbackNotesAtom(threadId))
   const refetch = useAtomRefresh(feedbackNotesAtom(threadId))
   const [written, setWritten] = useAtom(writtenFeedbackAtom(threadId))
-  const editingOnPage = useAtomValue(pageNoteEditingAtom(threadId)) !== null
+  const editingElsewhere = useAtomValue(noteEditorsAtom(threadId)).length > 0
   const saved = AsyncResult.isSuccess(listed) ? listed.value : null
   const notes = written ?? saved ?? noNotes
 
@@ -67,7 +72,7 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
     return {
       ready: saved !== null || written !== null,
       notes,
-      editingOnPage,
+      editingElsewhere,
       save: (note) =>
         write(
           noteWriteTitles.save,
@@ -84,5 +89,18 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
         refetch()
       },
     }
-  }, [threadId, runtime, notes, saved, written, setWritten, refetch, editingOnPage])
+  }, [threadId, runtime, notes, saved, written, setWritten, refetch, editingElsewhere])
+}
+
+export function useNoteEditorOpen(threadId: string, editor: NoteEditor, open: boolean) {
+  const setEditors = useAtomSet(noteEditorsAtom(threadId))
+
+  useEffect(() => {
+    const closed = (editors: ReadonlyArray<NoteEditor>) =>
+      editors.filter((other) => other !== editor)
+
+    setEditors((editors) => (open ? [...closed(editors), editor] : closed(editors)))
+
+    return () => setEditors(closed)
+  }, [open, editor, setEditors])
 }

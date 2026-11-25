@@ -6,11 +6,11 @@ import { FileDiff } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import { ChangesWithFeedback, LoadProblem } from "./ChangesWithFeedback"
+import { ChangesWithFeedback, LoadProblem, useNoteOpen } from "./ChangesWithFeedback"
 import { threadChangesAtom, feedbackNotesAtom } from "./threadsArea"
 import { SidePanel } from "./SidePanel"
 import { useShortcuts } from "./useShortcuts"
-import { lineNotesOf, useFeedbackNotes } from "./useFeedbackNotes"
+import { lineNotesOf, useFeedbackNotes, useNoteEditorOpen } from "./useFeedbackNotes"
 
 const paneWidthAtom = Atom.make(720).pipe(Atom.keepAlive)
 
@@ -96,8 +96,15 @@ function ThreadChanges(props: {
           store={lineNotes}
           sidebar={null}
           wide={props.wide}
+          footer={<ReportNoteOpen threadId={thread.id} />}
         />
       )}
     </div>
   )
+}
+
+function ReportNoteOpen(props: { threadId: string }) {
+  useNoteEditorOpen(props.threadId, "changes", useNoteOpen())
+
+  return null
 }

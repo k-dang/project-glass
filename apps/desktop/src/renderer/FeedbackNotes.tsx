@@ -69,7 +69,7 @@ const viewOf = (note: FeedbackNote): NoteView =>
 
 export function FeedbackNoteCard(props: {
   note: FeedbackNote
-  code: "hidden" | "shown" | "older"
+  snippet: "none" | "current" | "older"
   location: string
   onShow: (() => void) | null
   onEdit: (() => void) | null
@@ -77,7 +77,7 @@ export function FeedbackNoteCard(props: {
 }) {
   const { note } = props
   const view = viewOf(note)
-  const shown = props.code === "hidden" ? null : view.code
+  const snippet = props.snippet === "none" ? null : view.code
   const [removing, setRemoving] = useState(false)
   const [problem, setProblem] = useState<Problem | null>(null)
 
@@ -106,9 +106,9 @@ export function FeedbackNoteCard(props: {
             {props.location}
           </button>
         )}
-        {props.code === "older" && <OlderVersion />}
+        {props.snippet === "older" && <OlderVersion />}
       </div>
-      {shown !== null && <Snippet code={shown} />}
+      {snippet !== null && <Snippet code={snippet} />}
       <p className="whitespace-pre-wrap wrap-anywhere">{note.text}</p>
       {problem !== null && (
         <ProblemAlert problem={problem} action={{ label: "Retry", run: () => void remove() }} />
@@ -185,7 +185,7 @@ export function AttachedFeedback(props: {
             ) : (
               <FeedbackNoteCard
                 note={note}
-                code="shown"
+                snippet="current"
                 location={viewOf(note).location}
                 onShow={null}
                 onEdit={
@@ -373,7 +373,7 @@ export function FeedbackOverview(props: {
             ) : (
               <FeedbackNoteCard
                 note={note}
-                code={older ? "older" : "hidden"}
+                snippet={older ? "older" : "none"}
                 location={viewOf(note).location}
                 onShow={older ? null : () => props.onShow(note)}
                 onEdit={onEdit === null ? null : () => onEdit(note)}

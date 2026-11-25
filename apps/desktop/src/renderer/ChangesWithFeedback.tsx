@@ -50,7 +50,7 @@ export function ChangesWithFeedback(props: {
   store: LineNotesEditor
   sidebar: { tab: SidebarTab; onTabChange: (tab: SidebarTab) => void } | null
   wide: { on: boolean; onChange: (on: boolean) => void } | null
-  footer?: ReactNode
+  footer: ReactNode
 }) {
   const { changes, store, sidebar } = props
   const read = changes === "loading" || changes === "unavailable" ? null : changes

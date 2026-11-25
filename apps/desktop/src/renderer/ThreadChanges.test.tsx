@@ -229,7 +229,7 @@ it("shows the Changes while Feedback notes can't load, then the notes once a ret
   expect(await within(region).findByText("Rename B")).toBeTruthy()
 })
 
-it("keeps the note being edited until it's saved or cancelled", async () => {
+it("keeps the note being edited, and holds the message, until it's saved or cancelled", async () => {
   const { user, region } = await openChanges({
     WatchTranscript: idle,
     GetThreadChanges: () => Effect.succeed(changes("read-1")),
@@ -246,10 +246,16 @@ it("keeps the note being edited until it's saved or cancelled", async () => {
 
   expect(within(region).queryByRole("button", { name: "Add feedback" })).toBeNull()
   expect(within(second!).getByRole("button", { name: "Edit" })).toHaveProperty("disabled", true)
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", true),
+  )
 
   await user.click(within(region).getByRole("button", { name: "Cancel" }))
   const edits = await within(region).findAllByRole("button", { name: "Edit" })
   expect(edits.map((edit) => edit.hasAttribute("disabled"))).toEqual([false, false])
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", false),
+  )
 })
 
 it("attaches saved Feedback notes beside the unsent text and sends them as one message once accepted", async () => {

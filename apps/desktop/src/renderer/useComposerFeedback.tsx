@@ -22,7 +22,7 @@ export function useComposerFeedback(
   const open = editing !== null && included.includes(editing.id) ? editing : null
 
   return {
-    editing: open !== null || store.editingOnPage,
+    editing: open !== null || store.editingElsewhere,
     send: async (message: MessageInput) => {
       const accepted = await send({ ...message, feedback: included })
 

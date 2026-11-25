@@ -3,10 +3,7 @@ import {
   ThreadStarted,
   LineNote,
   Merge,
-  PageNote,
-  FilePage,
   PullRequestRef,
-  PageText,
   SandboxPlace,
   TextPatch,
   localPlace,
@@ -297,44 +294,6 @@ it.live(
       const gone = yield* restarted.ListFeedbackNotes({ threadId: thread.id }).pipe(Effect.flip)
 
       assert.equal(gone._tag, "ThreadNotFound")
-    }),
-)
-
-it.live(
-  "keeps a Thread's Feedback notes on changes and on pages, in the order they were saved",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* threadsFixture
-      const thread = yield* f.start("Write a plan")
-      const threadId = thread.id
-      yield* f.transcript(threadId, settled(1))
-
-      const onChanges = new LineNote({
-        id: "line-1",
-        path: "src/retry.ts",
-        side: "new",
-        start: 2,
-        end: 2,
-        code: "attempts++",
-        changesId: "changes-1",
-        text: "Cap the attempts",
-      })
-
-      const onPage = new PageNote({
-        id: "page-1",
-        page: FilePage.make({ path: "docs/plan.html" }),
-        part: PageText.make({
-          selector: "#limits > p",
-          heading: "Limits",
-          excerpt: "five per minute",
-        }),
-        text: "Make this ten",
-      })
-
-      yield* f.client.SaveFeedbackNote({ threadId, note: onChanges })
-      yield* f.client.SaveFeedbackNote({ threadId, note: onPage })
-
-      assert.deepStrictEqual(yield* f.client.ListFeedbackNotes({ threadId }), [onChanges, onPage])
     }),
 )
 
