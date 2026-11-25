@@ -13,8 +13,6 @@ const GLASS_TOOLS_MCP_PREFIX = `mcp__${GLASS_TOOLS_MCP_SERVER}__`
 const glassPrefixOf = (name: string) =>
   [GLASS_MCP_PREFIX, GLASS_TOOLS_MCP_PREFIX].find((prefix) => name.startsWith(prefix))
 
-export const isGlassTool = (name: string) => glassPrefixOf(name) !== undefined
-
 const shownName = (name: string) => name.slice(glassPrefixOf(name)?.length ?? 0)
 
 export const ToolInput = Schema.Record(Schema.String, Schema.Json)
