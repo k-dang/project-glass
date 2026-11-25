@@ -10,6 +10,7 @@ import {
   CheckInSendFeedback,
   CheckInStarted,
   LineNote,
+  ListedAnswer,
   type InboxItems,
   QuestionSetAside,
   QuestionWaiting,
@@ -81,6 +82,17 @@ const readAnswer = (mcp: Mcp, id: string) =>
   mcp
     .call("read_answer", { id })
     .pipe(Effect.map(({ structuredContent }) => answerState(structuredContent)))
+
+const listed = Schema.decodeUnknownSync(Schema.Struct({ items: Schema.Array(ListedAnswer) }))
+
+const listAnswers = (mcp: Mcp) =>
+  mcp
+    .call("list_answers", {})
+    .pipe(
+      Effect.map(({ structuredContent }) =>
+        listed(structuredContent).items.map(({ id, state }) => [id, state]),
+      ),
+    )
 
 const noteOn = (changesId: string, text: string) =>
   new LineNote({
@@ -177,6 +189,30 @@ describe("check_in", () => {
         (yield* client.ListCheckInNotes({ checkInId: second })).map(({ text }) => text),
         ["Why 3?"],
       )
+    }),
+  )
+
+  it.live("lists a Check-in until its answer is read, and never one the agent replaced", () =>
+    Effect.gen(function* () {
+      const { client, mcp } = yield* start
+      const folder = yield* repositoryWithWork
+
+      yield* checkedIn(mcp, { folder, baseRef: "main" })
+
+      const second = yield* checkedIn(mcp, { folder, baseRef: "main" })
+
+      assert.deepStrictEqual(yield* listAnswers(mcp), [[second, QuestionWaiting.make({})]])
+
+      yield* shownCheckIn(client, second)
+      yield* client.AnswerCheckIn({
+        checkInId: second,
+        answer: CheckInApprove.make({ message: "Ship it" }),
+      })
+
+      assert.deepStrictEqual(yield* listAnswers(mcp), [
+        [second, CheckInApproved.make({ message: "Ship it", notes: [] })],
+      ])
+      assert.deepStrictEqual(yield* listAnswers(mcp), [])
     }),
   )
 

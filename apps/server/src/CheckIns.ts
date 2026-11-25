@@ -14,6 +14,7 @@ import {
   CheckInReplaced,
   type CheckInStarted,
   type CheckInState,
+  ListedCheckIn,
   type FeedbackNote,
   isLineNote,
   type LineNote,
@@ -22,6 +23,7 @@ import {
   type ThreadError,
 } from "@glass/contracts"
 import {
+  Array as Arr,
   Context,
   DateTime,
   Effect,
@@ -120,10 +122,11 @@ export class CheckIns extends Context.Service<
       answer: CheckInAnswer,
     ) => Effect.Effect<void, CheckInNotWaiting | CheckInError>
     readonly setAside: (checkInId: string) => Effect.Effect<void, CheckInNotWaiting>
-    readonly stateFor: (
+    readonly readAnswer: (
       checkInId: string,
       agentId: string,
     ) => Effect.Effect<Option.Option<CheckInState>>
+    readonly unread: (agentId: string) => Effect.Effect<ReadonlyArray<ListedCheckIn>>
     readonly watch: () => Stream.Stream<ReadonlyArray<CheckIn>>
     readonly forgetAgent: (agentId: string) => Effect.Effect<void>
   }
@@ -232,7 +235,7 @@ export class CheckIns extends Context.Service<
 
               yield* sql`
                 UPDATE check_in
-                SET outcome = ${encodeOutcome(CheckInReplaced.make({ checkInId: id }))}
+                SET outcome = ${encodeOutcome(CheckInReplaced.make({ checkInId: id }))}, told = 1
                 WHERE folder = ${root} AND outcome IS NULL
               `
               yield* sql`
@@ -316,15 +319,47 @@ export class CheckIns extends Context.Service<
         yield* refresh
       })
 
-      const stateFor = Effect.fn("CheckIns.stateFor")(function* (
+      const markRead = (rows: ReadonlyArray<CheckInRow>) => {
+        const settled = rows.flatMap(({ id, outcome }) => (outcome === null ? [] : [id]))
+
+        return settled.length === 0
+          ? Effect.void
+          : sql`UPDATE check_in SET told = 1 WHERE ${sql.in("id", settled)}`.pipe(
+              Effect.orDie,
+              Effect.asVoid,
+            )
+      }
+
+      const readAnswer = Effect.fn("CheckIns.readAnswer")(function* (
         checkInId: string,
         agentId: string,
       ) {
-        const [row] = yield* rowsOf(
+        const rows = yield* rowsOf(
           sql`SELECT ${columns} FROM check_in WHERE id = ${checkInId} AND agent_id = ${agentId}`,
         )
 
-        return Option.map(Option.fromNullishOr(row), stateOf)
+        yield* markRead(rows)
+
+        return Option.map(Arr.head(rows), stateOf)
+      })
+
+      const unread = Effect.fn("CheckIns.unread")(function* (agentId: string) {
+        const rows = yield* rowsOf(sql`
+          SELECT ${columns} FROM check_in WHERE agent_id = ${agentId} AND told = 0
+          ORDER BY asked_at, rowid
+        `)
+
+        yield* markRead(rows)
+
+        return rows.map((row) =>
+          ListedCheckIn.make({
+            id: row.id,
+            folder: row.folder,
+            summary: row.summary,
+            since: row.asked_at,
+            state: stateOf(row),
+          }),
+        )
       })
 
       return CheckIns.of({
@@ -345,7 +380,8 @@ export class CheckIns extends Context.Service<
           listedFor(checkInId, (owner) => notes.remove(owner, noteId)),
         answer,
         setAside,
-        stateFor,
+        readAnswer,
+        unread,
         watch: () => SubscriptionRef.changes(waitingList),
         forgetAgent: (agentId) =>
           sql`

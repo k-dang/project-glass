@@ -3,6 +3,7 @@ import {
   AskedUser,
   ChoiceAnswer,
   type InboxItems,
+  ListedAnswer,
   QuestionAnswered,
   QuestionSetAside,
   QuestionState,
@@ -42,6 +43,17 @@ const readAnswer = (mcp: Mcp, id: string) =>
   mcp
     .call("read_answer", { id })
     .pipe(Effect.map(({ structuredContent }) => questionState(structuredContent)))
+
+const listed = Schema.decodeUnknownSync(Schema.Struct({ items: Schema.Array(ListedAnswer) }))
+
+const listAnswers = (mcp: Mcp) =>
+  mcp
+    .call("list_answers", {})
+    .pipe(
+      Effect.map(({ structuredContent }) =>
+        listed(structuredContent).items.map(({ id, state }) => [id, state]),
+      ),
+    )
 
 const shownQuestion = (client: Backend["client"], id: string) =>
   inboxWhen(client, (items) => outside(items).some((item) => item.id === id)).pipe(
@@ -191,6 +203,39 @@ describe("ask_user", () => {
 
       assert.isTrue(refused.isError)
       assert.include(toolText(refused), "You asked no question")
+    }),
+  )
+
+  it.live("lists for a new session the questions whose answer no session has read", () =>
+    Effect.gen(function* () {
+      const backend = yield* start
+      const { client, mcp } = backend
+      const answered = yield* ask(mcp, { question: "Ship the retry change?" })
+      const read = yield* ask(mcp, { question: "Bump the timeout?" })
+      const open = yield* ask(mcp, { question: "Rename the flag?" })
+
+      yield* shownQuestion(client, open.questionId)
+      yield* client.AnswerQuestions({
+        answers: [
+          { questionId: answered.questionId, answer: TextAnswer.make({ text: "Ship it" }) },
+          { questionId: read.questionId, answer: TextAnswer.make({ text: "Leave it" }) },
+        ],
+      })
+      yield* readAnswer(mcp, read.questionId)
+
+      const fresh = yield* connectMcp(backend.baseUrl, backend.bearer)
+
+      assert.deepStrictEqual(yield* listAnswers(fresh), [
+        [answered.questionId, QuestionAnswered.make({ answer: "Ship it", by: "text" })],
+        [open.questionId, QuestionWaiting.make({})],
+      ])
+
+      yield* client.SetQuestionAside({ questionId: open.questionId })
+
+      assert.deepStrictEqual(yield* listAnswers(fresh), [
+        [open.questionId, QuestionSetAside.make({})],
+      ])
+      assert.deepStrictEqual(yield* listAnswers(fresh), [])
     }),
   )
 

@@ -9,7 +9,8 @@ agent's question vanished when that call timed out.
 
 The answer reaches an agent Glass launched as a message: a Steer while a Turn runs, or a new Turn.
 Glass cannot start a Turn in an Outside agent, so an Outside agent reads its answer by the
-Question's id, from any of its sessions. Check-ins work the same way.
+Question's id, from any of its sessions. A session that has lost the id lists the answers none of
+the agent's sessions has read yet. Check-ins work the same way.
 
 Permission requests still block: they gate a tool call already under way, and answering one later
 would need the agent to retry the call and Glass to remember the approval.

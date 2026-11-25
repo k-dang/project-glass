@@ -21,7 +21,9 @@ export default Effect.gen(function* () {
   yield* sql`
     CREATE INDEX question_open ON question (asked_at) WHERE outcome IS NULL OR delivering = 1
   `
-  yield* sql`CREATE INDEX question_by_agent ON question (agent_id) WHERE agent_id IS NOT NULL`
+  yield* sql`
+    CREATE INDEX question_by_agent ON question (agent_id, told) WHERE agent_id IS NOT NULL
+  `
   yield* sql`
     CREATE INDEX question_untold ON question (notify_thread_id)
     WHERE told = 0 AND outcome IS NOT NULL

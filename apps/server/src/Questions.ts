@@ -1,6 +1,7 @@
 import {
   type AnsweredQuestion,
   type GivenAnswer,
+  ListedQuestion,
   OpenQuestion,
   QuestionAnswered,
   QuestionChoice,
@@ -72,6 +73,8 @@ const questionOf = (row: QuestionRow) =>
     since: row.asked_at,
   })
 
+const stateOf = ({ outcome }: QuestionRow): QuestionState => outcome ?? QuestionWaiting.make({})
+
 const notOpen = (message: string) => new QuestionNotOpen({ message })
 
 const answeredWith = (row: QuestionRow, { answer }: GivenAnswer) =>
@@ -118,10 +121,11 @@ export class Questions extends Context.Service<
     ) => Effect.Effect<void, QuestionNotOpen | E>
     readonly isAsking: (threadId: string) => Effect.Effect<boolean>
     readonly setAside: (questionId: string) => Effect.Effect<void, QuestionNotOpen>
-    readonly stateFor: (
+    readonly readAnswer: (
       questionId: string,
       agentId: string,
     ) => Effect.Effect<Option.Option<QuestionState>>
+    readonly unread: (agentId: string) => Effect.Effect<ReadonlyArray<ListedQuestion>>
     readonly open: Stream.Stream<ReadonlyArray<AskedQuestion>>
     readonly openByThread: Stream.Stream<
       ReadonlyMap<string, Arr.NonEmptyReadonlyArray<OpenQuestion>>
@@ -252,8 +256,15 @@ export class Questions extends Context.Service<
         yield* Effect.suspend(() => deliver(answered.asker, answered.answered)).pipe(
           Effect.onExit((exit) =>
             (Exit.isSuccess(exit)
-              ? sql`UPDATE question SET delivering = 0, told = 1 WHERE ${answeredIds}`
-              : sql`UPDATE question SET outcome = NULL, delivering = 0 WHERE ${answeredIds}`
+              ? sql`
+                  UPDATE question
+                  SET delivering = 0, told = CASE WHEN agent_id IS NULL THEN 1 ELSE told END
+                  WHERE ${answeredIds}
+                `
+              : sql`
+                  UPDATE question SET outcome = NULL, delivering = 0, told = 0
+                  WHERE ${answeredIds}
+                `
             ).pipe(Effect.orDie),
           ),
           Effect.ensuring(refresh),
@@ -272,17 +283,45 @@ export class Questions extends Context.Service<
         yield* refresh
       })
 
-      const stateFor = Effect.fn("Questions.stateFor")(function* (
+      const markRead = (rows: ReadonlyArray<QuestionRow>) => {
+        const settled = rows.flatMap(({ id, outcome }) => (outcome === null ? [] : [id]))
+
+        return settled.length === 0
+          ? Effect.void
+          : sql`UPDATE question SET told = 1 WHERE ${sql.in("id", settled)}`.pipe(
+              Effect.orDie,
+              Effect.asVoid,
+            )
+      }
+
+      const readAnswer = Effect.fn("Questions.readAnswer")(function* (
         questionId: string,
         agentId: string,
       ) {
-        const [row] = yield* rowsWhere(
+        const rows = yield* rowsWhere(
           sql`SELECT * FROM question WHERE id = ${questionId} AND agent_id = ${agentId}`,
         )
 
-        return Option.map(
-          Option.fromNullishOr(row),
-          ({ outcome }): QuestionState => outcome ?? QuestionWaiting.make({}),
+        yield* markRead(rows)
+
+        return Option.map(Arr.head(rows), stateOf)
+      })
+
+      const unread = Effect.fn("Questions.unread")(function* (agentId: string) {
+        const rows = yield* rowsWhere(sql`
+          SELECT * FROM question WHERE agent_id = ${agentId} AND told = 0
+          ORDER BY asked_at, rowid
+        `)
+
+        yield* markRead(rows)
+
+        return rows.map((row) =>
+          ListedQuestion.make({
+            id: row.id,
+            question: row.question,
+            since: row.asked_at,
+            state: stateOf(row),
+          }),
         )
       })
 
@@ -294,7 +333,8 @@ export class Questions extends Context.Service<
             Effect.map((asked) => asked.some(({ asker }) => notifiedThreadOf(asker) === threadId)),
           ),
         setAside,
-        stateFor,
+        readAnswer,
+        unread,
         open: SubscriptionRef.changes(open),
         openByThread: SubscriptionRef.changes(open).pipe(Stream.map(byThread)),
         setAsideUntold: (threadId) =>

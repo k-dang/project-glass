@@ -26,7 +26,9 @@ claude mcp login glass
 Claude Code opens the approval page. Approve it, then the agent can call `ask_user` and
 `check_in`. Neither waits for you: each returns an id at once, and you answer in the Inbox, now or
 days later, or set it aside. The agent reads your answer with `read_answer` and that id, from any
-of its sessions; Glass doesn't wake it, so tell it when you've answered.
+of its sessions; Glass doesn't wake it, so tell it when you've answered. A new session that doesn't
+have the id calls `list_answers`, which lists the questions and Check-ins whose answer the agent
+hasn't read yet.
 
 `claude mcp login glass` is the sign-in step. If your Claude Code build uses a different command,
 run `claude mcp --help` and use the login or authenticate command it lists for an HTTP server.

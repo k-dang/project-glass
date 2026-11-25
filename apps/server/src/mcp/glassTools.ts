@@ -3,6 +3,7 @@ import {
   AskedUser,
   AnswerState,
   CheckInStarted,
+  ListedAnswer,
   type ActivityLogError,
   ActivityPage,
   Thread,
@@ -38,7 +39,18 @@ import {
   ThreadPlace,
   localPlace,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, Match, Option, Predicate, Schema, Stream } from "effect"
+import {
+  Array as Arr,
+  Context,
+  DateTime,
+  Effect,
+  Match,
+  Option,
+  Order,
+  Predicate,
+  Schema,
+  Stream,
+} from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
@@ -310,6 +322,7 @@ const AskUser = Tool.make(ASK_USER_TOOL, {
 const ReadAnswer = Tool.make("read_answer", {
   description:
     "For an agent outside Glass: reads where a question you asked with ask_user, or a Check-in you made with check_in, stands, by its id, from any of your sessions. " +
+    "Once you have read an answer, list_answers no longer lists it. " +
     "The result is Waiting while the user hasn't answered, or SetAside when they chose not to. " +
     "A question's answer is Answered (by is choice or text). " +
     "A Check-in's answer is Approved or Feedback, each with the user's optional message and their Feedback notes (a file path, the side of the diff, the line range, the code they read there, their note, and whether that code changed since); or Replaced, with the id of the Check-in that replaced it when you checked in again from the same folder. " +
@@ -320,6 +333,16 @@ const ReadAnswer = Tool.make("read_answer", {
     }),
   }),
   success: AnswerState,
+  failure: GlassToolFailure,
+}).annotateMerge(readOnly)
+
+const ListAnswers = Tool.make("list_answers", {
+  description:
+    "For an agent outside Glass: lists the questions you asked with ask_user and the Check-ins you made with check_in whose answer you haven't read yet, oldest first, from any of your sessions. " +
+    "Each has its id and its state, as read_answer gives it: Waiting while the user hasn't answered, otherwise the answer. " +
+    "Call it first in a new session, or when you have lost an id, to pick up the answers an earlier session asked for. " +
+    "An answer listed here, or read with read_answer, isn't listed again; a Waiting one stays until it is answered and read.",
+  success: Schema.Struct({ items: Schema.Array(ListedAnswer) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
@@ -382,6 +405,7 @@ export const GlassTools = Toolkit.make(
   SendThreadMessage,
   AskUser,
   ReadAnswer,
+  ListAnswers,
   CheckIn,
 )
 
@@ -684,11 +708,11 @@ export const GlassToolHandlers = GlassTools.toLayer(
               message: "Glass sends a Thread its answers as messages; there's nothing to read.",
             })
 
-          const question = yield* questions.stateFor(id, caller.agentId)
+          const question = yield* questions.readAnswer(id, caller.agentId)
 
           const state: Option.Option<typeof AnswerState.Type> = Option.isSome(question)
             ? question
-            : yield* checkIns.stateFor(id, caller.agentId)
+            : yield* checkIns.readAnswer(id, caller.agentId)
 
           if (Option.isNone(state))
             return yield* new GlassToolFailure({
@@ -697,6 +721,30 @@ export const GlassToolHandlers = GlassTools.toLayer(
             })
 
           return state.value
+        }),
+      list_answers: () =>
+        Effect.gen(function* () {
+          const caller = yield* McpCaller.current
+
+          if (!Predicate.isTagged(caller, "OutsideAgent"))
+            return yield* new GlassToolFailure({
+              message: "Glass sends a Thread its answers as messages; there's nothing to list.",
+            })
+
+          const [asked, checkedIn] = yield* Effect.all([
+            questions.unread(caller.agentId),
+            checkIns.unread(caller.agentId),
+          ])
+
+          return {
+            items: Arr.sort(
+              [...asked, ...checkedIn],
+              Order.mapInput(
+                DateTime.Order,
+                ({ since }: { readonly since: DateTime.Utc }) => since,
+              ),
+            ),
+          }
         }),
       check_in: ({ folder, baseRef, summary }) =>
         Effect.gen(function* () {

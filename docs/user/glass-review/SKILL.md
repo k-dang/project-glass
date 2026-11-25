@@ -17,7 +17,9 @@ changes are waiting in their Glass Inbox, and stop.
 
 ## Act on the answer
 
-When the user says they answered, call Glass's `read_answer` MCP tool with the `checkInId`.
+When the user says they answered, call Glass's `read_answer` MCP tool with the `checkInId`. If
+this session doesn't have the `checkInId`, call `list_answers` and take the Check-in for this
+folder.
 
 - **Feedback**: address every note and the message. Each note names a file, the side of the diff,
   a line range, and the code the user read there, which may have moved since. Then tell the user

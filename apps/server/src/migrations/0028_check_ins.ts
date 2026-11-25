@@ -14,8 +14,10 @@ export default Effect.gen(function* () {
       changes TEXT NOT NULL,
       changes_id TEXT NOT NULL,
       asked_at TEXT NOT NULL,
-      outcome TEXT
+      outcome TEXT,
+      told INTEGER NOT NULL DEFAULT 0
     )
   `
   yield* sql`CREATE INDEX check_in_waiting ON check_in (folder) WHERE outcome IS NULL`
+  yield* sql`CREATE INDEX check_in_untold ON check_in (agent_id) WHERE told = 0`
 })
