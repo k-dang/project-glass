@@ -37,7 +37,6 @@ import {
   type TranscriptUpdate,
   type TurnEnd,
   type SentMessage,
-  type UnsentFeedback,
 } from "@glass/contracts"
 import {
   Array as Arr,
@@ -232,7 +231,10 @@ export class Threads extends Context.Service<
     readonly cancelQueued: (
       threadId: string,
       queuedId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | QueuedMessageStarted | ThreadError>
+    ) => Effect.Effect<
+      ReadonlyArray<FeedbackNote>,
+      ThreadNotFound | QueuedMessageStarted | ThreadError
+    >
     readonly sendQueued: (
       threadId: string,
       queuedId: string,
@@ -242,18 +244,15 @@ export class Threads extends Context.Service<
     ) => Effect.Effect<ThreadChanges, ThreadNotFound | ThreadError>
     readonly feedbackNotes: (
       threadId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
-    readonly stageFeedbackNotes: (
-      threadId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadNotFound | ThreadError>
     readonly saveFeedbackNote: (
       threadId: string,
       note: FeedbackNote,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadNotFound | ThreadError>
     readonly removeFeedbackNote: (
       threadId: string,
       noteId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadNotFound | ThreadError>
     readonly stop: (threadId: string) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly stopBackgroundTask: (
       threadId: string,
@@ -1041,8 +1040,6 @@ export class Threads extends Context.Service<
         changes,
         feedbackNotes: (threadId) =>
           find(threadId).pipe(Effect.andThen(notes.list(threadNotes(threadId)))),
-        stageFeedbackNotes: (threadId) =>
-          find(threadId).pipe(Effect.andThen(notes.stage(threadNotes(threadId)))),
         saveFeedbackNote: (threadId, note) =>
           find(threadId).pipe(Effect.andThen(notes.save(threadNotes(threadId), note))),
         removeFeedbackNote: (threadId, noteId) =>

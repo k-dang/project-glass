@@ -1,4 +1,3 @@
-import { useAtomSet } from "@effect/atom-react"
 import {
   isPageNote,
   PageEvent,
@@ -14,8 +13,7 @@ import { useEffect, useEffectEvent, useMemo, useState } from "react"
 import { createPortal } from "react-dom"
 import { useBrowserPageFrame } from "./browserPages"
 import { FeedbackEditor, pagePartLabel, withText } from "./FeedbackNotes"
-import { pageNoteEditingAtom } from "./threadsArea"
-import { useFeedbackNotes } from "./useFeedbackNotes"
+import { useFeedbackNotes, useNoteEditorOpen } from "./useFeedbackNotes"
 
 const decodeEvent = Schema.decodeUnknownOption(PageEvent)
 
@@ -70,13 +68,7 @@ export function PageNotes(props: {
   const isEditing = editing !== null
   const editingNoteId = editing?.note?.id ?? null
 
-  const setEditingOnPage = useAtomSet(pageNoteEditingAtom(threadId))
-
-  useEffect(() => {
-    setEditingOnPage(editingNoteId)
-
-    return () => setEditingOnPage(null)
-  }, [editingNoteId, setEditingOnPage])
+  useNoteEditorOpen(threadId, "page", editingNoteId !== null)
 
   const state = useMemo(
     (): PageState => ({

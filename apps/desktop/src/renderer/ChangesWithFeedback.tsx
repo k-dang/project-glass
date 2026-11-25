@@ -33,12 +33,12 @@ import { FilePanelTabsList, FilePanelTabTrigger } from "./FilePanelTabs"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
-import { useFeedbackComposer } from "./useFeedbackComposer"
+import { type NoteOpen, useFeedbackComposer } from "./useFeedbackComposer"
 import type { LineNotesEditor } from "./useFeedbackNotes"
 
 export type SidebarTab = "files" | "feedback"
 
-const NoteOpenContext = createContext(false)
+const NoteOpenContext = createContext<NoteOpen>("none")
 
 export const useNoteOpen = () => useContext(NoteOpenContext)
 
@@ -185,24 +185,15 @@ export function ChangesWithFeedback(props: {
           agentWork={null}
         />
         <NoteOpenContext value={feedback.editing}>{props.footer}</NoteOpenContext>
-        {sidebar === null
-          ? feedback.olderOverview !== null && (
-              <section aria-label="On an older version" className="max-h-80 shrink-0 border-b">
-                <h3 className="px-4 pt-3 text-xs font-medium text-muted-foreground">
-                  On an older version
-                </h3>
-                {feedback.olderOverview}
-              </section>
-            )
-          : older > 0 && (
-              <OlderNotes
-                count={older}
-                onView={() => {
-                  setFilePanelOpen(true)
-                  sidebar.onTabChange("feedback")
-                }}
-              />
-            )}
+        {sidebar !== null && older > 0 && (
+          <OlderNotes
+            count={older}
+            onView={() => {
+              setFilePanelOpen(true)
+              sidebar.onTabChange("feedback")
+            }}
+          />
+        )}
         {sidebar === null && empty}
         {layout.files.length > 0 && (
           <div

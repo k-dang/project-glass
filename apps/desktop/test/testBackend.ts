@@ -7,7 +7,6 @@ import {
   SavedPlace,
   type ToDo,
   TranscriptSnapshot,
-  UnsentFeedback,
 } from "@glass/contracts"
 import {
   type Cause,
@@ -173,8 +172,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         CreateThread: unused,
         SendMessage: unused,
         GetThreadChanges: unused,
-        ListFeedbackNotes: () => Effect.succeed(new UnsentFeedback({ notes: [], staged: [] })),
-        StageFeedbackNotes: unused,
+        ListFeedbackNotes: () => Effect.succeed([]),
         SaveFeedbackNote: unused,
         RemoveFeedbackNote: unused,
         CancelQueuedMessage: unused,

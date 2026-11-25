@@ -2,18 +2,15 @@ import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import { type Thread, ThreadChanges as Changes, type Turn } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { FileDiff, MessageSquareText } from "lucide-react"
+import { FileDiff } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { ChangesWithFeedback, LoadProblem, useNoteOpen } from "./ChangesWithFeedback"
 import { threadChangesAtom, feedbackNotesAtom } from "./threadsArea"
-import { plural } from "./plural"
-import { ProblemAlert } from "./ProblemAlert"
-import type { Problem } from "./problems"
 import { SidePanel } from "./SidePanel"
 import { useShortcuts } from "./useShortcuts"
-import { type FeedbackNotesStore, lineNotesOf, useFeedbackNotes } from "./useFeedbackNotes"
+import { lineNotesOf, useFeedbackNotes, useNoteEditorOpen } from "./useFeedbackNotes"
 
 const paneWidthAtom = Atom.make(720).pipe(Atom.keepAlive)
 
@@ -99,52 +96,15 @@ function ThreadChanges(props: {
           store={lineNotes}
           sidebar={null}
           wide={props.wide}
-          footer={
-            lineNotes.notes.length > 0 && (
-              <ReviewFeedback
-                count={lineNotes.notes.length}
-                store={store}
-                onStaged={() => props.wide.onChange(false)}
-              />
-            )
-          }
+          footer={<ReportNoteOpen threadId={thread.id} />}
         />
       )}
     </div>
   )
 }
 
-function ReviewFeedback(props: { count: number; store: FeedbackNotesStore; onStaged: () => void }) {
-  const { store } = props
-  const editing = useNoteOpen()
-  const [staging, setStaging] = useState(false)
-  const [problem, setProblem] = useState<Problem | null>(null)
+function ReportNoteOpen(props: { threadId: string }) {
+  useNoteEditorOpen(props.threadId, "changes", useNoteOpen() === "saved")
 
-  const stage = async () => {
-    setStaging(true)
-    const failed = await store.stage()
-    setStaging(false)
-    setProblem(failed)
-
-    if (failed === null) props.onStaged()
-  }
-
-  return (
-    <div className="flex flex-col gap-2 border-t px-4 py-2">
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm text-muted-foreground">
-        <span className="min-w-0 flex-1 basis-48">
-          {editing
-            ? "Save or cancel the open note before you review your feedback."
-            : `${plural(props.count, "Feedback note")} to send to the Thread.`}
-        </span>
-        <Button size="sm" disabled={editing || staging} onClick={() => void stage()}>
-          <MessageSquareText data-icon="inline-start" aria-hidden />
-          Review feedback
-        </Button>
-      </div>
-      {problem !== null && (
-        <ProblemAlert problem={problem} action={{ label: "Retry", run: () => void stage() }} />
-      )}
-    </div>
-  )
+  return null
 }

@@ -9,7 +9,6 @@ import {
   TranscriptSnapshot,
   TurnDone,
   TurnEnded,
-  UnsentFeedback,
 } from "@glass/contracts"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent, { PointerEventsCheckLevel } from "@testing-library/user-event"
@@ -38,13 +37,10 @@ const note = (id: string, changesId: string, text: string) =>
     text,
   })
 
-const unsent = (...notes: ReadonlyArray<FeedbackNote>) => new UnsentFeedback({ notes, staged: [] })
-
 const savedNotes = (...initial: ReadonlyArray<FeedbackNote>) => {
-  let current = unsent(...initial)
+  let current = initial
 
-  const write = (kept: ReadonlyArray<FeedbackNote>, staged = current.staged) =>
-    Effect.sync(() => (current = new UnsentFeedback({ notes: kept, staged })))
+  const write = (kept: ReadonlyArray<FeedbackNote>) => Effect.sync(() => (current = kept))
 
   return {
     current: () => current,
@@ -52,16 +48,11 @@ const savedNotes = (...initial: ReadonlyArray<FeedbackNote>) => {
       ListFeedbackNotes: () => Effect.sync(() => current),
       SaveFeedbackNote: ({ note: written }) =>
         write(
-          current.notes.some(({ id }) => id === written.id)
-            ? current.notes.map((kept) => (kept.id === written.id ? written : kept))
-            : [...current.notes, written],
+          current.some(({ id }) => id === written.id)
+            ? current.map((kept) => (kept.id === written.id ? written : kept))
+            : [...current, written],
         ),
-      RemoveFeedbackNote: ({ noteId }) => write(current.notes.filter(({ id }) => id !== noteId)),
-      StageFeedbackNotes: () =>
-        write(
-          current.notes,
-          current.notes.map(({ id }) => id),
-        ),
+      RemoveFeedbackNote: ({ noteId }) => write(current.filter(({ id }) => id !== noteId)),
     } satisfies Parameters<typeof testLayer>[0],
   }
 }
@@ -100,7 +91,17 @@ afterEach(() => {
   window.history.replaceState(null, "", "#/")
 })
 
-it("edits and removes Feedback notes, keeping older ones with their original code", async () => {
+const openAttachment = async (user: ReturnType<typeof userEvent.setup>) => {
+  const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
+  const details = attached.querySelector("details")!
+  expect(details.open).toBe(false)
+  await user.click(within(attached).getByText(/attached to this message/))
+  expect(details.open).toBe(true)
+
+  return attached
+}
+
+it("edits and removes Feedback notes, listing older ones only on the composer with their code", async () => {
   const store = savedNotes(note("current", "read-2", "Rename B"), note("older", "read-1", "Drop B"))
 
   const { user, region } = await openChanges({
@@ -109,26 +110,28 @@ it("edits and removes Feedback notes, keeping older ones with their original cod
     ...store.handlers,
   })
 
-  const [older, current] = await within(region).findAllByRole("article", {
+  const current = await within(region).findByRole("article", {
     name: "Feedback on greet.ts New line 2",
   })
 
-  expect(within(current!).queryByText("Older version")).toBeNull()
-  expect(within(older!).getByText("Older version")).toBeTruthy()
+  expect(within(region).queryByText("Drop B")).toBeNull()
+
+  const attached = await openAttachment(user)
+  const [, older] = within(attached).getAllByRole("article")
+  expect(within(older!).getByText("Drop B")).toBeTruthy()
   expect(within(older!).getByText("B")).toBeTruthy()
 
-  await user.click(within(older!).getByRole("button", { name: "Edit" }))
+  await user.click(within(current).getByRole("button", { name: "Edit" }))
   const editor = within(region).getByRole("textbox", { name: "Feedback on selected code" })
-  expect(editor).toHaveProperty("value", "Drop B")
   await user.clear(editor)
-  await user.type(editor, "Keep B after all")
+  await user.type(editor, "Rename B to Greeting")
   await user.click(within(region).getByRole("button", { name: "Save changes" }))
 
-  expect(await within(region).findByText("Keep B after all")).toBeTruthy()
+  expect(await within(attached).findByText("Rename B to Greeting")).toBeTruthy()
 
-  await user.click(within(current!).getByRole("button", { name: "Remove" }))
-  await waitFor(() => expect(within(region).queryByText("Rename B")).toBeNull())
-  expect(store.current().notes).toEqual([note("older", "read-1", "Keep B after all")])
+  await user.click(within(older!).getByRole("button", { name: "Remove" }))
+  await waitFor(() => expect(within(attached).queryByText("Drop B")).toBeNull())
+  expect(store.current()).toEqual([note("current", "read-2", "Rename B to Greeting")])
 })
 
 it("keeps what the user wrote when a Feedback note can't be saved, until a retry saves it", async () => {
@@ -158,7 +161,7 @@ it("keeps what the user wrote when a Feedback note can't be saved, until a retry
   expect(within(region).queryByText("Disk is full.")).toBeNull()
 })
 
-it("keeps the displayed Changes when Show latest fails, then marks notes older once it succeeds", async () => {
+it("keeps the displayed Changes and their notes when Show latest fails, until a retry reads the latest", async () => {
   const turnEnded = Deferred.makeUnsafe<void>()
 
   const reads: Array<Effect.Effect<ThreadChanges, ThreadError>> = [
@@ -195,7 +198,7 @@ it("keeps the displayed Changes when Show latest fails, then marks notes older o
         ),
       ),
     GetThreadChanges: () => reads.shift()!,
-    ListFeedbackNotes: () => Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
+    ListFeedbackNotes: () => Effect.succeed([note("current", "read-1", "Rename B")]),
   })
 
   const listed = await within(region).findByRole("article", {
@@ -206,20 +209,16 @@ it("keeps the displayed Changes when Show latest fails, then marks notes older o
   await user.click(await within(region).findByRole("button", { name: "Show latest" }))
 
   expect(await within(region).findByText("The Sandbox didn't answer.")).toBeTruthy()
-  expect(within(listed).queryByText("Older version")).toBeNull()
+  expect(listed.isConnected).toBe(true)
 
   await user.click(within(region).getByRole("button", { name: "Retry" }))
-  expect(
-    await within(
-      await within(region).findByRole("article", { name: "Feedback on greet.ts New line 2" }),
-    ).findByText("Older version"),
-  ).toBeTruthy()
+  await waitFor(() => expect(within(region).queryByText("Rename B")).toBeNull())
 })
 
 it("shows the Changes while Feedback notes can't load, then the notes once a retry reads them", async () => {
-  const lists: Array<Effect.Effect<UnsentFeedback, ThreadError>> = [
+  const lists: Array<Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>> = [
     Effect.fail(new ThreadError({ message: "Couldn't read your Feedback notes. Try again." })),
-    Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
+    Effect.succeed([note("current", "read-1", "Rename B")]),
   ]
 
   const { user, region } = await openChanges({
@@ -238,14 +237,12 @@ it("shows the Changes while Feedback notes can't load, then the notes once a ret
   expect(await within(region).findByText("Rename B")).toBeTruthy()
 })
 
-it("keeps the note being edited until it's saved or cancelled", async () => {
+it("keeps the note being edited, and holds the message, until it's saved or cancelled", async () => {
   const { user, region } = await openChanges({
     WatchTranscript: idle,
     GetThreadChanges: () => Effect.succeed(changes("read-1")),
     ListFeedbackNotes: () =>
-      Effect.succeed(
-        unsent(note("first", "read-1", "Rename B"), note("second", "read-1", "Test B")),
-      ),
+      Effect.succeed([note("first", "read-1", "Rename B"), note("second", "read-1", "Test B")]),
   })
 
   const [first, second] = await within(region).findAllByRole("article", {
@@ -257,30 +254,19 @@ it("keeps the note being edited until it's saved or cancelled", async () => {
 
   expect(within(region).queryByRole("button", { name: "Add feedback" })).toBeNull()
   expect(within(second!).getByRole("button", { name: "Edit" })).toHaveProperty("disabled", true)
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", true),
+  )
 
   await user.click(within(region).getByRole("button", { name: "Cancel" }))
   const edits = await within(region).findAllByRole("button", { name: "Edit" })
   expect(edits.map((edit) => edit.hasAttribute("disabled"))).toEqual([false, false])
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", false),
+  )
 })
 
-it("keeps Feedback notes readable when the Changes can't be read", async () => {
-  const { region } = await openChanges({
-    WatchTranscript: idle,
-    GetThreadChanges: () => Effect.fail(new ThreadError({ message: "The Sandbox expired." })),
-    ListFeedbackNotes: () => Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
-  })
-
-  expect(await within(region).findByText("The Sandbox expired.")).toBeTruthy()
-
-  const kept = await within(region).findByRole("article", {
-    name: "Feedback on greet.ts New line 2",
-  })
-
-  expect(within(kept).getByText("Older version")).toBeTruthy()
-  expect(within(kept).getByText("Rename B")).toBeTruthy()
-})
-
-it("stages Feedback notes beside the unsent text and sends them as one message once accepted", async () => {
+it("attaches saved Feedback notes beside the unsent text and sends them as one message once accepted", async () => {
   const store = savedNotes(note("first", "read-1", "Rename B"), note("second", "read-1", "Test B"))
   const sent: Array<{ message: string; feedback: ReadonlyArray<string> }> = []
   let attempts = 0
@@ -296,9 +282,7 @@ it("stages Feedback notes beside the unsent text and sends them as one message o
         : Effect.sync(() => void sent.push({ message, feedback })),
   })
 
-  await user.click(await within(region).findByRole("button", { name: "Review feedback" }))
-  const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
-  expect(store.current().staged).toEqual(["first", "second"])
+  const attached = await openAttachment(user)
   expect(within(attached).getAllByRole("article")).toHaveLength(2)
   expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Also add docs")
 
@@ -308,7 +292,7 @@ it("stages Feedback notes beside the unsent text and sends them as one message o
   expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", true)
   await user.click(within(attached).getByRole("button", { name: "Save changes" }))
   expect(await within(attached).findByText("Rename B!")).toBeTruthy()
-  expect(store.current().notes[0]).toEqual(note("first", "read-1", "Rename B!"))
+  expect(store.current()[0]).toEqual(note("first", "read-1", "Rename B!"))
 
   await user.click(screen.getByRole("button", { name: "Send" }))
   expect(await screen.findByText("Couldn't read or save the transcript.")).toBeTruthy()
@@ -321,7 +305,7 @@ it("stages Feedback notes beside the unsent text and sends them as one message o
   )
   expect(sent).toEqual([{ message: "Also add docs", feedback: ["first", "second"] }])
   expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("")
-  expect(within(region).queryByRole("button", { name: "Review feedback" })).toBeNull()
+  expect(within(region).queryByRole("article")).toBeNull()
 })
 
 it("shows sent and Queued Feedback notes with the code they were left on", async () => {
@@ -397,8 +381,7 @@ it("returns a canceled Queued message's Feedback notes beside newer work once a 
         : store.handlers.SaveFeedbackNote({ threadId: thread.id, note: queuedNote }),
   })
 
-  await user.click(await within(region).findByRole("button", { name: "Review feedback" }))
-  const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
+  const attached = await openAttachment(user)
 
   const queue = await screen.findByRole("region", { name: "Queued messages" })
   const cancelFeedback = "Cancel: Feedback notes without a message"
@@ -406,17 +389,14 @@ it("returns a canceled Queued message's Feedback notes beside newer work once a 
   expect(await screen.findByText("Couldn't cancel a Queued message.")).toBeTruthy()
 
   await user.click(within(queue).getByRole("button", { name: cancelFeedback }))
-  await waitFor(() => expect(store.current().notes).toHaveLength(2))
+  await waitFor(() => expect(store.current()).toHaveLength(2))
 
-  expect(within(attached).getAllByRole("article")).toHaveLength(1)
+  const [, restored] = await within(attached).findAllByRole("article")
+  expect(within(restored!).getByText("Cap the attempts")).toBeTruthy()
+  expect(within(restored!).getByText("B")).toBeTruthy()
   expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Also add docs")
-
-  const older = await within(region).findByRole("region", { name: "On an older version" })
-  const restored = await within(older).findByRole("article")
-  expect(within(restored).getByText("Cap the attempts")).toBeTruthy()
-  expect(within(restored).getByText("Older version")).toBeTruthy()
-  expect(within(older).queryByText("Newer")).toBeNull()
-  expect(await within(region).findByText("Newer")).toBeTruthy()
+  expect(within(region).getByText("Newer")).toBeTruthy()
+  expect(within(region).queryByText("Cap the attempts")).toBeNull()
 })
 
 it("selects lines with Shift+Arrow keys and starts a Feedback note on them with Enter", async () => {

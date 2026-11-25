@@ -21,6 +21,8 @@ import {
 import { FeedbackEditor, FeedbackNoteCard, FeedbackOverview, SelectionBar } from "./FeedbackNotes"
 import type { LineNotesEditor } from "./useFeedbackNotes"
 
+export type NoteOpen = "none" | "new" | "saved"
+
 type NoteDraft = Omit<LineNote, "_tag" | "text">
 
 type Composer =
@@ -261,7 +263,7 @@ export function useFeedbackComposer(props: {
       <FeedbackNoteCard
         key={note.id}
         note={note}
-        olderCode={null}
+        snippet="none"
         location={rangeLabel(note.side, note.start, note.end)}
         onShow={null}
         onEdit={editing === null ? () => editNote(note, "diff") : null}
@@ -286,10 +288,10 @@ export function useFeedbackComposer(props: {
     onSelectedLinesChange,
   }
 
-  const overviewOf = (notes: ReadonlyArray<LineNote>) => (
+  const overview = (
     <FeedbackOverview
       ready={store.ready}
-      notes={notes}
+      notes={store.notes}
       changesId={changesId}
       editingId={editing?.where === "overview" ? editing.note.id : null}
       editor={editing === null ? null : renderEditor(editing)}
@@ -299,13 +301,7 @@ export function useFeedbackComposer(props: {
     />
   )
 
-  const olderNotes = store.notes.filter((note) => isOlder(note, changesId))
+  const open: NoteOpen = editing === null ? "none" : editing.saved ? "saved" : "new"
 
-  return {
-    diffProps,
-    overview: overviewOf(store.notes),
-    olderOverview: olderNotes.length === 0 ? null : overviewOf(olderNotes),
-    onKeyDown,
-    editing: editing !== null,
-  }
+  return { diffProps, overview, onKeyDown, editing: open }
 }

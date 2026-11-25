@@ -1,9 +1,14 @@
-import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import { type FeedbackNote, isLineNote, type LineNote, UnsentFeedback } from "@glass/contracts"
+import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
+import { type FeedbackNote, isLineNote, type LineNote } from "@glass/contracts"
 import { type Effect, Exit } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { useMemo } from "react"
-import { feedbackNotesAtom, pageNoteEditingAtom, writtenFeedbackAtom } from "./threadsArea"
+import { useEffect, useMemo } from "react"
+import {
+  feedbackNotesAtom,
+  type NoteEditor,
+  noteEditorsAtom,
+  writtenFeedbackAtom,
+} from "./threadsArea"
 import { Backend, type BackendError, useBackendRuntime } from "./backend"
 import { type Problem, problemOf } from "./problems"
 
@@ -18,9 +23,7 @@ interface NotesEditor<Note> {
 export type LineNotesEditor = NotesEditor<LineNote>
 
 export interface FeedbackNotesStore extends NotesEditor<FeedbackNote> {
-  readonly staged: ReadonlyArray<FeedbackNote>
-  readonly editingOnPage: boolean
-  readonly stage: () => Promise<Problem | null>
+  readonly editingElsewhere: boolean
   readonly sent: (noteIds: ReadonlyArray<string>) => void
 }
 
@@ -49,31 +52,27 @@ export const notesWriter =
     return null
   }
 
-const noFeedback = new UnsentFeedback({ notes: [], staged: [] })
+const noNotes: ReadonlyArray<FeedbackNote> = []
 
-const without = (unsent: UnsentFeedback, noteIds: ReadonlyArray<string>) =>
-  new UnsentFeedback({
-    notes: unsent.notes.filter(({ id }) => !noteIds.includes(id)),
-    staged: unsent.staged.filter((id) => !noteIds.includes(id)),
-  })
+const without = (notes: ReadonlyArray<FeedbackNote>, noteIds: ReadonlyArray<string>) =>
+  notes.filter(({ id }) => !noteIds.includes(id))
 
 export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
   const runtime = useBackendRuntime()
   const listed = useAtomValue(feedbackNotesAtom(threadId))
   const refetch = useAtomRefresh(feedbackNotesAtom(threadId))
   const [written, setWritten] = useAtom(writtenFeedbackAtom(threadId))
-  const editingOnPage = useAtomValue(pageNoteEditingAtom(threadId)) !== null
+  const editingElsewhere = useAtomValue(noteEditorsAtom(threadId)).length > 0
   const saved = AsyncResult.isSuccess(listed) ? listed.value : null
-  const unsent = written ?? saved ?? noFeedback
+  const notes = written ?? saved ?? noNotes
 
   return useMemo(() => {
     const write = notesWriter(runtime, setWritten)
 
     return {
       ready: saved !== null || written !== null,
-      notes: unsent.notes,
-      staged: unsent.notes.filter(({ id }) => unsent.staged.includes(id)),
-      editingOnPage,
+      notes,
+      editingElsewhere,
       save: (note) =>
         write(
           noteWriteTitles.save,
@@ -84,16 +83,24 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
           noteWriteTitles.remove,
           Backend.use((backend) => backend.RemoveFeedbackNote({ threadId, noteId })),
         ),
-      stage: () =>
-        write(
-          "Couldn't add your feedback to the message",
-          Backend.use((backend) => backend.StageFeedbackNotes({ threadId })),
-        ),
-      sent: (noteIds) => setWritten((current) => without(current ?? saved ?? noFeedback, noteIds)),
+      sent: (noteIds) => setWritten((current) => without(current ?? saved ?? noNotes, noteIds)),
       refresh: () => {
         setWritten(null)
         refetch()
       },
     }
-  }, [threadId, runtime, unsent, saved, written, setWritten, refetch, editingOnPage])
+  }, [threadId, runtime, notes, saved, written, setWritten, refetch, editingElsewhere])
+}
+
+export function useNoteEditorOpen(threadId: string, editor: NoteEditor, open: boolean) {
+  const setEditors = useAtomSet(noteEditorsAtom(threadId))
+
+  useEffect(() => {
+    const closed = (editors: ReadonlyArray<NoteEditor>) =>
+      editors.filter((other) => other !== editor)
+
+    setEditors((editors) => (open ? [...closed(editors), editor] : closed(editors)))
+
+    return () => setEditors(closed)
+  }, [open, editor, setEditors])
 }
