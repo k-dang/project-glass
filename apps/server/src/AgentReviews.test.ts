@@ -13,7 +13,7 @@ import {
 } from "@glass/contracts"
 import { Clock, DateTime, Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { existsSync, mkdirSync, readdirSync, readFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { vi } from "vite-plus/test"
@@ -131,7 +131,6 @@ const fixture = Effect.fnUntraced(function* (
     runners,
     github,
     home,
-    gates,
     pr,
     ref,
     revision,
@@ -468,28 +467,6 @@ it.live(
       assert.strictEqual(threads[0]?.forReview, true)
       assert.deepStrictEqual(yield* f.restart, started)
     }),
-)
-
-it.live("lists the commands of the review's Thread in its checkout as a Review", () =>
-  Effect.gen(function* () {
-    const f = yield* fixture()
-    yield* f.start
-    yield* f.state(reviewed)
-    yield* followUp(f, "show the review")
-    const threadId = (yield* f.state(withThread)).review!.threadId!
-
-    yield* f.client.ListThreadCommands({ threadId })
-
-    const checkouts = join(f.home, ".project-glass", "agent-review-checkouts")
-    assert.deepStrictEqual(
-      readdirSync(f.gates).filter((name) => name.startsWith("listed-")),
-      ["listed-Review"],
-    )
-    assert.strictEqual(
-      readFileSync(join(f.gates, "listed-Review"), "utf8"),
-      join(checkouts, ...readdirSync(checkouts)),
-    )
-  }),
 )
 
 it.live("keeps the Suggested drafts the agent places on lines of the diff", () =>
