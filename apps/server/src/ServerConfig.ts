@@ -58,10 +58,6 @@ export class ServerConfig extends Context.Service<
         Config.withDefault(join(homeDirectory, ".project-glass")),
       )
 
-      const logFile = yield* Config.String("GLASS_LOG_FILE").pipe(
-        Config.withDefault(join(dataDirectory, "backend.log")),
-      )
-
       const agentHostBundle = yield* Config.String("GLASS_AGENT_HOST_BUNDLE").pipe(
         Config.withDefault(bundledEntry("agentHost", import.meta.url)),
       )
@@ -80,7 +76,7 @@ export class ServerConfig extends Context.Service<
         gitRemote,
         dataDirectory,
         homeDirectory,
-        logFile,
+        logFile: join(dataDirectory, "backend.log"),
       })
     }),
   )

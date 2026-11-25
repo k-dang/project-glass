@@ -6,7 +6,7 @@ Opening Glass shows one "Glass" window while its backend starts; the backend's o
 
 - `life-open` opens a 1280×820 window titled "Glass" showing an app icon rail ending in the connection avatar, and Dashboard.
 - `life-backend` starts the backend on a fresh localhost port behind a per-launch secret while the window loads; the window reaches it once it is up.
-- `life-logs` appends backend output and Glass's `[glass <time>]` start, restart, and give-up notes to `~/.glass/logs/backend.log` across launches, moving it to `backend.previous.log` at launch once it passes 5 MB.
+- `life-logs` appends backend output and Glass's `[glass <time>]` start, restart, and give-up notes to `~/.project-glass/backend.log` across launches, moving it to `backend.previous.log` at launch once it passes 5 MB.
 - `life-quit` closing the last window quits Glass and frees the backend's port.
 - `life-start-error` fills the window with "Glass's backend didn't start" when the backend fails to start four times in a row.
 - `life-restart` restarts a backend that exits after starting, on the same port and token, while a "Reconnecting to Glass's backend…" banner shows above the page.
@@ -27,7 +27,7 @@ Preconditions:
 - No live run with the same ID (`node $V list`).
 
 - **Open (`life-open`, `life-backend`).** `node $V launch`, then `node $V doctor`. Every line is `OK`, including "Window shows the built renderer" and "Backend health". `node $V snapshot opened` shows `navigation "App areas"` with seven links from Dashboard to Settings, `main "Dashboard"`, and `heading "Dashboard"`.
-- **Logs (`life-logs`).** The run's `GLASS_HOME` is `.verify/<id>/state/home`, so the log is `.verify/<id>/state/home/.glass/logs/backend.log` and holds one JSON line per note: `"message":"Starting backend"` from the desktop, then `"message":"Listening on http://127.0.0.1:<port>"` from the backend, matching the backend URL `launch` printed. Rotation to `backend.previous.log` needs 5 MB of output; the main-process test covers it.
+- **Logs (`life-logs`).** The run's `GLASS_HOME` is `.verify/<id>/state/home`, so the log is `.verify/<id>/state/home/.project-glass/backend.log` and holds one JSON line per note: `"message":"Starting backend"` from the desktop, then `"message":"Listening on http://127.0.0.1:<port>"` from the backend, matching the backend URL `launch` printed. Rotation to `backend.previous.log` needs 5 MB of output; the main-process test covers it.
 - **Quit (`life-quit`).** `node $V stop`. It requests app shutdown and prints `Backend port <port>: closed`. "Electron did not quit; killing its process tree" means the app did not quit by itself, which is a failure.
 - **Start error (`life-start-error`).** `node $V launch --github fake --fail-backend-start`. `node $V wait --text "didn't start"`, then `snapshot`/`screenshot`: `heading "Glass's backend didn't start"`, the log path, and `button "Relaunch Glass"`. `backend.log` shows four `Starting backend` notes, `Backend exited with code 1; restarting in` 500ms, 1s, and 2s, and `Backend exited with code 1; giving up`. A relaunch fails the same way in this mode.
 - **Restart (`life-restart`).** `node $V launch --github fake`, `wait --text "Dashboard"`. The banner lasts only while the backend restarts, about a second and a half, so start `wait --text "Reconnecting" --timeout 20000` in a second shell before `node $V kill-backend`; a `wait` started after `kill-backend` returns usually misses it. The banner then clears; `doctor` then shows the same Electron pid and "Backend health" OK on the same port. Add a to-do to prove calls work again, and `backend.log` shows `Backend exited with code 1; restarting in 500ms`.
@@ -43,4 +43,4 @@ Preconditions:
 - The window's avatar names `@glass-verify` only in its accessible name; wait for page text such as "Needs review" instead.
 - `kill-backend` fails with "nothing is listening" or "the backend is not up" while a restart is in progress; retry it once the banner clears.
 - Relaunch opens Dashboard.
-- The helper sets `GLASS_HOME` per run so it never touches the user's real `~/.glass/logs` or `~/.project-glass`. `HOME` stays the user's, so `gh` still finds their login.
+- The helper sets `GLASS_HOME` per run so it never touches the user's real `~/.project-glass`. `HOME` stays the user's, so `gh` still finds their login.
