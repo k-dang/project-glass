@@ -56,12 +56,25 @@ const hostUrls = HttpServerRequest.HttpServerRequest.pipe(
   Effect.map((request) => Option.fromNullishOr(requestUrls(request))),
 )
 
+const backgroundRequestFromAnotherSite = (
+  headers: HttpServerRequest.HttpServerRequest["headers"],
+) => {
+  const site = headers["sec-fetch-site"]
+
+  return (site === "cross-site" || site === "same-site") && headers["sec-fetch-dest"] !== "document"
+}
+
 const oauthError = (error: string, description: string) =>
   json(400, { error, error_description: description })
 
 const missingHost = oauthError("invalid_request", "The request host is missing.")
 
 const missingHostPage = page(400, renderError("The request host is missing."))
+
+const notInATabPage = page(
+  403,
+  renderError("Glass opens a sign-in only in a browser tab. Start it again from the app."),
+)
 
 const queryOf = (url: URL): AuthorizationQuery => ({
   client_id: url.searchParams.get("client_id") ?? undefined,
@@ -135,6 +148,8 @@ const authorize = Effect.gen(function* () {
   const found = yield* hostUrls
 
   if (Option.isNone(found)) return missingHostPage
+
+  if (backgroundRequestFromAnotherSite(request.headers)) return notInATabPage
 
   const validated = yield* oauth
     .validateAuthorization({
