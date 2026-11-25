@@ -261,7 +261,7 @@ export function useFeedbackComposer(props: {
       <FeedbackNoteCard
         key={note.id}
         note={note}
-        code={null}
+        code="hidden"
         location={rangeLabel(note.side, note.start, note.end)}
         onShow={null}
         onEdit={editing === null ? () => editNote(note, "diff") : null}

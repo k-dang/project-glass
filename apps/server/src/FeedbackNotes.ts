@@ -1,4 +1,4 @@
-import { ThreadError, FeedbackNote, UnsentFeedback } from "@glass/contracts"
+import { ThreadError, FeedbackNote } from "@glass/contracts"
 import { Context, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
@@ -36,15 +36,15 @@ const guarded =
 export class FeedbackNotes extends Context.Service<
   FeedbackNotes,
   {
-    readonly list: (owner: NotesOwner) => Effect.Effect<UnsentFeedback, ThreadError>
+    readonly list: (owner: NotesOwner) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>
     readonly save: (
       owner: NotesOwner,
       note: FeedbackNote,
-    ) => Effect.Effect<UnsentFeedback, ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>
     readonly remove: (
       owner: NotesOwner,
       noteId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>
     readonly take: (
       owner: NotesOwner,
       noteIds: ReadonlyArray<string>,
@@ -65,11 +65,7 @@ export class FeedbackNotes extends Context.Service<
       const list = Effect.fn("FeedbackNotes.list")((owner: NotesOwner) =>
         sql`
             SELECT note FROM feedback_note WHERE owner = ${owner} ORDER BY rowid
-          `.pipe(
-          Effect.flatMap(notesOf),
-          Effect.map((notes) => new UnsentFeedback({ notes })),
-          guarded("read"),
-        ),
+          `.pipe(Effect.flatMap(notesOf), guarded("read")),
       )
 
       return FeedbackNotes.of({

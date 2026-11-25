@@ -96,7 +96,6 @@ function ThreadChanges(props: {
           store={lineNotes}
           sidebar={null}
           wide={props.wide}
-          footer={null}
         />
       )}
     </div>

@@ -1,5 +1,5 @@
 import { useAtom, useAtomRefresh, useAtomValue } from "@effect/atom-react"
-import { type FeedbackNote, isLineNote, type LineNote, UnsentFeedback } from "@glass/contracts"
+import { type FeedbackNote, isLineNote, type LineNote } from "@glass/contracts"
 import { type Effect, Exit } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { useMemo } from "react"
@@ -47,12 +47,10 @@ export const notesWriter =
     return null
   }
 
-const noFeedback = new UnsentFeedback({ notes: [] })
+const noNotes: ReadonlyArray<FeedbackNote> = []
 
-const without = (unsent: UnsentFeedback, noteIds: ReadonlyArray<string>) =>
-  new UnsentFeedback({
-    notes: unsent.notes.filter(({ id }) => !noteIds.includes(id)),
-  })
+const without = (notes: ReadonlyArray<FeedbackNote>, noteIds: ReadonlyArray<string>) =>
+  notes.filter(({ id }) => !noteIds.includes(id))
 
 export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
   const runtime = useBackendRuntime()
@@ -61,14 +59,14 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
   const [written, setWritten] = useAtom(writtenFeedbackAtom(threadId))
   const editingOnPage = useAtomValue(pageNoteEditingAtom(threadId)) !== null
   const saved = AsyncResult.isSuccess(listed) ? listed.value : null
-  const unsent = written ?? saved ?? noFeedback
+  const notes = written ?? saved ?? noNotes
 
   return useMemo(() => {
     const write = notesWriter(runtime, setWritten)
 
     return {
       ready: saved !== null || written !== null,
-      notes: unsent.notes,
+      notes,
       editingOnPage,
       save: (note) =>
         write(
@@ -80,11 +78,11 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
           noteWriteTitles.remove,
           Backend.use((backend) => backend.RemoveFeedbackNote({ threadId, noteId })),
         ),
-      sent: (noteIds) => setWritten((current) => without(current ?? saved ?? noFeedback, noteIds)),
+      sent: (noteIds) => setWritten((current) => without(current ?? saved ?? noNotes, noteIds)),
       refresh: () => {
         setWritten(null)
         refetch()
       },
     }
-  }, [threadId, runtime, unsent, saved, written, setWritten, refetch, editingOnPage])
+  }, [threadId, runtime, notes, saved, written, setWritten, refetch, editingOnPage])
 }

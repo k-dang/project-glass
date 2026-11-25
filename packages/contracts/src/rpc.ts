@@ -56,7 +56,7 @@ import {
 } from "./comment"
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
-import { FeedbackNote, LineNote, UnsentFeedback } from "./feedbackNote"
+import { FeedbackNote, LineNote } from "./feedbackNote"
 import { BrowserControl, BrowserPageAnswer, BrowserPageRequest } from "./browserPage"
 import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
@@ -529,7 +529,7 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("CancelQueuedMessage", {
     payload: { threadId: Schema.String, queuedMessageId: Schema.String },
-    success: UnsentFeedback,
+    success: Schema.Array(FeedbackNote),
     error: Schema.Union([ThreadNotFound, QueuedMessageStarted, ThreadError]),
   }),
   Rpc.make("SendQueuedMessage", {
@@ -583,17 +583,17 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("ListFeedbackNotes", {
     payload: { threadId: Schema.String },
-    success: UnsentFeedback,
+    success: Schema.Array(FeedbackNote),
     error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("SaveFeedbackNote", {
     payload: { threadId: Schema.String, note: FeedbackNote },
-    success: UnsentFeedback,
+    success: Schema.Array(FeedbackNote),
     error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("RemoveFeedbackNote", {
     payload: { threadId: Schema.String, noteId: Schema.String },
-    success: UnsentFeedback,
+    success: Schema.Array(FeedbackNote),
     error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("RemoveThread", {

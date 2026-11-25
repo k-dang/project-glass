@@ -69,13 +69,15 @@ const viewOf = (note: FeedbackNote): NoteView =>
 
 export function FeedbackNoteCard(props: {
   note: FeedbackNote
-  code: { readonly text: string; readonly older: boolean } | null
+  code: "hidden" | "shown" | "older"
   location: string
   onShow: (() => void) | null
   onEdit: (() => void) | null
   onRemove: () => Promise<Problem | null>
 }) {
-  const { note, code } = props
+  const { note } = props
+  const view = viewOf(note)
+  const shown = props.code === "hidden" ? null : view.code
   const [removing, setRemoving] = useState(false)
   const [problem, setProblem] = useState<Problem | null>(null)
 
@@ -89,7 +91,7 @@ export function FeedbackNoteCard(props: {
 
   return (
     <article
-      aria-label={`Feedback on ${viewOf(note).location}`}
+      aria-label={`Feedback on ${view.location}`}
       className="flex flex-col gap-2 rounded-lg border bg-background p-3 font-sans text-sm"
     >
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -104,9 +106,9 @@ export function FeedbackNoteCard(props: {
             {props.location}
           </button>
         )}
-        {code?.older === true && <OlderVersion />}
+        {props.code === "older" && <OlderVersion />}
       </div>
-      {code !== null && <Snippet code={code.text} />}
+      {shown !== null && <Snippet code={shown} />}
       <p className="whitespace-pre-wrap wrap-anywhere">{note.text}</p>
       {problem !== null && (
         <ProblemAlert problem={problem} action={{ label: "Retry", run: () => void remove() }} />
@@ -137,12 +139,6 @@ export const withText = (note: FeedbackNote, text: string) =>
     // oxlint-disable-next-line typescript/no-misused-spread -- The fields go straight back into PageNote.
     PageNote: (page) => new PageNote({ ...page, text }),
   })
-
-const codeOf = (note: FeedbackNote) => {
-  const { code } = viewOf(note)
-
-  return code === null ? null : { text: code, older: false }
-}
 
 export interface AttachedEdit {
   readonly id: string
@@ -189,7 +185,7 @@ export function AttachedFeedback(props: {
             ) : (
               <FeedbackNoteCard
                 note={note}
-                code={codeOf(note)}
+                code="shown"
                 location={viewOf(note).location}
                 onShow={null}
                 onEdit={
@@ -377,7 +373,7 @@ export function FeedbackOverview(props: {
             ) : (
               <FeedbackNoteCard
                 note={note}
-                code={older ? { text: note.code, older } : null}
+                code={older ? "older" : "hidden"}
                 location={viewOf(note).location}
                 onShow={older ? null : () => props.onShow(note)}
                 onEdit={onEdit === null ? null : () => onEdit(note)}

@@ -56,7 +56,3 @@ export type FeedbackNote = typeof FeedbackNote.Type
 export const isLineNote = Schema.is(LineNote)
 
 export const isPageNote = Schema.is(PageNote)
-
-export class UnsentFeedback extends Schema.Class<UnsentFeedback>("UnsentFeedback")({
-  notes: Schema.Array(FeedbackNote),
-}) {}

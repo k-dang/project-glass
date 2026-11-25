@@ -57,9 +57,9 @@ import {
   TurnStarted,
   TurnStopped,
   QueuedMessageStarted,
-  UnsentFeedback,
   WaitingRequests,
   GitHubUnavailable,
+  type FeedbackNote,
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -1644,7 +1644,7 @@ it("lists Queued messages, cancels one, and sends one now once no Turn runs", as
       Effect.sync(() => {
         cancelled.push(queuedMessageId)
 
-        return new UnsentFeedback({ notes: [] })
+        return []
       }),
     SendQueuedMessage: ({ queuedMessageId }: { queuedMessageId: string }) =>
       Effect.sync(() => void sentNow.push(queuedMessageId)),
@@ -2413,7 +2413,7 @@ it("shows a Sandbox Thread's Browser pane nothing from this device, not even an 
 })
 
 it("leaves a Feedback note on the part of a page in the Browser pane the page reports, and sends it with the next message", async () => {
-  let unsent = new UnsentFeedback({ notes: [] })
+  let unsent: ReadonlyArray<FeedbackNote> = []
   const sent: Array<{ message: string; feedback: ReadonlyArray<string> }> = []
 
   const user = mount({
@@ -2433,8 +2433,7 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
         }),
       ),
     ListFeedbackNotes: () => Effect.sync(() => unsent),
-    SaveFeedbackNote: ({ note }) =>
-      Effect.sync(() => (unsent = new UnsentFeedback({ notes: [...unsent.notes, note] }))),
+    SaveFeedbackNote: ({ note }) => Effect.sync(() => (unsent = [...unsent, note])),
     SendMessage: ({ message, feedback }) =>
       Effect.sync(() => void sent.push({ message, feedback })),
   })
@@ -2466,7 +2465,7 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
   expect(within(attached).getByText("docs/plan.html · “refill of five per minute”")).toBeTruthy()
   expect(within(attached).getByText("Make this ten")).toBeTruthy()
 
-  const [note] = unsent.notes
+  const [note] = unsent
   expect(toPage.at(-1)).toEqual({ pick: false, notes: [{ id: note?.id, part }], active: null })
 
   fromPage({ type: "open", id: note!.id, rect: { top: 10, left: 10, bottom: 30, right: 200 } })

@@ -9,7 +9,6 @@ import {
   TranscriptSnapshot,
   TurnDone,
   TurnEnded,
-  UnsentFeedback,
 } from "@glass/contracts"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
 import userEvent, { PointerEventsCheckLevel } from "@testing-library/user-event"
@@ -38,13 +37,10 @@ const note = (id: string, changesId: string, text: string) =>
     text,
   })
 
-const unsent = (...notes: ReadonlyArray<FeedbackNote>) => new UnsentFeedback({ notes })
-
 const savedNotes = (...initial: ReadonlyArray<FeedbackNote>) => {
-  let current = unsent(...initial)
+  let current = initial
 
-  const write = (kept: ReadonlyArray<FeedbackNote>) =>
-    Effect.sync(() => (current = unsent(...kept)))
+  const write = (kept: ReadonlyArray<FeedbackNote>) => Effect.sync(() => (current = kept))
 
   return {
     current: () => current,
@@ -52,11 +48,11 @@ const savedNotes = (...initial: ReadonlyArray<FeedbackNote>) => {
       ListFeedbackNotes: () => Effect.sync(() => current),
       SaveFeedbackNote: ({ note: written }) =>
         write(
-          current.notes.some(({ id }) => id === written.id)
-            ? current.notes.map((kept) => (kept.id === written.id ? written : kept))
-            : [...current.notes, written],
+          current.some(({ id }) => id === written.id)
+            ? current.map((kept) => (kept.id === written.id ? written : kept))
+            : [...current, written],
         ),
-      RemoveFeedbackNote: ({ noteId }) => write(current.notes.filter(({ id }) => id !== noteId)),
+      RemoveFeedbackNote: ({ noteId }) => write(current.filter(({ id }) => id !== noteId)),
     } satisfies Parameters<typeof testLayer>[0],
   }
 }
@@ -127,7 +123,7 @@ it("edits and removes Feedback notes, listing older ones only on the composer wi
 
   await user.click(within(older!).getByRole("button", { name: "Remove" }))
   await waitFor(() => expect(within(attached).queryByText("Drop B")).toBeNull())
-  expect(store.current().notes).toEqual([note("current", "read-2", "Rename B to Greeting")])
+  expect(store.current()).toEqual([note("current", "read-2", "Rename B to Greeting")])
 })
 
 it("keeps what the user wrote when a Feedback note can't be saved, until a retry saves it", async () => {
@@ -194,7 +190,7 @@ it("keeps the displayed Changes and their notes when Show latest fails, until a 
         ),
       ),
     GetThreadChanges: () => reads.shift()!,
-    ListFeedbackNotes: () => Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
+    ListFeedbackNotes: () => Effect.succeed([note("current", "read-1", "Rename B")]),
   })
 
   const listed = await within(region).findByRole("article", {
@@ -212,9 +208,9 @@ it("keeps the displayed Changes and their notes when Show latest fails, until a 
 })
 
 it("shows the Changes while Feedback notes can't load, then the notes once a retry reads them", async () => {
-  const lists: Array<Effect.Effect<UnsentFeedback, ThreadError>> = [
+  const lists: Array<Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>> = [
     Effect.fail(new ThreadError({ message: "Couldn't read your Feedback notes. Try again." })),
-    Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
+    Effect.succeed([note("current", "read-1", "Rename B")]),
   ]
 
   const { user, region } = await openChanges({
@@ -238,9 +234,7 @@ it("keeps the note being edited until it's saved or cancelled", async () => {
     WatchTranscript: idle,
     GetThreadChanges: () => Effect.succeed(changes("read-1")),
     ListFeedbackNotes: () =>
-      Effect.succeed(
-        unsent(note("first", "read-1", "Rename B"), note("second", "read-1", "Test B")),
-      ),
+      Effect.succeed([note("first", "read-1", "Rename B"), note("second", "read-1", "Test B")]),
   })
 
   const [first, second] = await within(region).findAllByRole("article", {
@@ -284,7 +278,7 @@ it("attaches saved Feedback notes beside the unsent text and sends them as one m
   expect(screen.getByRole("button", { name: "Send" })).toHaveProperty("disabled", true)
   await user.click(within(attached).getByRole("button", { name: "Save changes" }))
   expect(await within(attached).findByText("Rename B!")).toBeTruthy()
-  expect(store.current().notes[0]).toEqual(note("first", "read-1", "Rename B!"))
+  expect(store.current()[0]).toEqual(note("first", "read-1", "Rename B!"))
 
   await user.click(screen.getByRole("button", { name: "Send" }))
   expect(await screen.findByText("Couldn't read or save the transcript.")).toBeTruthy()
@@ -381,7 +375,7 @@ it("returns a canceled Queued message's Feedback notes beside newer work once a 
   expect(await screen.findByText("Couldn't cancel a Queued message.")).toBeTruthy()
 
   await user.click(within(queue).getByRole("button", { name: cancelFeedback }))
-  await waitFor(() => expect(store.current().notes).toHaveLength(2))
+  await waitFor(() => expect(store.current()).toHaveLength(2))
 
   const [, restored] = await within(attached).findAllByRole("article")
   expect(within(restored!).getByText("Cap the attempts")).toBeTruthy()

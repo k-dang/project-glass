@@ -12,6 +12,7 @@ import {
   type MessageInput,
   type ModelChoice,
   type NewThread,
+  type FeedbackNote,
   type PermissionMode,
   type PlaceTag,
   type RequestAnswer,
@@ -19,7 +20,6 @@ import {
   type SentMessage,
   type Transcript,
   type TranscriptUpdate,
-  type UnsentFeedback,
   repositoryKey,
   localPlace,
   nothingUnsent,
@@ -127,7 +127,7 @@ export const feedbackNotesAtom = Atom.family((threadId: string) =>
 )
 
 export const writtenFeedbackAtom = Atom.family((_threadId: string) =>
-  Atom.make<UnsentFeedback | null>(null),
+  Atom.make<ReadonlyArray<FeedbackNote> | null>(null),
 )
 
 export const pageNoteEditingAtom = Atom.family((_threadId: string) =>

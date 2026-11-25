@@ -9,7 +9,6 @@ import {
   PageText,
   SandboxPlace,
   TextPatch,
-  UnsentFeedback,
   localPlace,
   toDoMention,
 } from "@glass/contracts"
@@ -291,9 +290,7 @@ it.live(
       assert.notEqual((yield* f.client.GetThreadChanges({ threadId: thread.id })).id, read.id)
 
       const restarted = yield* f.restart
-      assert.deepStrictEqual((yield* restarted.ListFeedbackNotes({ threadId: thread.id })).notes, [
-        edited,
-      ])
+      assert.deepStrictEqual(yield* restarted.ListFeedbackNotes({ threadId: thread.id }), [edited])
 
       yield* restarted.RemoveThread({ threadId: thread.id })
 
@@ -337,10 +334,7 @@ it.live(
       yield* f.client.SaveFeedbackNote({ threadId, note: onChanges })
       yield* f.client.SaveFeedbackNote({ threadId, note: onPage })
 
-      assert.deepStrictEqual(
-        yield* f.client.ListFeedbackNotes({ threadId }),
-        new UnsentFeedback({ notes: [onChanges, onPage] }),
-      )
+      assert.deepStrictEqual(yield* f.client.ListFeedbackNotes({ threadId }), [onChanges, onPage])
     }),
 )
 
@@ -375,14 +369,11 @@ it.live(
       const { queued } = yield* f.watch(threadId, (transcript) => transcript.queued.length === 1)
 
       assert.deepStrictEqual(queued[0]?.feedback, [capAttempts, keepError])
-      assert.deepStrictEqual(
-        yield* f.client.ListFeedbackNotes({ threadId }),
-        new UnsentFeedback({ notes: [later] }),
-      )
+      assert.deepStrictEqual(yield* f.client.ListFeedbackNotes({ threadId }), [later])
 
       const again = yield* f.client.SendMessage(sent).pipe(Effect.flip)
       assert.equal(again._tag, "ThreadError")
-      assert.lengthOf((yield* f.client.ListFeedbackNotes({ threadId })).notes, 1)
+      assert.lengthOf(yield* f.client.ListFeedbackNotes({ threadId }), 1)
 
       yield* f.release("first")
       yield* f.transcript(threadId, settled(2))
@@ -452,7 +443,7 @@ it.live(
     Effect.gen(function* () {
       const { f, threadId, sent, newer, queuedId } = yield* queuedFeedback
       const cancel = { threadId, queuedMessageId: queuedId }
-      const restored = new UnsentFeedback({ notes: [newer, ...sent] })
+      const restored = [newer, ...sent]
 
       assert.deepStrictEqual(yield* f.client.CancelQueuedMessage(cancel), restored)
       yield* f.watch(threadId, (transcript) => transcript.queued.length === 0)
@@ -475,10 +466,7 @@ it.live("refuses to cancel a Queued message whose Turn started, leaving its feed
       .pipe(Effect.flip)
 
     assert.equal(late._tag, "QueuedMessageStarted")
-    assert.deepStrictEqual(
-      yield* f.client.ListFeedbackNotes({ threadId }),
-      new UnsentFeedback({ notes: [newer] }),
-    )
+    assert.deepStrictEqual(yield* f.client.ListFeedbackNotes({ threadId }), [newer])
     assert.deepStrictEqual((yield* f.transcript(threadId, settled(2)))[1]?.feedback, sent)
   }),
 )
