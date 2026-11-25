@@ -2,10 +2,12 @@ import { assert, it } from "@effect/vitest"
 import { type InboxItems, isGone, type TurnEnd } from "@glass/contracts"
 import { DateTime, Effect, Option, Predicate, Stream } from "effect"
 import { type FakePullRequest, VIEWER } from "../test/fakePullRequest"
+import { withSkippableWaits } from "../test/deadlines"
 import { inboxWhen } from "../test/inboxWhen"
 import { fail, failed, failThreeTimes, subscribe } from "../test/pullRequestUpdates"
 import { holding, settled, threadsFixture } from "../test/threadsFixture"
 import { greeterPullRequest, pullRequestFor } from "../test/threadWithPullRequest"
+import { QUICK_RETRY_SPACING } from "./reconnecting"
 
 type Fixture = Effect.Success<typeof threadsFixture>
 
@@ -218,6 +220,39 @@ it.live(
       assert.isUndefined(threadItem(listed, f.thread.id))
       assert.isTrue(yield* unseenTurn(f, f.thread.id, update!.ended!))
     }),
+)
+
+const unfinished = (items: InboxItems, threadId: string) =>
+  threadItem(items, threadId)?.reasons.flatMap((reason) =>
+    Predicate.isTagged(reason, "TurnFinished") && !Predicate.isTagged(reason.ended.ending, "Done")
+      ? [reason.ended.ending._tag]
+      : [],
+  ) ?? []
+
+it.effect("lists a Thread whose PR update was cut off when its Sandbox host was lost", () =>
+  withSkippableWaits(QUICK_RETRY_SPACING, (skipQuickRetries) =>
+    Effect.gen(function* () {
+      const f = yield* threadsFixture
+      yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+      const pullRequest = f.github.seedPullRequest(greeterPullRequest(8, "feature/mine"))
+
+      const thread = yield* f.startSandbox(
+        subscribe("Keep it green\nduring-update:hold:fixing", undefined, pullRequest),
+      )
+
+      yield* f.transcript(thread.id, settled(1))
+      fail(pullRequest, failed("lint"))
+      yield* f.client.ListPullRequests()
+      yield* f.transcript(thread.id, (turns) => turns.length === 2 && holding(turns))
+
+      yield* Effect.promise(() => f.sandboxes.killHost(thread.id))
+      yield* skipQuickRetries
+
+      const listed = yield* inboxWhen(f.client, (items) => unfinished(items, thread.id).length > 0)
+
+      assert.deepStrictEqual(unfinished(listed, thread.id), ["CutOff"])
+    }),
+  ),
 )
 
 it.live("lists a Thread whose PR update stopped at a Permission request", () =>

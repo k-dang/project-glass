@@ -125,7 +125,9 @@ const inboxOf = (waiting: Waiting): InboxItems =>
     [
       ...waiting.threads.map(waitingItem),
       ...waiting.finished.flatMap((finished) =>
-        finished.pullRequestUpdate ? [] : [finishedItem(finished)],
+        finished.pullRequestUpdate && Predicate.isTagged(finished.ended.ending, "Done")
+          ? []
+          : [finishedItem(finished)],
       ),
       ...waiting.questions,
       ...waiting.checkIns,
