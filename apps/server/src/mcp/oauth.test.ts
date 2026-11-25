@@ -95,6 +95,11 @@ const postJson = (
     }),
   )
 
+const fromAnotherSite = (dest: string) => ({
+  "sec-fetch-site": "cross-site",
+  "sec-fetch-dest": dest,
+})
+
 const signInRequests = (items: InboxItems) =>
   items.filter((item) => Predicate.isTagged(item, "OutsideAgentRequest"))
 
@@ -131,9 +136,9 @@ const register = (baseUrl: string, name: string, redirectUri: string) =>
     return decodeRegistration(yield* read(registered)).client_id
   })
 
-const openAuthorize = (authorize: URL) =>
+const openAuthorize = (authorize: URL, headers: Record<string, string> = {}) =>
   Effect.gen(function* () {
-    const page = yield* Effect.promise(() => fetch(authorize, { redirect: "manual" }))
+    const page = yield* Effect.promise(() => fetch(authorize, { redirect: "manual", headers }))
     const html = yield* Effect.promise(() => page.text())
     const requestId = /request=([0-9a-f-]+)/.exec(html)?.[1]
 
@@ -432,6 +437,40 @@ describe("MCP OAuth", () => {
       assert.strictEqual(rejected.status, 302)
       assert.strictEqual(rejectedLocation.searchParams.get("error"), "invalid_request")
       assert.strictEqual(rejectedLocation.searchParams.get("code"), null)
+    }),
+  )
+
+  it.live("refuses a web page's background request but opens a sign-in its tab navigates to", () =>
+    Effect.gen(function* () {
+      const { baseUrl, client } = yield* start
+      const redirectUri = "http://127.0.0.1:9/callback"
+      const { challenge } = verifierPair()
+
+      const clientId = yield* register(baseUrl, "Claude Code", redirectUri)
+
+      const authorize = (state: string) =>
+        authorizeUrl(baseUrl, { clientId, redirectUri, challenge, state })
+
+      const statusOf = (state: string, dest: string) =>
+        Effect.promise(() =>
+          fetch(authorize(state), { redirect: "manual", headers: fromAnotherSite(dest) }),
+        ).pipe(Effect.map(({ status }) => status))
+
+      const fetched = yield* statusOf("fetched", "empty")
+      const framed = yield* statusOf("framed", "iframe")
+
+      const { requestId } = yield* openAuthorize(
+        authorize("navigated"),
+        fromAnotherSite("document"),
+      )
+
+      yield* shownInInbox(client, requestId)
+
+      assert.deepStrictEqual({ fetched, framed }, { fetched: 403, framed: 403 })
+      assert.deepStrictEqual(
+        signInRequests(yield* inboxNow(client)).map(({ id }) => id),
+        [requestId],
+      )
     }),
   )
 
