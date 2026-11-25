@@ -1,6 +1,6 @@
 import { NodeServices } from "@effect/platform-node"
 import { assert, describe, it } from "@effect/vitest"
-import { defaultReviewPrompt } from "@glass/contracts"
+import { defaultPullRequestUpdateNote, defaultReviewPrompt } from "@glass/contracts"
 import { ConfigProvider, Effect, Layer } from "effect"
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import { join } from "node:path"
@@ -32,6 +32,7 @@ describe("settings file", () => {
         agentReviewEngine: "pi",
         queueAgentReviews: false,
         reviewPrompt: defaultReviewPrompt,
+        pullRequestUpdateNote: defaultPullRequestUpdateNote,
         claudeCommand: "claude",
         piCommand: "pi",
       })
@@ -100,6 +101,7 @@ describe("settings file", () => {
         agentReviewEngine: "pi",
         queueAgentReviews: false,
         reviewPrompt: defaultReviewPrompt,
+        pullRequestUpdateNote: defaultPullRequestUpdateNote,
         claudeCommand: "claude",
         piCommand: "pi",
       })

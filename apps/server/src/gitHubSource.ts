@@ -12,6 +12,7 @@ import {
 } from "@glass/contracts"
 import { Match } from "effect"
 import type { EndedPullRequest } from "./github/branchPullRequests"
+import type { LookedUpPullRequest } from "./github/queuedPullRequests"
 import type { Mirror, MirroredPullRequest } from "./PullRequestMirror"
 
 const changesOf = (before: MirroredPullRequest, after: MirroredPullRequest): Array<Event> => {
@@ -78,14 +79,28 @@ export const endedEvents = (
 
   const open = new Set(pullRequestsOf(before).map((pr) => referenceKey(pr.ref)))
 
-  return ended.flatMap(({ ref: pullRequest, state }) => {
+  return ended.flatMap(({ ref: pullRequest, state, closedAt }) => {
     if (!open.has(referenceKey(pullRequest))) return []
 
     return [
       Match.valueTags(state, {
         Merged: ({ mergedAt }) => PullRequestMergedEvent.make({ pullRequest, mergedAt }),
-        Closed: () => PullRequestClosedEvent.make({ pullRequest }),
+        Closed: () => PullRequestClosedEvent.make({ pullRequest, closedAt }),
       }),
     ]
   })
+}
+
+export const endedEvent = ({
+  summary: { ref: pullRequest },
+  state,
+  mergedAt,
+  closedAt,
+}: LookedUpPullRequest): Event | null => {
+  if (state === "merged" && mergedAt !== null)
+    return PullRequestMergedEvent.make({ pullRequest, mergedAt })
+
+  return state === "closed" && closedAt !== null
+    ? PullRequestClosedEvent.make({ pullRequest, closedAt })
+    : null
 }

@@ -23,7 +23,7 @@ interface UnitFields {
   readonly pr?: string
   readonly head?: string
   readonly thread_id?: string
-  readonly turn_id?: string
+  readonly turn_id?: string | undefined
   readonly tool?: string
   readonly caller_id?: string
   readonly tool_failed?: boolean
@@ -41,6 +41,8 @@ interface UnitFields {
   readonly failed_tool_calls?: number
   readonly ended_lookups?: number
   readonly to_dos_done?: number
+  readonly subscription_ids?: string
+  readonly reasons?: string
 }
 
 type DurationField = "checkout_ms" | "agent_ms"

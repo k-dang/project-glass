@@ -47,6 +47,7 @@ import { OutsideQuestions } from "./OutsideQuestions"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
+import { PullRequestUpdates } from "./PullRequestUpdates"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
 import { AgentCommands, SettingsStore } from "./SettingsStore"
@@ -130,7 +131,13 @@ const services = (
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer,
 ) =>
-  Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge)
+  Layer.mergeAll(
+    GlassRpcHandlers,
+    mcpTools,
+    StartedWorkUpdates,
+    PullRequestUpdates,
+    CompleteToDosOnMerge,
+  )
     .pipe(
       Layer.provide(Layer.merge(Inbox.layer, Subscriptions.layer)),
       Layer.provide(SettledThreads.layer.pipe(Layer.provideMerge(ThreadPullRequests.layer))),

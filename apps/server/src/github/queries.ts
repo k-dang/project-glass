@@ -12,6 +12,7 @@ import {
   PullRequestAttentionData,
   PullRequestChecksData,
   ReviewRequestsConnection,
+  SubscribedPullRequestsData,
 } from "./repositoryPullRequests"
 
 export interface GraphQLBody<Data> {
@@ -199,6 +200,8 @@ export const SearchPullRequestsResponse = GraphQLResponse(SearchPullRequestsData
 export const PullRequestChecksResponse = GraphQLResponse(PullRequestChecksData)
 
 export const PullRequestAttentionResponse = GraphQLResponse(PullRequestAttentionData)
+
+export const SubscribedPullRequestsResponse = GraphQLResponse(SubscribedPullRequestsData)
 
 export const ReviewRequestsResponse = GraphQLResponse(
   Schema.Struct({

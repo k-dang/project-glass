@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  defaultPullRequestUpdateNote,
   defaultReviewPrompt,
   GitHubConnection,
   ToDo,
@@ -265,6 +266,7 @@ it("keeps an unfinished edit across areas and text typed while it saves", async 
         },
       }),
     GetReviewPrompt: () => Effect.succeed(defaultReviewPrompt),
+    GetPullRequestUpdateNote: () => Effect.succeed(defaultPullRequestUpdateNote),
   })
 
   await user.click(await screen.findByRole("button", { name: "Edit Rebase the branch" }))

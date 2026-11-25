@@ -39,7 +39,9 @@ export const latestOpinionatedReviews = (pr: FakePullRequest) => {
   }
 
   return [...latest.values()].map((review) => ({
+    id: review.id,
     author: author(review.author),
+    authorAssociation: review.authorAssociation ?? "NONE",
     state: review.state,
   }))
 }

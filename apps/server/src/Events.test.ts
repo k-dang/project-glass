@@ -370,7 +370,12 @@ describe("Events for a Thread's PR", () => {
             mergedAt: DateTime.makeUnsafe(merged.pr.mergedAt ?? ""),
           }),
         ],
-        closed: [PullRequestClosedEvent.make({ pullRequest: ref(closed.pr) })],
+        closed: [
+          PullRequestClosedEvent.make({
+            pullRequest: ref(closed.pr),
+            closedAt: DateTime.makeUnsafe(closed.pr.closedAt ?? ""),
+          }),
+        ],
       }
 
       assert.deepStrictEqual(yield* recorded(f), expected)

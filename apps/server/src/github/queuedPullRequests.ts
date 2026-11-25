@@ -4,7 +4,7 @@ import {
   PullRequestSummary,
   Revision,
 } from "@glass/contracts"
-import { Schema } from "effect"
+import { type DateTime, Schema } from "effect"
 import { login, GitHubAuthor } from "./author"
 import { aliasedLookup } from "./aliasedLookups"
 import { checksOfRollup, StatusState } from "./checkContexts"
@@ -20,6 +20,8 @@ const GitHubQueuedPullRequest = Schema.Struct({
   state: Schema.Literals(["OPEN", "CLOSED", "MERGED"]),
   baseRefOid: Schema.String,
   headRefOid: Schema.String,
+  mergedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
+  closedAt: Schema.NullOr(Schema.DateTimeUtcFromString),
   repository: Schema.Struct({
     owner: Schema.Struct({ login: Schema.String }),
     name: Schema.String,
@@ -40,6 +42,8 @@ export interface LookedUpPullRequest {
   readonly summary: PullRequestSummary
   readonly state: PullRequestState
   readonly revision: Revision
+  readonly mergedAt: DateTime.Utc | null
+  readonly closedAt: DateTime.Utc | null
 }
 
 const states = { OPEN: "open", CLOSED: "closed", MERGED: "merged" } as const
@@ -61,6 +65,8 @@ const toLookedUp = (node: typeof GitHubQueuedPullRequest.Type): LookedUpPullRequ
   }),
   state: node.state === "OPEN" && node.isDraft ? "draft" : states[node.state],
   revision: new Revision({ base: node.baseRefOid, head: node.headRefOid }),
+  mergedAt: node.mergedAt,
+  closedAt: node.closedAt,
 })
 
 export const QueuedPullRequests = aliasedLookup({
@@ -70,7 +76,7 @@ export const QueuedPullRequests = aliasedLookup({
   selection: (index) =>
     `repository(owner: $owner${index}, name: $name${index}) { pullRequest(number: $number${index}) { ...QueuedPullRequest } }`,
   fragment: `fragment QueuedPullRequest on PullRequest {
-  id number url title author { login } updatedAt isDraft state baseRefOid headRefOid
+  id number url title author { login } updatedAt isDraft state baseRefOid headRefOid mergedAt closedAt
   repository { owner { login } name }
   commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
 }`,

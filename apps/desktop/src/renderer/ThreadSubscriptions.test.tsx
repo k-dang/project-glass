@@ -1,13 +1,22 @@
 // @vitest-environment happy-dom
 import {
+  ChangesRequestedReason,
+  ClosedReason,
+  FailingChecksReason,
+  MergeConflictReason,
+  MergedReason,
   PullRequestOpen,
   PullRequestRef,
+  PullRequestUpdate,
+  ReviewFeedbackReason,
   Subscription,
+  TextPart,
   ThreadPullRequest,
   TranscriptSnapshot,
+  TurnDone,
 } from "@glass/contracts"
 import { screen, waitFor, within } from "@testing-library/react"
-import { Effect, Stream, SubscriptionRef } from "effect"
+import { DateTime, Effect, Stream, SubscriptionRef } from "effect"
 import { expect, it } from "vite-plus/test"
 import { thread } from "../../test/thread"
 import { mount } from "../../test/threadApp"
@@ -93,4 +102,88 @@ it("ends a Subscription from the Thread's details", async () => {
 
   await waitFor(async () => expect(await shownSubscriptions()).toHaveLength(1))
   expect((await shownSubscriptions())[0]).toContain("This Thread's PR #264")
+})
+
+it("shows a PR update as a Turn Glass started, listing each PR and its reasons", async () => {
+  const at = DateTime.makeUnsafe("2026-11-25T12:00:00Z")
+  const comment = { id: "PRRC_1", author: "alice", body: "Rename this." }
+
+  mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              id: "update-1",
+              message: "",
+              images: [],
+              context: PullRequestUpdate.make({
+                note: "Never merge a PR.",
+                pullRequests: [
+                  {
+                    subscriptionId: own.id,
+                    pullRequest: ownPullRequest.ref,
+                    own: true,
+                    note: own.note,
+                    events: [],
+                    reasons: [
+                      FailingChecksReason.make({
+                        head: "h1",
+                        checks: [
+                          { name: "lint", url: "https://ci.test/lint/1" },
+                          { name: "test", url: null },
+                        ],
+                      }),
+                      ReviewFeedbackReason.make({
+                        reviewThreads: [
+                          { id: "PRRT_1", path: "src/greet.ts", line: 12, comments: [comment] },
+                        ],
+                      }),
+                      ChangesRequestedReason.make({ reviewers: ["alice"] }),
+                      MergeConflictReason.make({ base: "b0" }),
+                    ],
+                  },
+                  {
+                    subscriptionId: dependency.id,
+                    pullRequest: dependency.pullRequest!,
+                    own: false,
+                    note: dependency.note,
+                    events: [],
+                    reasons: [MergedReason.make({})],
+                  },
+                  {
+                    subscriptionId: "other",
+                    pullRequest: new PullRequestRef({
+                      owner: "glass-demo",
+                      repo: "greeter",
+                      number: 9,
+                    }),
+                    own: false,
+                    note: "Stop once it closes",
+                    events: [],
+                    reasons: [ClosedReason.make({})],
+                  },
+                ],
+              }),
+              feedback: [],
+              sentAt: at,
+              ended: { at, ending: TurnDone.make({}) },
+              parts: [TextPart.make({ text: "Fixed lint and renamed it." })],
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  await screen.findByText("Fixed lint and renamed it.")
+  const update = within(screen.getByRole("list", { name: "PR update from Glass" }))
+
+  expect(update.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
+    "glass-demo/greeter#264: 2 checks failed, 1 Review thread waits for a reply, alice requested changes, a merge conflict",
+    "glass-demo/greeter#7: merged",
+    "glass-demo/greeter#9: closed",
+  ])
+  expect(screen.queryByText("Rename this.")).toBeNull()
 })

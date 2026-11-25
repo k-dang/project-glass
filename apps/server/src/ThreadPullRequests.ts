@@ -17,7 +17,7 @@ import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { Threads } from "./Threads"
 import { PullRequestLists } from "./PullRequestLists"
-import { type Mirror, mirrorOf, PullRequestMirror } from "./PullRequestMirror"
+import { type Mirror, mirrorOf, openPullRequestOf, PullRequestMirror } from "./PullRequestMirror"
 import { Transcripts } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
@@ -29,9 +29,6 @@ const branchKey = ({ repository, branch }: Branch) => `${repositoryKey(repositor
 
 const branchOf = ({ repository, branch }: Thread): Branch | undefined =>
   branch === null ? undefined : { repository, branch }
-
-const openPullRequestOf = (mirror: Mirror, { repository, branch }: Branch) =>
-  mirrorOf(mirror, repository)?.pullRequests.find((pr) => pr.headBranch === branch)
 
 interface Lookup extends Branch {
   readonly since: DateTime.Utc

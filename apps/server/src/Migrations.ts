@@ -28,6 +28,7 @@ import visualizations from "./migrations/0026_visualizations"
 import dropFeedbackNoteStaged from "./migrations/0027_drop_feedback_note_staged"
 import events from "./migrations/0028_events"
 import subscriptions from "./migrations/0029_subscriptions"
+import pullRequestUpdates from "./migrations/0030_pull_request_updates"
 
 const migrations = {
   "0001_baseline": baseline,
@@ -59,6 +60,7 @@ const migrations = {
   "0027_drop_feedback_note_staged": dropFeedbackNoteStaged,
   "0028_events": events,
   "0029_subscriptions": subscriptions,
+  "0030_pull_request_updates": pullRequestUpdates,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

@@ -1,9 +1,11 @@
 import {
   type WorkOutcome,
   type BackgroundWork,
+  type PullRequestUpdateReason,
   type Turn,
   type TurnEnd,
   type TurnPart,
+  type UpdatedPullRequest,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Equivalence, Match, Predicate } from "effect"
@@ -17,7 +19,7 @@ import {
   SquareTerminal,
   Unplug,
 } from "lucide-react"
-import { memo, type ReactNode, useCallback, useContext, useMemo, useState } from "react"
+import { memo, type ReactNode, useCallback, useContext, useId, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Message, MessageContent, MessageGroup } from "@/components/ui/message"
 import {
@@ -142,6 +144,47 @@ function StartedWorkUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
   )
 }
 
+const counted = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
+
+const reasonText = (reason: PullRequestUpdateReason) =>
+  Match.valueTags(reason, {
+    FailingChecks: ({ checks }) => counted(checks.length, "check failed", "checks failed"),
+    ReviewFeedback: ({ reviewThreads }) =>
+      counted(
+        reviewThreads.length,
+        "Review thread waits for a reply",
+        "Review threads wait for a reply",
+      ),
+    ChangesRequested: ({ reviewers }) => `${reviewers.join(", ")} requested changes`,
+    MergeConflict: () => "a merge conflict",
+    Merged: () => "merged",
+    Closed: () => "closed",
+  })
+
+function PullRequestUpdateMessage(props: { pullRequests: ReadonlyArray<UpdatedPullRequest> }) {
+  const id = useId()
+
+  return (
+    <Message align="end">
+      <MessageContent>
+        <span id={id} className="self-end text-xs text-muted-foreground">
+          PR update from Glass
+        </span>
+        <ul
+          aria-labelledby={id}
+          className="flex flex-col gap-1 self-end text-sm text-muted-foreground"
+        >
+          {props.pullRequests.map(({ subscriptionId, pullRequest, reasons }) => (
+            <li key={subscriptionId}>
+              {referenceText(pullRequest)}: {reasons.map(reasonText).join(", ")}
+            </li>
+          ))}
+        </ul>
+      </MessageContent>
+    </Message>
+  )
+}
+
 const backgroundKindText: Record<BackgroundWork["kind"], string> = {
   subagent: "Subagent",
   command: "Command",
@@ -174,6 +217,9 @@ function TurnMessage(props: { turn: Turn }) {
 
   if (Predicate.isTagged(turn.context, "StartedWorkUpdate"))
     return <StartedWorkUpdateMessage work={turn.context.work} />
+
+  if (Predicate.isTagged(turn.context, "PullRequestUpdate"))
+    return <PullRequestUpdateMessage pullRequests={turn.context.pullRequests} />
 
   if (Predicate.isTagged(turn.context, "BackgroundWorkEnded")) return null
 

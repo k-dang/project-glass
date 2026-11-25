@@ -95,6 +95,8 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         Ask: unused,
         GetReviewPrompt: unused,
         SetReviewPrompt: unused,
+        GetPullRequestUpdateNote: unused,
+        SetPullRequestUpdateNote: unused,
         GetEngineSettings: unused,
         SetEngineSettings: unused,
         GetQueueWork: () => Effect.succeed(false),

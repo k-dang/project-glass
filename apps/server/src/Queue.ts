@@ -60,7 +60,9 @@ const missingProblem = new GitHubUnavailable({
 
 const keyOf = (queued: QueuedPullRequest) => referenceKey(queued.pullRequest.ref)
 
-type Saved = Omit<LookedUpPullRequest, "revision"> & { readonly revision: Revision | null }
+type Saved = Pick<LookedUpPullRequest, "id" | "summary" | "state"> & {
+  readonly revision: Revision | null
+}
 
 type Candidate = Pick<QueuedPullRequest, "pullRequest" | "state" | "revision" | "problem">
 

@@ -21,6 +21,7 @@ import {
   Stream,
   SubscriptionRef,
 } from "effect"
+import { SqlClient } from "effect/sql"
 import { join } from "node:path"
 import { writeDataFile } from "./dataFiles"
 import { EventLog } from "./EventLog"
@@ -31,6 +32,8 @@ import {
   type Candidate,
   type CandidatesPage,
   type CheckObservation,
+  type SubscribedPullRequest,
+  SubscribedRead,
 } from "./github/repositoryPullRequests"
 import { ServerConfig } from "./ServerConfig"
 
@@ -54,6 +57,9 @@ const MirroredPullRequest = Schema.Struct({
   ),
   checks: Checks,
   attention: Schema.NullOr(Attention),
+  subscribed: Schema.NullOr(SubscribedRead).pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(null)),
+  ),
   viewerIsAuthor: Schema.Boolean,
   viewerHasDrafts: Schema.Boolean,
   viewerHasSubmittedReview: Schema.Boolean,
@@ -102,6 +108,47 @@ export const mirrorOf = (mirror: Mirror, repository: FollowedRepository) =>
     (candidate) => repositoryKey(candidate.repository) === repositoryKey(repository),
   )
 
+// WARNING: GitHub matches owner and repository names ignoring case, and a Followed repository keeps the case the user typed.
+export const isRepositoryOf =
+  ({ owner, repo }: Pick<PullRequestRef, "owner" | "repo">) =>
+  (repository: FollowedRepository) =>
+    repositoryKey(repository).toLowerCase() === `${owner}/${repo}`.toLowerCase()
+
+export const mirroredPullRequest = (mirror: Mirror, pullRequest: PullRequestRef) =>
+  mirror.repositories
+    .find(({ repository }) => isRepositoryOf(pullRequest)(repository))
+    ?.pullRequests.find(({ ref }) => ref.number === pullRequest.number)
+
+export const openPullRequestOf = (
+  mirror: Mirror,
+  { repository, branch }: { readonly repository: FollowedRepository; readonly branch: string },
+) => mirrorOf(mirror, repository)?.pullRequests.find((pr) => pr.headBranch === branch)
+
+const SubscribedTo = Schema.Struct({
+  owner: Schema.NullOr(Schema.String),
+  repo: Schema.NullOr(Schema.String),
+  number: Schema.NullOr(Schema.Int),
+  threadOwner: Schema.String,
+  threadRepo: Schema.String,
+  branch: Schema.NullOr(Schema.String),
+})
+
+const decodeSubscribedTo = Schema.decodeUnknownEffect(Schema.Array(SubscribedTo))
+
+const subscribedTo = (mirror: Mirror, subscription: typeof SubscribedTo.Type) => {
+  const { owner, repo, number, threadOwner, threadRepo, branch } = subscription
+
+  if (owner !== null && repo !== null && number !== null)
+    return mirroredPullRequest(mirror, new PullRequestRef({ owner, repo, number }))
+
+  return branch === null
+    ? undefined
+    : openPullRequestOf(mirror, {
+        repository: new FollowedRepository({ owner: threadOwner, repo: threadRepo }),
+        branch,
+      })
+}
+
 const newestFirst = (pullRequests: ReadonlyArray<MirroredPullRequest>) =>
   Arr.sortWith(pullRequests, (pr) => pr.updatedAt, Order.flip(DateTime.Order))
 
@@ -129,6 +176,7 @@ export class PullRequestMirror extends Context.Service<
       const github = yield* GitHubClient
       const fs = yield* FileSystem.FileSystem
       const events = yield* EventLog
+      const sql = yield* SqlClient.SqlClient
       const { dataDirectory } = yield* ServerConfig
       const path = join(dataDirectory, "pull-requests.json")
       const lock = yield* Semaphore.make(1)
@@ -194,6 +242,7 @@ export class PullRequestMirror extends Context.Service<
           ...fields,
           checks: known?.head === fields.head ? known.checks : "unavailable",
           attention: known?.attention ?? null,
+          subscribed: known?.subscribed ?? null,
           requestedUsers,
           requestedTeams,
         } satisfies MirroredPullRequest
@@ -250,9 +299,32 @@ export class PullRequestMirror extends Context.Service<
         } satisfies RepositoryMirror
       })
 
-      const latestAttention = (shown: ReadonlyArray<MirroredPullRequest>) =>
+      const subscribedIn = (mirror: Mirror) =>
+        sql`
+          SELECT s.owner, s.repo, s.number, t.owner AS threadOwner, t.repo AS threadRepo, t.branch
+          FROM subscription s JOIN thread t ON t.id = s.thread_id
+          WHERE s.ended IS NULL
+        `.pipe(
+          Effect.flatMap(decodeSubscribedTo),
+          Effect.map((subscriptions) => [
+            ...new Map(
+              subscriptions.flatMap((subscription) => {
+                const pr = subscribedTo(mirror, subscription)
+
+                return pr === undefined ? [] : [[pr.id, pr] as const]
+              }),
+            ).values(),
+          ]),
+          Effect.catch((cause) =>
+            Effect.logWarning("Couldn't read which PRs have a Subscription", cause).pipe(
+              Effect.as<ReadonlyArray<MirroredPullRequest>>([]),
+            ),
+          ),
+        )
+
+      const latestAttention = (pullRequests: ReadonlyArray<MirroredPullRequest>) =>
         github
-          .pullRequestAttention(shown.flatMap((pr) => (pr.viewerIsAuthor ? [pr.id] : [])))
+          .pullRequestAttention(pullRequests.flatMap((pr) => (pr.viewerIsAuthor ? [pr.id] : [])))
           .pipe(
             Effect.catch((error) =>
               Effect.logWarning("Couldn't read what the user's PRs wait on", error).pipe(
@@ -261,26 +333,44 @@ export class PullRequestMirror extends Context.Service<
             ),
           )
 
+      const latestSubscribed = (pullRequests: ReadonlyArray<MirroredPullRequest>) =>
+        github
+          .subscribedPullRequests(pullRequests.map((pr) => pr.id))
+          .pipe(
+            Effect.catch((error) =>
+              Effect.logWarning("Couldn't read the PRs with a Subscription", error).pipe(
+                Effect.as(new Map<string, SubscribedPullRequest>()),
+              ),
+            ),
+          )
+
       const withLatestStatus = Effect.fnUntraced(function* (
         mirror: Mirror,
         shown: ReadonlyArray<MirroredPullRequest>,
       ) {
-        const latestChecks = github.pullRequestChecks(shown.map((pr) => pr.id)).pipe(
-          Effect.tapError((error) => Effect.logWarning("Couldn't read PR checks", error)),
-          Effect.match({
-            onSuccess: (checks) => ({ checks, problem: null }),
-            onFailure: (error) => ({
-              checks: new Map<string, CheckObservation>(),
-              problem: new GitHubUnavailable({
-                message: `Checks couldn't refresh. ${error.message}`,
+        const subscribed = yield* subscribedIn(mirror)
+        const subscribedIds = new Set(subscribed.map((pr) => pr.id))
+        const others = shown.filter((pr) => !subscribedIds.has(pr.id))
+
+        const latestChecks = github
+          .pullRequestChecks([...others, ...subscribed].map((pr) => pr.id))
+          .pipe(
+            Effect.tapError((error) => Effect.logWarning("Couldn't read PR checks", error)),
+            Effect.match({
+              onSuccess: (checks) => ({ checks, problem: null }),
+              onFailure: (error) => ({
+                checks: new Map<string, CheckObservation>(),
+                problem: new GitHubUnavailable({
+                  message: `Checks couldn't refresh. ${error.message}`,
+                }),
               }),
             }),
-          }),
-        )
+          )
 
-        const [result, attention] = yield* Effect.all([latestChecks, latestAttention(shown)], {
-          concurrency: "unbounded",
-        })
+        const [result, attention, read] = yield* Effect.all(
+          [latestChecks, latestAttention(others), latestSubscribed(subscribed)],
+          { concurrency: "unbounded" },
+        )
 
         const shownRepositories = new Set(shown.map((pr) => repositoryKey(pr.ref)))
         const problem = result.problem
@@ -291,18 +381,22 @@ export class PullRequestMirror extends Context.Service<
             repositories: mirror.repositories.map((repository) => ({
               ...repository,
               pullRequests: repository.pullRequests.map((pr) => {
-                const read = attention.get(pr.id)
+                const latest = read.get(pr.id)?.attention ?? attention.get(pr.id)
 
                 return {
                   ...pr,
                   ...result.checks.get(pr.id),
                   attention:
-                    read === undefined
+                    latest === undefined
                       ? pr.attention
                       : {
-                          ...read,
-                          mergeConflict: read.mergeConflict ?? pr.attention?.mergeConflict ?? null,
+                          ...latest,
+                          mergeConflict:
+                            latest.mergeConflict ?? pr.attention?.mergeConflict ?? null,
                         },
+                  subscribed: subscribedIds.has(pr.id)
+                    ? (read.get(pr.id)?.subscribed ?? pr.subscribed)
+                    : null,
                 }
               }),
             })),
@@ -375,8 +469,8 @@ export class PullRequestMirror extends Context.Service<
         }
 
         const { mirror, failures } = yield* withLatestStatus(synced, shown(synced))
-        yield* commit(mirror)
         yield* events.record("github", eventsBetween(previous, mirror))
+        yield* commit(mirror)
 
         return {
           mirror,

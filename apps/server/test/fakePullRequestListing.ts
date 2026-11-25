@@ -36,6 +36,10 @@ export const ListingRequest = Schema.Union([
     variables: Schema.Struct({ ids: Schema.Array(Schema.String) }),
   }),
   Schema.Struct({
+    operationName: Schema.Literal("SubscribedPullRequests"),
+    variables: Schema.Struct({ ids: Schema.Array(Schema.String) }),
+  }),
+  Schema.Struct({
     operationName: Schema.Literal("QueuedPullRequests"),
     variables: Schema.Record(Schema.String, Schema.Union([Schema.String, Schema.Number])),
   }),
@@ -81,6 +85,31 @@ const attentionNode = (pr: FakePullRequest) => ({
     })),
   },
   commits: checkContextsNode(pr),
+})
+
+const text = (html: string) => html.replaceAll(/<[^>]+>/g, "")
+
+const subscribedNode = (pr: FakePullRequest) => ({
+  ...attentionNode(pr),
+  headRefOid: pr.head.sha,
+  baseRefOid: pr.base.sha,
+  reviewThreads: {
+    nodes: pr.reviewThreads.map((reviewThread) => ({
+      id: reviewThread.id,
+      isResolved: reviewThread.resolved,
+      path: reviewThread.path,
+      line: reviewThread.line ?? null,
+      comments: {
+        nodes: reviewThread.comments.map((comment) => ({
+          id: comment.id,
+          body: text(comment.bodyHtml),
+          author: author(comment.author),
+          authorAssociation: comment.authorAssociation ?? "NONE",
+          viewerDidAuthor: comment.author === VIEWER.login,
+        })),
+      },
+    })),
+  },
 })
 
 const candidatesPage = (
@@ -158,6 +187,8 @@ const queuedNode = (pr: FakePullRequest) => ({
   state: pr.state,
   baseRefOid: pr.base.sha,
   headRefOid: pr.head.sha,
+  mergedAt: pr.mergedAt,
+  closedAt: pr.closedAt,
   repository: { owner: { login: pr.owner }, name: pr.repo },
   commits: checksNode(pr),
 })
@@ -285,6 +316,7 @@ const endedBranchPullRequests = (
             isCrossRepository: pr.isCrossRepository,
             createdAt: pr.createdAt,
             mergedAt: pr.mergedAt,
+            closedAt: pr.closedAt,
           }))
 
         return [`lookup${index}`, { pullRequests: { nodes } }]
@@ -344,6 +376,17 @@ export const answerListing = (
             const pr = pullRequests.find((candidate) => candidate.id === id)
 
             return pr === undefined ? null : attentionNode(pr)
+          }),
+        },
+      }
+
+    case "SubscribedPullRequests":
+      return {
+        data: {
+          nodes: request.variables.ids.map((id) => {
+            const pr = pullRequests.find((candidate) => candidate.id === id)
+
+            return pr === undefined ? null : subscribedNode(pr)
           }),
         },
       }

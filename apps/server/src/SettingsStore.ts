@@ -1,10 +1,12 @@
 import {
   AgentHarness,
+  defaultPullRequestUpdateNote,
   defaultReviewPrompt,
   type EngineFeature,
   EngineModels,
   type EngineSettings,
   FollowedRepository,
+  PullRequestUpdateNote,
   ReviewPrompt,
   SettingsError,
 } from "@glass/contracts"
@@ -36,6 +38,9 @@ const Settings = Schema.Struct({
   queueAgentReviews: Schema.Boolean.pipe(Schema.withDecodingDefaultKey(Effect.succeed(false))),
   reviewPrompt: ReviewPrompt.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultReviewPrompt)),
+  ),
+  pullRequestUpdateNote: PullRequestUpdateNote.pipe(
+    Schema.withDecodingDefaultKey(Effect.succeed(defaultPullRequestUpdateNote)),
   ),
   claudeCommand: Schema.String.pipe(
     Schema.withDecodingDefaultKey(Effect.succeed(defaultAgentCommands.claudeCommand)),

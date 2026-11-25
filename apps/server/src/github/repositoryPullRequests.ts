@@ -232,30 +232,32 @@ export const toChecks = (
     ),
   )
 
-export const PullRequestAttentionData = Schema.Struct({
-  nodes: Schema.Array(
-    Schema.NullOr(
+const attentionFields = {
+  id: Schema.String,
+  mergeStateStatus: Schema.String,
+  mergeable: Schema.Literals(["MERGEABLE", "CONFLICTING", "UNKNOWN"]),
+  commits: CheckContexts,
+}
+
+const AttentionNode = Schema.Struct({
+  ...attentionFields,
+  latestOpinionatedReviews: Schema.Struct({
+    nodes: Schema.Array(Schema.Struct({ state: ReviewState })),
+  }),
+  reviewThreads: Schema.Struct({
+    nodes: Schema.Array(
       Schema.Struct({
-        id: Schema.String,
-        mergeStateStatus: Schema.String,
-        mergeable: Schema.Literals(["MERGEABLE", "CONFLICTING", "UNKNOWN"]),
-        latestOpinionatedReviews: Schema.Struct({
-          nodes: Schema.Array(Schema.Struct({ state: ReviewState })),
+        isResolved: Schema.Boolean,
+        comments: Schema.Struct({
+          nodes: Schema.Array(Schema.Struct({ viewerDidAuthor: Schema.Boolean })),
         }),
-        reviewThreads: Schema.Struct({
-          nodes: Schema.Array(
-            Schema.Struct({
-              isResolved: Schema.Boolean,
-              comments: Schema.Struct({
-                nodes: Schema.Array(Schema.Struct({ viewerDidAuthor: Schema.Boolean })),
-              }),
-            }),
-          ),
-        }),
-        commits: CheckContexts,
       }),
     ),
-  ),
+  }),
+})
+
+export const PullRequestAttentionData = Schema.Struct({
+  nodes: Schema.Array(Schema.NullOr(AttentionNode)),
 })
 
 export const Attention = Schema.Struct({
@@ -271,29 +273,164 @@ export type Attention = typeof Attention.Type
 
 const cleanMergeStates = new Set(["CLEAN", "HAS_HOOKS"])
 
+const awaitsReply = ({
+  isResolved,
+  comments,
+}: (typeof AttentionNode.Type)["reviewThreads"]["nodes"][number]) =>
+  !isResolved && comments.nodes.at(-1)?.viewerDidAuthor === false
+
+const attentionOf = (node: typeof AttentionNode.Type): Attention => {
+  const states = node.latestOpinionatedReviews.nodes.map(({ state }) => state)
+
+  return {
+    changesRequested: states.includes("CHANGES_REQUESTED"),
+    approved: states.includes("APPROVED"),
+    mergeClean: cleanMergeStates.has(node.mergeStateStatus),
+    mergeConflict: node.mergeable === "UNKNOWN" ? null : node.mergeable === "CONFLICTING",
+    awaitingReply: node.reviewThreads.nodes.filter(awaitsReply).length,
+    failingChecks: checksOfCommits(node.commits).filter((check) => check.state === "failed"),
+  }
+}
+
 export const toAttention = (
   data: typeof PullRequestAttentionData.Type,
 ): ReadonlyMap<string, Attention> =>
-  new Map(
-    data.nodes.flatMap((node) => {
-      if (node === null) return []
+  new Map(data.nodes.flatMap((node) => (node === null ? [] : [[node.id, attentionOf(node)]])))
 
-      const states = node.latestOpinionatedReviews.nodes.map(({ state }) => state)
+const MAX_THREAD_COMMENTS = 20
 
-      const attention: Attention = {
-        changesRequested: states.includes("CHANGES_REQUESTED"),
-        approved: states.includes("APPROVED"),
-        mergeClean: cleanMergeStates.has(node.mergeStateStatus),
-        mergeConflict: node.mergeable === "UNKNOWN" ? null : node.mergeable === "CONFLICTING",
-        awaitingReply: node.reviewThreads.nodes.filter(
-          ({ isResolved, comments }) =>
-            !isResolved && comments.nodes.some(({ viewerDidAuthor }) => !viewerDidAuthor),
-        ).length,
-        failingChecks: checksOfCommits(node.commits).filter((check) => check.state === "failed"),
-      }
+export const SUBSCRIBED_PULL_REQUESTS_QUERY = `query SubscribedPullRequests($ids: [ID!]!) {
+  nodes(ids: $ids) {
+    ... on PullRequest {
+      id
+      headRefOid
+      baseRefOid
+      mergeStateStatus
+      mergeable
+      latestOpinionatedReviews(first: 100) { nodes { id state authorAssociation author { login } } }
+      reviewThreads(first: 100) { nodes {
+        id isResolved path line
+        comments(last: ${MAX_THREAD_COMMENTS}) { nodes { id body authorAssociation viewerDidAuthor author { login } } }
+      } }
+      ${CHECK_CONTEXTS_FIELDS}
+    }
+  }
+}`
 
-      return [[node.id, attention] as const]
+const authored = {
+  author: GitHubAuthor,
+  authorAssociation: Schema.String,
+}
+
+export const SubscribedPullRequestsData = Schema.Struct({
+  nodes: Schema.Array(
+    Schema.NullOr(
+      Schema.Struct({
+        ...attentionFields,
+        headRefOid: Schema.String,
+        baseRefOid: Schema.String,
+        latestOpinionatedReviews: Schema.Struct({
+          nodes: Schema.Array(
+            Schema.Struct({ id: Schema.String, state: ReviewState, ...authored }),
+          ),
+        }),
+        reviewThreads: Schema.Struct({
+          nodes: Schema.Array(
+            Schema.Struct({
+              id: Schema.String,
+              isResolved: Schema.Boolean,
+              path: Schema.String,
+              line: Schema.NullOr(Schema.Int),
+              comments: Schema.Struct({
+                nodes: Schema.Array(
+                  Schema.Struct({
+                    id: Schema.String,
+                    body: Schema.String,
+                    viewerDidAuthor: Schema.Boolean,
+                    ...authored,
+                  }),
+                ),
+              }),
+            }),
+          ),
+        }),
+      }),
+    ),
+  ),
+})
+
+const Authored = { author: Schema.String, hasWriteAccess: Schema.Boolean }
+
+export const SubscribedRead = Schema.Struct({
+  head: Schema.String,
+  base: Schema.String,
+  reviewThreads: Schema.Array(
+    Schema.Struct({
+      id: Schema.String,
+      path: Schema.String,
+      line: Schema.NullOr(Schema.Int),
+      comments: Schema.Array(
+        Schema.Struct({ id: Schema.String, body: Schema.String, ...Authored }),
+      ),
     }),
+  ),
+  changesRequested: Schema.Array(Schema.Struct({ reviewId: Schema.String, ...Authored })),
+})
+
+export type SubscribedRead = typeof SubscribedRead.Type
+
+export interface SubscribedPullRequest {
+  readonly attention: Attention
+  readonly subscribed: SubscribedRead
+}
+
+// WARNING: GitHub's author association is the only sign of write access a PR's comments carry; owners, members and collaborators have it.
+const writeAccess = new Set(["OWNER", "MEMBER", "COLLABORATOR"])
+
+const authorOf = ({
+  author,
+  authorAssociation,
+}: {
+  readonly author: typeof GitHubAuthor.Type
+  readonly authorAssociation: string
+}) => ({
+  author: login(author),
+  hasWriteAccess: writeAccess.has(authorAssociation),
+})
+
+export const toSubscribedPullRequests = (
+  data: typeof SubscribedPullRequestsData.Type,
+): ReadonlyMap<string, SubscribedPullRequest> =>
+  new Map(
+    data.nodes.flatMap((node) =>
+      node === null
+        ? []
+        : [
+            [
+              node.id,
+              {
+                attention: attentionOf(node),
+                subscribed: {
+                  head: node.headRefOid,
+                  base: node.baseRefOid,
+                  reviewThreads: node.reviewThreads.nodes.filter(awaitsReply).map((thread) => ({
+                    id: thread.id,
+                    path: thread.path,
+                    line: thread.line,
+                    comments: thread.comments.nodes.map((comment) => ({
+                      id: comment.id,
+                      body: comment.body,
+                      ...authorOf(comment),
+                    })),
+                  })),
+                  changesRequested: node.latestOpinionatedReviews.nodes
+                    .filter(({ state }) => state === "CHANGES_REQUESTED")
+                    .map((review) => ({ reviewId: review.id, ...authorOf(review) })),
+                },
+              },
+            ] as const,
+          ],
+    ),
   )
 
 export const toCandidatesPage = (page: typeof CandidatesConnection.Type): CandidatesPage => ({

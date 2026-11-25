@@ -79,6 +79,7 @@ import {
   LatestPullRequestListings,
   PullRequestListings,
 } from "./pullRequestList"
+import { PullRequestUpdateNote } from "./pullRequestUpdate"
 import { Queue, QueueAddition, QueueError, QueuedPullRequest } from "./queue"
 import { FileContents, GetFileContentsError, RepositoryFiles } from "./repository"
 import { ReviewDecision, SubmitReviewError } from "./review"
@@ -177,6 +178,12 @@ export class GlassRpcs extends RpcGroup.make(
     error: AskFailure,
   }),
   Rpc.make("GetReviewPrompt", { success: ReviewPrompt, error: SettingsError }),
+  Rpc.make("GetPullRequestUpdateNote", { success: PullRequestUpdateNote, error: SettingsError }),
+  Rpc.make("SetPullRequestUpdateNote", {
+    payload: { note: PullRequestUpdateNote },
+    success: PullRequestUpdateNote,
+    error: SettingsError,
+  }),
   Rpc.make("SetReviewPrompt", {
     payload: { prompt: ReviewPrompt },
     success: ReviewPrompt,

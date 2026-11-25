@@ -1,16 +1,9 @@
 import { assert, it } from "@effect/vitest"
 import { localPlace, Subscription } from "@glass/contracts"
 import { Effect, Option, Schema, Stream } from "effect"
-import { gitIn } from "../test/gitRepositories"
 import { connectMcp, toolText } from "../test/mcpClient"
-import {
-  calledBy,
-  glassCall,
-  holding,
-  repository,
-  settled,
-  threadsFixture,
-} from "../test/threadsFixture"
+import { calledBy, glassCall, repository, settled, threadsFixture } from "../test/threadsFixture"
+import { greeterPullRequest, threadWithPullRequest } from "../test/threadWithPullRequest"
 import { GlobalChatCaller } from "./mcp/McpCredentials"
 
 type Fixture = Effect.Success<typeof threadsFixture>
@@ -67,15 +60,6 @@ it.live("replaces the reasons and the note when a Thread subscribes to the same 
     )
   }),
 )
-
-const greeterPullRequest = (number: number, headBranch: string) => ({
-  owner: "glass-demo",
-  repo: "greeter",
-  number,
-  headBranch,
-  base: { sha: "b0", files: {} },
-  head: { sha: `h${number}`, files: {} },
-})
 
 const named = (number: number, repo = "greeter") => ({ owner: "glass-demo", repo, number })
 
@@ -204,24 +188,6 @@ it.live("refuses a Subscription asked for in a Turn Glass started", () =>
     assert.deepStrictEqual(yield* subscriptionsOf(f, thread.id, () => true), [])
   }),
 )
-
-const threadWithPullRequest = Effect.gen(function* () {
-  const f = yield* threadsFixture
-  yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
-  const thread = yield* f.start("hold:first")
-  yield* f.transcript(thread.id, holding)
-  gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/own")
-  const pullRequest = f.github.seedPullRequest(greeterPullRequest(7, "feature/own"))
-  yield* f.release("first")
-  yield* f.transcript(thread.id, settled(1))
-
-  yield* f.client.WatchThreadPullRequests().pipe(
-    Stream.filter((listed) => listed.some(({ threadId }) => threadId === thread.id)),
-    Stream.runHead,
-  )
-
-  return { ...f, thread, pullRequest }
-})
 
 it.live(
   "subscribes a Thread to the PR it has, ends the Subscription once that PR merges, and refuses another",

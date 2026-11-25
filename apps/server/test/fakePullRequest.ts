@@ -25,9 +25,18 @@ export interface FakeDraft extends FakeLine {
   readonly outdated: boolean
 }
 
+export type FakeAuthorAssociation =
+  | "OWNER"
+  | "MEMBER"
+  | "COLLABORATOR"
+  | "CONTRIBUTOR"
+  | "FIRST_TIME_CONTRIBUTOR"
+  | "NONE"
+
 export interface FakeComment {
   readonly id: string
   readonly author: string | null
+  readonly authorAssociation?: FakeAuthorAssociation
   readonly bodyHtml: string
   readonly createdAt: string
 }
@@ -58,6 +67,7 @@ export type FakeReviewState = "COMMENTED" | "APPROVED" | "CHANGES_REQUESTED" | "
 export interface FakeReview {
   readonly id: string
   readonly author: string | null
+  readonly authorAssociation?: FakeAuthorAssociation
   readonly state: FakeReviewState
   readonly bodyHtml: string
   readonly submittedAt: string
@@ -194,6 +204,7 @@ export class FakePullRequest {
   mergedWith: FakeMergeMethod | null = null
   #state: FakePullRequestState
   #mergedAt: string | null
+  #closedAt: string | null
   #isDraft: boolean
   #updatedAt: string
   #createdAt: string
@@ -248,6 +259,7 @@ export class FakePullRequest {
     this.#updatedAt = seed.updatedAt ?? now()
     this.#createdAt = seed.createdAt ?? this.#updatedAt
     this.#mergedAt = this.#state === "MERGED" ? this.#updatedAt : null
+    this.#closedAt = this.#state === "OPEN" ? null : this.#updatedAt
     this.#base = seed.base
     this.#head = seed.head
     this.publishHead(seed)
@@ -352,6 +364,10 @@ export class FakePullRequest {
     return this.#mergedAt
   }
 
+  get closedAt(): string | null {
+    return this.#closedAt
+  }
+
   get isDraft(): boolean {
     return this.#isDraft
   }
@@ -365,6 +381,9 @@ export class FakePullRequest {
 
     if (changes.state === "MERGED" && this.#state !== "MERGED") this.#mergedAt = this.#updatedAt
 
+    if (changes.state !== undefined && changes.state !== this.#state)
+      this.#closedAt = changes.state === "OPEN" ? null : this.#updatedAt
+
     this.#state = changes.state ?? this.#state
     this.#isDraft = changes.isDraft ?? this.#isDraft
   }
@@ -376,6 +395,7 @@ export class FakePullRequest {
 
   addReview(review: {
     readonly author: string | null
+    readonly authorAssociation?: FakeAuthorAssociation
     readonly state: FakeReviewState
     readonly bodyHtml?: string
   }): FakeReview {

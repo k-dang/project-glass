@@ -43,6 +43,7 @@ export const PullRequestMergedEvent = Schema.TaggedStruct("PullRequestMerged", {
 
 export const PullRequestClosedEvent = Schema.TaggedStruct("PullRequestClosed", {
   pullRequest: PullRequestRef,
+  closedAt: Schema.DateTimeUtcFromString,
 })
 
 export const Event = Schema.Union([

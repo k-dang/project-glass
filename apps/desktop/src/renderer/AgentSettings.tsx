@@ -1,5 +1,12 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
-import { type EngineFeature, type EngineSettings, ReviewPrompt } from "@glass/contracts"
+import {
+  defaultPullRequestUpdateNote,
+  defaultReviewPrompt,
+  type EngineFeature,
+  type EngineSettings,
+  PullRequestUpdateNote,
+  ReviewPrompt,
+} from "@glass/contracts"
 import { Equal, identity, Schema } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import type { ReactNode } from "react"
@@ -10,8 +17,8 @@ import { harnessNames } from "./harnesses"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf, streamProblem } from "./problems"
 import { QueueWorkSetting } from "./QueueWorkSetting"
-import { ReviewPromptField } from "./ReviewPromptField"
 import { SettingsSection } from "./SettingsSection"
+import { type TextSettingCopy, TextSettingField } from "./TextSettingField"
 
 const engineAtoms = Atom.family((feature: EngineFeature) =>
   autosaveSetting(
@@ -27,6 +34,45 @@ const promptAtoms = autosaveSetting(
   (prompt) => Backend.use((backend) => backend.SetReviewPrompt({ prompt })),
   (prompt) => prompt.trim(),
 )
+
+const noteAtoms = autosaveSetting(
+  Backend.use((backend) => backend.GetPullRequestUpdateNote()),
+  (note) => Backend.use((backend) => backend.SetPullRequestUpdateNote({ note })),
+  (note) => note.trim(),
+)
+
+interface TextSetting {
+  readonly atoms: ReturnType<typeof autosaveSetting<string>>
+  readonly copy: TextSettingCopy
+  readonly isValid: (text: string) => boolean
+  readonly invalid: string
+}
+
+const reviewPrompt: TextSetting = {
+  atoms: promptAtoms,
+  isValid: Schema.is(ReviewPrompt),
+  invalid: "Write a review prompt. Agent reviews need it to know how you review.",
+  copy: {
+    title: "Review prompt",
+    description: "How you review: what to look for and what to skip.",
+    footnote:
+      "Glass wraps it in its own instructions, which fix the answer format and keep the agent from suggesting a Review decision.",
+    defaultValue: defaultReviewPrompt,
+  },
+}
+
+const pullRequestUpdateNote: TextSetting = {
+  atoms: noteAtoms,
+  isValid: Schema.is(PullRequestUpdateNote),
+  invalid: "Write a PR update note. Threads need it to know how you handle PRs.",
+  copy: {
+    title: "PR update note",
+    description: "How a Thread handles a PR: what to fix, what to leave, and what never to do.",
+    footnote:
+      "Glass gives it to the agent with every PR update, beside the note the agent left with its Subscription.",
+    defaultValue: defaultPullRequestUpdateNote,
+  },
+}
 
 function useSetting<A>(atoms: ReturnType<typeof autosaveSetting<A>>, saved: A) {
   const [draft, setDraft] = useAtom(atoms.draft)
@@ -74,7 +120,15 @@ export function AgentSettings() {
         <QueueWorkSetting feature="agentReviews" />
         <EngineSetting feature="agentReviews" />
         <SettingLoader atoms={promptAtoms} label="review prompt">
-          {(saved) => <PromptEditor saved={saved} />}
+          {(saved) => <TextSettingEditor setting={reviewPrompt} saved={saved} separated />}
+        </SettingLoader>
+      </SettingsSection>
+      <SettingsSection
+        title="PR updates"
+        description="Choose how Threads handle the PRs they have a Subscription to. Changes apply to the next PR update."
+      >
+        <SettingLoader atoms={noteAtoms} label="PR update note">
+          {(saved) => <TextSettingEditor setting={pullRequestUpdateNote} saved={saved} />}
         </SettingLoader>
       </SettingsSection>
     </>
@@ -117,24 +171,28 @@ function EngineEditor(props: { feature: EngineFeature; saved: EngineSettings }) 
   )
 }
 
-const isReviewPrompt = Schema.is(ReviewPrompt)
-
-function PromptEditor(props: { saved: string }) {
-  const setting = useSetting(promptAtoms, props.saved)
-  const trimmed = setting.value.trim()
-
-  const invalid = isReviewPrompt(trimmed)
-    ? null
-    : "Write a review prompt. Agent reviews need it to know how you review."
+function TextSettingEditor(props: { setting: TextSetting; saved: string; separated?: boolean }) {
+  const { atoms, copy, isValid, invalid } = props.setting
+  const setting = useSetting(atoms, props.saved)
 
   const commit = (value: string) => {
-    if (isReviewPrompt(value.trim())) setting.commit(value)
+    if (isValid(value.trim())) setting.commit(value)
   }
 
   return (
     <div className="flex flex-col gap-3" aria-busy={setting.save.waiting}>
-      <ReviewPromptField value={setting.value} onChange={setting.change} onCommit={commit} />
-      <SettingProblems setting={setting} invalid={invalid} retry={() => commit(setting.value)} />
+      <TextSettingField
+        copy={copy}
+        value={setting.value}
+        separated={props.separated}
+        onChange={setting.change}
+        onCommit={commit}
+      />
+      <SettingProblems
+        setting={setting}
+        invalid={isValid(setting.value.trim()) ? null : invalid}
+        retry={() => commit(setting.value)}
+      />
     </div>
   )
 }

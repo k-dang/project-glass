@@ -182,7 +182,7 @@ _Avoid_: Notification, wake-up
 
 **PR update**:
 An Update telling a Thread that a PR it has a Subscription to has failing checks, review feedback
-waiting, or a merge conflict, or has merged or closed.
+waiting, changes requested, or a merge conflict, or has merged or closed.
 _Avoid_: Babysitting, PR watch
 
 **PR update note**:

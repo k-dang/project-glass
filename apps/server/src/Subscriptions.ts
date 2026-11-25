@@ -1,15 +1,12 @@
 import {
   type ConnectionError,
-  type FollowedRepository,
   PullRequestRef,
   referenceKey,
-  repositoryKey,
   type SettingsError,
   Subscription,
   SubscriptionReason,
   ThreadError,
   type ThreadPullRequest,
-  type TurnContext,
 } from "@glass/contracts"
 import {
   Context,
@@ -22,12 +19,20 @@ import {
   Stream,
   SubscriptionRef,
 } from "effect"
-import { SqlClient, type SqlError } from "effect/sql"
+import { SqlClient, type SqlError, type Statement } from "effect/sql"
 import { randomUUID } from "node:crypto"
+import { EventLog } from "./EventLog"
 import { FollowedRepositories } from "./FollowedRepositories"
+import { endedEvent } from "./gitHubSource"
 import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
-import { type Mirror, PullRequestMirror } from "./PullRequestMirror"
+import {
+  isRepositoryOf,
+  type Mirror,
+  mirroredPullRequest,
+  PullRequestMirror,
+} from "./PullRequestMirror"
+import { nothingTold, Told } from "./pullRequestUpdateDecision"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Transcripts } from "./Transcripts"
 
@@ -41,6 +46,21 @@ const ReasonsJson = Schema.fromJsonString(Schema.Array(SubscriptionReason))
 
 const encodeReasons = Schema.encodeSync(ReasonsJson)
 
+const Ended = Schema.Struct({
+  state: Schema.Literals(["merged", "closed"]),
+  pullRequest: PullRequestRef,
+})
+
+type Ended = typeof Ended.Type
+
+const encodeEnded = Schema.encodeSync(Schema.fromJsonString(Ended))
+
+const LastTold = Schema.Struct({ pullRequest: Schema.String, told: Told })
+
+type LastTold = typeof LastTold.Type
+
+const encodeTold = Schema.encodeSync(Schema.fromJsonString(LastTold))
+
 const StoredSubscription = Schema.Struct({
   id: Schema.String,
   threadId: Schema.String,
@@ -50,26 +70,67 @@ const StoredSubscription = Schema.Struct({
   number: Schema.NullOr(Schema.Int),
   reasons: ReasonsJson,
   note: Schema.String,
+  lastTold: Schema.NullOr(Schema.fromJsonString(LastTold)),
+  ended: Schema.NullOr(Schema.fromJsonString(Ended)),
 })
+
+type StoredSubscription = typeof StoredSubscription.Type
 
 const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredSubscription))
 
-const decodeNamed = Schema.decodeUnknownEffect(Schema.Array(PullRequestRef))
+const decodeThreadIds = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ threadId: Schema.String })),
+)
 
-const subscriptionOf = ({ owner, repo, number, ...stored }: typeof StoredSubscription.Type) =>
+const subscriptionOf = ({
+  id,
+  threadId,
+  source,
+  owner,
+  repo,
+  number,
+  reasons,
+  note,
+}: StoredSubscription) =>
   new Subscription({
-    ...stored,
+    id,
+    threadId,
+    source,
+    reasons,
+    note,
     pullRequest:
       owner === null || repo === null || number === null ? null : { owner, repo, number },
   })
+
+export interface SubscriptionState {
+  readonly subscription: Subscription
+  readonly toldAbout: (pullRequest: PullRequestRef) => Told
+  readonly ended: Ended | null
+}
+
+export interface ToldSubscription {
+  readonly subscriptionId: string
+  readonly pullRequest: PullRequestRef
+  readonly told: Told
+  readonly ends: boolean
+}
+
+const stateOf = (stored: StoredSubscription): SubscriptionState => ({
+  subscription: subscriptionOf(stored),
+  toldAbout: (pullRequest) =>
+    stored.lastTold?.pullRequest === referenceKey(pullRequest) ? stored.lastTold.told : nothingTold,
+  ended: stored.ended,
+})
 
 const pullRequestKey = (pullRequest: PullRequestRef | null) =>
   pullRequest === null ? null : referenceKey(pullRequest)
 
 const named = ({ owner, repo, number }: PullRequestRef) => `${owner}/${repo}#${number}`
 
-const startedByGlass = (context: TurnContext | null) =>
-  Predicate.isTagged(context, "StartedWorkUpdate")
+const refusedStarters = {
+  glass: "Glass started this Turn",
+  harness: "The agent started this Turn by itself",
+}
 
 const refuse = (message: string) => Effect.fail(new ThreadError({ message }))
 
@@ -78,16 +139,8 @@ const refuseEnded = (pullRequest: string, state: "merged" | "closed") =>
 
 const hasEnded = ({ state }: ThreadPullRequest) => !Predicate.isTagged(state, "Open")
 
-// WARNING: GitHub matches owner and repository names ignoring case, and a Followed repository keeps the case the user typed.
-const isRepositoryOf =
-  ({ owner, repo }: PullRequestRef) =>
-  (repository: FollowedRepository) =>
-    repositoryKey(repository).toLowerCase() === `${owner}/${repo}`.toLowerCase()
-
-const isOpenIn = (mirror: Mirror, pullRequest: PullRequestRef) =>
-  mirror.repositories
-    .find(({ repository }) => isRepositoryOf(pullRequest)(repository))
-    ?.pullRequests.some(({ ref }) => ref.number === pullRequest.number)
+const isMirrored = (mirror: Mirror, pullRequest: PullRequestRef) =>
+  mirror.repositories.some(({ repository }) => isRepositoryOf(pullRequest)(repository))
 
 const sameSubscriptions = Schema.toEquivalence(Schema.Array(Subscription))
 
@@ -108,6 +161,13 @@ export class Subscriptions extends Context.Service<
     readonly list: (threadId: string) => Effect.Effect<ReadonlyArray<Subscription>, ThreadError>
     readonly watch: (threadId: string) => Stream.Stream<ReadonlyArray<Subscription>, ThreadError>
     readonly end: (threadId: string, subscriptionId: string) => Effect.Effect<boolean, ThreadError>
+    readonly changes: Stream.Stream<unknown>
+    readonly subscribedThreads: Effect.Effect<ReadonlyArray<string>, ThreadError>
+    readonly states: (
+      threadId: string,
+    ) => Effect.Effect<ReadonlyArray<SubscriptionState>, ThreadError>
+    readonly recordTold: (told: ReadonlyArray<ToldSubscription>) => Effect.Effect<void, ThreadError>
+    readonly toldChanged: Effect.Effect<void>
   }
 >()("@glass/server/Subscriptions") {
   static readonly layer = Layer.effect(
@@ -119,19 +179,23 @@ export class Subscriptions extends Context.Service<
       const transcripts = yield* Transcripts
       const threadPullRequests = yield* ThreadPullRequests
       const mirror = yield* PullRequestMirror
+      const events = yield* EventLog
       const writes = yield* SubscriptionRef.make(0)
 
       const wrote = SubscriptionRef.update(writes, (count) => count + 1)
 
-      const list = (threadId: string) =>
+      const stored = (matching: Statement.Fragment) =>
         sql`
-          SELECT id, thread_id AS threadId, source, owner, repo, number, reasons, note
-          FROM subscription WHERE thread_id = ${threadId} ORDER BY created_at, id
-        `.pipe(
-          Effect.flatMap(decodeStored),
-          Effect.map((stored) => stored.map(subscriptionOf)),
-          Effect.catch(storageFailure),
-        )
+          SELECT id, thread_id AS threadId, source, owner, repo, number, reasons, note,
+            last_told AS lastTold, ended
+          FROM subscription WHERE ${matching} ORDER BY created_at, id
+        `.pipe(Effect.flatMap(decodeStored))
+
+      const storedOf = (threadId: string) =>
+        stored(sql`thread_id = ${threadId}`).pipe(Effect.catch(storageFailure))
+
+      const list = (threadId: string) =>
+        storedOf(threadId).pipe(Effect.map((found) => found.map(subscriptionOf)))
 
       const lookUp = (pullRequests: ReadonlyArray<PullRequestRef>) =>
         github
@@ -172,9 +236,11 @@ export class Subscriptions extends Context.Service<
         threadId: string,
         input: NewSubscription,
       ) {
-        if (startedByGlass(yield* transcripts.runningContext(threadId)))
+        const starter = yield* transcripts.runningTurnStarter(threadId)
+
+        if (starter === "glass" || starter === "harness")
           return yield* refuse(
-            "Glass started this Turn, so it can't subscribe your Thread to a PR. Only a Turn the user's message started can.",
+            `${refusedStarters[starter]}, so it can't subscribe your Thread to a PR. Only a Turn the user's message started can.`,
           )
 
         if (input.pullRequest === null) yield* refuseOwnEnded(threadId)
@@ -240,49 +306,89 @@ export class Subscriptions extends Context.Service<
         return ended.length > 0
       })
 
+      const endTold = Effect.fnUntraced(function* (
+        subscriptions: ReadonlyArray<StoredSubscription>,
+        ended: Ended,
+      ) {
+        yield* Effect.forEach(
+          subscriptions,
+          ({ id, reasons }) =>
+            reasons.includes("merged-or-closed")
+              ? sql`UPDATE subscription SET ended = ${encodeEnded(ended)} WHERE id = ${id}`
+              : sql`DELETE FROM subscription WHERE id = ${id}`,
+          { discard: true },
+        )
+
+        if (subscriptions.length > 0) yield* wrote
+      })
+
       const endOwn = Effect.fnUntraced(function* (listed: ReadonlyArray<ThreadPullRequest>) {
-        const threadIds = listed.flatMap((own) => (hasEnded(own) ? [own.threadId] : []))
-
-        if (threadIds.length === 0) return
-
-        const ended = yield* sql`
-          DELETE FROM subscription WHERE owner IS NULL AND ${sql.in("thread_id", threadIds)}
-          RETURNING id
-        `
-
-        if (ended.length > 0) yield* wrote
+        yield* Effect.forEach(
+          listed,
+          (own) =>
+            Predicate.isTagged(own.state, "Open")
+              ? Effect.void
+              : stored(sql`owner IS NULL AND ended IS NULL AND thread_id = ${own.threadId}`).pipe(
+                  Effect.flatMap((subscriptions) =>
+                    endTold(subscriptions, {
+                      state: Predicate.isTagged(own.state, "Merged") ? "merged" : "closed",
+                      pullRequest: own.ref,
+                    }),
+                  ),
+                ),
+          { discard: true },
+        )
       })
 
       const endNamed = Effect.fnUntraced(function* (mirrored: Mirror | undefined) {
         if (mirrored === undefined) return
 
-        const subscribed = yield* sql`
-          SELECT DISTINCT owner, repo, number FROM subscription WHERE owner IS NOT NULL
-        `.pipe(Effect.flatMap(decodeNamed))
+        const subscribed = (yield* stored(sql`owner IS NOT NULL AND ended IS NULL`)).flatMap(
+          (subscription) => {
+            const { pullRequest } = subscriptionOf(subscription)
 
-        const gone = subscribed.filter((pullRequest) => isOpenIn(mirrored, pullRequest) === false)
+            return pullRequest !== null &&
+              isMirrored(mirrored, pullRequest) &&
+              mirroredPullRequest(mirrored, pullRequest) === undefined
+              ? [{ subscription, pullRequest }]
+              : []
+          },
+        )
+
+        const gone = [
+          ...new Map(
+            subscribed.map(({ pullRequest }) => [referenceKey(pullRequest), pullRequest]),
+          ).values(),
+        ]
 
         if (gone.length === 0) return
 
         const found = yield* lookUp(gone)
 
-        const ended = gone.filter((_, index) => {
-          const state = found[index]?.state
-
-          return state === "merged" || state === "closed"
-        })
-
         yield* Effect.forEach(
-          ended,
-          ({ owner, repo, number }) =>
-            sql`
-              DELETE FROM subscription
-              WHERE owner = ${owner} AND repo = ${repo} AND number = ${number}
-            `,
+          gone,
+          (pullRequest, index) => {
+            const lookedUp = found[index]
+            const state = lookedUp?.state
+            const event = lookedUp == null ? null : endedEvent(lookedUp)
+
+            return state === "merged" || state === "closed"
+              ? events.record("github", event === null ? [] : [event]).pipe(
+                  Effect.andThen(
+                    endTold(
+                      subscribed.flatMap((candidate) =>
+                        referenceKey(candidate.pullRequest) === referenceKey(pullRequest)
+                          ? [candidate.subscription]
+                          : [],
+                      ),
+                      { state, pullRequest },
+                    ),
+                  ),
+                )
+              : Effect.void
+          },
           { discard: true },
         )
-
-        if (ended.length > 0) yield* wrote
       })
 
       const endingMergedOrClosed = <A, E>(
@@ -312,6 +418,27 @@ export class Subscriptions extends Context.Service<
             Stream.mapEffect(() => list(threadId)),
             Stream.changesWith(sameSubscriptions),
           ),
+        changes: SubscriptionRef.changes(writes),
+        subscribedThreads: sql`SELECT DISTINCT thread_id AS threadId FROM subscription`.pipe(
+          Effect.flatMap(decodeThreadIds),
+          Effect.map((found) => found.map(({ threadId }) => threadId)),
+          Effect.catch(storageFailure),
+        ),
+        states: (threadId) => storedOf(threadId).pipe(Effect.map((found) => found.map(stateOf))),
+        recordTold: (told) =>
+          Effect.forEach(
+            told,
+            ({ subscriptionId, pullRequest, told: state, ends }) =>
+              ends
+                ? sql`DELETE FROM subscription WHERE id = ${subscriptionId}`
+                : sql`
+                    UPDATE subscription
+                    SET last_told = ${encodeTold({ pullRequest: referenceKey(pullRequest), told: state })}
+                    WHERE id = ${subscriptionId}
+                  `,
+            { discard: true },
+          ).pipe(Effect.catch(storageFailure)),
+        toldChanged: wrote,
       })
     }),
   )

@@ -159,9 +159,11 @@ const decodeMessages = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ message: Schema.String })),
 )
 
-const decodeContexts = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ context: ContextJson })),
+const decodeStarts = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ context: ContextJson, startedByHarness: Schema.BooleanFromBit })),
 )
+
+export type TurnStarter = "message" | "glass" | "harness"
 
 const decodePositions = Schema.decodeUnknownEffect(
   Schema.Array(
@@ -281,7 +283,9 @@ export class Transcripts extends Context.Service<
       threadIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<StartedTurn>, ThreadError>
     readonly runningMessage: (threadId: string) => Effect.Effect<string | null, ThreadError>
-    readonly runningContext: (threadId: string) => Effect.Effect<TurnContext | null, ThreadError>
+    readonly runningTurnStarter: (
+      threadId: string,
+    ) => Effect.Effect<TurnStarter | null, ThreadError>
     readonly startOrQueue: (
       threadId: string,
       input: MessageWithContext,
@@ -483,7 +487,7 @@ export class Transcripts extends Context.Service<
       const insertTurn = (
         threadId: string,
         { turnId, message, images, context, feedback, sentAt }: typeof TurnStarted.Type,
-        retriesDelivery: boolean,
+        start: { readonly retriesDelivery: boolean } | "by-harness",
       ) =>
         sql`INSERT INTO thread_turn ${sql.insert({
           id: turnId,
@@ -493,13 +497,14 @@ export class Transcripts extends Context.Service<
           context: encodeContext(context),
           feedback: encodeFeedback(feedback),
           sent_at: DateTime.formatIso(sentAt),
-          retries_delivery: retriesDelivery ? 1 : 0,
+          retries_delivery: start !== "by-harness" && start.retriesDelivery ? 1 : 0,
+          started_by_harness: start === "by-harness" ? 1 : 0,
         })}`.pipe(Effect.as(true))
 
       const writeApplied = (threadId: string, event: AgentEvent) =>
         Match.value(event).pipe(
           Match.tagsExhaustive({
-            TurnStarted: (started) => insertTurn(threadId, started, false),
+            TurnStarted: (started) => insertTurn(threadId, started, "by-harness"),
             PartSet: ({ turnId, index, part }) =>
               sql`
                 INSERT INTO thread_turn_part (turn_id, position, part)
@@ -602,7 +607,7 @@ export class Transcripts extends Context.Service<
                 sentAt: yield* DateTime.now,
               })
 
-              yield* insertTurn(threadId, event, write.message.retriesDelivery)
+              yield* insertTurn(threadId, event, write.message)
               started.push(event)
               break
             }
@@ -1005,12 +1010,24 @@ export class Transcripts extends Context.Service<
               Effect.map(([turn]) => turn?.message ?? null),
             ),
           ),
-        runningContext: (threadId) =>
+        runningTurnStarter: (threadId) =>
           withStorageFailure(
             "read a running Turn",
-            sql`SELECT context FROM thread_turn WHERE thread_id = ${threadId} AND ended IS NULL`.pipe(
-              Effect.flatMap(decodeContexts),
-              Effect.map(([turn]) => turn?.context ?? null),
+            sql`
+              SELECT context, started_by_harness AS startedByHarness
+              FROM thread_turn WHERE thread_id = ${threadId} AND ended IS NULL
+            `.pipe(
+              Effect.flatMap(decodeStarts),
+              Effect.map(([turn]): TurnStarter | null => {
+                if (turn === undefined) return null
+
+                if (turn.startedByHarness) return "harness"
+
+                return Predicate.isTagged(turn.context, "StartedWorkUpdate") ||
+                  Predicate.isTagged(turn.context, "PullRequestUpdate")
+                  ? "glass"
+                  : "message"
+              }),
             ),
           ),
         settleUndelivered: Effect.fnUntraced(function* (threadId, turnId, reason) {
