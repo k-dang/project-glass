@@ -75,9 +75,6 @@ function ThreadChanges(props: {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <p className="border-b px-6 py-2.5 text-sm text-muted-foreground">
-        Changes since {thread.baseBranch}, including uncommitted work
-      </p>
       {lastEnded !== lastEndedAtSnapshot && (
         <div className="border-b px-6 py-3">
           <Alert role="note">
