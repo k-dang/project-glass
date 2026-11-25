@@ -60,6 +60,9 @@ export const launchCommand = (
 
   if (!isScript(resolved)) return ChildProcess.make(resolved, args, options)
 
+  if (args.some((argument) => /[\r\n]/.test(argument)))
+    throw new Error(`cmd.exe ends ${resolved}'s command line at a line break in an argument`)
+
   const line = [resolved.replace(metacharacters, "^$1"), ...args.map(escapeArgument)].join(" ")
 
   return ChildProcess.make(line, [], { ...options, shell: true })
