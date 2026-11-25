@@ -1,206 +1,249 @@
 import { assert, describe, it } from "@effect/vitest"
-import { GlobalChatCaller } from "./McpCredentials"
 import {
-  AskUserAnswered,
-  AskUserCancelled,
-  AskUserResult,
-  AskUserTimedOut,
+  AskedUser,
+  ChoiceAnswer,
   type InboxItems,
-  OutsideChoice,
-  OutsideText,
+  QuestionAnswered,
+  QuestionSetAside,
+  QuestionState,
+  QuestionWaiting,
+  TextAnswer,
 } from "@glass/contracts"
-import {
-  Duration,
-  Effect,
-  Exit,
-  Fiber,
-  Option,
-  Predicate,
-  Redacted,
-  Schema,
-  Scope,
-  Stream,
-} from "effect"
-import { TestClock } from "effect/testing"
-import { withWatchedClock } from "../../test/deadlines"
-import { startBackend } from "../../test/harness"
+import { Effect, Exit, Option, Predicate, Redacted, Schema, Scope, Stream } from "effect"
+import { isolatedHome, startBackend } from "../../test/harness"
 import { inboxWhen } from "../../test/inboxWhen"
-import { connectMcp, initialize, mcpPost, toolResult, toolText } from "../../test/mcpClient"
+import { connectMcp, mcpPost, toolText } from "../../test/mcpClient"
 
 const outside = (items: InboxItems) =>
   items.filter((item) => Predicate.isTagged(item, "OutsideQuestion"))
 
-const askResult = Schema.decodeUnknownSync(AskUserResult)
+const askedUser = Schema.decodeUnknownSync(AskedUser)
 
-const approve = (backend: Effect.Success<ReturnType<typeof startBackend>>) =>
-  backend.outsideAgents.issue("Claude Code")
+const questionState = Schema.decodeUnknownSync(QuestionState)
+
+type Backend = Effect.Success<ReturnType<typeof startBackend>>
+
+type Mcp = Effect.Success<ReturnType<typeof connectMcp>>
 
 const start = Effect.gen(function* () {
   const backend = yield* startBackend({})
-  const bearer = yield* approve(backend)
+  const bearer = yield* backend.outsideAgents.issue("Claude Code")
   const mcp = yield* connectMcp(backend.baseUrl, bearer)
 
   return { ...backend, bearer, mcp }
 })
 
-const askUntilProgress = (baseUrl: string, bearer: Redacted.Redacted) =>
-  Effect.gen(function* () {
-    const opened = yield* mcpPost(baseUrl, initialize, { bearer })
+const ask = (mcp: Mcp, args: Schema.JsonObject) =>
+  mcp
+    .call("ask_user", args)
+    .pipe(Effect.map(({ structuredContent }) => askedUser(structuredContent)))
 
-    assert.equal(opened.status, 200)
-    assert.ok(opened.sessionId !== undefined)
+const readAnswer = (mcp: Mcp, id: string) =>
+  mcp
+    .call("read_answer", { id })
+    .pipe(Effect.map(({ structuredContent }) => questionState(structuredContent)))
 
-    yield* mcpPost(
-      baseUrl,
-      { jsonrpc: "2.0", method: "notifications/initialized" },
-      { bearer, sessionId: opened.sessionId },
-    )
-
-    return yield* Effect.promise(async () => {
-      const response = await fetch(`${baseUrl}/mcp`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          accept: "application/json, text/event-stream",
-          authorization: `Bearer ${Redacted.value(bearer)}`,
-          "mcp-session-id": opened.sessionId ?? "",
-        },
-        body: JSON.stringify({
-          jsonrpc: "2.0",
-          id: 1,
-          method: "tools/call",
-          params: {
-            name: "ask_user",
-            arguments: { question: "Ship the retry change?" },
-            _meta: { progressToken: "ask-1" },
-          },
-        }),
-      })
-
-      const reader = response.body?.getReader()
-
-      if (reader === undefined) throw new Error("ask_user returned no body")
-
-      const decoder = new TextDecoder()
-      let text = ""
-
-      while (!text.includes("notifications/progress")) {
-        const chunk = await reader.read()
-
-        if (chunk.value !== undefined) text += decoder.decode(chunk.value)
-
-        if (chunk.done) break
-      }
-
-      return { status: response.status, text, reader }
-    })
-  })
+const shownQuestion = (client: Backend["client"], id: string) =>
+  inboxWhen(client, (items) => outside(items).some((item) => item.id === id)).pipe(
+    Effect.map((items) =>
+      Option.getOrThrow(Option.fromNullishOr(outside(items).find((item) => item.id === id))),
+    ),
+  )
 
 describe("ask_user", () => {
-  it.live("returns the free-text answer from the Inbox", () =>
+  it.live("returns at once, waits in the Inbox, and hands back the typed answer", () =>
     Effect.gen(function* () {
       const { client, mcp } = yield* start
 
-      const call = mcp.request("tools/call", {
-        name: "ask_user",
-        arguments: { question: "Ship the retry change?" },
-      })
+      const { questionId } = yield* ask(mcp, { question: "Ship the retry change?" })
+      const question = yield* shownQuestion(client, questionId)
 
-      const inFlight = yield* Effect.forkChild(call.response)
-      const shown = yield* inboxWhen(client, (items) => outside(items).length === 1)
-      const question = outside(shown)[0]
-
-      assert.ok(question !== undefined)
       assert.equal(question.question, "Ship the retry change?")
       assert.deepStrictEqual(question.choices, [])
       assert.equal(question.askedBy, "Claude Code")
+      assert.deepStrictEqual(yield* readAnswer(mcp, questionId), QuestionWaiting.make({}))
 
-      yield* client.AnswerOutsideQuestion({
-        id: question.id,
-        answer: OutsideText.make({ text: "Ship it" }),
+      yield* client.AnswerQuestions({
+        answers: [{ questionId, answer: TextAnswer.make({ text: "Ship it" }) }],
       })
 
-      const result = toolResult(yield* Fiber.join(inFlight))
+      assert.deepStrictEqual(
+        yield* readAnswer(mcp, questionId),
+        QuestionAnswered.make({ answer: "Ship it", by: "text" }),
+      )
+      yield* inboxWhen(client, (items) => outside(items).length === 0)
+    }),
+  )
+
+  it.live("offers choices with their descriptions and hands back the one picked", () =>
+    Effect.gen(function* () {
+      const { client, mcp } = yield* start
+
+      const { questionId } = yield* ask(mcp, {
+        question: "Ship the retry change?",
+        choices: [
+          { label: "Ship it", description: "Merge once checks pass." },
+          { label: "Hold it" },
+        ],
+      })
+
+      const question = yield* shownQuestion(client, questionId)
+
+      assert.deepStrictEqual(question.choices, [
+        { label: "Ship it", description: "Merge once checks pass." },
+        { label: "Hold it", description: null },
+      ])
+
+      const unoffered = yield* client
+        .AnswerQuestions({
+          answers: [{ questionId, answer: ChoiceAnswer.make({ choice: "Revert it" }) }],
+        })
+        .pipe(Effect.flip)
+
+      assert.equal(unoffered._tag, "QuestionNotOpen")
+
+      yield* client.AnswerQuestions({
+        answers: [{ questionId, answer: ChoiceAnswer.make({ choice: "Hold it" }) }],
+      })
 
       assert.deepStrictEqual(
-        askResult(result.structuredContent),
-        AskUserAnswered.make({ answer: "Ship it", by: "text" }),
+        yield* readAnswer(mcp, questionId),
+        QuestionAnswered.make({ answer: "Hold it", by: "choice" }),
       )
+    }),
+  )
+
+  it.live("refuses two choices with one label", () =>
+    Effect.gen(function* () {
+      const { client, mcp } = yield* start
+
+      const result = yield* mcp.call("ask_user", {
+        question: "Ship it?",
+        choices: [{ label: "Yes" }, { label: "Yes" }],
+      })
+
+      assert.isTrue(result.isError)
+      assert.include(toolText(result), "its own label")
       assert.equal(outside(yield* inboxWhen(client, () => true)).length, 0)
     }),
   )
 
-  it.live("returns the choice the user picks", () =>
+  it.live("tells the agent a question was set aside, and takes no answer after", () =>
     Effect.gen(function* () {
       const { client, mcp } = yield* start
 
-      const call = mcp.request("tools/call", {
-        name: "ask_user",
-        arguments: {
-          question: "Ship the retry change?",
-          choices: ["Ship it", "Hold it"],
-        },
-      })
+      const { questionId } = yield* ask(mcp, { question: "Rename the module too?" })
 
-      const inFlight = yield* Effect.forkChild(call.response)
-      const shown = yield* inboxWhen(client, (items) => outside(items).length === 1)
-      const question = outside(shown)[0]
+      yield* shownQuestion(client, questionId)
+      yield* client.SetQuestionAside({ questionId })
 
-      assert.ok(question !== undefined)
-      assert.deepStrictEqual(question.choices, ["Ship it", "Hold it"])
+      assert.deepStrictEqual(yield* readAnswer(mcp, questionId), QuestionSetAside.make({}))
+      yield* inboxWhen(client, (items) => outside(items).length === 0)
 
-      yield* client.AnswerOutsideQuestion({
-        id: question.id,
-        answer: OutsideChoice.make({ choice: "Hold it" }),
-      })
+      const late = yield* client
+        .AnswerQuestions({
+          answers: [{ questionId, answer: TextAnswer.make({ text: "Yes" }) }],
+        })
+        .pipe(Effect.flip)
+
+      assert.equal(late._tag, "QuestionNotOpen")
+    }),
+  )
+
+  it.live("keeps several questions from one session open at once", () =>
+    Effect.gen(function* () {
+      const { client, mcp } = yield* start
+
+      const first = yield* ask(mcp, { question: "Ship the retry change?" })
+      const second = yield* ask(mcp, { question: "And the follow-up?" })
+
+      const shown = outside(yield* inboxWhen(client, (items) => outside(items).length === 2))
 
       assert.deepStrictEqual(
-        askResult(toolResult(yield* Fiber.join(inFlight)).structuredContent),
-        AskUserAnswered.make({ answer: "Hold it", by: "choice" }),
+        shown.map(({ id }) => id),
+        [first.questionId, second.questionId],
       )
     }),
   )
 
-  it.effect("returns timed out and drops the question when nobody answers", () => {
-    const timeout = Duration.seconds(1)
+  it.live("reads an answer from another session of the same agent, never from another agent", () =>
+    Effect.gen(function* () {
+      const backend = yield* start
+      const { questionId } = yield* ask(backend.mcp, { question: "Ship the retry change?" })
 
-    return withWatchedClock(timeout, (deadlineSet) =>
-      Effect.gen(function* () {
-        const { client, mcp } = yield* start
+      yield* backend.client.AnswerQuestions({
+        answers: [{ questionId, answer: TextAnswer.make({ text: "Ship it" }) }],
+      })
 
-        const call = mcp.request("tools/call", {
-          name: "ask_user",
-          arguments: { question: "Still there?", timeoutSeconds: Duration.toSeconds(timeout) },
-        })
+      const sameAgent = yield* connectMcp(backend.baseUrl, backend.bearer)
 
-        const inFlight = yield* Effect.forkChild(call.response)
+      assert.deepStrictEqual(
+        yield* readAnswer(sameAgent, questionId),
+        QuestionAnswered.make({ answer: "Ship it", by: "text" }),
+      )
 
-        const [asked] = outside(yield* inboxWhen(client, (items) => outside(items).length === 1))
-        assert.isDefined(asked)
+      const otherAgent = yield* connectMcp(
+        backend.baseUrl,
+        yield* backend.outsideAgents.issue("Codex"),
+      )
 
-        yield* deadlineSet
-        yield* TestClock.adjust(timeout)
+      const refused = yield* otherAgent.call("read_answer", { id: questionId })
 
-        assert.deepStrictEqual(
-          askResult(toolResult(yield* Fiber.join(inFlight)).structuredContent),
-          AskUserTimedOut.make({}),
-        )
-        yield* inboxWhen(client, (items) => outside(items).length === 0)
+      assert.isTrue(refused.isError)
+      assert.include(toolText(refused), "You asked no question")
+    }),
+  )
 
-        const late = yield* client
-          .AnswerOutsideQuestion({ id: asked.id, answer: OutsideText.make({ text: "too late" }) })
-          .pipe(Effect.flip)
+  it.live("keeps an open question across a Glass restart", () =>
+    Effect.gen(function* () {
+      const home = yield* isolatedHome
+      const before = yield* Scope.make()
+      const first = yield* startBackend({}, home).pipe(Scope.provide(before))
+      const bearer = yield* first.outsideAgents.issue("Claude Code")
 
-        assert.equal(late._tag, "OutsideQuestionNotWaiting")
-      }),
-    )
-  })
+      const { questionId } = yield* ask(yield* connectMcp(first.baseUrl, bearer), {
+        question: "Ship the retry change?",
+      })
+
+      yield* Scope.close(before, Exit.void)
+
+      const second = yield* startBackend({}, home)
+
+      yield* shownQuestion(second.client, questionId)
+      yield* second.client.AnswerQuestions({
+        answers: [{ questionId, answer: TextAnswer.make({ text: "Ship it" }) }],
+      })
+
+      assert.deepStrictEqual(
+        yield* readAnswer(yield* connectMcp(second.baseUrl, bearer), questionId),
+        QuestionAnswered.make({ answer: "Ship it", by: "text" }),
+      )
+    }),
+  )
+
+  it.live("drops an agent's open questions when it is disconnected", () =>
+    Effect.gen(function* () {
+      const { client, mcp } = yield* start
+      const { questionId } = yield* ask(mcp, { question: "Ship the retry change?" })
+
+      yield* shownQuestion(client, questionId)
+
+      const [agent] = yield* client
+        .WatchOutsideAgents()
+        .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+      assert.ok(agent !== undefined)
+      yield* client.RevokeOutsideAgent({ id: agent.id })
+
+      yield* inboxWhen(client, (items) => outside(items).length === 0)
+    }),
+  )
 
   it.live("rejects an unauthorized caller and posts nothing", () =>
     Effect.gen(function* () {
       const { baseUrl, client } = yield* startBackend({})
 
-      const ask = {
+      const call = {
         jsonrpc: "2.0" as const,
         id: 1,
         method: "tools/call",
@@ -209,155 +252,13 @@ describe("ask_user", () => {
 
       const statuses = yield* Effect.all(
         [
-          mcpPost(baseUrl, ask),
-          mcpPost(baseUrl, ask, { bearer: Redacted.make("not-a-credential") }),
+          mcpPost(baseUrl, call),
+          mcpPost(baseUrl, call, { bearer: Redacted.make("not-a-credential") }),
         ],
         { concurrency: "unbounded" },
       ).pipe(Effect.map((responses) => responses.map((response) => response.status)))
 
       assert.deepStrictEqual(statuses, [401, 401])
-      assert.equal(outside(yield* inboxWhen(client, () => true)).length, 0)
-    }),
-  )
-
-  it.live("returns cancelled when Glass shuts down", () =>
-    Effect.gen(function* () {
-      const scope = yield* Scope.make()
-      const backend = yield* startBackend({}).pipe(Scope.provide(scope))
-      const bearer = yield* approve(backend)
-      const mcp = yield* connectMcp(backend.baseUrl, bearer)
-
-      const call = mcp.request("tools/call", {
-        name: "ask_user",
-        arguments: { question: "Ship the retry change?" },
-      })
-
-      const inFlight = yield* Effect.forkChild(call.response)
-
-      yield* inboxWhen(backend.client, (items) => outside(items).length === 1)
-      yield* Scope.close(scope, Exit.void)
-
-      assert.deepStrictEqual(
-        askResult(toolResult(yield* Fiber.join(inFlight)).structuredContent),
-        AskUserCancelled.make({}),
-      )
-    }),
-  )
-
-  it.live("sends progress before the answer so the call outlives a client timeout", () =>
-    Effect.gen(function* () {
-      const backend = yield* startBackend({})
-      const body = yield* askUntilProgress(backend.baseUrl, yield* approve(backend))
-
-      assert.equal(body.status, 200)
-      assert.include(body.text, "notifications/progress")
-      assert.include(body.text, "ask-1")
-      assert.equal(body.text.includes('"id":1'), false)
-
-      const shown = yield* inboxWhen(backend.client, (items) => outside(items).length === 1)
-      const question = outside(shown)[0]
-
-      assert.ok(question !== undefined)
-      yield* backend.client.AnswerOutsideQuestion({
-        id: question.id,
-        answer: OutsideText.make({ text: "Ship it" }),
-      })
-      yield* Effect.promise(() => body.reader.cancel())
-    }),
-  )
-
-  it.live("ends a waiting question when its agent is disconnected", () =>
-    Effect.gen(function* () {
-      const backend = yield* startBackend({})
-      const body = yield* askUntilProgress(backend.baseUrl, yield* approve(backend))
-
-      yield* inboxWhen(backend.client, (items) => outside(items).length === 1)
-
-      const [thread] = yield* backend.client
-        .WatchOutsideAgents()
-        .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
-
-      assert.ok(thread !== undefined)
-      yield* backend.client.RevokeOutsideAgent({ id: thread.id })
-
-      yield* inboxWhen(backend.client, (items) => outside(items).length === 0)
-
-      const rest = yield* Effect.promise(async () => {
-        const decoder = new TextDecoder()
-        let text = ""
-
-        for (let chunk = await body.reader.read(); !chunk.done; chunk = await body.reader.read()) {
-          text += decoder.decode(chunk.value)
-        }
-
-        return text
-      })
-
-      assert.equal(rest.includes("Answered"), false)
-    }),
-  )
-
-  it.live("refuses a second question from the same MCP session, not from another", () =>
-    Effect.gen(function* () {
-      const { baseUrl, bearer, client, mcp } = yield* start
-      const otherTerminal = yield* connectMcp(baseUrl, bearer)
-
-      const first = yield* Effect.forkChild(
-        mcp.request("tools/call", {
-          name: "ask_user",
-          arguments: { question: "Ship the retry change?" },
-        }).response,
-      )
-
-      yield* inboxWhen(client, (items) => outside(items).length === 1)
-
-      const second = toolResult(
-        yield* mcp.request("tools/call", {
-          name: "ask_user",
-          arguments: { question: "And the follow-up?" },
-        }).response,
-      )
-
-      assert.isTrue(second.isError)
-      assert.include(toolText(second), "already waiting")
-
-      const other = yield* Effect.forkChild(
-        otherTerminal.request("tools/call", {
-          name: "ask_user",
-          arguments: { question: "Rebase first?" },
-        }).response,
-      )
-
-      const shown = outside(yield* inboxWhen(client, (items) => outside(items).length === 2))
-
-      yield* Effect.forEach(shown, (question) =>
-        client.AnswerOutsideQuestion({
-          id: question.id,
-          answer: OutsideText.make({ text: "Yes" }),
-        }),
-      )
-      yield* Fiber.join(first)
-      yield* Fiber.join(other)
-    }),
-  )
-
-  it.live("refuses a Thread Glass launched", () =>
-    Effect.gen(function* () {
-      const { baseUrl, client, mcpCredentials } = yield* startBackend({})
-
-      const bearer = yield* mcpCredentials.issue(
-        GlobalChatCaller.make({
-          globalChatId: "global-chat",
-          sessionId: "session-1",
-        }),
-      )
-
-      const mcp = yield* connectMcp(baseUrl, bearer)
-
-      const result = yield* mcp.call("ask_user", { question: "Ship it?" })
-
-      assert.isTrue(result.isError)
-      assert.include(toolText(result), "its own Question tool")
       assert.equal(outside(yield* inboxWhen(client, () => true)).length, 0)
     }),
   )

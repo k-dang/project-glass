@@ -13,7 +13,9 @@ import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
 import { Inbox } from "./Inbox"
 import { OutsideAgents } from "./OutsideAgents"
-import { OutsideQuestions } from "./OutsideQuestions"
+import { Answers } from "./Answers"
+import { OutsideAgentDisconnects } from "./OutsideAgentDisconnects"
+import { Questions } from "./Questions"
 import { CheckIns } from "./CheckIns"
 import { McpCredentials } from "./mcp/McpCredentials"
 import { PullRequestLists } from "./PullRequestLists"
@@ -54,7 +56,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const inbox = yield* Inbox
     const threadPullRequests = yield* ThreadPullRequests
     const settledThreads = yield* SettledThreads
-    const outsideQuestions = yield* OutsideQuestions
+    const questions = yield* Questions
+    const answers = yield* Answers
+    const disconnects = yield* OutsideAgentDisconnects
     const checkIns = yield* CheckIns
     const outsideAgents = yield* OutsideAgents
     const mcpCredentials = yield* McpCredentials
@@ -207,15 +211,17 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       BringBackThread: ({ threadId }) => threads.bringBack(threadId),
       WatchInbox: () => inbox.watch(),
       MarkTurnSeen: ({ threadId, endedAt }) => threads.markTurnSeen(threadId, endedAt),
-      AnswerOutsideQuestion: ({ id, answer }) => outsideQuestions.answer(id, answer),
+      AnswerQuestions: ({ answers: given }) => answers.answer(given),
+      SetQuestionAside: ({ questionId }) => questions.setAside(questionId),
       GetCheckInChanges: ({ checkInId }) => checkIns.changes(checkInId),
       ListCheckInNotes: ({ checkInId }) => checkIns.notes(checkInId),
       SaveCheckInNote: ({ checkInId, note }) => checkIns.saveNote(checkInId, note),
       RemoveCheckInNote: ({ checkInId, noteId }) => checkIns.removeNote(checkInId, noteId),
       AnswerCheckIn: ({ checkInId, answer }) => checkIns.answer(checkInId, answer),
+      SetCheckInAside: ({ checkInId }) => checkIns.setAside(checkInId),
       GetMcpEndpoint: () => mcpCredentials.endpoint.pipe(Effect.map((url) => ({ url }))),
       WatchOutsideAgents: () => outsideAgents.watch(),
-      RevokeOutsideAgent: ({ id }) => outsideAgents.revoke(id),
+      RevokeOutsideAgent: ({ id }) => disconnects.disconnect(id),
       ChangeThreadModel: ({ threadId, model, effort }) =>
         threads.changeModel(threadId, { model, effort }),
       ChangePermissionMode: ({ threadId, permissionMode }) =>

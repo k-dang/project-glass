@@ -16,7 +16,11 @@ const toolNames = ({ tools = [] }: FakeModelRequest) =>
       : [],
   )
 
-export const isGlobalChat = (input: FakeModelRequest) => toolNames(input).includes("ask_user")
+export const isGlobalChat = (input: FakeModelRequest) => {
+  const names = toolNames(input)
+
+  return names.includes("mcp__glass__ask_user") && !names.includes("bash")
+}
 
 export const globalChatReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   const last = input.messages.at(-1)
@@ -61,10 +65,16 @@ export const globalChatReply = (input: FakeModelRequest): ReadonlyArray<FakeMode
     })
   }
 
+  if (words.includes("<glass_answer "))
+    return [{ text: `Thanks, going with: ${/^Answer: (.+)$/m.exec(words)?.[1] ?? ""}` }]
+
   if (/\bask\b/i.test(words))
-    return call("ask_user", {
+    return call("mcp__glass__ask_user", {
       question: "Which files should I look at?",
-      options: ["Only the README", "Everything"],
+      choices: [
+        { label: "Only the README", description: "The quickest overview" },
+        { label: "Everything" },
+      ],
     })
 
   return [{ text: `Fake reply to: ${words.split("\n")[0]}` }]

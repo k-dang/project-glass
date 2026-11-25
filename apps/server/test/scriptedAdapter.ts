@@ -236,7 +236,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
               )
             }
 
-            if (prompt.includes("<glass_feedback>"))
+            if (/<(glass_feedback|glass_answer|glass_questions_set_aside)/.test(prompt))
               yield* part(turnId, TextPart.make({ text: prompt }))
 
             yield* part(turnId, TextPart.make({ text: `Reply to: ${message}` }))

@@ -104,21 +104,15 @@ export const replyTo = (request: FakeAnthropicRequest): Reply => {
       },
     }
 
-  if (/\bask\b/i.test(words))
+  if (/\bask\b/i.test(words) && !words.includes("<glass_answer "))
     return {
       type: "tool_use",
-      name: "AskUserQuestion",
+      name: "mcp__glass_tools__ask_user",
       input: {
-        questions: [
-          {
-            header: "Scope",
-            question: "Which files should I look at?",
-            multiSelect: false,
-            options: [
-              { label: "Only the README", description: "The quickest overview" },
-              { label: "Everything", description: "Every file in the checkout" },
-            ],
-          },
+        question: "Which files should I look at?",
+        choices: [
+          { label: "Only the README", description: "The quickest overview" },
+          { label: "Everything", description: "Every file in the checkout" },
         ],
       },
     }

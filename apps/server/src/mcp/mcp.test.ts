@@ -4,7 +4,8 @@ import { McpServer, Tool, Toolkit } from "effect/ai"
 import { AgentRunners } from "../agentRunners"
 import { LAUNCH_TOKEN, RENDERER_ORIGIN, startBackend } from "../../test/harness"
 import { connectMcp, initialize, listedTools, mcpPost, toolResult } from "../../test/mcpClient"
-import { McpCaller, GlobalChatCaller } from "./McpCredentials"
+import { GlobalChatCaller } from "../callers"
+import { McpCaller } from "./McpCredentials"
 
 const DescribeTarget = Tool.make("describe_target", {
   description: "Names the caller and the Thread it asked about.",

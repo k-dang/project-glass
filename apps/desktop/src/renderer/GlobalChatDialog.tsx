@@ -8,9 +8,11 @@ import {
   type QueuedMessage,
   StartFreshRefused,
   type Turn,
+  type InboxItems,
 } from "@glass/contracts"
-import { Cause, Data, DateTime, Option, Predicate } from "effect"
-import { AsyncResult } from "effect/reactivity"
+import { Data, DateTime, Option, Predicate } from "effect"
+import { AsyncResult, Atom } from "effect/reactivity"
+import { watchedInboxAtom } from "./inboxArea"
 import { ArrowLeft, History, SquarePen, X } from "lucide-react"
 import { type ReactNode, useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
@@ -133,13 +135,20 @@ function PaddedProblem(props: Parameters<typeof ProblemAlert>[0]) {
   )
 }
 
+const globalChatAskingAtom = Atom.make((get) =>
+  Option.getOrElse(AsyncResult.value(get(watchedInboxAtom)), (): InboxItems => []).some(
+    (item) => Predicate.isTagged(item, "GlobalChat") && item.questions.length > 0,
+  ),
+)
+
 const freshBlocked = (
   turns: ReadonlyArray<Turn>,
   queued: ReadonlyArray<QueuedMessage>,
+  asking: boolean,
 ): StartFreshRefused["reason"] | null => {
   const last = turns.at(-1)
 
-  if (last?.parts.some(isWaiting)) return "waiting"
+  if (asking || last?.parts.some(isWaiting)) return "waiting"
 
   if (last?.ended === null) return "running"
 
@@ -147,10 +156,6 @@ const freshBlocked = (
 
   return null
 }
-
-const refusedFresh = (result: AsyncResult.AsyncResult<unknown, unknown>) =>
-  AsyncResult.isFailure(result) &&
-  Predicate.isTagged(Option.getOrNull(Cause.findErrorOption(result.cause)), "StartFreshRefused")
 
 function StartFreshButton(props: {
   blocked: StartFreshRefused["reason"] | null
@@ -208,7 +213,8 @@ function GlobalChat(props: { onShowEnded: () => void }) {
     if (focused && unseen !== null && endedAt !== undefined) markSeen(endedAt)
   }, [markSeen, focused, unseen, endedAt])
 
-  const startProblem = refusedFresh(started) ? null : settledProblem(started)
+  const startProblem = settledProblem(started)
+  const asking = useAtomValue(globalChatAskingAtom)
 
   return (
     <>
@@ -222,7 +228,7 @@ function GlobalChat(props: { onShowEnded: () => void }) {
           <History aria-hidden />
         </Button>
         <StartFreshButton
-          blocked={freshBlocked(turns, queued)}
+          blocked={freshBlocked(turns, queued, asking)}
           pending={started.waiting}
           onClick={() => setConfirming(true)}
         />

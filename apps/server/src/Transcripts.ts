@@ -27,7 +27,7 @@ import {
   type TurnEnding,
   TurnFailed,
   TurnContext,
-  CapturedContext,
+  MessageContext,
   EarlierTurns,
   type MessageWithContext,
   TurnPart,
@@ -131,7 +131,7 @@ const decodeQueued = Schema.decodeUnknownEffect(
     Schema.Struct({
       ...QueuedMessage.fields,
       ...StoredMessage.fields,
-      context: Schema.NullOr(Schema.fromJsonString(CapturedContext)),
+      context: Schema.NullOr(Schema.fromJsonString(MessageContext)),
       feedback: FeedbackJson,
     }),
   ),

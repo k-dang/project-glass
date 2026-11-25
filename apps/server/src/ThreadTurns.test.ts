@@ -33,6 +33,7 @@ import { type ClaimedThread, type ThreadHost, ThreadTurns } from "./ThreadTurns"
 import { HOST_CONTROL_DEADLINE, HOST_DIDNT_ANSWER } from "./hostControl"
 import { migrationLoader } from "./Migrations"
 import { ToDos } from "./ToDos"
+import { Questions } from "./Questions"
 import { Transcripts } from "./Transcripts"
 import { wideEvents } from "./wideEvents"
 import { HostThreadError, notRunning, type SteersNotTakenIn } from "./agentHost/protocol"
@@ -91,6 +92,7 @@ const scriptedHost = (
 
 const layer = ThreadTurns.layer.pipe(
   Layer.provideMerge(Transcripts.layer),
+  Layer.provideMerge(Questions.layer),
   Layer.provideMerge(Layer.mock(ToDos)({})),
   Layer.provideMerge(SqliteMigrator.layer({ loader: migrationLoader })),
   Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
@@ -895,6 +897,7 @@ const database = Layer.provideMerge(
 
 const glassRun = ThreadTurns.layer.pipe(
   Layer.provideMerge(Transcripts.layer),
+  Layer.provideMerge(Questions.layer),
   Layer.provideMerge(Layer.mock(ToDos)({})),
 )
 

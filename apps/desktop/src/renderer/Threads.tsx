@@ -13,6 +13,7 @@ import {
   type PlaceTag,
   repositoryKey,
   type SandboxStatus,
+  waitsOnYou,
 } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams, useSearch } from "@tanstack/react-router"
 import { DateTime, Exit, Match, Option, Predicate } from "effect"
@@ -97,9 +98,10 @@ const workingMarker: Marker = {
 }
 
 const markerOf = ({ reasons }: InboxThread): Marker => {
-  const reason = reasons.find(Predicate.isTagged("WaitingRequests")) ?? reasons[0]
+  const reason = reasons.find(waitsOnYou) ?? reasons[0]
 
   return Match.valueTags(reason, {
+    OpenQuestions: () => ({ label: "Waiting on you", icon: CircleHelp, tone: warningTone }),
     WaitingRequests: () => ({ label: "Waiting on you", icon: CircleHelp, tone: warningTone }),
     TurnFinished: ({ ended }) => turnEndingLooks[ended.ending._tag],
   })

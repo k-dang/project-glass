@@ -27,12 +27,13 @@ import {
 } from "effect"
 import { SqlClient, type Statement } from "effect/sql"
 import { AgentReviews } from "./AgentReviews"
+import { Questions } from "./Questions"
 import { Threads } from "./Threads"
 import { Transcripts } from "./Transcripts"
 
 const StartedState = Schema.Literals(["running", "waiting", "finished", "failed"]).annotate({
   description:
-    "running: still working. waiting: waits for the user to answer a Question or Permission request. finished: done, or stopped by the user. failed: ended in an error, or Glass quit while it worked.",
+    "running: still working. waiting: has a question for the user open, or waits for them to answer a Permission request, even after its Turn ended. finished: done, or stopped by the user. failed: ended in an error, or Glass quit while it worked.",
 })
 
 type StartedState = typeof StartedState.Type
@@ -140,6 +141,24 @@ const endingState = (ending: TurnEnding): StartedState =>
     }),
   )
 
+const waitingSince = (
+  requests: ReadonlyMap<string, ReadonlyArray<{ readonly since: DateTime.Utc }>>,
+  asked: ReadonlyMap<string, ReadonlyArray<{ readonly since: DateTime.Utc }>>,
+) => {
+  const since = new Map<string, Arr.NonEmptyArray<DateTime.Utc>>()
+
+  for (const waiting of [requests, asked])
+    for (const [threadId, items] of waiting)
+      for (const { since: at } of items) {
+        const known = since.get(threadId)
+
+        if (known === undefined) since.set(threadId, [at])
+        else known.push(at)
+      }
+
+  return since
+}
+
 const threadState = (ended: TurnEnd | undefined, waiting: boolean): StartedState => {
   if (waiting) return "waiting"
 
@@ -197,6 +216,7 @@ export class StartedWork extends Context.Service<
       const threads = yield* Threads
       const agentReviews = yield* AgentReviews
       const transcripts = yield* Transcripts
+      const questions = yield* Questions
       const recorded = yield* SubscriptionRef.make(0)
 
       const rowsMatching = (matching: Statement.Fragment) =>
@@ -224,14 +244,20 @@ export class StartedWork extends Context.Service<
 
       const threadsOf = (threadRows: ReadonlyArray<ThreadRow>) =>
         Effect.gen(function* () {
-          const [listed, ends, waiting] = yield* Effect.all(
+          const [listed, ends, requests, asked] = yield* Effect.all(
             [
               threads.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
               transcripts.lastEnds(threadRows.map(({ thread_id }) => thread_id)),
               transcripts.waitingNow,
+              questions.openByThread.pipe(
+                Stream.runHead,
+                Effect.map(Option.getOrElse(() => new Map())),
+              ),
             ],
             { concurrency: "unbounded" },
           )
+
+          const waiting = waitingSince(requests, asked)
 
           const byId = new Map(listed.map((thread) => [thread.id, thread]))
 
@@ -264,6 +290,16 @@ export class StartedWork extends Context.Service<
                   transcripts.waiting.pipe(
                     Stream.map((waiting) => threadIds.map((threadId) => waiting.get(threadId))),
                     Stream.changesWith(Arr.makeEquivalence((a, b) => a === b)),
+                  ),
+                  questions.openByThread.pipe(
+                    Stream.map((byThread) =>
+                      threadIds.map((threadId) =>
+                        (byThread.get(threadId) ?? []).map(({ id }) => id),
+                      ),
+                    ),
+                    Stream.changesWith(
+                      Arr.makeEquivalence(Arr.makeEquivalence<string>((a, b) => a === b)),
+                    ),
                   ),
                   ...reviewRows.map((row) =>
                     agentReviews.watch(pullRequestOf(row)).pipe(Stream.catch(() => Stream.empty)),
@@ -358,13 +394,10 @@ export class StartedWork extends Context.Service<
                   askedWith: row.asked_with,
                 }
 
-                const requests = waiting.get(thread.id)
+                const since = waiting.get(thread.id)
 
-                if (requests !== undefined) {
-                  const latest = Arr.max(
-                    Arr.map(requests, ({ since }) => since),
-                    DateTime.Order,
-                  )
+                if (since !== undefined) {
+                  const latest = Arr.max(since, DateTime.Order)
 
                   return ifNew(
                     row,

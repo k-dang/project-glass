@@ -1,31 +1,44 @@
 import { assert, describe, it } from "@effect/vitest"
 import {
+  AnswerState,
+  CheckedIn,
+  CheckInApprove,
+  CheckInApproved,
   CheckInFeedback,
   CheckInNoChanges,
-  CheckInResult,
+  CheckInReplaced,
   CheckInSendFeedback,
+  CheckInStarted,
   LineNote,
   type InboxItems,
+  QuestionSetAside,
+  QuestionWaiting,
 } from "@glass/contracts"
-import { Effect, Fiber, Option, Predicate, Schema, Stream } from "effect"
+import { Effect, Exit, Option, Predicate, Schema, Scope, Stream } from "effect"
 import { writeFileSync } from "node:fs"
 import { mkdtemp } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { gitIn } from "../../test/gitRepositories"
-import { startBackend } from "../../test/harness"
+import { isolatedHome, startBackend } from "../../test/harness"
 import { inboxWhen } from "../../test/inboxWhen"
-import { connectMcp, toolResult, toolText } from "../../test/mcpClient"
+import { connectMcp, toolText } from "../../test/mcpClient"
 
 type Backend = Effect.Success<ReturnType<typeof startBackend>>
 
+type Mcp = Effect.Success<ReturnType<typeof connectMcp>>
+
 const checkIns = (items: InboxItems) => items.filter((item) => Predicate.isTagged(item, "CheckIn"))
 
-const checkInResult = Schema.decodeUnknownSync(CheckInResult)
+const started = Schema.decodeUnknownSync(CheckInStarted)
 
-const waitingCheckIn = (client: Backend["client"]) =>
-  inboxWhen(client, (items) => checkIns(items).length === 1).pipe(
-    Effect.map((items) => checkIns(items)[0]!),
+const answerState = Schema.decodeUnknownSync(AnswerState)
+
+const shownCheckIn = (client: Backend["client"], id: string) =>
+  inboxWhen(client, (items) => checkIns(items).some((item) => item.id === id)).pipe(
+    Effect.map((items) =>
+      Option.getOrThrow(Option.fromNullishOr(checkIns(items).find((item) => item.id === id))),
+    ),
   )
 
 const temporaryFolder = Effect.promise(() => mkdtemp(join(tmpdir(), "glass-check-in-")))
@@ -52,10 +65,22 @@ const start = Effect.gen(function* () {
   return { ...backend, mcp }
 })
 
-const checkIn = (
-  mcp: Effect.Success<ReturnType<typeof connectMcp>>,
-  args: Readonly<Record<string, string>>,
-) => mcp.request("tools/call", { name: "check_in", arguments: args }).response
+const checkIn = (mcp: Mcp, args: Readonly<Record<string, string>>) =>
+  mcp.call("check_in", args).pipe(Effect.map(({ structuredContent }) => started(structuredContent)))
+
+const checkedIn = (mcp: Mcp, args: Readonly<Record<string, string>>) =>
+  checkIn(mcp, args).pipe(
+    Effect.map((result) => {
+      assert.ok(Schema.is(CheckedIn)(result))
+
+      return result.checkInId
+    }),
+  )
+
+const readAnswer = (mcp: Mcp, id: string) =>
+  mcp
+    .call("read_answer", { id })
+    .pipe(Effect.map(({ structuredContent }) => answerState(structuredContent)))
 
 const noteOn = (changesId: string, text: string) =>
   new LineNote({
@@ -70,21 +95,24 @@ const noteOn = (changesId: string, text: string) =>
   })
 
 describe("check_in", () => {
-  it.live("shows the folder's changes in the Inbox and returns the feedback left on them", () =>
+  it.live("returns at once, shows the changes in the Inbox, and hands back the feedback", () =>
     Effect.gen(function* () {
       const { client, mcp } = yield* start
       const folder = yield* repositoryWithWork
 
-      const inFlight = yield* Effect.forkChild(
-        checkIn(mcp, { folder, baseRef: "main", summary: "Retry three times" }),
-      )
+      const checkInId = yield* checkedIn(mcp, {
+        folder,
+        baseRef: "main",
+        summary: "Retry three times",
+      })
 
-      const waiting = yield* waitingCheckIn(client)
+      const waiting = yield* shownCheckIn(client, checkInId)
 
       assert.equal(waiting.summary, "Retry three times")
       assert.equal(waiting.askedBy, "Claude Code")
+      assert.deepStrictEqual(yield* readAnswer(mcp, checkInId), QuestionWaiting.make({}))
 
-      const changes = yield* client.GetCheckInChanges({ checkInId: waiting.id })
+      const changes = yield* client.GetCheckInChanges({ checkInId })
 
       assert.deepStrictEqual(
         changes.files.map(({ path }) => path),
@@ -92,16 +120,16 @@ describe("check_in", () => {
       )
 
       yield* client.SaveCheckInNote({
-        checkInId: waiting.id,
+        checkInId,
         note: noteOn(changes.id, "Read this from config"),
       })
       yield* client.AnswerCheckIn({
-        checkInId: waiting.id,
+        checkInId,
         answer: CheckInSendFeedback.make({ message: "Close, one thing" }),
       })
 
       assert.deepStrictEqual(
-        checkInResult(toolResult(yield* Fiber.join(inFlight)).structuredContent),
+        yield* readAnswer(mcp, checkInId),
         CheckInFeedback.make({
           message: "Close, one thing",
           notes: [
@@ -117,65 +145,162 @@ describe("check_in", () => {
           ],
         }),
       )
-      assert.equal(checkIns(yield* inboxWhen(client, () => true)).length, 0)
+      yield* inboxWhen(client, (items) => checkIns(items).length === 0)
     }),
   )
 
-  it.live(
-    "keeps the notes for the folder's next Check-in when the agent goes before an answer",
-    () =>
-      Effect.gen(function* () {
-        const backend = yield* start
-        const { client, mcp } = backend
-        const folder = yield* repositoryWithWork
+  it.live("replaces a waiting Check-in from the same folder, carrying its notes over", () =>
+    Effect.gen(function* () {
+      const { client, mcp } = yield* start
+      const folder = yield* repositoryWithWork
 
-        yield* Effect.forkChild(checkIn(mcp, { folder, baseRef: "main" }))
+      const first = yield* checkedIn(mcp, { folder, baseRef: "main" })
+      const changes = yield* client.GetCheckInChanges({ checkInId: first })
 
-        const first = yield* waitingCheckIn(client)
-        const changes = yield* client.GetCheckInChanges({ checkInId: first.id })
+      yield* client.SaveCheckInNote({ checkInId: first, note: noteOn(changes.id, "Why 3?") })
 
-        yield* client.SaveCheckInNote({ checkInId: first.id, note: noteOn(changes.id, "Why 3?") })
+      const second = yield* checkedIn(mcp, { folder, baseRef: "main" })
 
-        const [agent] = yield* client
-          .WatchOutsideAgents()
-          .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+      const shown = checkIns(
+        yield* inboxWhen(client, (items) => checkIns(items).some(({ id }) => id === second)),
+      )
 
-        yield* client.RevokeOutsideAgent({ id: agent!.id })
-        yield* inboxWhen(client, (items) => checkIns(items).length === 0)
-
-        const again = yield* connectMcp(
-          backend.baseUrl,
-          yield* backend.outsideAgents.issue("Claude Code"),
-        )
-
-        yield* Effect.forkChild(checkIn(again, { folder, baseRef: "main" }))
-
-        const second = yield* waitingCheckIn(client)
-
-        assert.deepStrictEqual(
-          (yield* client.ListCheckInNotes({ checkInId: second.id })).map(({ text }) => text),
-          ["Why 3?"],
-        )
-      }),
+      assert.deepStrictEqual(
+        shown.map(({ id }) => id),
+        [second],
+      )
+      assert.deepStrictEqual(
+        yield* readAnswer(mcp, first),
+        CheckInReplaced.make({ checkInId: second }),
+      )
+      assert.deepStrictEqual(
+        (yield* client.ListCheckInNotes({ checkInId: second })).map(({ text }) => text),
+        ["Why 3?"],
+      )
+    }),
   )
 
-  it.live("refuses a second Check-in on a folder that already has one waiting", () =>
+  it.live("refuses another agent's Check-in while one waits on the same folder", () =>
     Effect.gen(function* () {
       const backend = yield* start
       const folder = yield* repositoryWithWork
 
-      yield* Effect.forkChild(checkIn(backend.mcp, { folder, baseRef: "main" }))
-      yield* waitingCheckIn(backend.client)
+      yield* checkedIn(backend.mcp, { folder, baseRef: "main" })
 
       const otherAgent = yield* connectMcp(
         backend.baseUrl,
         yield* backend.outsideAgents.issue("pi"),
       )
 
-      const result = toolResult(yield* checkIn(otherAgent, { folder, baseRef: "main" }))
+      const refused = yield* otherAgent.call("check_in", { folder, baseRef: "main" })
 
-      assert.isTrue(result.isError)
-      assert.include(toolText(result), "already waiting")
+      assert.isTrue(refused.isError)
+      assert.include(toolText(refused), "Another agent's Check-in")
+    }),
+  )
+
+  it.live("tells the agent a Check-in was set aside", () =>
+    Effect.gen(function* () {
+      const { client, mcp } = yield* start
+
+      const checkInId = yield* checkedIn(mcp, {
+        folder: yield* repositoryWithWork,
+        baseRef: "main",
+      })
+
+      yield* shownCheckIn(client, checkInId)
+      yield* client.SetCheckInAside({ checkInId })
+
+      assert.deepStrictEqual(yield* readAnswer(mcp, checkInId), QuestionSetAside.make({}))
+      yield* inboxWhen(client, (items) => checkIns(items).length === 0)
+
+      const late = yield* client
+        .AnswerCheckIn({ checkInId, answer: CheckInApprove.make({ message: null }) })
+        .pipe(Effect.flip)
+
+      assert.equal(late._tag, "CheckInNotWaiting")
+    }),
+  )
+
+  it.live("keeps a waiting Check-in across a Glass restart", () =>
+    Effect.gen(function* () {
+      const home = yield* isolatedHome
+      const folder = yield* repositoryWithWork
+      const before = yield* Scope.make()
+      const first = yield* startBackend({}, home).pipe(Scope.provide(before))
+      const bearer = yield* first.outsideAgents.issue("Claude Code")
+
+      const checkInId = yield* checkedIn(yield* connectMcp(first.baseUrl, bearer), {
+        folder,
+        baseRef: "main",
+      })
+
+      yield* Scope.close(before, Exit.void)
+
+      const second = yield* startBackend({}, home)
+
+      yield* shownCheckIn(second.client, checkInId)
+      yield* second.client.AnswerCheckIn({
+        checkInId,
+        answer: CheckInApprove.make({ message: "Ship it" }),
+      })
+
+      const answered = yield* readAnswer(yield* connectMcp(second.baseUrl, bearer), checkInId)
+
+      assert.deepStrictEqual(answered, CheckInApproved.make({ message: "Ship it", notes: [] }))
+    }),
+  )
+
+  it.live("keeps the notes for the folder's next Check-in when the agent is disconnected", () =>
+    Effect.gen(function* () {
+      const backend = yield* start
+      const { client, mcp } = backend
+      const folder = yield* repositoryWithWork
+
+      const first = yield* checkedIn(mcp, { folder, baseRef: "main" })
+      const changes = yield* client.GetCheckInChanges({ checkInId: first })
+
+      yield* client.SaveCheckInNote({ checkInId: first, note: noteOn(changes.id, "Why 3?") })
+
+      const [agent] = yield* client
+        .WatchOutsideAgents()
+        .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+      yield* client.RevokeOutsideAgent({ id: agent!.id })
+      yield* inboxWhen(client, (items) => checkIns(items).length === 0)
+
+      const again = yield* connectMcp(
+        backend.baseUrl,
+        yield* backend.outsideAgents.issue("Claude Code"),
+      )
+
+      const second = yield* checkedIn(again, { folder, baseRef: "main" })
+
+      assert.deepStrictEqual(
+        (yield* client.ListCheckInNotes({ checkInId: second })).map(({ text }) => text),
+        ["Why 3?"],
+      )
+    }),
+  )
+
+  it.live("hands a Check-in's answer to no other agent", () =>
+    Effect.gen(function* () {
+      const backend = yield* start
+
+      const checkInId = yield* checkedIn(backend.mcp, {
+        folder: yield* repositoryWithWork,
+        baseRef: "main",
+      })
+
+      const otherAgent = yield* connectMcp(
+        backend.baseUrl,
+        yield* backend.outsideAgents.issue("pi"),
+      )
+
+      const refused = yield* otherAgent.call("read_answer", { id: checkInId })
+
+      assert.isTrue(refused.isError)
+      assert.include(toolText(refused), "no Check-in with that id")
     }),
   )
 
@@ -188,9 +313,10 @@ describe("check_in", () => {
       gitIn(folder, "switch", "--quiet", "--discard-changes", "main")
       gitIn(folder, "clean", "--quiet", "--force")
 
-      const result = toolResult(yield* checkIn(mcp, { folder, baseRef: "main" }))
-
-      assert.deepStrictEqual(checkInResult(result.structuredContent), CheckInNoChanges.make({}))
+      assert.deepStrictEqual(
+        yield* checkIn(mcp, { folder, baseRef: "main" }),
+        CheckInNoChanges.make({}),
+      )
     }),
   )
 
@@ -199,7 +325,7 @@ describe("check_in", () => {
       const { mcp } = yield* start
       const folder = yield* temporaryFolder
 
-      const result = toolResult(yield* checkIn(mcp, { folder }))
+      const result = yield* mcp.call("check_in", { folder })
 
       assert.isTrue(result.isError)
       assert.include(toolText(result), "no git repository")

@@ -187,9 +187,27 @@ export const CapturedContext = Schema.Union([PullRequestContext, ThreadContext])
 
 export type CapturedContext = typeof CapturedContext.Type
 
+export const AnsweredQuestion = Schema.Struct({
+  questionId: Schema.String,
+  question: Schema.String,
+  answer: Schema.String,
+})
+
+export type AnsweredQuestion = typeof AnsweredQuestion.Type
+
+export const QuestionsAnswered = Schema.TaggedStruct("QuestionsAnswered", {
+  answers: Schema.NonEmptyArray(AnsweredQuestion),
+})
+
+export type QuestionsAnswered = typeof QuestionsAnswered.Type
+
+export const MessageContext = Schema.Union([PullRequestContext, ThreadContext, QuestionsAnswered])
+
+export type MessageContext = typeof MessageContext.Type
+
 export const MessageWithContext = Schema.Struct({
   ...SentMessage.fields,
-  context: Schema.NullOr(CapturedContext),
+  context: Schema.NullOr(MessageContext),
 })
 
 export type MessageWithContext = typeof MessageWithContext.Type
@@ -246,6 +264,7 @@ export const BackgroundWorkEnded = Schema.TaggedStruct("BackgroundWorkEnded", {
 export const TurnContext = Schema.Union([
   PullRequestContext,
   ThreadContext,
+  QuestionsAnswered,
   StartedWorkUpdate,
   BackgroundWorkEnded,
 ])

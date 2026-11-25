@@ -1,6 +1,8 @@
 import {
-  AskUserResult,
-  CheckInResult,
+  ASK_USER_TOOL,
+  AskedUser,
+  AnswerState,
+  CheckInStarted,
   type ActivityLogError,
   ActivityPage,
   Thread,
@@ -36,17 +38,7 @@ import {
   ThreadPlace,
   localPlace,
 } from "@glass/contracts"
-import {
-  Context,
-  DateTime,
-  Duration,
-  Effect,
-  Match,
-  Option,
-  Predicate,
-  Schema,
-  Stream,
-} from "effect"
+import { Context, DateTime, Effect, Match, Option, Predicate, Schema, Stream } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
@@ -57,11 +49,11 @@ import { GitHubClient } from "../github/GitHubClient"
 import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
 import { LocalCheckouts } from "../LocalCheckouts"
-import { AskProgress } from "./AskProgress"
-import { CHECK_IN_MAX_TIMEOUT_SECONDS, CHECK_IN_TIMEOUT_SECONDS, CheckIns } from "../CheckIns"
-import { McpCaller, type McpCallerIdentity, type OutsideAgentCaller } from "./McpCredentials"
+import { CheckIns } from "../CheckIns"
+import type { Caller } from "../callers"
+import { McpCaller } from "./McpCredentials"
 import { Inbox } from "../Inbox"
-import { ASK_PROGRESS_SECONDS, ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../OutsideQuestions"
+import { Questions } from "../Questions"
 import { Sandboxes } from "../Sandboxes"
 import { type Starter, StartedItem, StartedWork } from "../StartedWork"
 import { PullRequestLists } from "../PullRequestLists"
@@ -282,44 +274,61 @@ const ReadAgentReview = Tool.make("read_agent_review", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const AskUser = Tool.make("ask_user", {
+const AskUser = Tool.make(ASK_USER_TOOL, {
   description:
-    `For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. ` +
-    `A Thread Glass launched asks with its own Question tool instead. ` +
-    `Waits ${ASK_TIMEOUT_SECONDS / 60} minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to ${ASK_TIMEOUT_SECONDS}. ` +
-    `Glass sends a progress notification immediately and every ${ASK_PROGRESS_SECONDS} seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. ` +
-    `Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. ` +
-    `A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.`,
+    "Asks the user one question in the Glass Inbox and returns at once with its questionId; it doesn't wait for the answer. " +
+    "Keep working on what doesn't depend on the answer; if nothing does, end your Turn. " +
+    "A Thread or the Global chat that Glass launched gets the answer as a later message with a glass_answer block naming the questionId. " +
+    "An agent outside Glass reads it with read_answer when it is ready for it. " +
+    "The user picks one of the choices or types their own answer, or sets the question aside. Ask each question with its own call.",
   parameters: Schema.Struct({
     question: Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(2_000)).annotate({
-      description: "The question to show in the Inbox.",
+      description: "The question, as the user should read it in the Inbox.",
     }),
     choices: Schema.optional(
-      Schema.Array(Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(200)))
-        .check(Schema.isMinLength(1), Schema.isMaxLength(8), Schema.isUnique())
+      Schema.Array(
+        Schema.Struct({
+          label: Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(200)),
+          description: Schema.optional(
+            Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(500)).annotate({
+              description: "What picking this choice means, when the label alone doesn't say.",
+            }),
+          ),
+        }),
+      )
+        .check(Schema.isMinLength(1), Schema.isMaxLength(8))
         .annotate({
           description:
-            "Choices the user can pick. They can still type their own answer. Omit this to ask for text only.",
+            "Choices the user can pick, with distinct labels. They can still type their own answer. Omit this to ask for text only.",
         }),
     ),
-    timeoutSeconds: Schema.optional(
-      Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: ASK_TIMEOUT_SECONDS })).annotate({
-        description: `Seconds to wait. Defaults to ${ASK_TIMEOUT_SECONDS}, the most allowed.`,
-      }),
-    ),
   }),
-  success: AskUserResult,
+  success: AskedUser,
   failure: GlassToolFailure,
 }).annotateMerge(acting)
 
+const ReadAnswer = Tool.make("read_answer", {
+  description:
+    "For an agent outside Glass: reads where a question you asked with ask_user, or a Check-in you made with check_in, stands, by its id, from any of your sessions. " +
+    "The result is Waiting while the user hasn't answered, or SetAside when they chose not to. " +
+    "A question's answer is Answered (by is choice or text). " +
+    "A Check-in's answer is Approved or Feedback, each with the user's optional message and their Feedback notes (a file path, the side of the diff, the line range, the code they read there, their note, and whether that code changed since); or Replaced, with the id of the Check-in that replaced it when you checked in again from the same folder. " +
+    "Feedback asks you to change the code. Notes on an approval are guidance and ask for no more work.",
+  parameters: Schema.Struct({
+    id: Schema.String.annotate({
+      description: "The questionId ask_user returned, or the checkInId check_in returned.",
+    }),
+  }),
+  success: AnswerState,
+  failure: GlassToolFailure,
+}).annotateMerge(readOnly)
+
 const CheckIn = Tool.make("check_in", {
   description:
-    `For an agent outside Glass: asks the user to read the changes in a folder and approve them or send feedback, and waits for their answer in the Glass Inbox, under the name the user approved. ` +
-    `Pass the absolute path of your working directory. Glass reads the changes itself: the working tree, staged or not and including untracked files, against where the branch forked from baseRef, frozen as they are when you call. ` +
-    `Waits ${CHECK_IN_TIMEOUT_SECONDS / 60} minutes unless timeoutSeconds is set, at most ${CHECK_IN_MAX_TIMEOUT_SECONDS / 60} minutes. Glass sends a progress notification immediately and every ${ASK_PROGRESS_SECONDS} seconds while it waits; pass a progress token on the call. ` +
-    `The result is Approved or Feedback, each with the user's optional message and their Feedback notes (a file path, the side of the diff, the line range, the code they read there, and their note); NoChanges when there is nothing to read; TimedOut when they do not answer in time; or Cancelled when Glass shuts down. ` +
-    `Feedback asks you to change the code. Notes on an approval are guidance and ask for no more work. A Check-in that timed out or was cancelled is not approval; the user's notes come back if you check in again from the same folder. ` +
-    `Each MCP session may have one Check-in waiting.`,
+    "For an agent outside Glass: asks the user to read the changes in a folder and approve them or send feedback in the Glass Inbox, under the name the user approved, and returns at once; it doesn't wait for their answer. " +
+    "Pass the absolute path of your working directory. Glass reads the changes itself: the working tree, staged or not and including untracked files, against where the branch forked from baseRef, frozen as they are when you call. " +
+    "The result is CheckedIn with the checkInId to pass read_answer when you are ready for the answer, or NoChanges when there is nothing to read. " +
+    "Checking in again from the same folder replaces a Check-in the user hasn't answered, and the Feedback notes they left on it carry over.",
   parameters: Schema.Struct({
     folder: Schema.Trimmed.check(Schema.isNonEmpty()).annotate({
       description:
@@ -337,15 +346,8 @@ const CheckIn = Tool.make("check_in", {
           "Plain text on what changed and where to look. Its first line titles the Check-in in the Inbox.",
       }),
     ),
-    timeoutSeconds: Schema.optional(
-      Schema.Int.check(
-        Schema.isBetween({ minimum: 1, maximum: CHECK_IN_MAX_TIMEOUT_SECONDS }),
-      ).annotate({
-        description: `Seconds to wait. Defaults to ${CHECK_IN_TIMEOUT_SECONDS}.`,
-      }),
-    ),
   }),
-  success: CheckInResult,
+  success: CheckInStarted,
   failure: GlassToolFailure,
 }).annotateMerge(acting)
 
@@ -379,6 +381,7 @@ export const GlassTools = Toolkit.make(
   CreateThread,
   SendThreadMessage,
   AskUser,
+  ReadAnswer,
   CheckIn,
 )
 
@@ -464,7 +467,7 @@ const dropLargestDiffsToFit = (files: ReadonlyArray<FileMaterial>) => {
 const first = <A, E, R>(stream: Stream.Stream<A, E, R>) =>
   stream.pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
-const starterOf = (caller: McpCallerIdentity): Option.Option<Starter> =>
+const starterOf = (caller: Caller): Option.Option<Starter> =>
   Match.value(caller).pipe(
     Match.tagsExhaustive({
       GlobalChat: ({ globalChatId, sessionId }) =>
@@ -488,34 +491,6 @@ const recordedFor = <A, E, R, E2>(
     return done
   }).pipe(Effect.uninterruptible)
 
-const waitingProgress = Effect.gen(function* () {
-  const progress = yield* AskProgress.current
-  let step = 0
-
-  while (true) {
-    step += 1
-    yield* progress.notify(step)
-    yield* Effect.sleep(Duration.seconds(ASK_PROGRESS_SECONDS))
-  }
-}).pipe(Effect.ignore)
-
-const waitingOnTheUser = <A, R>(
-  refusal: string,
-  wait: (caller: OutsideAgentCaller) => Effect.Effect<A, GlassToolFailure, R>,
-) =>
-  Effect.scoped(
-    Effect.gen(function* () {
-      const caller = yield* McpCaller.current
-
-      if (!Predicate.isTagged(caller, "OutsideAgent"))
-        return yield* new GlassToolFailure({ message: refusal })
-
-      yield* Effect.forkScoped(waitingProgress)
-
-      return yield* wait(caller)
-    }),
-  )
-
 export const GlassToolHandlers = GlassTools.toLayer(
   Effect.gen(function* () {
     const lists = yield* PullRequestLists
@@ -529,7 +504,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const sandboxes = yield* Sandboxes
     const agentReviews = yield* AgentReviews
     const inbox = yield* Inbox
-    const outsideQuestions = yield* OutsideQuestions
+    const questions = yield* Questions
     const checkIns = yield* CheckIns
     const startedWork = yield* StartedWork
 
@@ -683,42 +658,66 @@ export const GlassToolHandlers = GlassTools.toLayer(
           Effect.map((delivery) => ({ delivery })),
           Effect.mapError(explained),
         ),
-      ask_user: ({ question, choices, timeoutSeconds }) =>
-        waitingOnTheUser(
-          "A Thread Glass launched asks the user with its own Question tool.",
-          (caller) =>
-            outsideQuestions
-              .ask({
-                question,
-                choices: choices ?? [],
-                session: caller.session,
-                askedBy: caller.name,
-                timeout: Duration.seconds(timeoutSeconds ?? ASK_TIMEOUT_SECONDS),
-              })
-              .pipe(
-                Effect.mapError(
-                  () =>
-                    new GlassToolFailure({
-                      message: "A question from this session is already waiting in the Inbox.",
-                    }),
-                ),
-              ),
-        ),
-      check_in: ({ folder, baseRef, summary, timeoutSeconds }) =>
-        waitingOnTheUser(
-          "Only an agent outside Glass checks in. A Thread's changes are beside it already.",
-          (caller) =>
-            checkIns
-              .ask({
-                folder,
-                baseRef: baseRef ?? null,
-                summary: summary ?? null,
-                session: caller.session,
-                askedBy: caller.name,
-                timeout: Duration.seconds(timeoutSeconds ?? CHECK_IN_TIMEOUT_SECONDS),
-              })
-              .pipe(Effect.mapError(({ message }) => new GlassToolFailure({ message }))),
-        ),
+      ask_user: ({ question, choices }) =>
+        Effect.gen(function* () {
+          const offered = (choices ?? []).map(({ label, description }) => ({
+            label,
+            description: description ?? null,
+          }))
+
+          if (new Set(offered.map(({ label }) => label)).size !== offered.length)
+            return yield* new GlassToolFailure({ message: "Give each choice its own label." })
+
+          const asked = yield* questions.ask(yield* McpCaller.current, {
+            question,
+            choices: offered,
+          })
+
+          return { questionId: asked.id }
+        }),
+      read_answer: ({ id }) =>
+        Effect.gen(function* () {
+          const caller = yield* McpCaller.current
+
+          if (!Predicate.isTagged(caller, "OutsideAgent"))
+            return yield* new GlassToolFailure({
+              message: "Glass sends a Thread its answers as messages; there's nothing to read.",
+            })
+
+          const question = yield* questions.stateFor(id, caller.agentId)
+
+          const state: Option.Option<typeof AnswerState.Type> = Option.isSome(question)
+            ? question
+            : yield* checkIns.stateFor(id, caller.agentId)
+
+          if (Option.isNone(state))
+            return yield* new GlassToolFailure({
+              message:
+                "You asked no question and made no Check-in with that id. Pass the id ask_user or check_in returned.",
+            })
+
+          return state.value
+        }),
+      check_in: ({ folder, baseRef, summary }) =>
+        Effect.gen(function* () {
+          const caller = yield* McpCaller.current
+
+          if (!Predicate.isTagged(caller, "OutsideAgent"))
+            return yield* new GlassToolFailure({
+              message:
+                "Only an agent outside Glass checks in. A Thread's changes are beside it already.",
+            })
+
+          return yield* checkIns
+            .ask({
+              folder,
+              baseRef: baseRef ?? null,
+              summary: summary ?? null,
+              agentId: caller.agentId,
+              askedBy: caller.name,
+            })
+            .pipe(Effect.mapError(({ message }) => new GlassToolFailure({ message })))
+        }),
     })
   }),
 )

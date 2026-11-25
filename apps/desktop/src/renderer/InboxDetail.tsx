@@ -4,10 +4,7 @@ import {
   type InboxThread,
   type InboxGlobalChat,
   type InboxItem,
-  OutsideChoice,
   type OutsideQuestion,
-  type OutsideQuestionAnswer,
-  OutsideText,
   type InboxPullRequest,
   referenceKey,
 } from "@glass/contracts"
@@ -15,12 +12,9 @@ import { Link } from "@tanstack/react-router"
 import { cn } from "cn"
 import { DateTime, Match } from "effect"
 import { Atom } from "effect/reactivity"
-import { type ReactNode, useId, useMemo, useState } from "react"
+import { type ReactNode, useId, useMemo } from "react"
 import { Button, buttonVariants } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
-import { Label } from "@/components/ui/label"
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { threadColumn } from "./threadColumn"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
@@ -33,6 +27,7 @@ import {
   finishedAgentReviewOf,
   type InboxAction,
   ItemIcon,
+  questionsOf,
   Reasons,
   summaryParts,
   titleOf,
@@ -42,6 +37,7 @@ import { settledProblem } from "./problems"
 import { ago } from "./PullRequestRow"
 import { CheckList } from "./PullRequestStatus"
 import { referenceText } from "./queue"
+import { QuestionsForm } from "./QuestionsForm"
 import { RequestCard } from "./RequestCard"
 
 interface DetailProps<Item> {
@@ -130,108 +126,58 @@ function DetailHeader(props: { item: InboxItem; now: Date; meta?: string }) {
   )
 }
 
-const answerOutsideQuestionAtom = Atom.family((id: string) =>
-  backendRuntime.fn((answer: OutsideQuestionAnswer) =>
-    Backend.use((backend) => backend.AnswerOutsideQuestion({ id, answer })),
-  ),
-)
-
 function OutsideQuestionDetail(props: DetailProps<OutsideQuestion>) {
   const { item } = props
-  const answering = answerOutsideQuestionAtom(item.id)
-  const sent = useAtomValue(answering)
-  const answer = useAtomSet(answering)
-  const [choice, setChoice] = useState<string | null>(null)
-  const [text, setText] = useState("")
-  const textId = useId()
-  const choicesId = useId()
-  const typed = text.trim()
-  const problem = settledProblem(sent)
-  const textLabel = item.choices.length > 0 ? "Or type an answer" : "Your answer"
-
-  const submit = () => {
-    if (typed !== "") answer(OutsideText.make({ text: typed }))
-    else if (choice !== null) answer(OutsideChoice.make({ choice }))
-  }
 
   return (
     <DetailShell actions={props.actions}>
       <DetailHeader item={item} now={props.now} />
-      <form
-        className="flex flex-col gap-4 rounded-xl border bg-card p-4"
-        onSubmit={(event) => {
-          event.preventDefault()
-          submit()
-        }}
-      >
-        {item.choices.length > 0 && (
-          <RadioGroup<string | null>
-            aria-labelledby={choicesId}
-            value={choice}
-            onValueChange={setChoice}
-          >
-            <span id={choicesId} className="sr-only">
-              Choices
-            </span>
-            {item.choices.map((label) => (
-              <Label
-                key={label}
-                className="flex cursor-pointer items-start gap-3 rounded-lg border px-3 py-2.5 font-normal transition-colors duration-150 ease-out hover:bg-muted/50 has-data-checked:border-primary/60 has-data-checked:bg-primary/5"
-              >
-                <RadioGroupItem value={label} className="mt-px" />
-                <span className="min-w-0 text-pretty break-words">{label}</span>
-              </Label>
-            ))}
-          </RadioGroup>
-        )}
-        <Label htmlFor={textId} className="sr-only">
-          {textLabel}
-        </Label>
-        <Input
-          id={textId}
-          placeholder={textLabel}
-          value={text}
-          onChange={(event) => setText(event.target.value)}
-        />
-        <div className="flex items-center justify-end gap-3">
-          <p className="inline-flex items-center gap-1 text-xs text-muted-foreground">
-            <Kbd>Enter</Kbd>
-            sends
-          </p>
-          <Button type="submit" disabled={sent.waiting || (typed === "" && choice === null)}>
-            Send
-          </Button>
-        </div>
-        {problem !== null && (
-          <p role="alert" className="text-xs text-destructive">
-            {problem.detail}
-          </p>
-        )}
-      </form>
+      <QuestionsForm asker={`ask:${item.id}`} questions={[item]} />
     </DetailShell>
   )
 }
 
+const setCheckInAsideAtom = Atom.family((checkInId: string) =>
+  backendRuntime.fn(() => Backend.use((backend) => backend.SetCheckInAside({ checkInId }))),
+)
+
 function CheckInDetail(props: DetailProps<CheckIn>) {
   const { item } = props
   const details = summaryParts(item.summary)?.details ?? ""
+  const settingAside = useAtomValue(setCheckInAsideAtom(item.id))
+  const setAside = useAtomSet(setCheckInAsideAtom(item.id))
+  const problem = settledProblem(settingAside)
 
   return (
     <DetailShell
       actions={props.actions}
       buttons={
-        <Link
-          to="/inbox/check-ins/$checkInId"
-          params={{ checkInId: item.id }}
-          className={buttonVariants()}
-        >
-          Read the changes
-        </Link>
+        <>
+          <Link
+            to="/inbox/check-ins/$checkInId"
+            params={{ checkInId: item.id }}
+            className={buttonVariants()}
+          >
+            Read the changes
+          </Link>
+          <Button
+            variant="outline"
+            disabled={settingAside.waiting}
+            onClick={() => setAside(undefined)}
+          >
+            Set aside
+          </Button>
+        </>
       }
     >
       <DetailHeader item={item} now={props.now} />
       {details !== "" && (
         <p className="text-sm whitespace-pre-wrap text-pretty break-words">{details}</p>
+      )}
+      {problem !== null && (
+        <p role="alert" className="text-xs text-destructive">
+          {problem.detail}
+        </p>
       )}
     </DetailShell>
   )
@@ -241,12 +187,18 @@ function ThreadDetail(props: DetailProps<InboxThread>) {
   const { thread } = props.item
   const atoms = useMemo(() => threadAtoms(thread.id), [thread.id])
   const done = props.actions.find(({ key }) => key === "E")
+  const questions = questionsOf(props.item)
 
   return (
     <ThreadAtomsContext value={atoms}>
       <article className="flex min-h-0 flex-1 flex-col">
-        <div className={cn(detailWidth, "pt-6 pb-2")}>
+        <div className={cn(detailWidth, "flex flex-col gap-4 pt-6 pb-2")}>
           <DetailHeader item={props.item} now={props.now} />
+          {questions.length > 0 && (
+            <div className="max-h-[50vh] overflow-y-auto">
+              <QuestionsForm key={thread.id} asker={`thread:${thread.id}`} questions={questions} />
+            </div>
+          )}
         </div>
         <TranscriptProblem />
         <ThreadChat thread={thread} place="inbox" />
@@ -283,6 +235,9 @@ function GlobalChatDetail(props: DetailProps<InboxGlobalChat>) {
       buttons={<Button onClick={() => open(true)}>Open the Global chat</Button>}
     >
       <DetailHeader item={props.item} now={props.now} />
+      {props.item.questions.length > 0 && (
+        <QuestionsForm asker="global" questions={props.item.questions} />
+      )}
       <ThreadAtomsContext value={globalChat}>
         {props.item.requests.map((part) => (
           <RequestCard key={part.requestId} part={part} />

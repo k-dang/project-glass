@@ -630,7 +630,10 @@ const globalReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => 
   ]
 
   if (words.includes("greeting"))
-    return call("ask_user", { question: "Which greeting?", options: ["Hi", "Hello"] })
+    return call("mcp__glass__ask_user", {
+      question: "Which greeting?",
+      choices: [{ label: "Hi" }, { label: "Hello" }],
+    })
 
   if (words.includes("To-dos")) return call("mcp__glass__list_to_dos")
 
@@ -643,31 +646,28 @@ const globalReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => 
   return call("mcp__glass__wait_for_release")
 }
 
-it.live("asks a Question as the Global chat", () =>
-  Effect.gen(function* () {
-    const glass = yield* glassToolsBackend(threadId)
-    const f = yield* piSession("pi-global", { fake: { reply: globalReply }, places: glass.places })
+it.live(
+  "asks a Question as the Global chat with Glass's ask_user, without waiting for the answer",
+  () =>
+    Effect.gen(function* () {
+      const glass = yield* glassToolsBackend(threadId)
 
-    const session = yield* f.open(threadId, glass.role)
+      const f = yield* piSession("pi-global", {
+        fake: { reply: globalReply },
+        places: glass.places,
+      })
 
-    yield* session.send("Ask me which greeting I prefer.")
-    const question = yield* f.request
-    assert.ok(Predicate.isTagged(question, "Question"))
-    assert.deepStrictEqual(question.questions[0]?.question, "Which greeting?")
-    assert.deepStrictEqual(
-      question.questions[0]?.options.map(({ label }) => label),
-      ["Hi", "Hello"],
-    )
+      const session = yield* f.open(threadId, glass.role)
 
-    yield* session.answer(
-      question.requestId,
-      AnswerQuestion.make({ answers: [{ chosen: ["Hello"], text: null }] }),
-    )
-    const [turn] = yield* f.until(settled(1))
+      yield* session.send("Ask me which greeting I prefer.")
+      const [turn] = yield* f.until(settled(1))
+      const asked = turn?.parts.find((part) => Predicate.isTagged(part, "ToolCall"))
 
-    assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
-    assert.include(lastTextOf(turn), "Hello")
-  }).pipe(Effect.scoped),
+      assert.deepStrictEqual(turn?.ended?.ending, TurnDone.make({}))
+      assert.deepInclude(asked, { name: "ask_user", status: "done" })
+      assert.include(asked?.output, "questionId")
+      assert.isFalse(turn?.parts.some(Predicate.isTagged("Question")))
+    }).pipe(Effect.scoped),
 )
 
 it.live("reads Glass through its tools as the Global chat, explaining a failed read", () =>

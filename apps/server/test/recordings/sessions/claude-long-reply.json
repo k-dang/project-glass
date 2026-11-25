@@ -10,6 +10,7 @@
         "--input-format",
         "stream-json",
         "--permission-prompt-tool=stdio",
+        "--disallowedTools=AskUserQuestion",
         "--allow-dangerously-skip-permissions",
         "--include-partial-messages",
         "--session-id=6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
@@ -18,7 +19,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "lgkj2kmce4",
+            "request_id": "l554d10cu0g",
             "type": "control_request",
             "request": {
               "subtype": "initialize",
@@ -78,9 +79,249 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "lgkj2kmce4",
+              "request_id": "l554d10cu0g",
               "response": {
                 "commands": [
+                  {
+                    "name": "announce-pr",
+                    "description": "Watch a PR's CI and draft a paste-ready post (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "babysit-pr",
+                    "description": "Monitor a pull request through review and CI. Use when the user asks to monitor, watch, or babysit a PR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "before-and-after",
+                    "description": "Add existing screenshots or screen recordings to a GitHub pull request as a before/after or preview block. Use when a PR needs visual media attached to its description. Browser navigation and capture belong to agent-browser. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "bro",
+                    "description": "Restate the last message in plain human language, with no jargon (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "codebase-design",
+                    "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "create-formal-verification-skill",
+                    "description": "Generate a project-local skill that formally verifies the code where a bug costs the most and tests reach the least, in any language, with whichever verification tool fits. Use for /create-formal-verification-skill, \"model-check this race\", \"prove this invariant\", or when concurrency, retries, state machines, parsers, or unsafe code need more than tests. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "create-verification-skill",
+                    "description": "Generate a project-local verification skill that drives your app the way a user does — any language, framework, or platform. Use for /create-verification-skill, \"make a control skill for this repo\", or when a project has no scripted way to prove UI/CLI/service behavior. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "deslop",
+                    "description": "Remove AI-generated code slop and clean up code style (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "diagnosing-bugs",
+                    "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "domain-modeling",
+                    "description": "Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a GLOSSARY.md, or recording or editing an ADR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "eli5",
+                    "description": "Explain a topic like I'm a 5 year old. Use when the user types /eli5 &lt;topic&gt; or asks for a dead-simple picture explainer of how something works. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "explain-diff-html",
+                    "description": "Use when the user asks for a rich explanation of a code change, diff, branch, or PR. Produces HTML output. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "explainer",
+                    "description": "Turns a system, flow, process, dataset or plan into a clear interactive diagram delivered as one self-contained HTML file: architecture and flow diagrams, sequence and state machines, bar, line, slope, scatter, waterfall, heatmap, treemap, Sankey, funnel, radar and quadrant charts, Gantt charts, timelines, kanban boards, user journeys, story maps, database schemas, UML class diagrams, swimlanes, fishbone and Wardley maps, and incident or release reports with an annotated timeline. Every diagram works bare or with text, in light and dark, with click-to-explore details and PNG capture. Use when asked to explain how something works, diagram or map a system, chart or compare numbers, plan a project, or screenshot such a diagram. Not for Svelte or .svx documents, app UI components, live dashboards over changing data, quick ASCII diagrams, or answers that read fine as a paragraph. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "file-pr",
+                    "description": "File a concise pull request. Use when the user asks to file, open or create a PR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "finish-pr",
+                    "description": "Trigger this when the user says 'finish pr' or asks to finish the PR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "full-ship",
+                    "description": "Trigger this if the user says 'full ship'. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "grill-me",
+                    "description": "A relentless interview to sharpen a plan or design. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "grill-with-docs",
+                    "description": "A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "grilling",
+                    "description": "Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "handing-off-to-worktree",
+                    "description": "Hand off a scoped code change to a fresh agent session in its own git worktree, with a self-contained brief. Use when the user asks to hand off, spin up, or start a fix or feature in a new worktree, or when another skill fans work out to parallel sessions. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "handoff",
+                    "description": "Compact the current conversation into a handoff document for another agent to pick up. (project)",
+                    "argumentHint": "What will the next session be used for?"
+                  },
+                  {
+                    "name": "html",
+                    "description": "Create or redesign self-contained single-file HTML artifacts with a visual direction shaped by the user's brief, project, and subject. Use when HTML is the deliverable for a report, explainer, landing page, presentation, tool, mixed artifact, or broad request. This is the collection's only implicit router. Route clear wireframe, prototype, mockup, plan, or diagram requests to the matching direct-invocation specialist when available. Do not use for ordinary application implementation when a standalone HTML file is not the deliverable. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "html-plan",
+                    "description": "Direct-invocation specialist for clear, self-contained HTML plans that preserve source material while improving hierarchy, sequence, ownership, dependencies, and reviewability. Use when the user explicitly invokes html-plan or the broad html skill routes a plan request here. Do not activate independently from a general request. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "idiomatic-code",
+                    "description": "Audit idiomatic use of a language, library, or framework against source fetched with opensrc. Use for idiomatic-code audits or alignment with named reference repositories. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "implement",
+                    "description": "Implement a piece of work based on a spec or set of tickets. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "maintain-formal-verification-skill",
+                    "description": "Bring a project's formal verification back in line with the code after the code changes: find the commits that touched verified code, update the model, harness, or properties to describe the code as it is now, rerun, and say whether each failure is drift in the verification or a bug in the code. Use for /maintain-formal-verification-skill, \"is the model still true to the code\", or after merges and refactors that touched verified code without rechecking it. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "maintain-verification-skill",
+                    "description": "Periodic pass that keeps a project's verification skill and feature map honest: parallel source readers per feature, one live session driving every feature, at most one PR of proven corrections. Use for /maintain-verification-skill or \"audit the verify skill\". (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "matt-code-review",
+                    "description": "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/PRD asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\". (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "multi-repo-explorer",
+                    "description": "Use when you need to understand how internal libraries work, trace dependencies across repositories, or explore code patterns in reference repos - clones/updates a configured list of repos and provides exploration guidance (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "no-comments",
+                    "description": "Remove unnecessary comments and fix the code that needs them (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "parallel-code-review",
+                    "description": "Runs code-reviewer subagents (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator",
+                    "description": "Reference for using Plannotator (its `plannotator` tool when you have one, otherwise the CLI): plan review, code review, annotating files, URLs, folders, and running local apps, annotating the last assistant message, browsing archived plan decisions, exporting or sharing Guided Reviews, and the Plannotator Inbox (messages and questions the person answers later, without blocking you). Invoke when asked to use Plannotator for anything not covered by a more specific plannotator-* skill, and before you leave the person a decision, a question or finished work while they are away from the chat (if another agent started you, report to it instead). (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator-annotate",
+                    "description": "Open Plannotator's annotation UI for a markdown file, HTML file, URL, or folder and then respond to the returned annotations. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator-last",
+                    "description": "Open Plannotator on the latest rendered assistant message and use the returned annotations to revise that message or continue. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator-review",
+                    "description": "Open Plannotator's browser-based code review UI for the current worktree, another directory, or a pull request URL, then act on the feedback that comes back. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "prototype",
+                    "description": "Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "research",
+                    "description": "Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "retro",
+                    "description": "Conduct a retrospective on a coding session. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "show-me",
+                    "description": "Help the user understand the current topic visually with concise diagrams, code-shape sketches, and focused HTML artifacts. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "sol-loop",
+                    "description": "Use when the user says \"sol loop\". (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "statechart",
+                    "description": "Check a TLA+ model of a system that moves between states, such as a product flow, a protocol, or a service, and draw it as a Mermaid statechart. The report gives the shortest path to each state that breaks a rule. Use for /statechart, or to show a bug as a path through states. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "tdd",
+                    "description": "Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions \"red-green-refactor\", or wants integration tests. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "teach",
+                    "description": "Teach the user a new skill or concept, within this workspace. (project)",
+                    "argumentHint": "What would you like to learn about?"
+                  },
+                  {
+                    "name": "thermo-nuclear-code-quality-review",
+                    "description": "Run an extremely strict maintainability review for abstraction quality, giant files, and spaghetti-condition growth. Use for a thermo-nuclear code quality review, thermonuclear review, deep code quality audit, or especially harsh maintainability review. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "to-spec",
+                    "description": "Turn the current conversation into a spec and publish it to the project issue tracker: no interview, just synthesis of what you've already discussed. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "to-tickets",
+                    "description": "Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker — edges as text in one file per ticket locally. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "video-explainer",
+                    "description": "Narrated motion-graphics video recap of the session's changes. Use when the user asks for a video explainer, a video recap, or to explain the changes as a video. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "writing-for-agents",
+                    "description": "Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md. (project)",
+                    "argumentHint": ""
+                  },
                   {
                     "name": "deep-research",
                     "description": "Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. (dynamic workflow)",
@@ -372,6 +613,11 @@
                     "model": "haiku"
                   },
                   {
+                    "name": "code-reviewer",
+                    "description": "Staff/principal-level review of unstaged changes — code quality, maintainability, architecture, and engineering best practices. Use when you want a thorough quality pass before committing.",
+                    "model": "opus"
+                  },
+                  {
                     "name": "Explore",
                     "description": "Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions.",
                     "model": "inherit"
@@ -499,7 +745,7 @@
               "content": "Reply with exactly this text and nothing else: Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece."
             },
             "parent_tool_use_id": null,
-            "uuid": "c8c1dcec-9aee-4bfa-8dd3-f69f217992c1"
+            "uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884"
           }
         },
         {
@@ -508,25 +754,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "50be9af7-1aa3-4315-b7b7-e4d8be8a9be3",
+            "uuid": "459d6cbc-a739-4bc7-b606-4850007a9266",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "c8c1dcec-9aee-4bfa-8dd3-f69f217992c1",
+            "command_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
             "state": "queued",
-            "uuid": "5ca3809b-b917-4461-b1c5-338d10d2f77f",
+            "uuid": "d60bad29-1ed9-4e6c-9986-cf0f8146c342",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "c8c1dcec-9aee-4bfa-8dd3-f69f217992c1",
+            "command_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
             "state": "started",
-            "uuid": "714efeab-55ff-4e86-9778-f779955c4810",
+            "uuid": "492c868b-9305-4766-8ce6-719d6a44325d",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -538,7 +784,6 @@
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "tools": [
               "Task",
-              "AskUserQuestion",
               "Bash",
               "CronCreate",
               "CronDelete",
@@ -577,6 +822,54 @@
             "model": "claude-haiku-5-5",
             "permissionMode": "default",
             "slash_commands": [
+              "announce-pr",
+              "babysit-pr",
+              "before-and-after",
+              "bro",
+              "codebase-design",
+              "create-formal-verification-skill",
+              "create-verification-skill",
+              "deslop",
+              "diagnosing-bugs",
+              "domain-modeling",
+              "eli5",
+              "explain-diff-html",
+              "explainer",
+              "file-pr",
+              "finish-pr",
+              "full-ship",
+              "grill-me",
+              "grill-with-docs",
+              "grilling",
+              "handing-off-to-worktree",
+              "handoff",
+              "html",
+              "html-plan",
+              "idiomatic-code",
+              "implement",
+              "maintain-formal-verification-skill",
+              "maintain-verification-skill",
+              "matt-code-review",
+              "multi-repo-explorer",
+              "no-comments",
+              "parallel-code-review",
+              "plannotator",
+              "plannotator-annotate",
+              "plannotator-last",
+              "plannotator-review",
+              "prototype",
+              "research",
+              "retro",
+              "show-me",
+              "sol-loop",
+              "statechart",
+              "tdd",
+              "teach",
+              "thermo-nuclear-code-quality-review",
+              "to-spec",
+              "to-tickets",
+              "video-explainer",
+              "writing-for-agents",
               "deep-research",
               "dataviz",
               "update-config",
@@ -630,12 +923,61 @@
             "agents": [
               "claude",
               "claude-code-guide",
+              "code-reviewer",
               "Explore",
               "general-purpose",
               "Plan",
               "statusline-setup"
             ],
             "skills": [
+              "announce-pr",
+              "babysit-pr",
+              "before-and-after",
+              "bro",
+              "codebase-design",
+              "create-formal-verification-skill",
+              "create-verification-skill",
+              "deslop",
+              "diagnosing-bugs",
+              "domain-modeling",
+              "eli5",
+              "explain-diff-html",
+              "explainer",
+              "file-pr",
+              "finish-pr",
+              "full-ship",
+              "grill-me",
+              "grill-with-docs",
+              "grilling",
+              "handing-off-to-worktree",
+              "handoff",
+              "html",
+              "html-plan",
+              "idiomatic-code",
+              "implement",
+              "maintain-formal-verification-skill",
+              "maintain-verification-skill",
+              "matt-code-review",
+              "multi-repo-explorer",
+              "no-comments",
+              "parallel-code-review",
+              "plannotator",
+              "plannotator-annotate",
+              "plannotator-last",
+              "plannotator-review",
+              "prototype",
+              "research",
+              "retro",
+              "show-me",
+              "sol-loop",
+              "statechart",
+              "tdd",
+              "teach",
+              "thermo-nuclear-code-quality-review",
+              "to-spec",
+              "to-tickets",
+              "video-explainer",
+              "writing-for-agents",
               "deep-research",
               "dataviz",
               "update-config",
@@ -690,13 +1032,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "c1b76bd1-f8a3-46b2-827f-9d92f25735d2",
+            "uuid": "0ae7c55d-166f-4f3b-8b92-08054f496ffc",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-5aa0a882020be30404d740a1d35dd1a2",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-9711d676819c981bee3ffbb81ae503ba",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -704,7 +1046,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["c8c1dcec-9aee-4bfa-8dd3-f69f217992c1"]
+            "user_message_uuids": ["009205b0-a91c-4bb2-a5ee-7499d9128884"]
           }
         },
         {
@@ -713,8 +1055,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "557c6a99-0cf3-4c2c-839c-0d9f3f5c9007",
-            "user_message_uuids": ["c8c1dcec-9aee-4bfa-8dd3-f69f217992c1"]
+            "uuid": "4a987391-044f-4bf8-9bcf-e6cddc7b2630",
+            "user_message_uuids": ["009205b0-a91c-4bb2-a5ee-7499d9128884"]
           }
         },
         {
@@ -724,7 +1066,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChFNZoyTUDZsbN9mu8eAu",
+                "id": "msg_011ChNbxRmf8Tmy7tw8yAmAA",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -752,12 +1094,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f56ef60c-f3fd-4c97-9b12-9530c00f8baf",
-            "ttft_ms": 1112,
+            "uuid": "7d1e0bd2-8286-4790-a402-586e49837de7",
+            "ttft_ms": 752,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu",
-            "user_message_uuid": "c8c1dcec-9aee-4bfa-8dd3-f69f217992c1",
-            "user_message_uuids": ["c8c1dcec-9aee-4bfa-8dd3-f69f217992c1"]
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA",
+            "user_message_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
+            "user_message_uuids": ["009205b0-a91c-4bb2-a5ee-7499d9128884"]
           }
         },
         {
@@ -766,162 +1108,6 @@
             "event": {
               "type": "content_block_start",
               "index": 0,
-              "content_block": {
-                "type": "thinking",
-                "thinking": "",
-                "signature": ""
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "34f43908-4791-4473-9e44-32e88c4b03f0",
-            "thinking_display": "updates",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
-          }
-        },
-        {
-          "in": {
-            "type": "system",
-            "subtype": "thinking_tokens",
-            "estimated_tokens": 0,
-            "estimated_tokens_delta": 0,
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "6a4b8e41-eb6a-4ff6-b759-30a1fadf24c6",
-            "user_message_uuid": "c8c1dcec-9aee-4bfa-8dd3-f69f217992c1"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "thinking_delta",
-                "thinking": "",
-                "estimated_tokens": 0
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "2c15348b-1e5e-41e3-a73c-4a80981c9dfb",
-            "thinking_display": "updates",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "thinking_delta",
-                "thinking": "",
-                "estimated_tokens": null
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "e2566520-9122-472d-b004-9986bfc3d23f",
-            "thinking_display": "updates",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
-          }
-        },
-        {
-          "in": {
-            "type": "system",
-            "subtype": "thinking_tokens",
-            "estimated_tokens": 0,
-            "estimated_tokens_delta": 0,
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "a8ecc272-9ae8-4fcc-8e3e-ff7b59ed4323",
-            "user_message_uuid": "c8c1dcec-9aee-4bfa-8dd3-f69f217992c1"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "signature_delta",
-                "signature": "CAQSnggKEAgUGAI4AUIIdGhpbmtpbmcSDJW4vmtC+qQI7QNwvxoM4qvsbIVydUch6GM3IjARlk/1Fo3ONHcGJTTLzPIdP7Dwd3jtrOV3CR70gfRFVtHwwAlo/Cl4Ujsi53DmUpIquwfXeBe8/zDldQEL1BLzr6a3s2wvmsf8dVFCPXtpn9Bgqcxb5l2zVMPpzS3EkTwaF29UhuFRtBvUAKm2XaBlFWkGiiFpaHezZDZsU2o24usUjgQkwXJsqD3VI2z6D6JHpt350kKrLgksWxh1RKC1dTU0+4Ts26qIk8LDSI22k84sP3lFx3YP7BL15JMdv/3LhmNhdTfjDGyOcme6Ipc3OICnJpwvaRHtUjRHZC8XnxtVMPQK6q7qUbhsycS5eCLBTbf3QZ3UCJkHt+5vt3KaS0vpM8iw/10Ki0LZQ0qxwiq0hClUVmq1lPQWXMUKvi8YP2zB6qGkd1qHPG9j/TJGUmDKIE+6LbRFykYjXfOPC+BmD+XdxuExsCn/LY3BK54rKQSLBnND84ySZtY1tixuyIYmNJ6Nm0uFz3ZJlRblwwDI8I8lC2D36DF3vttpF3frwyW/URad4od2RTS1DWmeEbr0cfxMLsoSfrzb5tKkgO/ZQGqL/qQRu0IXNMcrQbxDt0LkxhhTqbmAOrMcIVMelAnrYBfHYpSw98siTlf4cVrLM9C5w+nc9XOGReHHk5Q6sFHmZwN/Oa9zD3MWadRtO5DfRG14DVAY87hKgNYF0T6U2NAYVo+zlqgKXzRO9/ne9KlLQR/ovrGpVXMjgscvA+9ViRN6Pj42J04z0HpyKPM23dfdBLivkcAdIYWPVeeLpjwrQcvgLeadQa1irIiWB28O10MevmU+AZ7CocafFYIRia9mAoLu2tAiFhlJTAub99CqsrUnR2JjdVLTZJ6W7TItx96HczrWZXV0V3X2liskH24p8chWSIDAmvCy7zjxCXojTv83c5DrH32mPkd5ySgPtF47DQJLxwYcXOWrcUhUjBx15IqE0Nhg+7HXr6dRHXRJDtmBnyvuAfDbCGFNOH8hOKLQvVMIhpuOMUJuX/hiHC6Js+21NctmlJbOY47ctg0kliWKo8rhVOISgzLCqexPCxS5QutlgjVr2EOZ7pomVII+o1P7GvZDR3wd8dcd9ORk8+hmX1cJ8UJhUCNCmNSSqnUx0awacA0Ay+wbrpNhUyCNimZZIHAEKwLug/yejFUgQe2JCuQNSGplLKnKkAIhCBZLNwquZIuS7+7jPKETZHteJvVe+1S6XKdzUTB6dcl3vkCFMEcea9D/LOrM2I1QXJ9aRp2nHuAusK5tsCv7JjSs1U+mdrVkUfk2r/zsPhcud7tPoIgFfrBYZsgJYJcwAnEj84/+q3xhE7T+WPXtqn92W9WjzMZEP+fbGAE="
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "12c1e9ca-3fa7-4e8e-9318-e970b2abd010",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
-          }
-        },
-        {
-          "in": {
-            "type": "assistant",
-            "message": {
-              "model": "claude-haiku-5-5",
-              "id": "msg_011ChFNZoyTUDZsbN9mu8eAu",
-              "type": "message",
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "thinking",
-                  "thinking": "",
-                  "signature": "CAQSnggKEAgUGAI4AUIIdGhpbmtpbmcSDJW4vmtC+qQI7QNwvxoM4qvsbIVydUch6GM3IjARlk/1Fo3ONHcGJTTLzPIdP7Dwd3jtrOV3CR70gfRFVtHwwAlo/Cl4Ujsi53DmUpIquwfXeBe8/zDldQEL1BLzr6a3s2wvmsf8dVFCPXtpn9Bgqcxb5l2zVMPpzS3EkTwaF29UhuFRtBvUAKm2XaBlFWkGiiFpaHezZDZsU2o24usUjgQkwXJsqD3VI2z6D6JHpt350kKrLgksWxh1RKC1dTU0+4Ts26qIk8LDSI22k84sP3lFx3YP7BL15JMdv/3LhmNhdTfjDGyOcme6Ipc3OICnJpwvaRHtUjRHZC8XnxtVMPQK6q7qUbhsycS5eCLBTbf3QZ3UCJkHt+5vt3KaS0vpM8iw/10Ki0LZQ0qxwiq0hClUVmq1lPQWXMUKvi8YP2zB6qGkd1qHPG9j/TJGUmDKIE+6LbRFykYjXfOPC+BmD+XdxuExsCn/LY3BK54rKQSLBnND84ySZtY1tixuyIYmNJ6Nm0uFz3ZJlRblwwDI8I8lC2D36DF3vttpF3frwyW/URad4od2RTS1DWmeEbr0cfxMLsoSfrzb5tKkgO/ZQGqL/qQRu0IXNMcrQbxDt0LkxhhTqbmAOrMcIVMelAnrYBfHYpSw98siTlf4cVrLM9C5w+nc9XOGReHHk5Q6sFHmZwN/Oa9zD3MWadRtO5DfRG14DVAY87hKgNYF0T6U2NAYVo+zlqgKXzRO9/ne9KlLQR/ovrGpVXMjgscvA+9ViRN6Pj42J04z0HpyKPM23dfdBLivkcAdIYWPVeeLpjwrQcvgLeadQa1irIiWB28O10MevmU+AZ7CocafFYIRia9mAoLu2tAiFhlJTAub99CqsrUnR2JjdVLTZJ6W7TItx96HczrWZXV0V3X2liskH24p8chWSIDAmvCy7zjxCXojTv83c5DrH32mPkd5ySgPtF47DQJLxwYcXOWrcUhUjBx15IqE0Nhg+7HXr6dRHXRJDtmBnyvuAfDbCGFNOH8hOKLQvVMIhpuOMUJuX/hiHC6Js+21NctmlJbOY47ctg0kliWKo8rhVOISgzLCqexPCxS5QutlgjVr2EOZ7pomVII+o1P7GvZDR3wd8dcd9ORk8+hmX1cJ8UJhUCNCmNSSqnUx0awacA0Ay+wbrpNhUyCNimZZIHAEKwLug/yejFUgQe2JCuQNSGplLKnKkAIhCBZLNwquZIuS7+7jPKETZHteJvVe+1S6XKdzUTB6dcl3vkCFMEcea9D/LOrM2I1QXJ9aRp2nHuAusK5tsCv7JjSs1U+mdrVkUfk2r/zsPhcud7tPoIgFfrBYZsgJYJcwAnEj84/+q3xhE7T+WPXtqn92W9WjzMZEP+fbGAE="
-                }
-              ],
-              "container": null,
-              "stop_reason": null,
-              "stop_sequence": null,
-              "stop_details": null,
-              "usage": {
-                "input_tokens": 0,
-                "cache_creation_input_tokens": 0,
-                "cache_read_input_tokens": 0,
-                "cache_creation": {
-                  "ephemeral_5m_input_tokens": 0,
-                  "ephemeral_1h_input_tokens": 0
-                },
-                "output_tokens": 0,
-                "service_tier": "standard",
-                "inference_geo": "global",
-                "speed": "standard"
-              },
-              "input_transformations": [],
-              "diagnostics": null,
-              "context_management": null
-            },
-            "parent_tool_use_id": null,
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "08507cfa-6e2d-4b5b-90a0-66bd7e0c5b17",
-            "timestamp": "2026-11-21T03:35:29.673Z",
-            "request_id": "req_011ChFNZopHJ2Zr6E7F4ASfb",
-            "thinking_duration_ms": 585,
-            "thinking_display": "updates",
-            "user_message_uuid": "c8c1dcec-9aee-4bfa-8dd3-f69f217992c1",
-            "user_message_uuids": ["c8c1dcec-9aee-4bfa-8dd3-f69f217992c1"]
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_stop",
-              "index": 0
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "d9121da1-d5b7-4e96-9d8e-fab4c7c3bbe6",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_start",
-              "index": 1,
               "content_block": {
                 "type": "text",
                 "text": ""
@@ -929,8 +1115,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c7293a2c-f6b0-45e7-926f-77a93b48072b",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "c2943628-37f2-414a-b5ad-95bcf7196f4d",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -938,16 +1124,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "Every"
+                "text": "Every word of this reply streams"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "fc68cc38-7d2b-4d34-b85e-1c2bda53b242",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "c29d1d24-771a-41ad-95fb-efcd3b3715a1",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -955,16 +1141,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " word of this reply streams in"
+                "text": " in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8392378a-0af6-4611-90d3-02fd9ef60e47",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "4770dd78-b231-42f9-a36a-9c2747f6b402",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -972,16 +1158,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " its own small piece. Every"
+                "text": " Every word of this reply streams"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "073741e5-9d1f-4a1f-af1a-7db7bfe722d9",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "a5a75134-69bf-4c6c-a0dd-33ecb812ce1d",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -989,16 +1175,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " word of this reply streams in"
+                "text": " in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3069fce5-f4c0-4f5e-adba-a6ffba8937e9",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "0dc2cf3a-fc07-4cca-8c7f-0be9df6cc2a9",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1006,16 +1192,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " its own small piece. Every"
+                "text": " Every word of this reply streams"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c89cda65-4769-4367-b301-b2e455347466",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "2da2b281-1ebc-48f7-ba6d-dbcbdb6f60f8",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1023,16 +1209,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " word of this reply streams in"
+                "text": " in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "851a08be-ec7d-411c-b46a-b14f1b897d1b",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "7b8a5352-78e9-4e04-81b8-d31899960625",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1040,16 +1226,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " its own small piece. Every"
+                "text": " Every word of this reply streams"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5d661d2b-d99e-42a2-beca-95a941ea94dc",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "957ea681-0309-41ac-8a1c-67241b19848c",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1057,16 +1243,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " word of this reply streams in"
+                "text": " in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e4df9953-4797-48e9-ba47-570b10132bcc",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "9957de20-8908-4656-8356-b346cec61ee6",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1074,16 +1260,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " its own small piece. Every"
+                "text": " Every word of this reply streams"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "30757eb5-a5e8-4bf3-b9fb-c10bd678b689",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "a3656e39-8bf5-4b05-ad54-b067a8bbf192",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1091,16 +1277,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " word of this reply streams in"
+                "text": " in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "dbb9ef91-f9a2-4537-9564-2e6e07148170",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "1a8f5835-f143-4072-a344-5b602f7d084f",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1108,16 +1294,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " its own small piece. Every"
+                "text": " Every word of this reply streams"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2dc38515-9e66-4107-8e36-b3363f941001",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "11b3ed9e-64f0-402d-be9a-d7aa82bf6025",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1125,16 +1311,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " word of this reply streams in"
+                "text": " in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "cf6e7e0b-ea9c-4f92-94de-452431320bd1",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "52a7ace7-fd09-4825-b556-bfbf313cbe94",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1142,16 +1328,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " its own small piece. Every"
+                "text": " Every word of this reply streams"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d46c07a3-3cd1-4117-bd1b-9945d9925303",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "f4eb04f3-0095-4894-a304-7df4d34c76ef",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1159,16 +1345,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " word of this reply streams in"
+                "text": " in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "21bc89c1-e9fc-45d3-96e3-d9909959ba21",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "0e116280-7d39-4854-b2d0-88076e742bfb",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1176,16 +1362,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " its own small piece. Every"
+                "text": " Every word of this reply streams"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0675ec3c-0496-4da5-8a5b-16cea0aa776d",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "42c51d7c-cf9d-4ab3-94c1-e94ff454a058",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1193,33 +1379,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " word of this reply streams in"
+                "text": " in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "db7aac98-e95c-43c3-960e-19b070c9762d",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 1,
-              "delta": {
-                "type": "text_delta",
-                "text": " its own small piece."
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "28c45fe9-4ae9-4f12-ad67-ecadceac3c0a",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "72c6b799-a8a3-4125-bd92-997b54ed9a1d",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1227,7 +1396,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChFNZoyTUDZsbN9mu8eAu",
+              "id": "msg_011ChNbxRmf8Tmy7tw8yAmAA",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -1259,9 +1428,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "42bfa69f-f721-4826-aa6f-a5e3832e6f35",
-            "timestamp": "2026-11-21T03:35:30.170Z",
-            "request_id": "req_011ChFNZopHJ2Zr6E7F4ASfb"
+            "uuid": "7e433a49-a796-4e24-b4e8-941c23e291ad",
+            "timestamp": "2026-11-24T23:15:14.174Z",
+            "request_id": "req_011ChNbxRdj6GqdmxDDssVdb",
+            "user_message_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
+            "user_message_uuids": ["009205b0-a91c-4bb2-a5ee-7499d9128884"]
           }
         },
         {
@@ -1269,12 +1440,12 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_stop",
-              "index": 1
+              "index": 0
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a7141089-1cad-47b0-a19c-91857b8209f1",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "8c17141c-9892-484e-ba9b-0c9a7446794a",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1303,8 +1474,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e2887c51-bba4-48e5-9161-4d2d21baeb98",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "be6b65b7-8200-46d4-a7f0-d173b3d286c4",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
@@ -1315,21 +1486,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "cf848607-700c-4cb5-a66b-53c87518a74d",
-            "api_message_id": "msg_011ChFNZoyTUDZsbN9mu8eAu"
+            "uuid": "0d792bd0-fc3d-4be2-a7fd-b27f2454bb4d",
+            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "ecdac338-7c43-4639-b6a2-de8f8e875125",
+            "uuid": "bc8900dc-44a9-45bf-b7d5-dc047ac34619",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 2212,
+            "duration_api_ms": 1118,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -1407,18 +1578,18 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece.",
-            "ttft_ms": 1764,
+            "ttft_ms": 1165,
             "type": "result",
-            "duration_ms": 2280,
-            "uuid": "815791cf-548f-4dbf-b385-c5a20e1d6483",
-            "ttft_stream_ms": 1179,
-            "time_to_request_ms": 69,
-            "first_content_frame_ms": 1179,
-            "user_message_uuid": "c8c1dcec-9aee-4bfa-8dd3-f69f217992c1",
-            "user_message_uuids": ["c8c1dcec-9aee-4bfa-8dd3-f69f217992c1"],
-            "request_sent_wall_ms": 1795232127978,
+            "duration_ms": 1173,
+            "uuid": "4aacf4a6-b419-4139-b2f4-4e69fe551757",
+            "ttft_stream_ms": 806,
+            "time_to_request_ms": 57,
+            "first_content_frame_ms": 807,
+            "user_message_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
+            "user_message_uuids": ["009205b0-a91c-4bb2-a5ee-7499d9128884"],
+            "request_sent_wall_ms": 1795562113067,
             "first_request_input_tokens": 0,
-            "first_request_cache_read_input_tokens": 14807,
+            "first_request_cache_read_input_tokens": 13041,
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
@@ -1444,9 +1615,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "c8c1dcec-9aee-4bfa-8dd3-f69f217992c1",
+            "command_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
             "state": "completed",
-            "uuid": "cb1bccd0-1d7d-41c1-919f-a044ce57b8a5",
+            "uuid": "a590b7ca-622f-4476-878f-d433bfa49d86",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1456,7 +1627,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "2290fc22-d1ad-4821-b747-2ad9bd345b5c",
+            "uuid": "95912812-f9e7-464b-b70d-6e1d31e3377f",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

@@ -2,6 +2,8 @@ export * from "./activity"
 
 export * from "./agentReview"
 
+export * from "./answerState"
+
 export * from "./appearance"
 
 export * from "./ask"
@@ -43,6 +45,8 @@ export * from "./outsideAgent"
 export * from "./merge"
 
 export * from "./pullRequest"
+
+export * from "./question"
 
 export * from "./pullRequestList"
 

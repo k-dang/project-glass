@@ -1,4 +1,6 @@
 import {
+  type AnsweredQuestion,
+  QuestionsAnswered,
   type Turn,
   ThreadBusy,
   ThreadError,
@@ -21,7 +23,18 @@ import {
   TurnInterrupted,
   TurnStopped,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, Layer, Option, Predicate, Schema, Scope, Stream } from "effect"
+import {
+  type Array as Arr,
+  Context,
+  DateTime,
+  Effect,
+  Layer,
+  Option,
+  Predicate,
+  Schema,
+  Scope,
+  Stream,
+} from "effect"
 import { SqlClient } from "effect/sql"
 import type { DeliveredTurn } from "./agentHost/deliveredMessage"
 import type { TurnSettings } from "./agentHost/protocol"
@@ -29,6 +42,7 @@ import { boundHostCall } from "./hostControl"
 import { keyedLock } from "./keyedLock"
 import { type HostCallError, type HostClient, hostFailure } from "./Placement"
 import { prompt } from "./prompt"
+import { Questions } from "./Questions"
 import { ToDos } from "./ToDos"
 import { encodeImages, type IdleTurn, StoredMessage, Transcripts } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
@@ -74,6 +88,7 @@ type StartedMessage = Pick<Turn, "message" | "images" | "context" | "feedback">
 interface Prepared {
   readonly client: ThreadHost
   readonly message: DeliveredTurn
+  readonly setAside: ReadonlyArray<string>
 }
 
 const decodeUnsent = Schema.decodeUnknownEffect(Schema.Array(StoredMessage))
@@ -110,6 +125,10 @@ export class ThreadTurns extends Context.Service<
       thread: ClaimedThread,
       message: MessageWithContext,
     ) => Effect.Effect<void, RequestWaiting | ThreadError>
+    readonly deliverAnswers: (
+      thread: ClaimedThread,
+      answers: Arr.NonEmptyReadonlyArray<AnsweredQuestion>,
+    ) => Effect.Effect<void, ThreadError>
     readonly whenIdle: <E>(
       threadId: string,
       effect: (start: StartIdle) => Effect.Effect<void, E>,
@@ -139,13 +158,16 @@ export class ThreadTurns extends Context.Service<
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
       const toDos = yield* ToDos
+      const questions = yield* Questions
       const scope = yield* Scope.Scope
       const withThread = keyedLock().withLock
 
       const delivered = Effect.fnUntraced(function* <Context extends TurnContext>(
+        threadId: string,
         sent: SentMessage & { readonly context: Context | null },
         feedback: ReadonlyArray<FeedbackNote> = [],
       ) {
+        const setAside = yield* questions.setAsideUntold(threadId)
         const ids = mentionedToDoIds(sent.message)
 
         const listed =
@@ -180,14 +202,16 @@ export class ThreadTurns extends Context.Service<
         )
 
         return {
-          ...withContextOf(sent),
-          mentionedImages: mentioned.flatMap(({ images }) => images),
-          prompt: prompt(
-            sent.message,
-            mentioned.map(({ toDo }) => toDo),
-            sent.context,
-            feedback,
-          ),
+          message: {
+            ...withContextOf(sent),
+            mentionedImages: mentioned.flatMap(({ images }) => images),
+            prompt: prompt(
+              sent.message,
+              mentioned.map(({ toDo }) => toDo),
+              { context: sent.context, feedback, setAside },
+            ),
+          },
+          setAside: setAside.map(({ id }) => id),
         }
       })
 
@@ -195,12 +219,12 @@ export class ThreadTurns extends Context.Service<
         Effect.gen(function* () {
           const client = yield* thread.prepareHost
 
-          const [, message] = yield* Effect.all(
-            [thread.ensureStarted(client), delivered(sent, sent.feedback)],
+          const [, { message, setAside }] = yield* Effect.all(
+            [thread.ensureStarted(client), delivered(thread.id, sent, sent.feedback)],
             { concurrency: "unbounded" },
           )
 
-          return { client, message } satisfies Prepared
+          return { client, message, setAside } satisfies Prepared
         })
 
       const failTurn = (threadId: string, turnId: string, reason: string) =>
@@ -223,7 +247,11 @@ export class ThreadTurns extends Context.Service<
           ),
         )
 
-      const dispatch = (thread: ClaimedThread, turnId: string, { client, message }: Prepared) =>
+      const dispatch = (
+        thread: ClaimedThread,
+        turnId: string,
+        { client, message, setAside }: Prepared,
+      ) =>
         Effect.gen(function* () {
           const threadId = thread.id
 
@@ -248,6 +276,7 @@ export class ThreadTurns extends Context.Service<
 
               if (started === "accepted") {
                 if (!still) yield* stopHost(thread, turnId)
+                else yield* questions.markTold(setAside)
 
                 return still
                   ? ("dispatched" as const satisfies Delivery)
@@ -332,9 +361,10 @@ export class ThreadTurns extends Context.Service<
 
           if (Option.isNone(running)) return false
 
-          const message = yield* delivered(sent)
+          const { message, setAside } = yield* delivered(threadId, sent)
 
           return yield* boundHostCall(running.value.Steer({ threadId, ...message })).pipe(
+            Effect.andThen(questions.markTold(setAside)),
             Effect.as(true),
             Effect.tapError((cause) => Effect.logWarning("Couldn't Steer a Turn", cause)),
             Effect.catch((error) =>
@@ -454,6 +484,15 @@ export class ThreadTurns extends Context.Service<
         }),
         steer: Effect.fn("ThreadTurns.steer")(function* (thread, sent) {
           yield* refuseWhileWaiting(thread.id)
+
+          if (!(yield* trySteer(thread, sent))) yield* startOrQueue(thread.id, sent)
+        }),
+        deliverAnswers: Effect.fn("ThreadTurns.deliverAnswers")(function* (thread, answers) {
+          const sent = {
+            message: "",
+            images: [],
+            context: QuestionsAnswered.make({ answers }),
+          }
 
           if (!(yield* trySteer(thread, sent))) yield* startOrQueue(thread.id, sent)
         }),

@@ -18,8 +18,6 @@ import {
   type AgentModel,
   AgentModels,
   AgentStatusesChanged,
-  QuestionPart,
-  type QuestionReply,
   type RequestAnswer,
   RequestNotWaiting,
   type RequestPart,
@@ -34,7 +32,6 @@ import {
   FiberSet,
   Match,
   Option,
-  Predicate,
   Queue,
   Redacted,
   Schema,
@@ -154,7 +151,7 @@ const workOptions = (tools: GlassToolsAccess | undefined): Options => {
     }),
   }
 
-  if (tools === undefined) return { mcpServers }
+  if (tools === undefined) return { mcpServers, disallowedTools: [QUESTION_TOOL] }
 
   mcpServers[GLASS_TOOLS_MCP_SERVER] = {
     type: "http",
@@ -164,6 +161,7 @@ const workOptions = (tools: GlassToolsAccess | undefined): Options => {
 
   return {
     mcpServers,
+    disallowedTools: [QUESTION_TOOL],
     systemPrompt: { type: "preset", preset: "claude_code", append: workInstructions },
   }
 }
@@ -303,71 +301,12 @@ const control = (what: "model" | "effort" | "Permission mode", call: () => Promi
     Effect.mapError(() => couldNotSwitch("Claude Code", what)),
   )
 
-const AskedQuestions = Schema.Struct({
-  questions: Schema.Array(
-    Schema.Struct({
-      question: Schema.String,
-      header: Schema.optional(Schema.String),
-      options: Schema.Array(
-        Schema.Struct({ label: Schema.String, description: Schema.optional(Schema.String) }),
-      ),
-      multiSelect: Schema.optional(Schema.Boolean),
-    }),
-  ),
-})
-
-const decodeQuestions = Schema.decodeUnknownOption(AskedQuestions)
-
 const decodeToolInput = Schema.decodeUnknownOption(ToolInput)
 
-const requestOf = (requestId: string, toolName: string, input: ToolInput) => {
-  if (toolName === QUESTION_TOOL) {
-    const asked = decodeQuestions(input)
-
-    if (Option.isSome(asked))
-      return QuestionPart.make({
-        requestId,
-        questions: asked.value.questions.map((question) => ({
-          header: question.header ?? null,
-          question: question.question,
-          detail: null,
-          options: question.options.map(({ label, description }) => ({
-            label,
-            description: description ?? null,
-          })),
-          multiSelect: question.multiSelect ?? false,
-          freeText: true,
-        })),
-        status: "waiting",
-        answers: null,
-      })
-  }
-
-  return permissionRequest(requestId, toolName, input)
-}
-
-const replyText = (reply: QuestionReply | undefined) =>
-  reply?.text ?? reply?.chosen.join(", ") ?? ""
-
-const permissionResult = (settled: RequestPart, input: ToolInput): PermissionResult => {
-  if (Predicate.isTagged(settled, "Question")) {
-    const answers = settled.answers ?? []
-
-    return {
-      behavior: "allow",
-      updatedInput: {
-        ...input,
-        answers: Object.fromEntries(
-          settled.questions.map(({ question }, index) => [question, replyText(answers[index])]),
-        ),
-      },
-    }
-  }
-
-  return settled.status === "denied"
+const permissionResult = (settled: RequestPart, input: ToolInput): PermissionResult =>
+  settled.status === "denied"
     ? { behavior: "deny", message: settled.reason ?? "The user denied this tool call." }
     : { behavior: "allow", updatedInput: input }
-}
 
 interface Asked {
   readonly part: RequestPart
@@ -431,7 +370,7 @@ export const claudeAdapter = (
 
     const ask = (toolName: string, input: ToolInput, requestId: string) =>
       Effect.gen(function* () {
-        const part = requestOf(requestId, toolName, input)
+        const part = permissionRequest(requestId, toolName, input)
         const answered = yield* Deferred.make<PermissionResult>()
         waiting.set(requestId, { part, input, answered })
         yield* Queue.offer(requests, Input.Asked({ part }))

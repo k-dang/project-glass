@@ -2,6 +2,7 @@
 import {
   Thread,
   InboxThread,
+  OpenQuestions,
   AgentReviewFinished,
   AllowRequest,
   AwaitingReply,
@@ -16,16 +17,16 @@ import {
   emptyTranscript,
   GitHubConnection,
   type InboxItems,
-  OutsideChoice,
+  ChoiceAnswer,
+  type GivenAnswer,
   OutsideQuestion,
-  OutsideText,
+  TextAnswer,
   PermissionRequestPart,
   PullRequest,
   InboxPullRequest,
   PullRequestRef,
   PullRequestSummary,
   PullRequestWorkspace,
-  type OutsideQuestionAnswer,
   ReadyToMerge,
   type RequestAnswer,
   TextPart,
@@ -382,20 +383,26 @@ it("answers a permission in the detail pane and selects the next item when that 
   expect(screen.queryByRole("option", { name: /agent\/swift-otter/ })).toBeNull()
 })
 
+const choicesOf = (...labels: ReadonlyArray<string>) =>
+  labels.map((label) => ({ label, description: null }))
+
 const outsideQuestion = OutsideQuestion.make({
   id: "ask-1",
   question: "Ship the retry change?",
-  choices: ["Ship it", "Hold it"],
+  choices: [
+    { label: "Ship it", description: "Merge once checks pass." },
+    { label: "Hold it", description: null },
+  ],
   askedBy: "Claude Code",
   since: ago({ minutes: 1 }),
 })
 
 it("answers an outside question in Stopped on you", async () => {
-  const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
+  const answers: Array<ReadonlyArray<GivenAnswer>> = []
   const inbox = inboxRef([outsideQuestion, finishedReview])
 
   const user = mount(inbox, {
-    AnswerOutsideQuestion: (payload) => Effect.sync(() => void answers.push(payload)),
+    AnswerQuestions: ({ answers: given }) => Effect.sync(() => void answers.push(given)),
   })
 
   const stopped = await screen.findByRole("region", { name: "Stopped on you" })
@@ -404,10 +411,13 @@ it("answers an outside question in Stopped on you", async () => {
   expect(within(stopped).getByText("Asked by Claude Code")).toBeTruthy()
 
   const pane = within(articleOf("Ship the retry change?"))
-  await user.click(pane.getByRole("radio", { name: "Ship it" }))
-  await user.click(pane.getByRole("button", { name: "Send" }))
+  expect(pane.getByText("Merge once checks pass.")).toBeTruthy()
+  await user.click(pane.getByRole("radio", { name: /Ship it/ }))
+  await user.click(pane.getByRole("button", { name: "Send answers" }))
 
-  expect(answers).toEqual([{ id: "ask-1", answer: OutsideChoice.make({ choice: "Ship it" }) }])
+  expect(answers).toEqual([
+    [{ questionId: "ask-1", answer: ChoiceAnswer.make({ choice: "Ship it" }) }],
+  ])
 
   await setInbox(inbox, [finishedReview])
   expect(await screen.findByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
@@ -465,6 +475,21 @@ it("opens a Check-in's changes on their own page and approves them, with the not
   expect(await screen.findByRole("main", { name: "Inbox" })).toBeTruthy()
 })
 
+it("sets a Check-in aside", async () => {
+  const setAside: Array<string> = []
+
+  const user = mount(inboxRef([checkInOf("check-1", "Retry three times")]), {
+    SetCheckInAside: ({ checkInId }) => Effect.sync(() => void setAside.push(checkInId)),
+  })
+
+  await screen.findByRole("heading", { name: "Retry three times" })
+  await user.click(
+    within(articleOf("Retry three times")).getByRole("button", { name: "Set aside" }),
+  )
+
+  expect(setAside).toEqual(["check-1"])
+})
+
 const checkInOf = (id: string, title: string) =>
   CheckIn.make({
     id,
@@ -500,21 +525,100 @@ it("brings Glass to the front on a new Check-in's page, but leaves waiting ones 
   expect(bringToFront).toHaveBeenCalledTimes(1)
 })
 
+const askedOf = (id: string, question: string) => ({
+  id,
+  question,
+  choices: [],
+  since: ago({ minutes: 3 }),
+})
+
+const askingThread = InboxThread.make({
+  thread,
+  reasons: [
+    OpenQuestions.make({
+      questions: [
+        askedOf("q-1", "Which branch?"),
+        askedOf("q-2", "Rename the module too?"),
+        askedOf("q-3", "Ship it today?"),
+      ],
+    }),
+  ],
+  since: ago({ minutes: 3 }),
+})
+
+const questionGroup = (name: string) =>
+  within(within(articleOf("agent/swift-otter")).getByRole("group", { name }))
+
+it("drafts answers to a Thread's Questions and sends them together", async () => {
+  const answers: Array<ReadonlyArray<GivenAnswer>> = []
+
+  const user = mount(inboxRef([askingThread]), {
+    AnswerQuestions: ({ answers: given }) => Effect.sync(() => void answers.push(given)),
+  })
+
+  const stopped = await screen.findByRole("region", { name: "Stopped on you" })
+  expect(within(stopped).getByRole("option", { name: /agent\/swift-otter/ })).toBeTruthy()
+
+  await user.type(questionGroup("Which branch?").getByRole("textbox"), "main")
+  await user.type(questionGroup("Ship it today?").getByRole("textbox"), "Not today")
+  await user.click(
+    within(articleOf("agent/swift-otter")).getByRole("button", { name: "Send answers" }),
+  )
+
+  expect(answers).toEqual([
+    [
+      { questionId: "q-1", answer: TextAnswer.make({ text: "main" }) },
+      { questionId: "q-3", answer: TextAnswer.make({ text: "Not today" }) },
+    ],
+  ])
+  expect(questionGroup("Rename the module too?").getByRole("textbox")).toHaveProperty("value", "")
+})
+
+it("sets one of a Thread's Questions aside", async () => {
+  const setAside: Array<string> = []
+
+  const user = mount(inboxRef([askingThread]), {
+    SetQuestionAside: ({ questionId }) => Effect.sync(() => void setAside.push(questionId)),
+  })
+
+  await screen.findByRole("heading", { name: "agent/swift-otter" })
+  await user.click(
+    questionGroup("Rename the module too?").getByRole("button", { name: "Set aside" }),
+  )
+
+  expect(setAside).toEqual(["q-2"])
+})
+
+it("sets an outside question aside", async () => {
+  const setAside: Array<string> = []
+
+  const user = mount(inboxRef([outsideQuestion]), {
+    SetQuestionAside: ({ questionId }) => Effect.sync(() => void setAside.push(questionId)),
+  })
+
+  await screen.findByRole("heading", { name: "Ship the retry change?" })
+  await user.click(
+    within(articleOf("Ship the retry change?")).getByRole("button", { name: "Set aside" }),
+  )
+
+  expect(setAside).toEqual(["ask-1"])
+})
+
 it("starts the next outside question with an empty answer", async () => {
-  const answers: Array<{ id: string; answer: OutsideQuestionAnswer }> = []
+  const answers: Array<ReadonlyArray<GivenAnswer>> = []
   const typed = OutsideQuestion.make({ ...outsideQuestion, id: "ask-3", choices: [] })
 
   const chosen = OutsideQuestion.make({
     ...outsideQuestion,
     id: "ask-4",
     question: "Merge it today?",
-    choices: ["Merge today", "Wait for CI"],
+    choices: choicesOf("Merge today", "Wait for CI"),
   })
 
   const inbox = inboxRef([typed, chosen])
 
   const user = mount(inbox, {
-    AnswerOutsideQuestion: (payload) => Effect.sync(() => void answers.push(payload)),
+    AnswerQuestions: ({ answers: given }) => Effect.sync(() => void answers.push(given)),
   })
 
   await screen.findByRole("heading", { name: "Ship the retry change?" })
@@ -523,19 +627,22 @@ it("starts the next outside question with an empty answer", async () => {
     "release/2026-11",
   )
   await user.click(
-    within(articleOf("Ship the retry change?")).getByRole("button", { name: "Send" }),
+    within(articleOf("Ship the retry change?")).getByRole("button", { name: "Send answers" }),
   )
   await setInbox(inbox, [chosen])
 
   await screen.findByRole("heading", { name: "Merge it today?" })
   const pane = within(articleOf("Merge it today?"))
-  expect(pane.getByRole("textbox", { name: "Or type an answer" })).toHaveProperty("value", "")
+  expect(pane.getByRole("textbox", { name: "Or answer in your own words" })).toHaveProperty(
+    "value",
+    "",
+  )
   await user.click(pane.getByRole("radio", { name: "Wait for CI" }))
-  await user.click(pane.getByRole("button", { name: "Send" }))
+  await user.click(pane.getByRole("button", { name: "Send answers" }))
 
   expect(answers).toEqual([
-    { id: "ask-3", answer: OutsideText.make({ text: "release/2026-11" }) },
-    { id: "ask-4", answer: OutsideChoice.make({ choice: "Wait for CI" }) },
+    [{ questionId: "ask-3", answer: TextAnswer.make({ text: "release/2026-11" }) }],
+    [{ questionId: "ask-4", answer: ChoiceAnswer.make({ choice: "Wait for CI" }) }],
   ])
 })
 

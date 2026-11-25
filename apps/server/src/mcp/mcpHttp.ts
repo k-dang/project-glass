@@ -7,7 +7,7 @@ export const MCP_PATH = "/mcp"
 
 export const digest = (bearer: string) => createHash("sha256").update(bearer).digest("hex")
 
-export const SESSION_HEADER = "mcp-session-id"
+const SESSION_HEADER = "mcp-session-id"
 
 export const ownsSession = (
   request: HttpServerRequest.HttpServerRequest,

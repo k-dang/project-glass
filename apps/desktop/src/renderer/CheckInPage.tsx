@@ -43,7 +43,8 @@ export function CheckInPage(props: { checkInId: string }) {
       ) : AsyncResult.isSuccess(inbox) ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            This Check-in isn't waiting anymore: it was answered, or its wait ended.
+            This Check-in isn't waiting anymore: it was answered, set aside, or replaced by a newer
+            one.
           </p>
           <BackToInbox onBack={backToInbox} />
         </div>

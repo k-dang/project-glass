@@ -11,7 +11,7 @@ import { join } from "node:path"
 import { LAUNCH_TOKEN } from "../../test/harness"
 import { connectMcp, toolText } from "../../test/mcpClient"
 import { calledBy, glassCall, settled, threadsFixture } from "../../test/threadsFixture"
-import { GlobalChatCaller } from "./McpCredentials"
+import { GlobalChatCaller } from "../callers"
 
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",

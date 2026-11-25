@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { GlobalChatCaller } from "./McpCredentials"
+import { GlobalChatCaller } from "../callers"
 import {
   Thread,
   AgentReviewState,

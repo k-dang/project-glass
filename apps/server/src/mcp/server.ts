@@ -1,5 +1,5 @@
-import { Effect, Layer, Option, Predicate, Redacted, Schema, Stream } from "effect"
-import { McpSchema, McpServer } from "effect/ai"
+import { Effect, Layer, Option, Predicate, Redacted, Stream } from "effect"
+import { McpServer } from "effect/ai"
 import {
   HttpBody,
   HttpRouter,
@@ -9,37 +9,13 @@ import {
 } from "effect/http"
 import { HttpApiBuilder, HttpApiSecurity } from "effect/http-api"
 import { OutsideAgents } from "../OutsideAgents"
-import { AskProgress } from "./AskProgress"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
 import { GlassToolRelay } from "./GlassToolRelay"
 import { BrowserMcpTools } from "./browserTools"
 import { VisualizationToolHandlers, VisualizationTools } from "./visualizationTools"
-import { McpCaller, McpCredentials, OutsideAgentCaller } from "./McpCredentials"
-import { claimOpenedSession, glassMcpHttp, MCP_PATH, ownsSession, SESSION_HEADER } from "./mcpHttp"
+import { McpCaller, McpCredentials } from "./McpCredentials"
+import { claimOpenedSession, glassMcpHttp, MCP_PATH, ownsSession } from "./mcpHttp"
 import { requestUrls } from "./McpOAuth"
-
-const progressTokenOf = (metadata: Schema.JsonObject | undefined) =>
-  Schema.decodeUnknownOption(McpSchema.ProgressToken)(metadata?.["progressToken"])
-
-const askProgress = AskProgress.of({
-  notify: (progress) =>
-    Effect.gen(function* () {
-      const server = yield* Effect.serviceOption(McpServer.McpServer)
-      const client = yield* Effect.serviceOption(McpSchema.McpServerClient)
-
-      const token = Option.isSome(client)
-        ? progressTokenOf(client.value.requestMetadata)
-        : Option.none()
-
-      if (Option.isNone(server) || Option.isNone(token)) return
-
-      yield* server.value.notifications["notifications/progress"]({
-        progressToken: token.value,
-        progress,
-        message: "Waiting for an answer in the Glass Inbox",
-      }).pipe(Effect.ignore)
-    }),
-})
 
 const challenge = (issuer: string, presented: boolean) => {
   const metadata = `${issuer}/.well-known/oauth-protected-resource/mcp`
@@ -99,23 +75,8 @@ const McpAccess = HttpRouter.middleware(
 
         if (!ownsSession(request, ownedSessions)) return HttpServerResponse.empty({ status: 404 })
 
-        const session = request.headers[SESSION_HEADER]
-
-        const calling =
-          Predicate.isTagged(caller, "OutsideAgent") && session !== undefined
-            ? new OutsideAgentCaller({
-                agentId: caller.agentId,
-                name: caller.name,
-                session,
-              })
-            : caller
-
         const response = yield* Effect.raceFirst(
-          Effect.provideService(
-            Effect.provideService(httpEffect, McpCaller, calling),
-            AskProgress,
-            askProgress,
-          ),
+          Effect.provideService(httpEffect, McpCaller, caller),
           Effect.as(revoked, challenge(urls.issuer, true)),
         )
 

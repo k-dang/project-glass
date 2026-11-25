@@ -38,38 +38,31 @@ const pixel = Image.make({
   data: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==",
 })
 
-it.live("answers Claude Code's Permission requests and Questions through Glass", () =>
-  Effect.gen(function* () {
-    const f = yield* claudeSession("claude-requests")
-    const session = yield* f.open(threadId)
-    yield* session.configure({ permissionMode: "default" })
+it.live(
+  "answers Claude Code's Permission requests through Glass, and leaves it no question tool of its own",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* claudeSession("claude-requests")
+      const session = yield* f.open(threadId)
+      yield* session.configure({ permissionMode: "default" })
 
-    yield* session.send(run("Bash", "touch compatible.txt", "DONE"))
-    const permission = yield* f.request
-    assert.ok(Predicate.isTagged(permission, "PermissionRequest"))
-    assert.equal(permission.toolName, "Bash")
-    yield* session.answer(permission.requestId, AllowRequest.make({}))
-    const allowed = yield* f.until(settled(1))
-    assert.deepStrictEqual(allowed[0]?.ended?.ending, TurnDone.make({}))
+      yield* session.send(run("Bash", "touch compatible.txt", "DONE"))
+      const permission = yield* f.request
+      assert.ok(Predicate.isTagged(permission, "PermissionRequest"))
+      assert.equal(permission.toolName, "Bash")
+      yield* session.answer(permission.requestId, AllowRequest.make({}))
+      const allowed = yield* f.until(settled(1))
+      assert.deepStrictEqual(allowed[0]?.ended?.ending, TurnDone.make({}))
 
-    yield* session.send(
-      "Use the AskUserQuestion tool once to ask me which files to read, offering exactly two options labelled Only the README and Everything. After I answer, reply with exactly the label I chose.",
-    )
+      yield* session.send(
+        "If you have a tool named AskUserQuestion, reply with exactly HAS_IT. Otherwise reply with exactly NO_SUCH_TOOL. Don't call any tool.",
+      )
 
-    const question = yield* f.request
-
-    assert.ok(Predicate.isTagged(question, "Question"))
-    yield* session.answer(
-      question.requestId,
-      AnswerQuestion.make({ answers: [{ chosen: ["Only the README"], text: null }] }),
-    )
-    const answered = yield* f.until(settled(2))
-    assert.deepStrictEqual(answered[1]?.ended?.ending, TurnDone.make({}))
-    assert.include(
-      Predicate.isTagged(lastText(answered[1]), "Text") ? lastText(answered[1])!.text : "",
-      "Only the README",
-    )
-  }).pipe(Effect.scoped),
+      const answered = yield* f.until(settled(2))
+      assert.deepStrictEqual(answered[1]?.ended?.ending, TurnDone.make({}))
+      assert.isFalse(answered[1]?.parts.some(Predicate.isTagged("Question")))
+      assert.deepStrictEqual(lastText(answered[1]), TextPart.make({ text: "NO_SUCH_TOOL" }))
+    }).pipe(Effect.scoped),
 )
 
 it.live("lists a sent Skill pack's skills as `/pack:skill`", () =>

@@ -40,8 +40,10 @@ import { McpOAuth } from "./mcp/McpOAuth"
 import { OAuthRoutes } from "./mcp/oauthHttp"
 import { GlassMcpTools, McpRoutes } from "./mcp/server"
 import { OutsideAgents } from "./OutsideAgents"
+import { Answers } from "./Answers"
+import { OutsideAgentDisconnects } from "./OutsideAgentDisconnects"
 import { Inbox } from "./Inbox"
-import { OutsideQuestions } from "./OutsideQuestions"
+import { Questions } from "./Questions"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
@@ -129,7 +131,7 @@ const services = (
 ) =>
   Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge)
     .pipe(
-      Layer.provide(Inbox.layer),
+      Layer.provide(Layer.mergeAll(Inbox.layer, Answers.layer, OutsideAgentDisconnects.layer)),
       Layer.provide(SettledThreads.layer.pipe(Layer.provideMerge(ThreadPullRequests.layer))),
       Layer.provide(StartedWork.layer),
       Layer.provide(PullRequestLists.layer),
@@ -161,45 +163,29 @@ const services = (
       Layer.provideMerge(OutsideAgents.layer),
       Layer.provideMerge(McpOAuth.layer),
       Layer.provide(GlassToolRelay.layer),
+      Layer.provideMerge(Questions.layer),
       Layer.provide(DatabaseLive),
       Layer.provide(FollowedRepositories.layer),
       Layer.provide(SettingsStore.layer),
       Layer.provide(GitHubClient.layer),
       Layer.provide(GitHubAuth.layer),
       Layer.provideMerge(McpCredentials.layer),
-      Layer.provideMerge(OutsideQuestions.layer),
     )
-
-const releaseAskers = Layer.effectDiscard(
-  Effect.gen(function* () {
-    const questions = yield* OutsideQuestions
-    const checkIns = yield* CheckIns
-
-    // WARNING: Acquired after the listener so this runs before server.close waits on open responses.
-    yield* Effect.addFinalizer(() =>
-      Effect.all([questions.cancelAll(), checkIns.cancelAll()], { concurrency: "unbounded" }),
-    )
-  }),
-)
 
 export const serve = (
   agentRunners: AgentRunnersLayer,
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer = AgentCommands.layer,
 ) =>
-  releaseAskers.pipe(
-    Layer.provideMerge(
-      HttpRouter.serve(Layer.mergeAll(RendererRoutes, McpRoutes, OAuthRoutes), {
-        disableLogger: true,
-      }).pipe(
-        // WARNING: Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
-        Layer.provideMerge(NodeServerLive),
-        Layer.provideMerge(services(agentRunners, mcpTools, agentCommands)),
-        Layer.provide(RpcSerialization.layerJson),
-        Layer.provide(NodeServices.layer),
-        Layer.provide(Layer.succeed(UrlParams.CurrentRedactedNames)([TOKEN_PARAM])),
-      ),
-    ),
+  HttpRouter.serve(Layer.mergeAll(RendererRoutes, McpRoutes, OAuthRoutes), {
+    disableLogger: true,
+  }).pipe(
+    // WARNING: Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
+    Layer.provideMerge(NodeServerLive),
+    Layer.provideMerge(services(agentRunners, mcpTools, agentCommands)),
+    Layer.provide(RpcSerialization.layerJson),
+    Layer.provide(NodeServices.layer),
+    Layer.provide(Layer.succeed(UrlParams.CurrentRedactedNames)([TOKEN_PARAM])),
   )
 
 export const ServerLive = serve(AgentRunners.layer, GlassMcpTools)

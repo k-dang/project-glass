@@ -10,6 +10,7 @@
         "--input-format",
         "stream-json",
         "--permission-prompt-tool=stdio",
+        "--disallowedTools=AskUserQuestion",
         "--allow-dangerously-skip-permissions",
         "--include-partial-messages",
         "--session-id=6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
@@ -18,7 +19,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "h8pq8pp7njc",
+            "request_id": "0ur7q93jpse",
             "type": "control_request",
             "request": {
               "subtype": "initialize",
@@ -78,9 +79,249 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "h8pq8pp7njc",
+              "request_id": "0ur7q93jpse",
               "response": {
                 "commands": [
+                  {
+                    "name": "announce-pr",
+                    "description": "Watch a PR's CI and draft a paste-ready post (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "babysit-pr",
+                    "description": "Monitor a pull request through review and CI. Use when the user asks to monitor, watch, or babysit a PR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "before-and-after",
+                    "description": "Add existing screenshots or screen recordings to a GitHub pull request as a before/after or preview block. Use when a PR needs visual media attached to its description. Browser navigation and capture belong to agent-browser. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "bro",
+                    "description": "Restate the last message in plain human language, with no jargon (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "codebase-design",
+                    "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "create-formal-verification-skill",
+                    "description": "Generate a project-local skill that formally verifies the code where a bug costs the most and tests reach the least, in any language, with whichever verification tool fits. Use for /create-formal-verification-skill, \"model-check this race\", \"prove this invariant\", or when concurrency, retries, state machines, parsers, or unsafe code need more than tests. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "create-verification-skill",
+                    "description": "Generate a project-local verification skill that drives your app the way a user does — any language, framework, or platform. Use for /create-verification-skill, \"make a control skill for this repo\", or when a project has no scripted way to prove UI/CLI/service behavior. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "deslop",
+                    "description": "Remove AI-generated code slop and clean up code style (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "diagnosing-bugs",
+                    "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "domain-modeling",
+                    "description": "Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a GLOSSARY.md, or recording or editing an ADR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "eli5",
+                    "description": "Explain a topic like I'm a 5 year old. Use when the user types /eli5 &lt;topic&gt; or asks for a dead-simple picture explainer of how something works. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "explain-diff-html",
+                    "description": "Use when the user asks for a rich explanation of a code change, diff, branch, or PR. Produces HTML output. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "explainer",
+                    "description": "Turns a system, flow, process, dataset or plan into a clear interactive diagram delivered as one self-contained HTML file: architecture and flow diagrams, sequence and state machines, bar, line, slope, scatter, waterfall, heatmap, treemap, Sankey, funnel, radar and quadrant charts, Gantt charts, timelines, kanban boards, user journeys, story maps, database schemas, UML class diagrams, swimlanes, fishbone and Wardley maps, and incident or release reports with an annotated timeline. Every diagram works bare or with text, in light and dark, with click-to-explore details and PNG capture. Use when asked to explain how something works, diagram or map a system, chart or compare numbers, plan a project, or screenshot such a diagram. Not for Svelte or .svx documents, app UI components, live dashboards over changing data, quick ASCII diagrams, or answers that read fine as a paragraph. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "file-pr",
+                    "description": "File a concise pull request. Use when the user asks to file, open or create a PR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "finish-pr",
+                    "description": "Trigger this when the user says 'finish pr' or asks to finish the PR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "full-ship",
+                    "description": "Trigger this if the user says 'full ship'. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "grill-me",
+                    "description": "A relentless interview to sharpen a plan or design. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "grill-with-docs",
+                    "description": "A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "grilling",
+                    "description": "Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "handing-off-to-worktree",
+                    "description": "Hand off a scoped code change to a fresh agent session in its own git worktree, with a self-contained brief. Use when the user asks to hand off, spin up, or start a fix or feature in a new worktree, or when another skill fans work out to parallel sessions. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "handoff",
+                    "description": "Compact the current conversation into a handoff document for another agent to pick up. (project)",
+                    "argumentHint": "What will the next session be used for?"
+                  },
+                  {
+                    "name": "html",
+                    "description": "Create or redesign self-contained single-file HTML artifacts with a visual direction shaped by the user's brief, project, and subject. Use when HTML is the deliverable for a report, explainer, landing page, presentation, tool, mixed artifact, or broad request. This is the collection's only implicit router. Route clear wireframe, prototype, mockup, plan, or diagram requests to the matching direct-invocation specialist when available. Do not use for ordinary application implementation when a standalone HTML file is not the deliverable. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "html-plan",
+                    "description": "Direct-invocation specialist for clear, self-contained HTML plans that preserve source material while improving hierarchy, sequence, ownership, dependencies, and reviewability. Use when the user explicitly invokes html-plan or the broad html skill routes a plan request here. Do not activate independently from a general request. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "idiomatic-code",
+                    "description": "Audit idiomatic use of a language, library, or framework against source fetched with opensrc. Use for idiomatic-code audits or alignment with named reference repositories. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "implement",
+                    "description": "Implement a piece of work based on a spec or set of tickets. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "maintain-formal-verification-skill",
+                    "description": "Bring a project's formal verification back in line with the code after the code changes: find the commits that touched verified code, update the model, harness, or properties to describe the code as it is now, rerun, and say whether each failure is drift in the verification or a bug in the code. Use for /maintain-formal-verification-skill, \"is the model still true to the code\", or after merges and refactors that touched verified code without rechecking it. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "maintain-verification-skill",
+                    "description": "Periodic pass that keeps a project's verification skill and feature map honest: parallel source readers per feature, one live session driving every feature, at most one PR of proven corrections. Use for /maintain-verification-skill or \"audit the verify skill\". (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "matt-code-review",
+                    "description": "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/PRD asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\". (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "multi-repo-explorer",
+                    "description": "Use when you need to understand how internal libraries work, trace dependencies across repositories, or explore code patterns in reference repos - clones/updates a configured list of repos and provides exploration guidance (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "no-comments",
+                    "description": "Remove unnecessary comments and fix the code that needs them (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "parallel-code-review",
+                    "description": "Runs code-reviewer subagents (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator",
+                    "description": "Reference for using Plannotator (its `plannotator` tool when you have one, otherwise the CLI): plan review, code review, annotating files, URLs, folders, and running local apps, annotating the last assistant message, browsing archived plan decisions, exporting or sharing Guided Reviews, and the Plannotator Inbox (messages and questions the person answers later, without blocking you). Invoke when asked to use Plannotator for anything not covered by a more specific plannotator-* skill, and before you leave the person a decision, a question or finished work while they are away from the chat (if another agent started you, report to it instead). (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator-annotate",
+                    "description": "Open Plannotator's annotation UI for a markdown file, HTML file, URL, or folder and then respond to the returned annotations. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator-last",
+                    "description": "Open Plannotator on the latest rendered assistant message and use the returned annotations to revise that message or continue. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator-review",
+                    "description": "Open Plannotator's browser-based code review UI for the current worktree, another directory, or a pull request URL, then act on the feedback that comes back. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "prototype",
+                    "description": "Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "research",
+                    "description": "Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "retro",
+                    "description": "Conduct a retrospective on a coding session. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "show-me",
+                    "description": "Help the user understand the current topic visually with concise diagrams, code-shape sketches, and focused HTML artifacts. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "sol-loop",
+                    "description": "Use when the user says \"sol loop\". (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "statechart",
+                    "description": "Check a TLA+ model of a system that moves between states, such as a product flow, a protocol, or a service, and draw it as a Mermaid statechart. The report gives the shortest path to each state that breaks a rule. Use for /statechart, or to show a bug as a path through states. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "tdd",
+                    "description": "Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions \"red-green-refactor\", or wants integration tests. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "teach",
+                    "description": "Teach the user a new skill or concept, within this workspace. (project)",
+                    "argumentHint": "What would you like to learn about?"
+                  },
+                  {
+                    "name": "thermo-nuclear-code-quality-review",
+                    "description": "Run an extremely strict maintainability review for abstraction quality, giant files, and spaghetti-condition growth. Use for a thermo-nuclear code quality review, thermonuclear review, deep code quality audit, or especially harsh maintainability review. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "to-spec",
+                    "description": "Turn the current conversation into a spec and publish it to the project issue tracker: no interview, just synthesis of what you've already discussed. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "to-tickets",
+                    "description": "Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker — edges as text in one file per ticket locally. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "video-explainer",
+                    "description": "Narrated motion-graphics video recap of the session's changes. Use when the user asks for a video explainer, a video recap, or to explain the changes as a video. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "writing-for-agents",
+                    "description": "Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md. (project)",
+                    "argumentHint": ""
+                  },
                   {
                     "name": "deep-research",
                     "description": "Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. (dynamic workflow)",
@@ -370,6 +611,11 @@
                     "name": "claude-code-guide",
                     "description": "Use this agent when the user asks questions (\"Can Claude...\", \"Does Claude...\", \"How do I...\") about: (1) Claude Code (the CLI tool) - features, hooks, slash commands, MCP servers, settings, IDE integrations, keyboard shortcuts; (2) Claude Agent SDK - building custom agents; (3) Claude API (formerly Anthropic API) - Messages API for directly passing messages to Claude, Tool Runner (`client.beta.messages.tool_runner`) for running an agentic loop over your own tools, manual tool-use loops, Managed Agents for server-hosted agents with a managed sandbox, prompt caching, and general Anthropic SDK usage; (4) Claude Tag (Claude in Slack) - what it is, setting it up for a Slack workspace, `/install-slack-app`; (5) `claude plugin eval` (writing and running plugin eval suites, its JSON/report, sandbox, CI) and the `/skill-doctor` report. **IMPORTANT:** Before spawning a new agent, check if there is already a running or recently completed claude-code-guide agent that you can continue via SendMessage.",
                     "model": "haiku"
+                  },
+                  {
+                    "name": "code-reviewer",
+                    "description": "Staff/principal-level review of unstaged changes — code quality, maintainability, architecture, and engineering best practices. Use when you want a thorough quality pass before committing.",
+                    "model": "opus"
                   },
                   {
                     "name": "Explore",
@@ -499,7 +745,7 @@
               "content": "Remember the word lantern. Reply with exactly: Noted."
             },
             "parent_tool_use_id": null,
-            "uuid": "93c83619-d05d-4eda-a68f-42132e54709c"
+            "uuid": "76d68da9-5b0e-4770-8163-4ad34133af61"
           }
         },
         {
@@ -508,25 +754,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "6a10bce2-b4b2-4f68-8062-062c059b780d",
+            "uuid": "5a05d4d0-4279-4950-ab94-943a931759a7",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "93c83619-d05d-4eda-a68f-42132e54709c",
+            "command_uuid": "76d68da9-5b0e-4770-8163-4ad34133af61",
             "state": "queued",
-            "uuid": "8aee956f-7591-47bc-b461-91a9309417e6",
+            "uuid": "3c932c15-9bd2-4298-9f5e-0da02b3fabd4",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "93c83619-d05d-4eda-a68f-42132e54709c",
+            "command_uuid": "76d68da9-5b0e-4770-8163-4ad34133af61",
             "state": "started",
-            "uuid": "da8d0815-202d-4a6f-9e3a-ea64fe22041e",
+            "uuid": "9f07f5b4-dbe2-4a74-a5fa-5f5b0e5645e1",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -538,7 +784,6 @@
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "tools": [
               "Task",
-              "AskUserQuestion",
               "Bash",
               "CronCreate",
               "CronDelete",
@@ -577,6 +822,54 @@
             "model": "claude-haiku-5-5",
             "permissionMode": "default",
             "slash_commands": [
+              "announce-pr",
+              "babysit-pr",
+              "before-and-after",
+              "bro",
+              "codebase-design",
+              "create-formal-verification-skill",
+              "create-verification-skill",
+              "deslop",
+              "diagnosing-bugs",
+              "domain-modeling",
+              "eli5",
+              "explain-diff-html",
+              "explainer",
+              "file-pr",
+              "finish-pr",
+              "full-ship",
+              "grill-me",
+              "grill-with-docs",
+              "grilling",
+              "handing-off-to-worktree",
+              "handoff",
+              "html",
+              "html-plan",
+              "idiomatic-code",
+              "implement",
+              "maintain-formal-verification-skill",
+              "maintain-verification-skill",
+              "matt-code-review",
+              "multi-repo-explorer",
+              "no-comments",
+              "parallel-code-review",
+              "plannotator",
+              "plannotator-annotate",
+              "plannotator-last",
+              "plannotator-review",
+              "prototype",
+              "research",
+              "retro",
+              "show-me",
+              "sol-loop",
+              "statechart",
+              "tdd",
+              "teach",
+              "thermo-nuclear-code-quality-review",
+              "to-spec",
+              "to-tickets",
+              "video-explainer",
+              "writing-for-agents",
               "deep-research",
               "dataviz",
               "update-config",
@@ -630,12 +923,61 @@
             "agents": [
               "claude",
               "claude-code-guide",
+              "code-reviewer",
               "Explore",
               "general-purpose",
               "Plan",
               "statusline-setup"
             ],
             "skills": [
+              "announce-pr",
+              "babysit-pr",
+              "before-and-after",
+              "bro",
+              "codebase-design",
+              "create-formal-verification-skill",
+              "create-verification-skill",
+              "deslop",
+              "diagnosing-bugs",
+              "domain-modeling",
+              "eli5",
+              "explain-diff-html",
+              "explainer",
+              "file-pr",
+              "finish-pr",
+              "full-ship",
+              "grill-me",
+              "grill-with-docs",
+              "grilling",
+              "handing-off-to-worktree",
+              "handoff",
+              "html",
+              "html-plan",
+              "idiomatic-code",
+              "implement",
+              "maintain-formal-verification-skill",
+              "maintain-verification-skill",
+              "matt-code-review",
+              "multi-repo-explorer",
+              "no-comments",
+              "parallel-code-review",
+              "plannotator",
+              "plannotator-annotate",
+              "plannotator-last",
+              "plannotator-review",
+              "prototype",
+              "research",
+              "retro",
+              "show-me",
+              "sol-loop",
+              "statechart",
+              "tdd",
+              "teach",
+              "thermo-nuclear-code-quality-review",
+              "to-spec",
+              "to-tickets",
+              "video-explainer",
+              "writing-for-agents",
               "deep-research",
               "dataviz",
               "update-config",
@@ -690,13 +1032,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "46cb8419-6e08-47c0-b338-796c0b1487b2",
+            "uuid": "847f0f4f-9fdb-45f9-975b-0615a1e55935",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-c89862554272671fb7a632e3ee239fc5",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-4ca8b6dd37a63074b971776167ff2cfb",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -704,7 +1046,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["93c83619-d05d-4eda-a68f-42132e54709c"]
+            "user_message_uuids": ["76d68da9-5b0e-4770-8163-4ad34133af61"]
           }
         },
         {
@@ -713,8 +1055,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "019ad118-1712-46bd-9343-23b3705df29a",
-            "user_message_uuids": ["93c83619-d05d-4eda-a68f-42132e54709c"]
+            "uuid": "9b6f3287-9c8e-47cc-956d-105aebcec80b",
+            "user_message_uuids": ["76d68da9-5b0e-4770-8163-4ad34133af61"]
           }
         },
         {
@@ -724,7 +1066,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChFNb5ugW3ggduYunLM9K",
+                "id": "msg_011ChNbyTpTqouLAAS7L8r2q",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -752,12 +1094,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9a425e92-cda7-4597-a619-bae0f63b46d6",
-            "ttft_ms": 823,
+            "uuid": "88745e14-3804-4858-b0b9-3c6cb2ce1268",
+            "ttft_ms": 884,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChFNb5ugW3ggduYunLM9K",
-            "user_message_uuid": "93c83619-d05d-4eda-a68f-42132e54709c",
-            "user_message_uuids": ["93c83619-d05d-4eda-a68f-42132e54709c"]
+            "api_message_id": "msg_011ChNbyTpTqouLAAS7L8r2q",
+            "user_message_uuid": "76d68da9-5b0e-4770-8163-4ad34133af61",
+            "user_message_uuids": ["76d68da9-5b0e-4770-8163-4ad34133af61"]
           }
         },
         {
@@ -773,8 +1115,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "6c9fae4d-beac-44b7-83e6-2c3cb23b0262",
-            "api_message_id": "msg_011ChFNb5ugW3ggduYunLM9K"
+            "uuid": "6c132970-c310-4840-bd24-90e861276a9a",
+            "api_message_id": "msg_011ChNbyTpTqouLAAS7L8r2q"
           }
         },
         {
@@ -790,8 +1132,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b09a97c1-1592-43e0-80a4-ec9236cda897",
-            "api_message_id": "msg_011ChFNb5ugW3ggduYunLM9K"
+            "uuid": "42beee9e-9f18-40ef-aa65-0776b50875bc",
+            "api_message_id": "msg_011ChNbyTpTqouLAAS7L8r2q"
           }
         },
         {
@@ -799,7 +1141,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChFNb5ugW3ggduYunLM9K",
+              "id": "msg_011ChNbyTpTqouLAAS7L8r2q",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -831,11 +1173,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "23e411d8-25e2-4260-b715-c56952fec792",
-            "timestamp": "2026-11-21T03:35:46.098Z",
-            "request_id": "req_011ChFNb5mkgiGpHc4f3vbqU",
-            "user_message_uuid": "93c83619-d05d-4eda-a68f-42132e54709c",
-            "user_message_uuids": ["93c83619-d05d-4eda-a68f-42132e54709c"]
+            "uuid": "dc639b0a-9a35-4fd1-903e-47353d02b4f3",
+            "timestamp": "2026-11-24T23:15:28.017Z",
+            "request_id": "req_011ChNbyTh1sFGrXYb81cBeo",
+            "user_message_uuid": "76d68da9-5b0e-4770-8163-4ad34133af61",
+            "user_message_uuids": ["76d68da9-5b0e-4770-8163-4ad34133af61"]
           }
         },
         {
@@ -847,8 +1189,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1882d032-8e46-457e-ac68-c6a98ee002c7",
-            "api_message_id": "msg_011ChFNb5ugW3ggduYunLM9K"
+            "uuid": "c8dcc2dc-b9d7-4579-80b4-1a046a167056",
+            "api_message_id": "msg_011ChNbyTpTqouLAAS7L8r2q"
           }
         },
         {
@@ -877,8 +1219,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9656b7f0-3608-474d-bac3-b6f73d95b326",
-            "api_message_id": "msg_011ChFNb5ugW3ggduYunLM9K"
+            "uuid": "d8377ea3-0c58-426d-984e-7edb806f2379",
+            "api_message_id": "msg_011ChNbyTpTqouLAAS7L8r2q"
           }
         },
         {
@@ -889,21 +1231,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5db885f9-b9b1-4060-9bed-fb0e4395cec1",
-            "api_message_id": "msg_011ChFNb5ugW3ggduYunLM9K"
+            "uuid": "c1050792-9bb7-4c9f-93fa-b069f9013bf2",
+            "api_message_id": "msg_011ChNbyTpTqouLAAS7L8r2q"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "8e573e0f-7181-4e06-bc7d-818e6589cd23",
+            "uuid": "42ba43b6-4022-479e-bc05-cb3f2d6bd00d",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 832,
+            "duration_api_ms": 917,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -981,18 +1323,18 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "Noted.",
-            "ttft_ms": 883,
+            "ttft_ms": 972,
             "type": "result",
-            "duration_ms": 892,
-            "uuid": "ef015a08-beea-4978-a581-20b5feb50742",
-            "ttft_stream_ms": 882,
-            "time_to_request_ms": 61,
-            "first_content_frame_ms": 882,
-            "user_message_uuid": "93c83619-d05d-4eda-a68f-42132e54709c",
-            "user_message_uuids": ["93c83619-d05d-4eda-a68f-42132e54709c"],
-            "request_sent_wall_ms": 1795232145276,
+            "duration_ms": 977,
+            "uuid": "d57f9be3-296f-4e73-9fe3-074359942e26",
+            "ttft_stream_ms": 944,
+            "time_to_request_ms": 63,
+            "first_content_frame_ms": 945,
+            "user_message_uuid": "76d68da9-5b0e-4770-8163-4ad34133af61",
+            "user_message_uuids": ["76d68da9-5b0e-4770-8163-4ad34133af61"],
+            "request_sent_wall_ms": 1795562127108,
             "first_request_input_tokens": 0,
-            "first_request_cache_read_input_tokens": 14807,
+            "first_request_cache_read_input_tokens": 13041,
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
@@ -1018,9 +1360,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "93c83619-d05d-4eda-a68f-42132e54709c",
+            "command_uuid": "76d68da9-5b0e-4770-8163-4ad34133af61",
             "state": "completed",
-            "uuid": "effdda0d-d476-499e-a321-3ab1bcf13d0e",
+            "uuid": "f1b80d10-af98-48ef-ad48-570d9ac50bb6",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1030,7 +1372,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "92cf9a2d-6c7e-4f0b-8fdc-ee906d6b7a64",
+            "uuid": "93ddb3c1-4491-4ca2-80fd-a7eda59a1699",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1048,6 +1390,7 @@
         "stream-json",
         "--permission-prompt-tool=stdio",
         "--resume=6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+        "--disallowedTools=AskUserQuestion",
         "--allow-dangerously-skip-permissions",
         "--include-partial-messages"
       ],
@@ -1055,7 +1398,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "pupg5b3e66s",
+            "request_id": "g70hs4z4sv",
             "type": "control_request",
             "request": {
               "subtype": "initialize",
@@ -1115,9 +1458,249 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "pupg5b3e66s",
+              "request_id": "g70hs4z4sv",
               "response": {
                 "commands": [
+                  {
+                    "name": "announce-pr",
+                    "description": "Watch a PR's CI and draft a paste-ready post (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "babysit-pr",
+                    "description": "Monitor a pull request through review and CI. Use when the user asks to monitor, watch, or babysit a PR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "before-and-after",
+                    "description": "Add existing screenshots or screen recordings to a GitHub pull request as a before/after or preview block. Use when a PR needs visual media attached to its description. Browser navigation and capture belong to agent-browser. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "bro",
+                    "description": "Restate the last message in plain human language, with no jargon (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "codebase-design",
+                    "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "create-formal-verification-skill",
+                    "description": "Generate a project-local skill that formally verifies the code where a bug costs the most and tests reach the least, in any language, with whichever verification tool fits. Use for /create-formal-verification-skill, \"model-check this race\", \"prove this invariant\", or when concurrency, retries, state machines, parsers, or unsafe code need more than tests. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "create-verification-skill",
+                    "description": "Generate a project-local verification skill that drives your app the way a user does — any language, framework, or platform. Use for /create-verification-skill, \"make a control skill for this repo\", or when a project has no scripted way to prove UI/CLI/service behavior. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "deslop",
+                    "description": "Remove AI-generated code slop and clean up code style (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "diagnosing-bugs",
+                    "description": "Diagnosis loop for hard bugs and performance regressions. Use when the user says \"diagnose\"/\"debug this\", or reports something broken/throwing/failing/slow. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "domain-modeling",
+                    "description": "Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a GLOSSARY.md, or recording or editing an ADR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "eli5",
+                    "description": "Explain a topic like I'm a 5 year old. Use when the user types /eli5 &lt;topic&gt; or asks for a dead-simple picture explainer of how something works. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "explain-diff-html",
+                    "description": "Use when the user asks for a rich explanation of a code change, diff, branch, or PR. Produces HTML output. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "explainer",
+                    "description": "Turns a system, flow, process, dataset or plan into a clear interactive diagram delivered as one self-contained HTML file: architecture and flow diagrams, sequence and state machines, bar, line, slope, scatter, waterfall, heatmap, treemap, Sankey, funnel, radar and quadrant charts, Gantt charts, timelines, kanban boards, user journeys, story maps, database schemas, UML class diagrams, swimlanes, fishbone and Wardley maps, and incident or release reports with an annotated timeline. Every diagram works bare or with text, in light and dark, with click-to-explore details and PNG capture. Use when asked to explain how something works, diagram or map a system, chart or compare numbers, plan a project, or screenshot such a diagram. Not for Svelte or .svx documents, app UI components, live dashboards over changing data, quick ASCII diagrams, or answers that read fine as a paragraph. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "file-pr",
+                    "description": "File a concise pull request. Use when the user asks to file, open or create a PR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "finish-pr",
+                    "description": "Trigger this when the user says 'finish pr' or asks to finish the PR. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "full-ship",
+                    "description": "Trigger this if the user says 'full ship'. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "grill-me",
+                    "description": "A relentless interview to sharpen a plan or design. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "grill-with-docs",
+                    "description": "A relentless interview to sharpen a plan or design, which also creates docs (ADR's and glossary) as we go. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "grilling",
+                    "description": "Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "handing-off-to-worktree",
+                    "description": "Hand off a scoped code change to a fresh agent session in its own git worktree, with a self-contained brief. Use when the user asks to hand off, spin up, or start a fix or feature in a new worktree, or when another skill fans work out to parallel sessions. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "handoff",
+                    "description": "Compact the current conversation into a handoff document for another agent to pick up. (project)",
+                    "argumentHint": "What will the next session be used for?"
+                  },
+                  {
+                    "name": "html",
+                    "description": "Create or redesign self-contained single-file HTML artifacts with a visual direction shaped by the user's brief, project, and subject. Use when HTML is the deliverable for a report, explainer, landing page, presentation, tool, mixed artifact, or broad request. This is the collection's only implicit router. Route clear wireframe, prototype, mockup, plan, or diagram requests to the matching direct-invocation specialist when available. Do not use for ordinary application implementation when a standalone HTML file is not the deliverable. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "html-plan",
+                    "description": "Direct-invocation specialist for clear, self-contained HTML plans that preserve source material while improving hierarchy, sequence, ownership, dependencies, and reviewability. Use when the user explicitly invokes html-plan or the broad html skill routes a plan request here. Do not activate independently from a general request. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "idiomatic-code",
+                    "description": "Audit idiomatic use of a language, library, or framework against source fetched with opensrc. Use for idiomatic-code audits or alignment with named reference repositories. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "implement",
+                    "description": "Implement a piece of work based on a spec or set of tickets. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "maintain-formal-verification-skill",
+                    "description": "Bring a project's formal verification back in line with the code after the code changes: find the commits that touched verified code, update the model, harness, or properties to describe the code as it is now, rerun, and say whether each failure is drift in the verification or a bug in the code. Use for /maintain-formal-verification-skill, \"is the model still true to the code\", or after merges and refactors that touched verified code without rechecking it. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "maintain-verification-skill",
+                    "description": "Periodic pass that keeps a project's verification skill and feature map honest: parallel source readers per feature, one live session driving every feature, at most one PR of proven corrections. Use for /maintain-verification-skill or \"audit the verify skill\". (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "matt-code-review",
+                    "description": "Review the changes since a fixed point (commit, branch, tag, or merge-base) along two axes — Standards (does the code follow this repo's documented coding standards?) and Spec (does the code match what the originating issue/PRD asked for?). Runs both reviews in parallel sub-agents and reports them side by side. Use when the user wants to review a branch, a PR, work-in-progress changes, or asks to \"review since X\". (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "multi-repo-explorer",
+                    "description": "Use when you need to understand how internal libraries work, trace dependencies across repositories, or explore code patterns in reference repos - clones/updates a configured list of repos and provides exploration guidance (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "no-comments",
+                    "description": "Remove unnecessary comments and fix the code that needs them (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "parallel-code-review",
+                    "description": "Runs code-reviewer subagents (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator",
+                    "description": "Reference for using Plannotator (its `plannotator` tool when you have one, otherwise the CLI): plan review, code review, annotating files, URLs, folders, and running local apps, annotating the last assistant message, browsing archived plan decisions, exporting or sharing Guided Reviews, and the Plannotator Inbox (messages and questions the person answers later, without blocking you). Invoke when asked to use Plannotator for anything not covered by a more specific plannotator-* skill, and before you leave the person a decision, a question or finished work while they are away from the chat (if another agent started you, report to it instead). (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator-annotate",
+                    "description": "Open Plannotator's annotation UI for a markdown file, HTML file, URL, or folder and then respond to the returned annotations. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator-last",
+                    "description": "Open Plannotator on the latest rendered assistant message and use the returned annotations to revise that message or continue. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "plannotator-review",
+                    "description": "Open Plannotator's browser-based code review UI for the current worktree, another directory, or a pull request URL, then act on the feedback that comes back. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "prototype",
+                    "description": "Build a throwaway prototype to answer a design question. Use when the user wants to sanity-check whether a state model or logic feels right, or explore what a UI should look like. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "research",
+                    "description": "Investigate a question against high-trust primary sources and capture the findings as a Markdown file in the repo. Use when the user wants a topic researched, docs or API facts gathered, or reading legwork delegated to a background agent. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "retro",
+                    "description": "Conduct a retrospective on a coding session. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "show-me",
+                    "description": "Help the user understand the current topic visually with concise diagrams, code-shape sketches, and focused HTML artifacts. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "sol-loop",
+                    "description": "Use when the user says \"sol loop\". (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "statechart",
+                    "description": "Check a TLA+ model of a system that moves between states, such as a product flow, a protocol, or a service, and draw it as a Mermaid statechart. The report gives the shortest path to each state that breaks a rule. Use for /statechart, or to show a bug as a path through states. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "tdd",
+                    "description": "Test-driven development. Use when the user wants to build features or fix bugs test-first, mentions \"red-green-refactor\", or wants integration tests. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "teach",
+                    "description": "Teach the user a new skill or concept, within this workspace. (project)",
+                    "argumentHint": "What would you like to learn about?"
+                  },
+                  {
+                    "name": "thermo-nuclear-code-quality-review",
+                    "description": "Run an extremely strict maintainability review for abstraction quality, giant files, and spaghetti-condition growth. Use for a thermo-nuclear code quality review, thermonuclear review, deep code quality audit, or especially harsh maintainability review. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "to-spec",
+                    "description": "Turn the current conversation into a spec and publish it to the project issue tracker: no interview, just synthesis of what you've already discussed. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "to-tickets",
+                    "description": "Break a plan, spec, or the current conversation into a set of tracer-bullet tickets, each declaring its blocking edges, published to the configured tracker — edges as text in one file per ticket locally. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "video-explainer",
+                    "description": "Narrated motion-graphics video recap of the session's changes. Use when the user asks for a video explainer, a video recap, or to explain the changes as a video. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "writing-for-agents",
+                    "description": "Writing documents for agents. Use when creating or editing skills, or modifying AGENTS.md or CLAUDE.md. (project)",
+                    "argumentHint": ""
+                  },
                   {
                     "name": "deep-research",
                     "description": "Deep research harness — fan-out web searches, fetch sources, adversarially verify claims, synthesize a cited report. (dynamic workflow)",
@@ -1409,6 +1992,11 @@
                     "model": "haiku"
                   },
                   {
+                    "name": "code-reviewer",
+                    "description": "Staff/principal-level review of unstaged changes — code quality, maintainability, architecture, and engineering best practices. Use when you want a thorough quality pass before committing.",
+                    "model": "opus"
+                  },
+                  {
                     "name": "Explore",
                     "description": "Fast read-only search agent for locating code. Use it to find files by pattern (eg. \"src/components/**/*.tsx\"), grep for symbols or keywords (eg. \"API endpoints\"), or answer \"where is X defined / which files reference Y.\" Do NOT use it for code review, design-doc auditing, cross-file consistency checks, or open-ended analysis — it reads excerpts rather than whole files and will miss content past its read window. When calling, specify search breadth: \"quick\" for a single targeted lookup, \"medium\" for moderate exploration, or \"very thorough\" to search across multiple locations and naming conventions.",
                     "model": "inherit"
@@ -1536,7 +2124,7 @@
               "content": "Which word did I ask you to remember? Reply with only that word, in lowercase."
             },
             "parent_tool_use_id": null,
-            "uuid": "72f9c351-6b18-4ee8-9890-02270d33312b"
+            "uuid": "1e9ebb4f-c63c-4ae7-bbac-73f653139b91"
           }
         },
         {
@@ -1545,25 +2133,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "3870843b-b322-4b60-9e9e-b43204244d41",
+            "uuid": "d2a66854-ee85-4328-81c4-33989effa6e2",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "72f9c351-6b18-4ee8-9890-02270d33312b",
+            "command_uuid": "1e9ebb4f-c63c-4ae7-bbac-73f653139b91",
             "state": "queued",
-            "uuid": "d9b6c02e-eef0-4723-80a7-ec41ed27e7e3",
+            "uuid": "1d228f5f-d207-461b-b4b3-419a558b159d",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "72f9c351-6b18-4ee8-9890-02270d33312b",
+            "command_uuid": "1e9ebb4f-c63c-4ae7-bbac-73f653139b91",
             "state": "started",
-            "uuid": "04aebb44-8ba1-4878-9be0-e9ae9adc7fd5",
+            "uuid": "97c3eee0-6682-46b3-93e3-95076fe851fd",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1575,7 +2163,6 @@
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "tools": [
               "Task",
-              "AskUserQuestion",
               "Bash",
               "CronCreate",
               "CronDelete",
@@ -1614,6 +2201,54 @@
             "model": "claude-haiku-5-5",
             "permissionMode": "default",
             "slash_commands": [
+              "announce-pr",
+              "babysit-pr",
+              "before-and-after",
+              "bro",
+              "codebase-design",
+              "create-formal-verification-skill",
+              "create-verification-skill",
+              "deslop",
+              "diagnosing-bugs",
+              "domain-modeling",
+              "eli5",
+              "explain-diff-html",
+              "explainer",
+              "file-pr",
+              "finish-pr",
+              "full-ship",
+              "grill-me",
+              "grill-with-docs",
+              "grilling",
+              "handing-off-to-worktree",
+              "handoff",
+              "html",
+              "html-plan",
+              "idiomatic-code",
+              "implement",
+              "maintain-formal-verification-skill",
+              "maintain-verification-skill",
+              "matt-code-review",
+              "multi-repo-explorer",
+              "no-comments",
+              "parallel-code-review",
+              "plannotator",
+              "plannotator-annotate",
+              "plannotator-last",
+              "plannotator-review",
+              "prototype",
+              "research",
+              "retro",
+              "show-me",
+              "sol-loop",
+              "statechart",
+              "tdd",
+              "teach",
+              "thermo-nuclear-code-quality-review",
+              "to-spec",
+              "to-tickets",
+              "video-explainer",
+              "writing-for-agents",
               "deep-research",
               "dataviz",
               "update-config",
@@ -1667,12 +2302,61 @@
             "agents": [
               "claude",
               "claude-code-guide",
+              "code-reviewer",
               "Explore",
               "general-purpose",
               "Plan",
               "statusline-setup"
             ],
             "skills": [
+              "announce-pr",
+              "babysit-pr",
+              "before-and-after",
+              "bro",
+              "codebase-design",
+              "create-formal-verification-skill",
+              "create-verification-skill",
+              "deslop",
+              "diagnosing-bugs",
+              "domain-modeling",
+              "eli5",
+              "explain-diff-html",
+              "explainer",
+              "file-pr",
+              "finish-pr",
+              "full-ship",
+              "grill-me",
+              "grill-with-docs",
+              "grilling",
+              "handing-off-to-worktree",
+              "handoff",
+              "html",
+              "html-plan",
+              "idiomatic-code",
+              "implement",
+              "maintain-formal-verification-skill",
+              "maintain-verification-skill",
+              "matt-code-review",
+              "multi-repo-explorer",
+              "no-comments",
+              "parallel-code-review",
+              "plannotator",
+              "plannotator-annotate",
+              "plannotator-last",
+              "plannotator-review",
+              "prototype",
+              "research",
+              "retro",
+              "show-me",
+              "sol-loop",
+              "statechart",
+              "tdd",
+              "teach",
+              "thermo-nuclear-code-quality-review",
+              "to-spec",
+              "to-tickets",
+              "video-explainer",
+              "writing-for-agents",
               "deep-research",
               "dataviz",
               "update-config",
@@ -1727,13 +2411,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "7ecb5883-e2e9-4fb3-87fa-81b79a1c06f4",
+            "uuid": "64b9adc0-042c-4314-b9a4-402080f0653d",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-42abeed8b36449111e6f6cd9dfbac6a8",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-c18f5bd9e5893542576db1849b974c10",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -1741,7 +2425,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["72f9c351-6b18-4ee8-9890-02270d33312b"]
+            "user_message_uuids": ["1e9ebb4f-c63c-4ae7-bbac-73f653139b91"]
           }
         },
         {
@@ -1750,8 +2434,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "af656ddb-f3de-4b58-9d14-f3d9f057fcf0",
-            "user_message_uuids": ["72f9c351-6b18-4ee8-9890-02270d33312b"]
+            "uuid": "665fe4bf-17b9-4b96-aeeb-fe5596a62248",
+            "user_message_uuids": ["1e9ebb4f-c63c-4ae7-bbac-73f653139b91"]
           }
         },
         {
@@ -1761,7 +2445,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChFNbBSKjTxRoB6LzRqiF",
+                "id": "msg_011ChNbyZciCp5GE19F3Tqto",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1786,7 +2470,7 @@
                 "diagnostics": {
                   "cache_miss_reason": {
                     "type": "messages_changed",
-                    "cache_missed_input_tokens": 3913
+                    "cache_missed_input_tokens": 6881
                   }
                 },
                 "context_management": null
@@ -1794,12 +2478,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "13b74ea6-aa42-46e8-ad08-fda0b9bd7b24",
-            "ttft_ms": 763,
+            "uuid": "776d7ac2-6983-41ef-ac4e-1e120304fb25",
+            "ttft_ms": 837,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChFNbBSKjTxRoB6LzRqiF",
-            "user_message_uuid": "72f9c351-6b18-4ee8-9890-02270d33312b",
-            "user_message_uuids": ["72f9c351-6b18-4ee8-9890-02270d33312b"]
+            "api_message_id": "msg_011ChNbyZciCp5GE19F3Tqto",
+            "user_message_uuid": "1e9ebb4f-c63c-4ae7-bbac-73f653139b91",
+            "user_message_uuids": ["1e9ebb4f-c63c-4ae7-bbac-73f653139b91"]
           }
         },
         {
@@ -1815,8 +2499,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a2cfa1c0-8c2c-4cb9-83c1-792e5fddb238",
-            "api_message_id": "msg_011ChFNbBSKjTxRoB6LzRqiF"
+            "uuid": "78998317-40da-4295-8fd0-d014f60bbfeb",
+            "api_message_id": "msg_011ChNbyZciCp5GE19F3Tqto"
           }
         },
         {
@@ -1832,8 +2516,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "92e72156-0307-42c4-93e8-b92ad1ade122",
-            "api_message_id": "msg_011ChFNbBSKjTxRoB6LzRqiF"
+            "uuid": "95c8c1e7-9957-43b2-b6b4-eddf6636e787",
+            "api_message_id": "msg_011ChNbyZciCp5GE19F3Tqto"
           }
         },
         {
@@ -1841,7 +2525,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChFNbBSKjTxRoB6LzRqiF",
+              "id": "msg_011ChNbyZciCp5GE19F3Tqto",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -1871,18 +2555,18 @@
               "diagnostics": {
                 "cache_miss_reason": {
                   "type": "messages_changed",
-                  "cache_missed_input_tokens": 3913
+                  "cache_missed_input_tokens": 6881
                 }
               },
               "context_management": null
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "274cf606-5c4d-48ca-a213-a29883082e9b",
-            "timestamp": "2026-11-21T03:35:47.353Z",
-            "request_id": "req_011ChFNbBKNdzE6TLrrSXqMs",
-            "user_message_uuid": "72f9c351-6b18-4ee8-9890-02270d33312b",
-            "user_message_uuids": ["72f9c351-6b18-4ee8-9890-02270d33312b"]
+            "uuid": "05df44f0-0c34-46b9-9d49-f0c28fe237f9",
+            "timestamp": "2026-11-24T23:15:29.298Z",
+            "request_id": "req_011ChNbyZV2wpgLTZFHZoPSK",
+            "user_message_uuid": "1e9ebb4f-c63c-4ae7-bbac-73f653139b91",
+            "user_message_uuids": ["1e9ebb4f-c63c-4ae7-bbac-73f653139b91"]
           }
         },
         {
@@ -1894,8 +2578,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b8db6ff3-ecac-425e-89cb-95aa96d7e14d",
-            "api_message_id": "msg_011ChFNbBSKjTxRoB6LzRqiF"
+            "uuid": "d6310fea-77c8-42b5-ba2f-a460bed66c09",
+            "api_message_id": "msg_011ChNbyZciCp5GE19F3Tqto"
           }
         },
         {
@@ -1924,8 +2608,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b4a73c5a-762b-4c37-8691-97705aa56935",
-            "api_message_id": "msg_011ChFNbBSKjTxRoB6LzRqiF"
+            "uuid": "8e6bd077-1b86-4d4f-902b-8a40ee1c7995",
+            "api_message_id": "msg_011ChNbyZciCp5GE19F3Tqto"
           }
         },
         {
@@ -1936,21 +2620,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0e6a2819-49fc-4151-95ce-05c302c8ceac",
-            "api_message_id": "msg_011ChFNbBSKjTxRoB6LzRqiF"
+            "uuid": "c67b7ba0-1394-4cc4-96d2-b1529e1c75af",
+            "api_message_id": "msg_011ChNbyZciCp5GE19F3Tqto"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "a31ef880-def5-4138-99b1-ea2ba0b29fbc",
+            "uuid": "210cee1b-88cf-4cae-991e-b7779c57af8a",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 1603,
+            "duration_api_ms": 1771,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -2028,18 +2712,18 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "lantern",
-            "ttft_ms": 855,
+            "ttft_ms": 926,
             "type": "result",
-            "duration_ms": 863,
-            "uuid": "b7159d26-9769-4644-a27b-859bd11cb005",
-            "ttft_stream_ms": 854,
-            "time_to_request_ms": 94,
-            "first_content_frame_ms": 855,
-            "user_message_uuid": "72f9c351-6b18-4ee8-9890-02270d33312b",
-            "user_message_uuids": ["72f9c351-6b18-4ee8-9890-02270d33312b"],
-            "request_sent_wall_ms": 1795232146591,
+            "duration_ms": 942,
+            "uuid": "3c959af9-8e04-4749-b2ad-f6d601348de0",
+            "ttft_stream_ms": 926,
+            "time_to_request_ms": 91,
+            "first_content_frame_ms": 926,
+            "user_message_uuid": "1e9ebb4f-c63c-4ae7-bbac-73f653139b91",
+            "user_message_uuids": ["1e9ebb4f-c63c-4ae7-bbac-73f653139b91"],
+            "request_sent_wall_ms": 1795562128463,
             "first_request_input_tokens": 0,
-            "first_request_cache_read_input_tokens": 17378,
+            "first_request_cache_read_input_tokens": 16311,
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
@@ -2065,9 +2749,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "72f9c351-6b18-4ee8-9890-02270d33312b",
+            "command_uuid": "1e9ebb4f-c63c-4ae7-bbac-73f653139b91",
             "state": "completed",
-            "uuid": "40886c14-42c5-4482-828b-3d0fe7e7c94b",
+            "uuid": "f331ef4d-067b-4a74-ab72-56c90db533ef",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2077,7 +2761,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "867a0910-6b46-4ba8-b3fe-e815a97c9059",
+            "uuid": "868afbd0-cb6b-46bc-ba47-78bee466d9ee",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2103,12 +2787,12 @@
       "info": {
         "sessionId": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
         "summary": "Remember the word lantern. Reply with exactly: Noted.",
-        "lastModified": 1795232146122,
-        "fileSize": 170426,
+        "lastModified": 1795562128045,
+        "fileSize": 186368,
         "firstPrompt": "Remember the word lantern. Reply with exactly: Noted.",
         "gitBranch": "HEAD",
         "cwd": "<folder>",
-        "createdAt": 1795232145209
+        "createdAt": 1795562127040
       }
     }
   ]

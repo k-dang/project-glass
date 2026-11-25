@@ -24,7 +24,9 @@ claude mcp login glass
 ```
 
 Claude Code opens the approval page. Approve it, then the agent can call `ask_user` and
-`check_in`. Answer in the Inbox.
+`check_in`. Neither waits for you: each returns an id at once, and you answer in the Inbox, now or
+days later, or set it aside. The agent reads your answer with `read_answer` and that id, from any
+of its sessions; Glass doesn't wake it, so tell it when you've answered.
 
 `claude mcp login glass` is the sign-in step. If your Claude Code build uses a different command,
 run `claude mcp --help` and use the login or authenticate command it lists for an HTTP server.
@@ -47,12 +49,13 @@ untracked files. Glass freezes them as they are, so your notes always match the 
 When a Check-in arrives, Glass comes to the front on its page. Check-ins already waiting when Glass
 starts stay in the Inbox: select one and choose **Read the changes** to open them on their own page.
 Select lines in the diff to leave Feedback notes, then choose **Send feedback** for
-the agent to change the code, or **Approve** for it to carry on. Notes on an approval go to the
-agent as guidance. The agent waits up to an hour, or the time it asks for, at most two hours. If it
-stops waiting before you answer, your notes stay with the folder and come back on its next
-Check-in.
+the agent to change the code, or **Approve** for it to carry on, or **Set aside** in the Inbox to
+answer neither. Notes on an approval go to the agent as guidance. A Check-in waits until you answer
+it, across restarts. If the agent checks in again from the same folder first, the new Check-in
+replaces the old one and your notes carry over to it.
 
 To ask for a Check-in yourself, copy the [`glass-review`](glass-review/SKILL.md) folder into your
 agent's skills folder: `~/.claude/skills/` for Claude Code, then type `/glass-review`, or
-`~/.agents/skills/` for pi, then type `/skill:glass-review`. After Feedback, the agent addresses it
-and stops; run the skill again when you want to read the new changes.
+`~/.agents/skills/` for pi, then type `/skill:glass-review`. Once you've answered in the Inbox, tell
+the agent; it reads your answer, and after Feedback addresses it and stops. Run the skill again when
+you want to read the new changes.

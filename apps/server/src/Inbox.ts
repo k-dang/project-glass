@@ -1,6 +1,9 @@
 import {
   type CheckIn,
   InboxThread,
+  type OpenQuestion,
+  OpenQuestions,
+  type Thread,
   AgentReviewFinished,
   AwaitingReply,
   ChangesRequested,
@@ -11,7 +14,7 @@ import {
   canRunQueueWork,
   type InboxItem,
   InboxItems,
-  type OutsideQuestion,
+  OutsideQuestion,
   InboxPullRequest,
   type PullRequestReason,
   type PullRequestSummary,
@@ -38,7 +41,7 @@ import { AgentReviews } from "./AgentReviews"
 import { CheckIns } from "./CheckIns"
 import { Threads, type FinishedThread, type WaitingThread } from "./Threads"
 import { GlobalChat } from "./GlobalChat"
-import { OutsideQuestions } from "./OutsideQuestions"
+import { type AskedQuestion, Questions } from "./Questions"
 import {
   type Mirror,
   type MirroredPullRequest,
@@ -59,26 +62,39 @@ const order: Order.Order<InboxItem> = Order.combine(
   Order.mapInput(DateTime.Order, (item: InboxItem) => item.since),
 )
 
-const waitingOn = (requests: Arr.NonEmptyReadonlyArray<WaitingRequest>) => ({
-  requests: Arr.map(requests, ({ part }) => part),
-  since: Arr.min(
-    Arr.map(requests, ({ since }) => since),
+const earliest = (waiting: Arr.NonEmptyReadonlyArray<{ readonly since: DateTime.Utc }>) =>
+  Arr.min(
+    Arr.map(waiting, ({ since }) => since),
     DateTime.Order,
-  ),
-})
+  )
 
-const waitingItem = ({ thread, requests }: WaitingThread) => {
-  const { requests: parts, since } = waitingOn(requests)
-
-  return InboxThread.make({
+const waitingItem = ({ thread, requests }: WaitingThread) =>
+  InboxThread.make({
     thread,
-    reasons: [WaitingRequests.make({ requests: parts })],
-    since,
+    reasons: [WaitingRequests.make({ requests: Arr.map(requests, ({ part }) => part) })],
+    since: earliest(requests),
   })
-}
 
-const globalItem = (requests: ReadonlyArray<WaitingRequest>) =>
-  Arr.isReadonlyArrayNonEmpty(requests) ? [InboxGlobalChat.make(waitingOn(requests))] : []
+const globalItem = (
+  requests: ReadonlyArray<WaitingRequest>,
+  asked: ReadonlyArray<AskedQuestion>,
+) => {
+  const questions = asked.flatMap(({ asker, question }) =>
+    Predicate.isTagged(asker, "GlobalChat") ? [question] : [],
+  )
+
+  const waiting = [...requests, ...questions]
+
+  return Arr.isReadonlyArrayNonEmpty(waiting)
+    ? [
+        InboxGlobalChat.make({
+          requests: requests.map(({ part }) => part),
+          questions,
+          since: earliest(waiting),
+        }),
+      ]
+    : []
+}
 
 const finishedItem = ({ thread, ended }: FinishedThread) =>
   InboxThread.make({
@@ -87,24 +103,53 @@ const finishedItem = ({ thread, ended }: FinishedThread) =>
     since: ended.at,
   })
 
+interface AskingThread {
+  readonly thread: Thread
+  readonly questions: Arr.NonEmptyReadonlyArray<OpenQuestion>
+}
+
+const askingThreads = (
+  threads: ReadonlyArray<Thread>,
+  byThread: ReadonlyMap<string, Arr.NonEmptyReadonlyArray<OpenQuestion>>,
+) =>
+  threads.flatMap((thread) => {
+    const questions = byThread.get(thread.id)
+
+    return questions === undefined ? [] : [{ thread, questions }]
+  })
+
+const askingItem = ({ thread, questions }: AskingThread) =>
+  InboxThread.make({
+    thread,
+    reasons: [OpenQuestions.make({ questions })],
+    since: earliest(questions),
+  })
+
+const threadItems = (items: ReadonlyArray<InboxThread>) =>
+  Object.values(Arr.groupBy(items, ({ thread }) => thread.id)).map((group) =>
+    InboxThread.make({
+      thread: group[0].thread,
+      reasons: Arr.flatMap(group, ({ reasons }) => reasons),
+      since: earliest(group),
+    }),
+  )
+
 const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
   Object.values(Arr.groupBy(waiting, ({ pullRequest }) => referenceKey(pullRequest.ref))).map(
     (group) =>
       InboxPullRequest.make({
         pullRequest: group[0].pullRequest,
         reasons: Arr.flatMap(group, ({ reasons }) => reasons),
-        since: Arr.min(
-          Arr.map(group, ({ since }) => since),
-          DateTime.Order,
-        ),
+        since: earliest(group),
       }),
   )
 
 interface Waiting {
+  readonly asking: ReadonlyArray<AskingThread>
   readonly threads: ReadonlyArray<WaitingThread>
   readonly finished: ReadonlyArray<FinishedThread>
   readonly pullRequests: ReadonlyArray<WaitingPullRequest>
-  readonly questions: ReadonlyArray<OutsideQuestion>
+  readonly questions: ReadonlyArray<AskedQuestion>
   readonly checkIns: ReadonlyArray<CheckIn>
   readonly global: ReadonlyArray<WaitingRequest>
 }
@@ -112,11 +157,14 @@ interface Waiting {
 const inboxOf = (waiting: Waiting): InboxItems =>
   Arr.sort(
     [
-      ...waiting.threads.map(waitingItem),
-      ...waiting.finished.map(finishedItem),
-      ...waiting.questions,
+      ...threadItems([
+        ...waiting.asking.map(askingItem),
+        ...waiting.threads.map(waitingItem),
+        ...waiting.finished.map(finishedItem),
+      ]),
+      ...outsideQuestions(waiting.questions),
       ...waiting.checkIns,
-      ...globalItem(waiting.global),
+      ...globalItem(waiting.global, waiting.questions),
       ...pullRequestItems(waiting.pullRequests),
     ],
     order,
@@ -174,6 +222,13 @@ const samePullRequests = (
     )
   })
 
+const outsideQuestions = (asked: ReadonlyArray<AskedQuestion>) =>
+  asked.flatMap(({ asker, question }) =>
+    Predicate.isTagged(asker, "OutsideAgent")
+      ? [OutsideQuestion.make({ ...question, askedBy: asker.name })]
+      : [],
+  )
+
 export class Inbox extends Context.Service<
   Inbox,
   {
@@ -186,7 +241,7 @@ export class Inbox extends Context.Service<
       const threads = yield* Threads
       const queue = yield* Queue
       const agentReviews = yield* AgentReviews
-      const questions = yield* OutsideQuestions
+      const questions = yield* Questions
       const checkIns = yield* CheckIns
       const mirror = yield* PullRequestMirror
       const globalChat = yield* GlobalChat
@@ -247,15 +302,30 @@ export class Inbox extends Context.Service<
       return Inbox.of({
         watch: () =>
           Stream.zipLatestAll(
+            Stream.zipLatest(
+              threads
+                .watch()
+                .pipe(
+                  Stream.catch((cause) =>
+                    Stream.fromEffect(
+                      Effect.logWarning("Couldn't read the Threads for the Inbox", cause).pipe(
+                        Effect.as<ReadonlyArray<Thread>>([]),
+                      ),
+                    ),
+                  ),
+                ),
+              questions.openByThread,
+            ).pipe(Stream.map(([listed, byThread]) => askingThreads(listed, byThread))),
             threads.watchWaiting(),
             threads.watchFinished(),
             waitingPullRequests,
-            questions.watch(),
+            questions.open,
             checkIns.watch(),
             globalChat.waiting,
           ).pipe(
-            Stream.map(([waiting, finished, pullRequests, asked, checkingIn, global]) =>
+            Stream.map(([asking, waiting, finished, pullRequests, asked, checkingIn, global]) =>
               inboxOf({
+                asking,
                 threads: waiting,
                 finished,
                 pullRequests,

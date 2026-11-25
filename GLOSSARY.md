@@ -303,8 +303,8 @@ How much the agent in a local Claude Code Thread may do without asking: default,
 edits, auto, or bypass.
 
 **Question**:
-An agent asking the user to choose between options or answer in their own words, waiting until
-they answer.
+An agent asking the user to choose between options or answer in their own words, without waiting:
+the answer reaches the agent later. It stays open until the user answers it or sets it aside.
 
 **Outside agent**:
 An agent Glass did not launch that the user has approved to use Glass's MCP tools on this

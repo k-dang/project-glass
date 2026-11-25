@@ -57,6 +57,7 @@ import { ServerConfig } from "../src/ServerConfig"
 import { GitHubClient } from "../src/github/GitHubClient"
 import { LocalPlacement } from "../src/LocalPlacement"
 import { ToDos } from "../src/ToDos"
+import { Questions } from "../src/Questions"
 import { Transcripts } from "../src/Transcripts"
 import { isolatedHome } from "./harness"
 import { inProcessSandboxes } from "./inProcessSandboxes"
@@ -265,6 +266,7 @@ export const threadServicesFixture = Effect.gen(function* () {
           ),
           Layer.provide(ThreadTurns.layer),
           Layer.provide(FeedbackNotes.layer),
+          Layer.provide(Questions.layer),
           Layer.provideMerge(Transcripts.layer),
           Layer.provide(Layer.succeed(LocalPlacement, placement)),
           Layer.provideMerge(ToDos.layer),

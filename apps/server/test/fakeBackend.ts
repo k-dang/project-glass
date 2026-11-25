@@ -1,5 +1,5 @@
 import { NodeServices, NodeSocket } from "@effect/platform-node"
-import { ConfigProvider, Context, Duration, Effect, Layer, Redacted } from "effect"
+import { ConfigProvider, Context, Effect, Layer, Redacted } from "effect"
 import { FetchHttpClient } from "effect/http"
 import { SqlClient } from "effect/sql"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
@@ -8,7 +8,8 @@ import { tmpdir } from "node:os"
 import { dirname, join } from "node:path"
 import { fileURLToPath } from "node:url"
 import { DatabaseLive } from "../src/Database"
-import { ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../src/OutsideQuestions"
+import { OutsideAgentCaller } from "../src/callers"
+import { Questions } from "../src/Questions"
 import { GlassMcpTools } from "../src/mcp/server"
 import { serve } from "../src/server"
 import { ServerConfig } from "../src/ServerConfig"
@@ -140,27 +141,29 @@ const main = Effect.gen(function* () {
     ),
   )
 
-  const questions = Context.get(running, OutsideQuestions)
+  const questions = Context.get(running, Questions)
 
-  yield* questions
-    .ask({
-      question: "Ship the retry change?",
-      choices: ["Ship it", "Hold it"],
-      session: "demo-session",
-      askedBy: "Claude Code",
-      timeout: Duration.seconds(ASK_TIMEOUT_SECONDS),
-    })
-    .pipe(Effect.forkScoped)
+  if (fresh) {
+    yield* questions.ask(
+      new OutsideAgentCaller({ agentId: "demo-claude-code", name: "Claude Code" }),
+      {
+        question: "Ship the retry change?",
+        choices: [
+          { label: "Ship it", description: null },
+          { label: "Hold it", description: null },
+        ],
+      },
+    )
 
-  yield* questions
-    .ask({
+    yield* questions.ask(new OutsideAgentCaller({ agentId: "demo-codex", name: "Codex" }), {
       question: "Which branch should the gateway timeout fix go to?",
-      choices: ["main", "release/1.5", "Both"],
-      session: "demo-session-2",
-      askedBy: "Codex",
-      timeout: Duration.seconds(ASK_TIMEOUT_SECONDS),
+      choices: [
+        { label: "main", description: null },
+        { label: "release/1.5", description: "The branch the next patch ships from." },
+        { label: "Both", description: null },
+      ],
     })
-    .pipe(Effect.forkScoped)
+  }
 
   yield* seedDemoToDos(config.port, Redacted.value(config.token)).pipe(
     Effect.catchCause((cause) => Effect.logWarning("Couldn't seed the demo to-dos", cause)),

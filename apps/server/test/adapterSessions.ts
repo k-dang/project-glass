@@ -1,5 +1,5 @@
 import { getSessionInfo, query } from "@anthropic-ai/claude-agent-sdk"
-import { GlobalChatCaller } from "../src/mcp/McpCredentials"
+import { GlobalChatCaller } from "../src/callers"
 import {
   type AgentEvent,
   type AgentHarness,

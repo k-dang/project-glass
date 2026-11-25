@@ -1,4 +1,5 @@
 import {
+  type AnsweredQuestion,
   type ThreadBusy,
   type QueuedMessageStarted,
   ThreadError,
@@ -15,6 +16,7 @@ import {
   TurnEnd,
 } from "@glass/contracts"
 import {
+  Array as Arr,
   Context,
   DateTime,
   Effect,
@@ -31,9 +33,11 @@ import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { GlobalRole } from "./agentHost/protocol"
 import { LocalAgentHost } from "./LocalAgentHost"
-import { GlobalChatCaller, McpCredentials } from "./mcp/McpCredentials"
+import { GlobalChatCaller } from "./callers"
+import { McpCredentials } from "./mcp/McpCredentials"
 import { type ClaimedThread, type ThreadHost, ThreadTurns, type StartIdle } from "./ThreadTurns"
 import { boundHostCall } from "./hostControl"
+import { Questions } from "./Questions"
 import { ServerConfig } from "./ServerConfig"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
@@ -83,6 +87,10 @@ export class GlobalChat extends Context.Service<
       requestId: string,
       answer: RequestAnswer,
     ) => Effect.Effect<void, RequestNotWaiting | ThreadError>
+    readonly deliverAnswers: (
+      sessionId: string,
+      answers: Arr.NonEmptyReadonlyArray<AnsweredQuestion>,
+    ) => Effect.Effect<void, ThreadError>
     readonly unsent: Effect.Effect<SentMessage, ThreadError>
     readonly saveUnsent: (unsent: SentMessage) => Effect.Effect<void, ThreadError>
     readonly id: string
@@ -111,6 +119,7 @@ export class GlobalChat extends Context.Service<
       const config = yield* ServerConfig
       const fs = yield* FileSystem.FileSystem
       const transcripts = yield* Transcripts
+      const questions = yield* Questions
       const turns = yield* ThreadTurns
       const host = yield* LocalAgentHost
       const credentials = yield* McpCredentials
@@ -250,6 +259,8 @@ export class GlobalChat extends Context.Service<
         Effect.gen(function* () {
           if (yield* transcripts.isWaiting(sessionId)) return "waiting" as const
 
+          if (yield* questions.isAsking(sessionId)) return "waiting" as const
+
           if ((yield* transcripts.runningTurn(sessionId)) !== null) return "running" as const
 
           if (!(yield* transcripts.idle(sessionId))) return "queued" as const
@@ -317,6 +328,16 @@ export class GlobalChat extends Context.Service<
         stop: inThread(turns.stop),
         answer: (requestId, answer) =>
           inThread((current) => turns.answer(current, requestId, answer)),
+        deliverAnswers: (sessionId, answers) =>
+          inSession((current) =>
+            current === sessionId
+              ? threadOf(current).pipe(
+                  Effect.flatMap((claimed) => turns.deliverAnswers(claimed, answers)),
+                )
+              : Effect.fail(
+                  new ThreadError({ message: "The Global chat that asked has started fresh." }),
+                ),
+          ),
         unsent: turns.unsent(id),
         saveUnsent: (unsent) => turns.saveUnsent(id, unsent),
         id,

@@ -53,7 +53,7 @@ import {
   machine,
   stoppedReason,
 } from "./piTurn"
-import { globalInstructions, PI_QUESTION_TOOL, piQuestionExtension } from "./globalRole"
+import { globalInstructions } from "./globalRole"
 import { PI_GLASS_TOOLS, piGlassToolsExtension } from "./piGlassTools"
 import { workInstructions } from "./workRole"
 import {
@@ -248,11 +248,8 @@ const roleFlags = (
       Global: () =>
         lockedDownFlags(
           folder,
-          [PI_QUESTION_TOOL, PI_GLASS_TOOLS],
-          [
-            { name: "ask-user.js", source: piQuestionExtension },
-            { name: "glass-tools.js", source: piGlassToolsExtension },
-          ],
+          [PI_GLASS_TOOLS],
+          [{ name: "glass-tools.js", source: piGlassToolsExtension }],
           globalInstructions,
         ),
     }),

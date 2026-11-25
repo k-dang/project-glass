@@ -48,7 +48,7 @@ test("keeps one Global chat over every area, answered by pi without a Local chec
   await expect(chat.getByText("Fake reply to: Hello there")).toBeVisible()
 })
 
-test("restores the Global chat after Glass restarts, with its waiting Turn interrupted", async ({
+test("keeps the Global chat's question in the Inbox across a restart, and answers it there", async ({
   window,
   relaunch,
 }) => {
@@ -58,15 +58,23 @@ test("restores the Global chat after Glass restarts, with its waiting Turn inter
   await message.fill("Please ask me something")
   await message.press("Enter")
 
-  await expect(chat.getByRole("group", { name: "Which files should I look at?" })).toBeVisible()
+  await expect(chat.getByText("Asked: Which files should I look at?")).toBeVisible()
+  await expect(chat.getByText("Waiting in the Inbox")).toBeVisible()
 
   const restarted = await relaunch()
-  await restarted.getByRole("button", { name: "Global chat" }).click()
+  await restarted.getByRole("link", { name: "Inbox", exact: true }).click()
+  await restarted.getByRole("option", { name: /Global chat/ }).click()
+
+  const question = restarted.getByRole("group", { name: "Which files should I look at?" })
+  await expect(question.getByText("The quickest overview")).toBeVisible()
+  await question.getByRole("radio", { name: /Everything/ }).click()
+  await restarted.getByRole("button", { name: "Send answers" }).click()
+
+  await restarted.getByRole("button", { name: "Global chat", exact: true }).click()
   const restored = restarted.getByRole("dialog", { name: "Global chat" })
 
-  await expect(restored.getByText("Please ask me something")).toBeVisible()
-  await expect(restored.getByText("Interrupted when Glass quit")).toBeVisible()
-  await expect(restored.getByText("No longer answerable: its Turn ended.")).toBeVisible()
+  await expect(restored.getByText("Answered in the Inbox")).toBeVisible()
+  await expect(restored.getByText("Thanks, going with: Everything")).toBeVisible()
 })
 
 test("reads the PR in view through Glass's tools, keeping that PR after navigating away", async ({

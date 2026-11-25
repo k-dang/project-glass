@@ -1,5 +1,6 @@
 import { Match, Predicate, Schema } from "effect"
 import { CheckIn } from "./checkIn"
+import { OpenQuestion } from "./question"
 import { Thread, PermissionRequestPart, QuestionPart, TurnEnd } from "./thread"
 import { Check } from "./pullRequest"
 import { PullRequestSummary } from "./pullRequestList"
@@ -21,9 +22,16 @@ export const TurnSeen = Schema.Struct({
 
 export type TurnSeen = typeof TurnSeen.Type
 
-const ThreadReason = Schema.Union([WaitingRequests, TurnFinished])
+export const OpenQuestions = Schema.TaggedStruct("OpenQuestions", {
+  questions: Schema.NonEmptyArray(OpenQuestion),
+})
+
+const ThreadReason = Schema.Union([OpenQuestions, WaitingRequests, TurnFinished])
 
 type ThreadReason = typeof ThreadReason.Type
+
+export const waitsOnYou = (reason: ThreadReason) =>
+  Predicate.isTagged(reason, "WaitingRequests") || Predicate.isTagged(reason, "OpenQuestions")
 
 export const AgentReviewFinished = Schema.TaggedStruct("AgentReviewFinished", {
   writtenAt: Schema.DateTimeUtcFromString,
@@ -67,51 +75,19 @@ export const InboxPullRequest = Schema.TaggedStruct("PullRequest", {
 export type InboxPullRequest = typeof InboxPullRequest.Type
 
 export const OutsideQuestion = Schema.TaggedStruct("OutsideQuestion", {
-  id: Schema.String,
-  question: Schema.String,
-  choices: Schema.Array(Schema.String),
+  ...OpenQuestion.fields,
   askedBy: Schema.String,
-  since: Schema.DateTimeUtcFromString,
 })
 
 export type OutsideQuestion = typeof OutsideQuestion.Type
 
 export const InboxGlobalChat = Schema.TaggedStruct("GlobalChat", {
-  requests: WaitingRequestParts,
+  requests: Schema.Array(Schema.Union([PermissionRequestPart, QuestionPart])),
+  questions: Schema.Array(OpenQuestion),
   since: Schema.DateTimeUtcFromString,
 })
 
 export type InboxGlobalChat = typeof InboxGlobalChat.Type
-
-export const OutsideChoice = Schema.TaggedStruct("Choice", {
-  choice: Schema.String,
-})
-
-export const OutsideText = Schema.TaggedStruct("Text", {
-  text: Schema.Trimmed.check(Schema.isNonEmpty()),
-})
-
-export const OutsideQuestionAnswer = Schema.Union([OutsideChoice, OutsideText])
-
-export type OutsideQuestionAnswer = typeof OutsideQuestionAnswer.Type
-
-export class OutsideQuestionNotWaiting extends Schema.TaggedError<OutsideQuestionNotWaiting>()(
-  "OutsideQuestionNotWaiting",
-  {},
-) {}
-
-export const AskUserAnswered = Schema.TaggedStruct("Answered", {
-  answer: Schema.String,
-  by: Schema.Literals(["choice", "text"]),
-})
-
-export const AskUserTimedOut = Schema.TaggedStruct("TimedOut", {})
-
-export const AskUserCancelled = Schema.TaggedStruct("Cancelled", {})
-
-export const AskUserResult = Schema.Union([AskUserAnswered, AskUserTimedOut, AskUserCancelled])
-
-export type AskUserResult = typeof AskUserResult.Type
 
 export const InboxItem = Schema.Union([
   InboxThread,
@@ -137,9 +113,7 @@ export const inboxGroupOf = (item: InboxItem): InboxGroup =>
     CheckIn: () => "stopped" as const,
     GlobalChat: () => "stopped" as const,
     Thread: ({ reasons }) =>
-      reasons.some(Predicate.isTagged("WaitingRequests"))
-        ? ("stopped" as const)
-        : ("finished" as const),
+      reasons.some(waitsOnYou) ? ("stopped" as const) : ("finished" as const),
     PullRequest: ({ reasons }) =>
       reasons.some(Predicate.isTagged("AgentReviewFinished"))
         ? ("reviews" as const)

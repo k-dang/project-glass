@@ -1,5 +1,5 @@
 import { assert, describe, it } from "@effect/vitest"
-import { GlobalChatCaller } from "./McpCredentials"
+import { GlobalChatCaller } from "../callers"
 import { PullRequestRef, Revision } from "@glass/contracts"
 import { Effect, Schema } from "effect"
 import { type FakeGitHubRequest, startFakeGitHub } from "../../test/fakeGitHub"
@@ -80,6 +80,7 @@ describe("Glass tools over MCP", () => {
           ["create_thread", false],
           ["send_thread_message", false],
           ["ask_user", false],
+          ["read_answer", true],
           ["check_in", false],
           ["show_visualization", true],
         ],

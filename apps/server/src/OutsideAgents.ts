@@ -14,7 +14,8 @@ import {
 } from "effect"
 import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
-import { mintBearer, OutsideAgentCaller, type McpCredential } from "./mcp/McpCredentials"
+import { OutsideAgentCaller } from "./callers"
+import { mintBearer, type McpCredential } from "./mcp/McpCredentials"
 import { digest } from "./mcp/mcpHttp"
 
 export const OUTSIDE_AGENT_TTL = Duration.days(30)
@@ -146,7 +147,6 @@ export class OutsideAgents extends Context.Service<
               caller: new OutsideAgentCaller({
                 agentId: agent.id,
                 name: agent.name,
-                session: agent.id,
               }),
               ownedSessions,
               revoked: Deferred.await(revoked),

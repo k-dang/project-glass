@@ -3,7 +3,8 @@ import { McpSchema, McpServer } from "effect/ai"
 import { SqlClient } from "effect/sql"
 import { failedToolCall, type RelayedToolCall } from "../agentHost/protocol"
 import { annotateUnit } from "../wideEvents"
-import { ThreadCaller, McpCaller } from "./McpCredentials"
+import { ThreadCaller } from "../callers"
+import { McpCaller } from "./McpCredentials"
 import { RELAY_CLIENT_NAME, SANDBOX_RELAY_CLIENT_NAME } from "./toolAudience"
 
 export type ToolCallOrigin = Data.TaggedEnum<{

@@ -41,6 +41,7 @@ import { join } from "node:path"
 import { watchDeadlines } from "../test/deadlines"
 import { AgentHostRpcs, HOST_PROTOCOL } from "./agentHost/protocol"
 import type { HostClient } from "./Placement"
+import { Questions } from "./Questions"
 import { ThreadTurns } from "./ThreadTurns"
 import { GlobalChat } from "./GlobalChat"
 import { HOST_CONTROL_DEADLINE, HOST_DIDNT_ANSWER } from "./hostControl"
@@ -386,6 +387,7 @@ const openGlobal = (client: HostClient, scope: Scope.Scope, reattached = false) 
     Layer.provide(NodeFileSystem.layer),
     Layer.provide(ThreadTurns.layer),
     Layer.provideMerge(Transcripts.layer),
+    Layer.provideMerge(Questions.layer),
     Layer.provideMerge(Layer.mock(ToDos)({})),
     Layer.provideMerge(SqliteMigrator.layer({ loader: migrationLoader })),
     Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),

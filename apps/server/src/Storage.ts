@@ -41,6 +41,8 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["skill_pack_skill", "threads"],
   ["skill_pack_file", "threads"],
   ["thread_skill_pack", "threads"],
+  ["question", "threads"],
+  ["check_in", "threads"],
   ["agent_reviews", "reviews"],
   ["queued_pull_request", "reviews"],
   ["tours", "reviews"],

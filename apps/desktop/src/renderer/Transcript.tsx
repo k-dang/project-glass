@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/message-scroller"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import { BackgroundToolCalls, callStatus, toolCallsOf, TurnParts } from "./TurnParts"
-import { sentFrom, UserMessage } from "./UserMessage"
+import { SentMessage } from "./UserMessage"
 import { threadColumn } from "./threadColumn"
 import { referenceText } from "./queue"
 
@@ -178,11 +178,11 @@ function TurnMessage(props: { turn: Turn }) {
   if (Predicate.isTagged(turn.context, "BackgroundWorkEnded")) return null
 
   return (
-    <UserMessage
+    <SentMessage
       message={turn.message}
       images={turn.images}
       feedback={turn.feedback}
-      label={sentFrom(turn.context)}
+      context={turn.context}
     />
   )
 }

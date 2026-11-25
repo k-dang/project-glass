@@ -1,9 +1,11 @@
 import {
+  type AnsweredQuestion,
   type CapturedContext,
   type FeedbackNote,
   isLineNote,
   isPageNote,
   type LineNote,
+  type OpenQuestion,
   type PageNote,
   replaceMentions,
   type WorkOutcome,
@@ -11,11 +13,11 @@ import {
   type TurnContext,
   type StartedWorkUpdate,
 } from "@glass/contracts"
-import { Match, Predicate } from "effect"
+import { Match } from "effect"
 
 const withoutBlockTags = (text: string) =>
   text.replaceAll(
-    /<(\/?)(glass_to_dos|to_do|glass_context|glass_feedback|feedback_note|glass_started_work_update|work_outcome)\b/gi,
+    /<(\/?)(glass_to_dos|to_do|glass_context|glass_feedback|feedback_note|glass_started_work_update|work_outcome|glass_answer|glass_questions_set_aside)\b/gi,
     "&lt;$1$2",
   )
 
@@ -56,13 +58,28 @@ const startedWorkUpdateBlock = ({ work }: StartedWorkUpdate) =>
     ...work.map(workOutcomeEntry),
   ])
 
-const contextBlock = (context: TurnContext) => {
-  if (Predicate.isTagged(context, "StartedWorkUpdate")) return startedWorkUpdateBlock(context)
+const answerBlock = ({ questionId, question, answer }: AnsweredQuestion) =>
+  [
+    `<glass_answer question_id="${attribute(questionId)}">`,
+    "The user answered a question you asked with ask_user.",
+    `Question: ${withoutBlockTags(question)}`,
+    `Answer: ${withoutBlockTags(answer)}`,
+    "</glass_answer>",
+  ].join("\n")
 
-  if (Predicate.isTagged(context, "BackgroundWorkEnded")) return null
+const viewedBlock = (context: CapturedContext) =>
+  block("glass_context", [`The user sent this while viewing ${viewing(context)}.`])
 
-  return block("glass_context", [`The user sent this while viewing ${viewing(context)}.`])
-}
+const contextBlock = (context: TurnContext) =>
+  Match.value(context).pipe(
+    Match.tagsExhaustive({
+      PullRequest: viewedBlock,
+      Thread: viewedBlock,
+      QuestionsAnswered: ({ answers }) => answers.map(answerBlock).join("\n\n"),
+      StartedWorkUpdate: startedWorkUpdateBlock,
+      BackgroundWorkEnded: () => null,
+    }),
+  )
 
 const entry = ({ id, title, notes, done, images }: ToDo) =>
   [
@@ -125,11 +142,21 @@ const feedbackIntro = (feedback: ReadonlyArray<FeedbackNote>) => {
 const block = (tag: string, lines: ReadonlyArray<string>) =>
   [`<${tag}>`, ...lines, `</${tag}>`].join("\n")
 
+const setAsideEntry = ({ id, question }: OpenQuestion) =>
+  `<question question_id="${attribute(id)}">${withoutBlockTags(question)}</question>`
+
 export const prompt = (
   message: string,
   toDos: ReadonlyArray<ToDo>,
-  context: TurnContext | null = null,
-  feedback: ReadonlyArray<FeedbackNote> = [],
+  {
+    context = null,
+    feedback = [],
+    setAside = [],
+  }: {
+    readonly context?: TurnContext | null
+    readonly feedback?: ReadonlyArray<FeedbackNote>
+    readonly setAside?: ReadonlyArray<OpenQuestion>
+  } = {},
 ) => {
   const marked = replaceMentions(message, (mentioned) =>
     mentioned.kind === "toDo"
@@ -139,6 +166,12 @@ export const prompt = (
 
   const blocks = [
     context === null ? null : contextBlock(context),
+    setAside.length === 0
+      ? null
+      : block("glass_questions_set_aside", [
+          "The user set aside these questions you asked with ask_user without answering them. Stop waiting on them.",
+          ...setAside.map(setAsideEntry),
+        ]),
     feedback.length === 0
       ? null
       : block("glass_feedback", [feedbackIntro(feedback), ...feedback.map(feedbackEntry)]),

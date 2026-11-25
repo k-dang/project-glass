@@ -1,19 +1,13 @@
-import { Deferred, type Duration, Effect, Option, Schema, Stream, SubscriptionRef } from "effect"
-
-export class AlreadyWaiting extends Schema.TaggedError<AlreadyWaiting>()("AlreadyWaiting", {
-  on: Schema.Literals(["session", "subject"]),
-}) {}
+import { Deferred, type Duration, Effect, Stream, SubscriptionRef } from "effect"
 
 interface Waiting<Item, Result> {
   readonly item: Item
-  readonly session: string
   readonly slot: Deferred.Deferred<Result>
   readonly settled: Deferred.Deferred<void>
 }
 
 export const inboxWaitsOf = <Item, Result>(options: {
   readonly idOf: (item: Item) => string
-  readonly subjectOf?: (item: Item) => string
   readonly timedOut: Result
   readonly cancelled: Result
 }) =>
@@ -36,27 +30,14 @@ export const inboxWaitsOf = <Item, Result>(options: {
         ),
       )
 
-    const sameSubject = (a: Item, b: Item) =>
-      options.subjectOf !== undefined && options.subjectOf(a) === options.subjectOf(b)
-
-    const wait = (item: Item, session: string, timeout: Duration.Duration) =>
+    const wait = (item: Item, timeout: Duration.Duration) =>
       Effect.scoped(
         Effect.gen(function* () {
           const slot = yield* Deferred.make<Result>()
           const settled = yield* Deferred.make<void>()
           const id = options.idOf(item)
 
-          const refused = yield* SubscriptionRef.modify(pending, (items) => {
-            if (items.some((waiting) => waiting.session === session))
-              return ["session" as const, items] as const
-
-            if (items.some((waiting) => sameSubject(waiting.item, item)))
-              return ["subject" as const, items] as const
-
-            return [null, [...items, { item, session, slot, settled }]] as const
-          })
-
-          if (refused !== null) return yield* new AlreadyWaiting({ on: refused })
+          yield* SubscriptionRef.update(pending, (items) => [...items, { item, slot, settled }])
 
           yield* Effect.sleep(timeout).pipe(
             Effect.andThen(resolve(id, options.timedOut)),
@@ -68,13 +49,6 @@ export const inboxWaitsOf = <Item, Result>(options: {
             Effect.ensuring(Deferred.succeed(settled, undefined).pipe(Effect.ignore)),
           )
         }),
-      )
-
-    const find = (id: string) =>
-      SubscriptionRef.get(pending).pipe(
-        Effect.map((items) =>
-          Option.fromNullishOr(items.find(({ item }) => options.idOf(item) === id)?.item),
-        ),
       )
 
     const cancelAll = Effect.fnUntraced(function* () {
@@ -93,7 +67,6 @@ export const inboxWaitsOf = <Item, Result>(options: {
     return {
       wait,
       resolve,
-      find,
       watch: () =>
         SubscriptionRef.changes(pending).pipe(Stream.map((items) => items.map(({ item }) => item))),
       cancelAll,

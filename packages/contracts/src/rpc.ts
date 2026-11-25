@@ -61,7 +61,8 @@ import { BrowserControl, BrowserPageAnswer, BrowserPageRequest } from "./browser
 import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { MergeAction, MergePullRequestError } from "./merge"
-import { InboxItems, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./inbox"
+import { InboxItems, TurnSeen } from "./inbox"
+import { GivenAnswer, QuestionNotOpen } from "./question"
 import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
 import {
   LoadPullRequestError,
@@ -411,9 +412,13 @@ export class GlassRpcs extends RpcGroup.make(
     payload: TurnSeen,
     error: ThreadError,
   }),
-  Rpc.make("AnswerOutsideQuestion", {
-    payload: { id: Schema.String, answer: OutsideQuestionAnswer },
-    error: OutsideQuestionNotWaiting,
+  Rpc.make("AnswerQuestions", {
+    payload: { answers: Schema.NonEmptyArray(GivenAnswer) },
+    error: Schema.Union([QuestionNotOpen, ThreadError]),
+  }),
+  Rpc.make("SetQuestionAside", {
+    payload: { questionId: Schema.String },
+    error: QuestionNotOpen,
   }),
   Rpc.make("GetCheckInChanges", {
     payload: { checkInId: Schema.String },
@@ -438,6 +443,10 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("AnswerCheckIn", {
     payload: { checkInId: Schema.String, answer: CheckInAnswer },
     error: Schema.Union([CheckInNotWaiting, CheckInError]),
+  }),
+  Rpc.make("SetCheckInAside", {
+    payload: { checkInId: Schema.String },
+    error: CheckInNotWaiting,
   }),
   Rpc.make("GetMcpEndpoint", { success: Schema.Struct({ url: Schema.String }) }),
   Rpc.make("WatchOutsideAgents", { success: Schema.Array(OutsideAgent), stream: true }),

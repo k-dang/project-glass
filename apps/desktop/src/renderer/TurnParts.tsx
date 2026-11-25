@@ -45,7 +45,8 @@ import {
   TraceTitle,
 } from "@/components/ui/trace"
 import { plural } from "./plural"
-import { sentFrom, UserMessage } from "./UserMessage"
+import { AskedQuestionLine, isAskUser } from "./AskedQuestion"
+import { SentMessage } from "./UserMessage"
 import { PullRequestLink } from "./ThreadPullRequest"
 import { BrowserLinks } from "./BrowserPane"
 import { RequestCard } from "./RequestCard"
@@ -428,11 +429,7 @@ const PartView = memo(function PartView(props: {
     Match.tagsExhaustive({
       Text: ({ text }) => <ThreadMarkdown text={text} />,
       Steer: ({ message, images, context }) => (
-        <UserMessage
-          label={["Steered", sentFrom(context)].filter(Predicate.isString).join(" · ")}
-          message={message}
-          images={images}
-        />
+        <SentMessage message={message} images={images} context={context} steered />
       ),
       Thinking: ({ text }) => (
         <Trace>
@@ -455,6 +452,8 @@ const PartView = memo(function PartView(props: {
         const shown = toolCallView(call)
 
         if (shown !== null) return shown
+
+        if (isAskUser(call.name)) return <AskedQuestionLine call={call} />
 
         const shownStatus = callStatus(call, inBackground)
         const status = toolStatus[shownStatus]

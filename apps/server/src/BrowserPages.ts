@@ -260,8 +260,7 @@ export class BrowserPages extends Context.Service<
       const endpointFor = (threadId: string, restoreLastPage: boolean) => {
         const request = new BrowserPageRequest({ id: randomUUID(), threadId, restoreLastPage })
 
-        return waits.wait(request, request.id, ANSWER_TIMEOUT).pipe(
-          Effect.orDie,
+        return waits.wait(request, ANSWER_TIMEOUT).pipe(
           Effect.flatMap((answer) =>
             Match.valueTags(answer, {
               BrowserPageReady: ({ endpoint }) => Effect.succeed(endpoint),

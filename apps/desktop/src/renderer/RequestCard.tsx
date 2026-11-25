@@ -146,7 +146,7 @@ function Permission(props: {
 const change = <A,>(list: ReadonlyArray<A>, index: number, value: A) =>
   list.map((current, at) => (at === index ? value : current))
 
-const option = (label: string, description: string | null, control: ReactNode) => (
+export const option = (label: string, description: string | null, control: ReactNode) => (
   <Label key={label} className="flex items-start gap-2.5 leading-snug font-normal">
     <span className="flex h-[1lh] items-center">{control}</span>
     <span className="flex flex-col gap-0.5">

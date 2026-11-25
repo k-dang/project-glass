@@ -6,12 +6,14 @@ import { SqlClient } from "effect/sql"
 import { Threads } from "./Threads"
 import { AgentReviews } from "./AgentReviews"
 import { migrationLoader } from "./Migrations"
+import { Questions } from "./Questions"
 import { StartedWork } from "./StartedWork"
 import { Transcripts } from "./Transcripts"
 
 const layer = (seen: Array<string> = []) =>
   StartedWork.layer.pipe(
     Layer.provideMerge(Transcripts.layer),
+    Layer.provide(Questions.layer),
     Layer.provide(
       Layer.mock(Threads)({
         harnesses: () => ["pi"],

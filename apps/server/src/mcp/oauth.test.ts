@@ -1,18 +1,26 @@
 import { assert, describe, it } from "@effect/vitest"
-import { GlobalChatCaller } from "./McpCredentials"
-import { AskUserAnswered, AskUserResult, type InboxItems, OutsideText } from "@glass/contracts"
+import { GlobalChatCaller } from "../callers"
+import {
+  AskedUser,
+  type InboxItems,
+  QuestionAnswered,
+  QuestionState,
+  TextAnswer,
+} from "@glass/contracts"
 import { Effect, Fiber, Option, Predicate, Redacted, Schema, Stream } from "effect"
 import { createHash, randomBytes } from "node:crypto"
 import { request as httpRequest } from "node:http"
 import { DatabaseSync } from "node:sqlite"
 import { join } from "node:path"
 import { isolatedHome, startBackend } from "../../test/harness"
-import { connectMcp, initialize, mcpPost, toolResult } from "../../test/mcpClient"
+import { connectMcp, initialize, mcpPost } from "../../test/mcpClient"
 
 const outside = (items: InboxItems) =>
   items.filter((item) => Predicate.isTagged(item, "OutsideQuestion"))
 
-const askResult = Schema.decodeUnknownSync(AskUserResult)
+const askedUser = Schema.decodeUnknownSync(AskedUser)
+
+const questionState = Schema.decodeUnknownSync(QuestionState)
 
 const connectedThreads = (client: Effect.Success<ReturnType<typeof startBackend>>["client"]) =>
   client.WatchOutsideAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
@@ -241,12 +249,10 @@ describe("MCP OAuth", () => {
       const { token, expiresIn } = yield* signIn(baseUrl, "Claude Code")
       const mcp = yield* connectMcp(baseUrl, token)
 
-      const call = mcp.request("tools/call", {
-        name: "ask_user",
-        arguments: { question: "May I land the retry change?" },
-      })
-
-      const inFlight = yield* Effect.forkChild(call.response)
+      const asked = askedUser(
+        (yield* mcp.call("ask_user", { question: "May I land the retry change?" }))
+          .structuredContent,
+      )
 
       const shown = yield* client.WatchInbox().pipe(
         Stream.filter((items) =>
@@ -265,20 +271,20 @@ describe("MCP OAuth", () => {
       assert.ok(expiresIn > 29 * 24 * 60 * 60)
       assert.ok(expiresIn <= 30 * 24 * 60 * 60)
       assert.ok(question !== undefined)
+      assert.strictEqual(question.id, asked.questionId)
       assert.strictEqual(question.askedBy, "Claude Code")
       assert.deepStrictEqual(
         listed.map((thread) => thread.name),
         ["Claude Code"],
       )
 
-      yield* client.AnswerOutsideQuestion({
-        id: question.id,
-        answer: OutsideText.make({ text: "Yes" }),
+      yield* client.AnswerQuestions({
+        answers: [{ questionId: question.id, answer: TextAnswer.make({ text: "Yes" }) }],
       })
 
       assert.deepStrictEqual(
-        askResult(toolResult(yield* Fiber.join(inFlight)).structuredContent),
-        AskUserAnswered.make({ answer: "Yes", by: "text" }),
+        questionState((yield* mcp.call("read_answer", { id: asked.questionId })).structuredContent),
+        QuestionAnswered.make({ answer: "Yes", by: "text" }),
       )
     }),
   )

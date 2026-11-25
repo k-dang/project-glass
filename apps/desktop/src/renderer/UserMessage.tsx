@@ -1,5 +1,12 @@
-import { type CapturedContext, type FeedbackNote, type Image, shortSha } from "@glass/contracts"
-import { Match } from "effect"
+import {
+  type AnsweredQuestion,
+  type CapturedContext,
+  type FeedbackNote,
+  type Image,
+  type MessageContext,
+  shortSha,
+} from "@glass/contracts"
+import { Match, Predicate } from "effect"
 import { useState } from "react"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
 import { Message, MessageContent } from "@/components/ui/message"
@@ -39,8 +46,17 @@ export const contextLabel = (context: CapturedContext) =>
     }),
   )
 
-export const sentFrom = (context: CapturedContext | null) =>
-  context === null ? undefined : `From ${contextLabel(context)}`
+const answersLabel = (answers: ReadonlyArray<AnsweredQuestion>) =>
+  answers.length === 1 ? "Your answer" : `Your ${answers.length} answers`
+
+export const sentFrom = (context: MessageContext | null) =>
+  context === null
+    ? undefined
+    : Match.valueTags(context, {
+        PullRequest: (viewed) => `From ${contextLabel(viewed)}`,
+        Thread: (viewed) => `From ${contextLabel(viewed)}`,
+        QuestionsAnswered: ({ answers }) => answersLabel(answers),
+      })
 
 export function UserMessage(props: {
   message: string
@@ -69,5 +85,49 @@ export function UserMessage(props: {
         )}
       </MessageContent>
     </Message>
+  )
+}
+
+function AnsweredQuestions(props: { answers: ReadonlyArray<AnsweredQuestion>; label: string }) {
+  return (
+    <Message align="end">
+      <MessageContent>
+        <span className="self-end text-xs text-muted-foreground">{props.label}</span>
+        <dl className="flex flex-col gap-2 text-sm">
+          {props.answers.map(({ questionId, question, answer }) => (
+            <div key={questionId} className="flex flex-col gap-0.5">
+              <dt className="text-muted-foreground">{question}</dt>
+              <dd className="whitespace-pre-wrap text-pretty break-words">{answer}</dd>
+            </div>
+          ))}
+        </dl>
+      </MessageContent>
+    </Message>
+  )
+}
+
+export function SentMessage(props: {
+  message: string
+  images: ReadonlyArray<Image>
+  context: MessageContext | null
+  feedback?: ReadonlyArray<FeedbackNote>
+  steered?: boolean
+}) {
+  const { context } = props
+
+  const steered = (label: string) => (props.steered === true ? `Steered · ${label}` : label)
+
+  if (Predicate.isTagged(context, "QuestionsAnswered"))
+    return <AnsweredQuestions answers={context.answers} label={steered("Answered in the Inbox")} />
+
+  const from = sentFrom(context)
+
+  return (
+    <UserMessage
+      message={props.message}
+      images={props.images}
+      feedback={props.feedback ?? []}
+      label={from === undefined ? (props.steered === true ? "Steered" : undefined) : steered(from)}
+    />
   )
 }

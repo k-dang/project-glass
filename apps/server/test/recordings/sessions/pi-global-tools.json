@@ -9,7 +9,7 @@
         "--session-id",
         "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
         "--tools",
-        "ask_user,mcp__glass__*",
+        "mcp__glass__*",
         "--no-extensions",
         "--no-mcp",
         "--no-skills",
@@ -17,8 +17,6 @@
         "--no-themes",
         "--no-context-files",
         "--no-approve",
-        "--extension",
-        "<folder>.pi/ask-user.js",
         "--extension",
         "<folder>.pi/glass-tools.js",
         "--append-system-prompt",
@@ -61,7 +59,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T15-54-53-220Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T23-13-55-588Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,30 +103,8 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795535693411,
+              "timestamp": 1795562035786,
               "toolsAdded": [
-                {
-                  "name": "ask_user",
-                  "description": "Ask the user one question and wait for their answer. Give options when the answer is one of a few choices; leave them out for the user to answer in their own words.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {
-                      "question": {
-                        "type": "string",
-                        "description": "The question, as the user should read it."
-                      },
-                      "options": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        },
-                        "description": "The answers the user can choose from, if any."
-                      }
-                    },
-                    "required": ["question"],
-                    "additionalProperties": false
-                  }
-                },
                 {
                   "name": "mcp__glass__list_pull_requests",
                   "description": "Lists the user's PR lists in Glass: PRs that need their review, their own PRs, and PRs they are reviewing, grouped by followed repository.",
@@ -552,7 +528,7 @@
                 },
                 {
                   "name": "mcp__glass__ask_user",
-                  "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. A Thread Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
+                  "description": "Asks the user one question in the Glass Inbox and returns at once with its questionId; it doesn't wait for the answer. Keep working on what doesn't depend on the answer; if nothing does, end your Turn. A Thread or the Global chat that Glass launched gets the answer as a later message with a glass_answer block naming the questionId. An agent outside Glass reads it with read_answer when it is ready for it. The user picks one of the choices or types their own answer, or sets the question aside. Ask each question with its own call.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -561,35 +537,42 @@
                         "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
                         "minLength": 1,
                         "maxLength": 2000,
-                        "description": "The question to show in the Inbox."
+                        "description": "The question, as the user should read it in the Inbox."
                       },
                       "choices": {
                         "anyOf": [
                           {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
-                              "minLength": 1,
-                              "maxLength": 200
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string",
+                                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "description": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                                      "minLength": 1,
+                                      "maxLength": 500,
+                                      "description": "What picking this choice means, when the label alone doesn't say."
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": ["label"],
+                              "additionalProperties": true
                             },
                             "minItems": 1,
                             "maxItems": 8,
-                            "uniqueItems": true,
-                            "description": "Choices the user can pick. They can still type their own answer. Omit this to ask for text only."
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "timeoutSeconds": {
-                        "anyOf": [
-                          {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 600,
-                            "description": "Seconds to wait. Defaults to 600, the most allowed."
+                            "description": "Choices the user can pick, with distinct labels. They can still type their own answer. Omit this to ask for text only."
                           },
                           {
                             "type": "null"
@@ -602,8 +585,23 @@
                   }
                 },
                 {
+                  "name": "mcp__glass__read_answer",
+                  "description": "For an agent outside Glass: reads where a question you asked with ask_user, or a Check-in you made with check_in, stands, by its id, from any of your sessions. The result is Waiting while the user hasn't answered, or SetAside when they chose not to. A question's answer is Answered (by is choice or text). A Check-in's answer is Approved or Feedback, each with the user's optional message and their Feedback notes (a file path, the side of the diff, the line range, the code they read there, their note, and whether that code changed since); or Replaced, with the id of the Check-in that replaced it when you checked in again from the same folder. Feedback asks you to change the code. Notes on an approval are guidance and ask for no more work.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The questionId ask_user returned, or the checkInId check_in returned."
+                      }
+                    },
+                    "required": ["id"],
+                    "additionalProperties": true
+                  }
+                },
+                {
                   "name": "mcp__glass__check_in",
-                  "description": "For an agent outside Glass: asks the user to read the changes in a folder and approve them or send feedback, and waits for their answer in the Glass Inbox, under the name the user approved. Pass the absolute path of your working directory. Glass reads the changes itself: the working tree, staged or not and including untracked files, against where the branch forked from baseRef, frozen as they are when you call. Waits 60 minutes unless timeoutSeconds is set, at most 120 minutes. Glass sends a progress notification immediately and every 15 seconds while it waits; pass a progress token on the call. The result is Approved or Feedback, each with the user's optional message and their Feedback notes (a file path, the side of the diff, the line range, the code they read there, and their note); NoChanges when there is nothing to read; TimedOut when they do not answer in time; or Cancelled when Glass shuts down. Feedback asks you to change the code. Notes on an approval are guidance and ask for no more work. A Check-in that timed out or was cancelled is not approval; the user's notes come back if you check in again from the same folder. Each MCP session may have one Check-in waiting.",
+                  "description": "For an agent outside Glass: asks the user to read the changes in a folder and approve them or send feedback in the Glass Inbox, under the name the user approved, and returns at once; it doesn't wait for their answer. Pass the absolute path of your working directory. Glass reads the changes itself: the working tree, staged or not and including untracked files, against where the branch forked from baseRef, frozen as they are when you call. The result is CheckedIn with the checkInId to pass read_answer when you are ready for the answer, or NoChanges when there is nothing to read. Checking in again from the same folder replaces a Check-in the user hasn't answered, and the Feedback notes they left on it carry over.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -634,19 +632,6 @@
                             "minLength": 1,
                             "maxLength": 2000,
                             "description": "Plain text on what changed and where to look. Its first line titles the Check-in in the Inbox."
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "timeoutSeconds": {
-                        "anyOf": [
-                          {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 7200,
-                            "description": "Seconds to wait. Defaults to 3600."
                           },
                           {
                             "type": "null"
@@ -677,30 +662,8 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795535693411,
+              "timestamp": 1795562035786,
               "toolsAdded": [
-                {
-                  "name": "ask_user",
-                  "description": "Ask the user one question and wait for their answer. Give options when the answer is one of a few choices; leave them out for the user to answer in their own words.",
-                  "parameters": {
-                    "type": "object",
-                    "properties": {
-                      "question": {
-                        "type": "string",
-                        "description": "The question, as the user should read it."
-                      },
-                      "options": {
-                        "type": "array",
-                        "items": {
-                          "type": "string"
-                        },
-                        "description": "The answers the user can choose from, if any."
-                      }
-                    },
-                    "required": ["question"],
-                    "additionalProperties": false
-                  }
-                },
                 {
                   "name": "mcp__glass__list_pull_requests",
                   "description": "Lists the user's PR lists in Glass: PRs that need their review, their own PRs, and PRs they are reviewing, grouped by followed repository.",
@@ -1124,7 +1087,7 @@
                 },
                 {
                   "name": "mcp__glass__ask_user",
-                  "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. A Thread Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
+                  "description": "Asks the user one question in the Glass Inbox and returns at once with its questionId; it doesn't wait for the answer. Keep working on what doesn't depend on the answer; if nothing does, end your Turn. A Thread or the Global chat that Glass launched gets the answer as a later message with a glass_answer block naming the questionId. An agent outside Glass reads it with read_answer when it is ready for it. The user picks one of the choices or types their own answer, or sets the question aside. Ask each question with its own call.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -1133,35 +1096,42 @@
                         "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
                         "minLength": 1,
                         "maxLength": 2000,
-                        "description": "The question to show in the Inbox."
+                        "description": "The question, as the user should read it in the Inbox."
                       },
                       "choices": {
                         "anyOf": [
                           {
                             "type": "array",
                             "items": {
-                              "type": "string",
-                              "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
-                              "minLength": 1,
-                              "maxLength": 200
+                              "type": "object",
+                              "properties": {
+                                "label": {
+                                  "type": "string",
+                                  "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                                  "minLength": 1,
+                                  "maxLength": 200
+                                },
+                                "description": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string",
+                                      "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                                      "minLength": 1,
+                                      "maxLength": 500,
+                                      "description": "What picking this choice means, when the label alone doesn't say."
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": ["label"],
+                              "additionalProperties": true
                             },
                             "minItems": 1,
                             "maxItems": 8,
-                            "uniqueItems": true,
-                            "description": "Choices the user can pick. They can still type their own answer. Omit this to ask for text only."
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      },
-                      "timeoutSeconds": {
-                        "anyOf": [
-                          {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 600,
-                            "description": "Seconds to wait. Defaults to 600, the most allowed."
+                            "description": "Choices the user can pick, with distinct labels. They can still type their own answer. Omit this to ask for text only."
                           },
                           {
                             "type": "null"
@@ -1174,8 +1144,23 @@
                   }
                 },
                 {
+                  "name": "mcp__glass__read_answer",
+                  "description": "For an agent outside Glass: reads where a question you asked with ask_user, or a Check-in you made with check_in, stands, by its id, from any of your sessions. The result is Waiting while the user hasn't answered, or SetAside when they chose not to. A question's answer is Answered (by is choice or text). A Check-in's answer is Approved or Feedback, each with the user's optional message and their Feedback notes (a file path, the side of the diff, the line range, the code they read there, their note, and whether that code changed since); or Replaced, with the id of the Check-in that replaced it when you checked in again from the same folder. Feedback asks you to change the code. Notes on an approval are guidance and ask for no more work.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "description": "The questionId ask_user returned, or the checkInId check_in returned."
+                      }
+                    },
+                    "required": ["id"],
+                    "additionalProperties": true
+                  }
+                },
+                {
                   "name": "mcp__glass__check_in",
-                  "description": "For an agent outside Glass: asks the user to read the changes in a folder and approve them or send feedback, and waits for their answer in the Glass Inbox, under the name the user approved. Pass the absolute path of your working directory. Glass reads the changes itself: the working tree, staged or not and including untracked files, against where the branch forked from baseRef, frozen as they are when you call. Waits 60 minutes unless timeoutSeconds is set, at most 120 minutes. Glass sends a progress notification immediately and every 15 seconds while it waits; pass a progress token on the call. The result is Approved or Feedback, each with the user's optional message and their Feedback notes (a file path, the side of the diff, the line range, the code they read there, and their note); NoChanges when there is nothing to read; TimedOut when they do not answer in time; or Cancelled when Glass shuts down. Feedback asks you to change the code. Notes on an approval are guidance and ask for no more work. A Check-in that timed out or was cancelled is not approval; the user's notes come back if you check in again from the same folder. Each MCP session may have one Check-in waiting.",
+                  "description": "For an agent outside Glass: asks the user to read the changes in a folder and approve them or send feedback in the Glass Inbox, under the name the user approved, and returns at once; it doesn't wait for their answer. Pass the absolute path of your working directory. Glass reads the changes itself: the working tree, staged or not and including untracked files, against where the branch forked from baseRef, frozen as they are when you call. The result is CheckedIn with the checkInId to pass read_answer when you are ready for the answer, or NoChanges when there is nothing to read. Checking in again from the same folder replaces a Check-in the user hasn't answered, and the Feedback notes they left on it carry over.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -1211,19 +1196,6 @@
                             "type": "null"
                           }
                         ]
-                      },
-                      "timeoutSeconds": {
-                        "anyOf": [
-                          {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 7200,
-                            "description": "Seconds to wait. Defaults to 3600."
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
                       }
                     },
                     "required": ["folder"],
@@ -1253,7 +1225,7 @@
                   "text": "What are my To-dos?"
                 }
               ],
-              "timestamp": 1795535693409
+              "timestamp": 1795562035785
             }
           }
         },
@@ -1268,7 +1240,7 @@
                   "text": "What are my To-dos?"
                 }
               ],
-              "timestamp": 1795535693409
+              "timestamp": 1795562035785
             }
           }
         },
@@ -1296,7 +1268,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795535693435
+              "timestamp": 1795562035811
             }
           }
         },
@@ -1409,10 +1381,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795535693435,
+              "timestamp": 1795562035811,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 11,
+              "durationMs": 12,
               "thinkingLevel": "off"
             }
           }
@@ -1439,7 +1411,7 @@
               ]
             },
             "isError": false,
-            "durationMs": 4
+            "durationMs": 3
           }
         },
         {
@@ -1456,8 +1428,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 4,
-              "timestamp": 1795535693452
+              "durationMs": 3,
+              "timestamp": 1795562035830
             }
           }
         },
@@ -1475,8 +1447,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 4,
-              "timestamp": 1795535693452
+              "durationMs": 3,
+              "timestamp": 1795562035830
             }
           }
         },
@@ -1511,10 +1483,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795535693435,
+              "timestamp": 1795562035811,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 11,
+              "durationMs": 12,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1529,8 +1501,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 4,
-                "timestamp": 1795535693452
+                "durationMs": 3,
+                "timestamp": 1795562035830
               }
             ]
           }
@@ -1564,7 +1536,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795535693455
+              "timestamp": 1795562035833
             }
           }
         },
@@ -1668,7 +1640,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795535693455,
+              "timestamp": 1795562035833,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1705,7 +1677,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795535693455,
+              "timestamp": 1795562035833,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1722,30 +1694,8 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795535693411,
+                "timestamp": 1795562035786,
                 "toolsAdded": [
-                  {
-                    "name": "ask_user",
-                    "description": "Ask the user one question and wait for their answer. Give options when the answer is one of a few choices; leave them out for the user to answer in their own words.",
-                    "parameters": {
-                      "type": "object",
-                      "properties": {
-                        "question": {
-                          "type": "string",
-                          "description": "The question, as the user should read it."
-                        },
-                        "options": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          },
-                          "description": "The answers the user can choose from, if any."
-                        }
-                      },
-                      "required": ["question"],
-                      "additionalProperties": false
-                    }
-                  },
                   {
                     "name": "mcp__glass__list_pull_requests",
                     "description": "Lists the user's PR lists in Glass: PRs that need their review, their own PRs, and PRs they are reviewing, grouped by followed repository.",
@@ -2169,7 +2119,7 @@
                   },
                   {
                     "name": "mcp__glass__ask_user",
-                    "description": "For an agent outside Glass: asks the user a question and waits for their answer in the Glass Inbox, in Stopped on you, under the name the user approved. A Thread Glass launched asks with its own Question tool instead. Waits 10 minutes unless timeoutSeconds is set. timeoutSeconds is a whole number of seconds from 1 to 600. Glass sends a progress notification immediately and every 15 seconds while it waits, so a client that resets its timeout when progress arrives is not cut off before Glass's own limit. Pass a progress token on the call. The result is Answered with the user's answer (by is choice or text), TimedOut when they do not answer in time, or Cancelled when Glass shuts down. A timed out or cancelled question leaves the Inbox. choices are optional. The user can pick one or type their own answer. Each MCP session may have one question waiting.",
+                    "description": "Asks the user one question in the Glass Inbox and returns at once with its questionId; it doesn't wait for the answer. Keep working on what doesn't depend on the answer; if nothing does, end your Turn. A Thread or the Global chat that Glass launched gets the answer as a later message with a glass_answer block naming the questionId. An agent outside Glass reads it with read_answer when it is ready for it. The user picks one of the choices or types their own answer, or sets the question aside. Ask each question with its own call.",
                     "parameters": {
                       "type": "object",
                       "properties": {
@@ -2178,35 +2128,42 @@
                           "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
                           "minLength": 1,
                           "maxLength": 2000,
-                          "description": "The question to show in the Inbox."
+                          "description": "The question, as the user should read it in the Inbox."
                         },
                         "choices": {
                           "anyOf": [
                             {
                               "type": "array",
                               "items": {
-                                "type": "string",
-                                "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
-                                "minLength": 1,
-                                "maxLength": 200
+                                "type": "object",
+                                "properties": {
+                                  "label": {
+                                    "type": "string",
+                                    "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                                    "minLength": 1,
+                                    "maxLength": 200
+                                  },
+                                  "description": {
+                                    "anyOf": [
+                                      {
+                                        "type": "string",
+                                        "pattern": "^\\S[\\s\\S]*\\S$|^\\S$|^$",
+                                        "minLength": 1,
+                                        "maxLength": 500,
+                                        "description": "What picking this choice means, when the label alone doesn't say."
+                                      },
+                                      {
+                                        "type": "null"
+                                      }
+                                    ]
+                                  }
+                                },
+                                "required": ["label"],
+                                "additionalProperties": true
                               },
                               "minItems": 1,
                               "maxItems": 8,
-                              "uniqueItems": true,
-                              "description": "Choices the user can pick. They can still type their own answer. Omit this to ask for text only."
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "timeoutSeconds": {
-                          "anyOf": [
-                            {
-                              "type": "integer",
-                              "minimum": 1,
-                              "maximum": 600,
-                              "description": "Seconds to wait. Defaults to 600, the most allowed."
+                              "description": "Choices the user can pick, with distinct labels. They can still type their own answer. Omit this to ask for text only."
                             },
                             {
                               "type": "null"
@@ -2219,8 +2176,23 @@
                     }
                   },
                   {
+                    "name": "mcp__glass__read_answer",
+                    "description": "For an agent outside Glass: reads where a question you asked with ask_user, or a Check-in you made with check_in, stands, by its id, from any of your sessions. The result is Waiting while the user hasn't answered, or SetAside when they chose not to. A question's answer is Answered (by is choice or text). A Check-in's answer is Approved or Feedback, each with the user's optional message and their Feedback notes (a file path, the side of the diff, the line range, the code they read there, their note, and whether that code changed since); or Replaced, with the id of the Check-in that replaced it when you checked in again from the same folder. Feedback asks you to change the code. Notes on an approval are guidance and ask for no more work.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "description": "The questionId ask_user returned, or the checkInId check_in returned."
+                        }
+                      },
+                      "required": ["id"],
+                      "additionalProperties": true
+                    }
+                  },
+                  {
                     "name": "mcp__glass__check_in",
-                    "description": "For an agent outside Glass: asks the user to read the changes in a folder and approve them or send feedback, and waits for their answer in the Glass Inbox, under the name the user approved. Pass the absolute path of your working directory. Glass reads the changes itself: the working tree, staged or not and including untracked files, against where the branch forked from baseRef, frozen as they are when you call. Waits 60 minutes unless timeoutSeconds is set, at most 120 minutes. Glass sends a progress notification immediately and every 15 seconds while it waits; pass a progress token on the call. The result is Approved or Feedback, each with the user's optional message and their Feedback notes (a file path, the side of the diff, the line range, the code they read there, and their note); NoChanges when there is nothing to read; TimedOut when they do not answer in time; or Cancelled when Glass shuts down. Feedback asks you to change the code. Notes on an approval are guidance and ask for no more work. A Check-in that timed out or was cancelled is not approval; the user's notes come back if you check in again from the same folder. Each MCP session may have one Check-in waiting.",
+                    "description": "For an agent outside Glass: asks the user to read the changes in a folder and approve them or send feedback in the Glass Inbox, under the name the user approved, and returns at once; it doesn't wait for their answer. Pass the absolute path of your working directory. Glass reads the changes itself: the working tree, staged or not and including untracked files, against where the branch forked from baseRef, frozen as they are when you call. The result is CheckedIn with the checkInId to pass read_answer when you are ready for the answer, or NoChanges when there is nothing to read. Checking in again from the same folder replaces a Check-in the user hasn't answered, and the Feedback notes they left on it carry over.",
                     "parameters": {
                       "type": "object",
                       "properties": {
@@ -2256,19 +2228,6 @@
                               "type": "null"
                             }
                           ]
-                        },
-                        "timeoutSeconds": {
-                          "anyOf": [
-                            {
-                              "type": "integer",
-                              "minimum": 1,
-                              "maximum": 7200,
-                              "description": "Seconds to wait. Defaults to 3600."
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
                         }
                       },
                       "required": ["folder"],
@@ -2293,7 +2252,7 @@
                     "text": "What are my To-dos?"
                   }
                 ],
-                "timestamp": 1795535693409
+                "timestamp": 1795562035785
               },
               {
                 "role": "assistant",
@@ -2323,10 +2282,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795535693435,
+                "timestamp": 1795562035811,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 11,
+                "durationMs": 12,
                 "thinkingLevel": "off"
               },
               {
@@ -2340,8 +2299,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 4,
-                "timestamp": 1795535693452
+                "durationMs": 3,
+                "timestamp": 1795562035830
               },
               {
                 "role": "assistant",
@@ -2369,7 +2328,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1795535693455,
+                "timestamp": 1795562035833,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2420,7 +2379,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T15-54-53-220Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T23-13-55-588Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,
@@ -2468,7 +2427,7 @@
                   "text": "Read acme/api#42 at a stale Revision."
                 }
               ],
-              "timestamp": 1795535693460
+              "timestamp": 1795562035839
             }
           }
         },
@@ -2483,7 +2442,7 @@
                   "text": "Read acme/api#42 at a stale Revision."
                 }
               ],
-              "timestamp": 1795535693460
+              "timestamp": 1795562035839
             }
           }
         },
@@ -2511,7 +2470,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795535693463
+              "timestamp": 1795562035841
             }
           }
         },
@@ -2644,7 +2603,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795535693463,
+              "timestamp": 1795562035841,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -2685,7 +2644,7 @@
               "details": {}
             },
             "isError": true,
-            "durationMs": 22
+            "durationMs": 24
           }
         },
         {
@@ -2703,8 +2662,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 22,
-              "timestamp": 1795535693488
+              "durationMs": 24,
+              "timestamp": 1795562035869
             }
           }
         },
@@ -2723,8 +2682,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 22,
-              "timestamp": 1795535693488
+              "durationMs": 24,
+              "timestamp": 1795562035869
             }
           }
         },
@@ -2769,7 +2728,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795535693463,
+              "timestamp": 1795562035841,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -2788,8 +2747,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 22,
-                "timestamp": 1795535693488
+                "durationMs": 24,
+                "timestamp": 1795562035869
               }
             ]
           }
@@ -2823,7 +2782,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795535693491
+              "timestamp": 1795562035872
             }
           }
         },
@@ -2927,7 +2886,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795535693491,
+              "timestamp": 1795562035872,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -2964,7 +2923,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795535693491,
+              "timestamp": 1795562035872,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -2985,7 +2944,7 @@
                     "text": "Read acme/api#42 at a stale Revision."
                   }
                 ],
-                "timestamp": 1795535693460
+                "timestamp": 1795562035839
               },
               {
                 "role": "assistant",
@@ -3025,7 +2984,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795535693463,
+                "timestamp": 1795562035841,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 2,
@@ -3043,8 +3002,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 22,
-                "timestamp": 1795535693488
+                "durationMs": 24,
+                "timestamp": 1795562035869
               },
               {
                 "role": "assistant",
@@ -3072,7 +3031,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1795535693491,
+                "timestamp": 1795562035872,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -3123,7 +3082,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T15-54-53-220Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T23-13-55-588Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 9,

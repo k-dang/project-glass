@@ -11,6 +11,7 @@ import {
   type RequestPart,
   TurnFinished,
   type TurnSeen,
+  type OpenQuestion,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Match, Predicate, Schema } from "effect"
@@ -107,6 +108,7 @@ const reasonsOf = (item: InboxItem): ReadonlyArray<Reason> =>
       Thread: ({ reasons }) =>
         reasons.flatMap((reason) =>
           Match.valueTags(reason, {
+            OpenQuestions: () => [{ label: "Question", tone: toneClass.warning }],
             WaitingRequests: ({ requests }) => requests.map(requestReason),
             TurnFinished: ({ ended }) => [turnEndingLooks[ended.ending._tag]],
           }),
@@ -114,7 +116,10 @@ const reasonsOf = (item: InboxItem): ReadonlyArray<Reason> =>
       OutsideQuestion: () => [{ label: "Question", tone: toneClass.warning }],
       CheckIn: () => [{ label: "Check-in", tone: toneClass.warning }],
       PullRequest: ({ reasons }) => reasons.map(pullRequestReason),
-      GlobalChat: ({ requests }) => requests.map(requestReason),
+      GlobalChat: ({ requests, questions }) => [
+        ...(questions.length > 0 ? [{ label: "Question", tone: toneClass.warning }] : []),
+        ...requests.map(requestReason),
+      ],
     }),
     (a, b) => a.label === b.label,
   )
@@ -146,6 +151,7 @@ const requestsOf = (item: InboxItem): ReadonlyArray<RequestPart> =>
     Thread: ({ reasons }) =>
       reasons.flatMap((reason) =>
         Match.valueTags(reason, {
+          OpenQuestions: () => [],
           WaitingRequests: ({ requests }) => requests,
           TurnFinished: () => [],
         }),
@@ -154,6 +160,18 @@ const requestsOf = (item: InboxItem): ReadonlyArray<RequestPart> =>
     CheckIn: () => [],
     PullRequest: () => [],
     GlobalChat: ({ requests }) => requests,
+  })
+
+export const questionsOf = (item: InboxItem): ReadonlyArray<OpenQuestion> =>
+  Match.valueTags(item, {
+    Thread: ({ reasons }) =>
+      reasons.flatMap((reason) =>
+        Predicate.isTagged(reason, "OpenQuestions") ? reason.questions : [],
+      ),
+    OutsideQuestion: (question) => [question],
+    CheckIn: () => [],
+    PullRequest: () => [],
+    GlobalChat: ({ questions }) => questions,
   })
 
 export const firstPermission = (item: InboxItem) =>

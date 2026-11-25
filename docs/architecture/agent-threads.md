@@ -53,5 +53,6 @@ Thread.
 
 `StartThread` names the harness, folder, role and skills. The host writes Local skills and Skill
 packs into a folder beside the Thread's folder. Claude Code loads them as plugins, and pi loads them with
-`--skill`. Tools that need nothing from the backend, `draw_diagram`, `suggest_draft` and
-`ask_user`, are defined in the host and answered there.
+`--skill`. Tools that need nothing from the backend, `draw_diagram` and `suggest_draft`, are
+defined in the host and answered there. Every agent asks the user with the Glass tool `ask_user`,
+which returns at once; the answer comes back later as a message.

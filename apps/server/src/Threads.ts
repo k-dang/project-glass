@@ -1,4 +1,5 @@
 import {
+  type AnsweredQuestion,
   Thread,
   ThreadBusy,
   type AgentHarness,
@@ -154,6 +155,10 @@ export class Threads extends Context.Service<
     readonly watch: () => Stream.Stream<ReadonlyArray<Thread>, ThreadError>
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<WaitingThread>>
     readonly watchFinished: () => Stream.Stream<ReadonlyArray<FinishedThread>>
+    readonly deliverAnswers: (
+      threadId: string,
+      answers: Arr.NonEmptyReadonlyArray<AnsweredQuestion>,
+    ) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly watchWorking: () => Stream.Stream<ReadonlyArray<string>>
     readonly keptGoing: Stream.Stream<ReadonlyMap<string, DateTime.Utc>>
     readonly bringBack: (threadId: string) => Effect.Effect<void, ThreadNotFound | ThreadError>
@@ -779,6 +784,16 @@ export class Threads extends Context.Service<
         yield* keepGoing(threadId)
       })
 
+      const deliverAnswers = Effect.fn("Threads.deliverAnswers")(function* (
+        threadId: string,
+        answers: Arr.NonEmptyReadonlyArray<AnsweredQuestion>,
+      ) {
+        const row = yield* findWritable(threadId)
+
+        yield* turns.deliverAnswers(threadOf(row), answers)
+        yield* keepGoing(threadId)
+      })
+
       const bringBack = Effect.fn("Threads.bringBack")(function* (threadId: string) {
         yield* find(threadId)
         yield* keepGoing(threadId)
@@ -1087,6 +1102,7 @@ export class Threads extends Context.Service<
               }),
             ),
           ),
+        deliverAnswers,
         watchWorking: () =>
           Stream.zipLatest(placed, transcripts.running).pipe(
             Stream.map(([current, running]) =>

@@ -1,28 +1,10 @@
-import { Context, Deferred, Effect, Exit, Layer, Option, Redacted, Schema, Scope } from "effect"
+import { Context, Deferred, Effect, Exit, Layer, Option, Redacted, Scope } from "effect"
 import { randomBytes, timingSafeEqual } from "node:crypto"
 import type { GlassToolsAccess, StartOutcome } from "../agentHost/protocol"
+import { type Caller, GlobalChatCaller } from "../callers"
 import { digest } from "./mcpHttp"
 
-export class GlobalChatCaller extends Schema.TaggedClass<GlobalChatCaller>()("GlobalChat", {
-  globalChatId: Schema.String,
-  sessionId: Schema.String,
-}) {}
-
-export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()("OutsideAgent", {
-  agentId: Schema.String,
-  name: Schema.String,
-  session: Schema.String,
-}) {}
-
-export class ThreadCaller extends Schema.TaggedClass<ThreadCaller>()("Thread", {
-  threadId: Schema.String,
-}) {}
-
-export type McpCallerIdentity = GlobalChatCaller | ThreadCaller | OutsideAgentCaller
-
-export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
-  "@glass/server/McpCaller",
-) {
+export class McpCaller extends Context.Service<McpCaller, Caller>()("@glass/server/McpCaller") {
   static readonly current = Effect.serviceOption(McpCaller).pipe(
     Effect.flatMap(
       Option.match({
@@ -43,7 +25,7 @@ export const timingSafeSameSecret = (left: string, right: string) => {
 }
 
 export interface McpCredential {
-  readonly caller: McpCallerIdentity
+  readonly caller: Caller
   readonly ownedSessions: Set<string>
   readonly revoked: Effect.Effect<void>
 }

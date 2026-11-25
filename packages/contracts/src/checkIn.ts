@@ -52,18 +52,16 @@ export const CheckInApproved = Schema.TaggedStruct("Approved", sent)
 
 export const CheckInFeedback = Schema.TaggedStruct("Feedback", sent)
 
+export const CheckInAnswered = Schema.Union([CheckInApproved, CheckInFeedback])
+
+export type CheckInAnswered = typeof CheckInAnswered.Type
+
 export const CheckInNoChanges = Schema.TaggedStruct("NoChanges", {})
 
-export const CheckInTimedOut = Schema.TaggedStruct("TimedOut", {})
+export const CheckedIn = Schema.TaggedStruct("CheckedIn", { checkInId: Schema.String })
 
-export const CheckInCancelled = Schema.TaggedStruct("Cancelled", {})
+export const CheckInStarted = Schema.Union([CheckedIn, CheckInNoChanges])
 
-export const CheckInResult = Schema.Union([
-  CheckInApproved,
-  CheckInFeedback,
-  CheckInNoChanges,
-  CheckInTimedOut,
-  CheckInCancelled,
-])
+export type CheckInStarted = typeof CheckInStarted.Type
 
-export type CheckInResult = typeof CheckInResult.Type
+export const CheckInReplaced = Schema.TaggedStruct("Replaced", { checkInId: Schema.String })
