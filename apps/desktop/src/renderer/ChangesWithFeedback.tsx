@@ -33,12 +33,12 @@ import { FilePanelTabsList, FilePanelTabTrigger } from "./FilePanelTabs"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
-import { useFeedbackComposer } from "./useFeedbackComposer"
+import { type NoteOpen, useFeedbackComposer } from "./useFeedbackComposer"
 import type { LineNotesEditor } from "./useFeedbackNotes"
 
 export type SidebarTab = "files" | "feedback"
 
-const NoteOpenContext = createContext(false)
+const NoteOpenContext = createContext<NoteOpen>("none")
 
 export const useNoteOpen = () => useContext(NoteOpenContext)
 

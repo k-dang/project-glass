@@ -104,7 +104,7 @@ function ThreadChanges(props: {
 }
 
 function ReportNoteOpen(props: { threadId: string }) {
-  useNoteEditorOpen(props.threadId, "changes", useNoteOpen())
+  useNoteEditorOpen(props.threadId, "changes", useNoteOpen() === "saved")
 
   return null
 }

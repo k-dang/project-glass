@@ -145,7 +145,7 @@ const answerHint = (editing: boolean, noteCount: number) => {
 }
 
 function AnswerBar(props: { checkInId: string; noteCount: number; onAnswered: () => void }) {
-  const editing = useNoteOpen()
+  const editing = useNoteOpen() !== "none"
   const runtime = useBackendRuntime()
   const [text, setText] = useState("")
   const [answering, setAnswering] = useState(false)

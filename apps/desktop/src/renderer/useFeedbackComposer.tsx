@@ -21,6 +21,8 @@ import {
 import { FeedbackEditor, FeedbackNoteCard, FeedbackOverview, SelectionBar } from "./FeedbackNotes"
 import type { LineNotesEditor } from "./useFeedbackNotes"
 
+export type NoteOpen = "none" | "new" | "saved"
+
 type NoteDraft = Omit<LineNote, "_tag" | "text">
 
 type Composer =
@@ -299,10 +301,7 @@ export function useFeedbackComposer(props: {
     />
   )
 
-  return {
-    diffProps,
-    overview,
-    onKeyDown,
-    editing: editing !== null,
-  }
+  const open: NoteOpen = editing === null ? "none" : editing.saved ? "saved" : "new"
+
+  return { diffProps, overview, onKeyDown, editing: open }
 }
