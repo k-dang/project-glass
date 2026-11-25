@@ -16,6 +16,7 @@ import {
 import { OtlpLogger, OtlpSerialization, OtlpTracer } from "effect/observability"
 import { randomUUID } from "node:crypto"
 import type { Delivery } from "./ThreadTurns"
+import { untilDesktopStops } from "./desktopMain"
 
 // WARNING: Fields hold only IDs, counts, choices and durations, never message text, prompts, diffs, transcripts or credentials: users attach backend.log to bug reports.
 interface UnitFields {
@@ -229,6 +230,7 @@ export const runMain =
         Cause.hasInterruptsOnly(cause) ? Effect.void : Effect.logError("Stopped", cause),
       ),
       Effect.provide(output),
+      untilDesktopStops,
       NodeRuntime.runMain({ disableErrorReporting: true }),
     )
 

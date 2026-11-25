@@ -5,13 +5,20 @@ import {
   TOKEN_PARAM,
   VISUALIZATIONS_PATH,
 } from "@glass/contracts"
-import type { BackendEndpoint, BackendFailure } from "@glass/contracts/desktop"
-import { Cause, Deferred, Duration, Effect, Fiber, Option } from "effect"
-import { app, type UtilityProcess, utilityProcess } from "electron"
+import {
+  BACKEND_READY,
+  type BackendEndpoint,
+  type BackendFailure,
+  STOP_BACKEND,
+} from "@glass/contracts/desktop"
+import { Cause, Duration, Effect, Fiber, Option } from "effect"
+import { app, utilityProcess } from "electron"
 import { randomBytes, randomUUID } from "node:crypto"
-import { BackendError, keepRunning, openBackendLog, waitForBackend } from "./backendIo"
+import { BackendError, keepRunning, openBackendLog } from "./backendIo"
 import { lastBoundPortOrFree } from "./backendPort"
 import { prependLoginShellPath } from "./loginShellPath"
+
+const READY_DEADLINE = Duration.seconds(20)
 
 const STOP_DEADLINE = Duration.seconds(10)
 
@@ -44,25 +51,35 @@ export const threadFileUrl = (
 export const visualizationUrl = (endpoint: BackendEndpoint, id: string) =>
   GLASS_ID.test(id) ? backendUrl(endpoint, VISUALIZATIONS_PATH, [id]) : null
 
-// WARNING: UtilityProcess.kill() SIGKILLs 2 s after its SIGTERM (Chromium EnsureProcessTerminated), cutting off the Agent host's shutdown.
-const stopBackend = (backend: UtilityProcess, exitCode: Promise<number>) =>
-  Effect.sync(() => {
-    if (backend.pid !== undefined) process.kill(backend.pid, "SIGINT")
-  }).pipe(
-    Effect.andThen(Effect.promise(() => exitCode)),
+export interface BackendProcess {
+  readonly ready: Promise<void>
+  readonly exited: Promise<number>
+  readonly running: () => boolean
+  readonly stop: () => void
+  readonly kill: () => void
+}
+
+type ForkBackend = (env: Readonly<Record<string, string>>) => BackendProcess
+
+type Note = (level: "INFO" | "ERROR", message: string) => Effect.Effect<void>
+
+const stopBackend = (backend: BackendProcess) =>
+  Effect.sync(backend.stop).pipe(
+    Effect.andThen(Effect.promise(() => backend.exited)),
     Effect.timeoutOrElse({
       duration: STOP_DEADLINE,
       orElse: () =>
-        Effect.sync(() => backend.kill()).pipe(Effect.andThen(Effect.promise(() => exitCode))),
+        Effect.sync(backend.kill).pipe(Effect.andThen(Effect.promise(() => backend.exited))),
     }),
-    Effect.asVoid,
   )
 
-const startBackend = Effect.fn("startBackend")(function* (options: {
-  readonly entry: string
+export const launchBackend = Effect.fn("launchBackend")(function* (options: {
+  readonly fork: ForkBackend
   readonly rendererOrigin: string
-  readonly logFile: string
   readonly dataDirectory: string
+  readonly onReady: (endpoint: BackendEndpoint) => void
+  readonly onDown: () => void
+  readonly note: Note
 }) {
   const port = yield* Effect.tryPromise({
     try: () => lastBoundPortOrFree(options.dataDirectory),
@@ -73,8 +90,86 @@ const startBackend = Effect.fn("startBackend")(function* (options: {
   })
 
   const token = randomBytes(32).toString("base64url")
-  const log = yield* openBackendLog(options.logFile)
-  const ready = yield* Deferred.make<void>()
+
+  const backend = yield* Effect.acquireRelease(
+    Effect.sync(() =>
+      options.fork({
+        GLASS_PORT: String(port),
+        GLASS_TOKEN: token,
+        GLASS_ALLOWED_ORIGINS: options.rendererOrigin,
+        GLASS_DATA_DIRECTORY: options.dataDirectory,
+      }),
+    ),
+    (started) =>
+      started.running()
+        ? stopBackend(started).pipe(
+            Effect.flatMap((code) => options.note("INFO", `Backend stopped with code ${code}`)),
+          )
+        : Effect.void,
+  )
+
+  const exited = Effect.promise(() => backend.exited).pipe(
+    Effect.flatMap((code) =>
+      Effect.fail(new BackendError({ message: `Backend exited with code ${code}` })),
+    ),
+  )
+
+  yield* Effect.raceFirst(
+    Effect.promise(() => backend.ready),
+    exited,
+  ).pipe(
+    Effect.timeoutOrElse({
+      duration: READY_DEADLINE,
+      orElse: () => Effect.fail(new BackendError({ message: "Backend did not start in time" })),
+    }),
+  )
+
+  options.onReady({ url: `ws://127.0.0.1:${port}${RPC_PATH}`, token })
+
+  return yield* exited.pipe(Effect.ensuring(Effect.sync(options.onDown)))
+}, Effect.scoped)
+
+const forkUtilityProcess = (
+  entry: string,
+  env: Readonly<Record<string, string>>,
+  output: { readonly stdout: (chunk: Buffer) => void; readonly stderr: (chunk: Buffer) => void },
+): BackendProcess => {
+  const child = utilityProcess.fork(entry, [], {
+    serviceName: "Glass backend",
+    stdio: "pipe",
+    env: { ...process.env, ...env },
+  })
+
+  child.stdout?.on("data", output.stdout)
+  child.stderr?.on("data", output.stderr)
+
+  return {
+    ready: new Promise((resolve) =>
+      child.on("message", (message) => {
+        if (message === BACKEND_READY) resolve()
+      }),
+    ),
+    exited: new Promise((resolve) => child.once("exit", resolve)),
+    running: () => child.pid !== undefined,
+    // oxlint-disable-next-line unicorn/require-post-message-target-origin -- A UtilityProcess takes no target origin.
+    stop: () => child.postMessage(STOP_BACKEND),
+    kill: () => child.kill(),
+  }
+}
+
+const superviseBackend = Effect.fn("superviseBackend")(function* ({
+  entry,
+  logFile,
+  ...options
+}: {
+  readonly entry: string
+  readonly rendererOrigin: string
+  readonly logFile: string
+  readonly dataDirectory: string
+  readonly onReady: (endpoint: BackendEndpoint) => void
+  readonly onDown: () => void
+}) {
+  const log = yield* openBackendLog(logFile)
 
   const writeOutput = (chunk: Buffer) => {
     log.stream.write(chunk)
@@ -91,7 +186,7 @@ const startBackend = Effect.fn("startBackend")(function* (options: {
     platform: `${process.platform}-${process.arch}`,
   }
 
-  const note = (level: "INFO" | "ERROR", message: string) =>
+  const note: Note = (level, message) =>
     Effect.sync(() =>
       writeOutput(
         Buffer.from(
@@ -100,62 +195,22 @@ const startBackend = Effect.fn("startBackend")(function* (options: {
       ),
     )
 
-  const run = Effect.gen(function* () {
-    yield* note("INFO", "Starting backend")
-
-    const { exitCode } = yield* Effect.acquireRelease(
-      Effect.sync(() => {
-        const backend = utilityProcess.fork(options.entry, [], {
-          serviceName: "Glass backend",
-          stdio: "pipe",
-          env: {
-            ...process.env,
-            GLASS_PORT: String(port),
-            GLASS_TOKEN: token,
-            GLASS_ALLOWED_ORIGINS: options.rendererOrigin,
-            GLASS_DATA_DIRECTORY: options.dataDirectory,
-          },
-        })
-
-        backend.stdout?.on("data", writeOutput)
-        backend.stderr?.on("data", relayStderr)
-
-        return {
-          backend,
-          exitCode: new Promise<number>((resolve) => backend.once("exit", resolve)),
-        }
+  const run = note("INFO", "Starting backend").pipe(
+    Effect.andThen(
+      launchBackend({
+        ...options,
+        fork: (env) => forkUtilityProcess(entry, env, { stdout: writeOutput, stderr: relayStderr }),
+        note,
       }),
-      (started) => stopBackend(started.backend, started.exitCode),
-    )
+    ),
+  )
 
-    const exited = Effect.promise(() => exitCode).pipe(
-      Effect.flatMap((code) =>
-        Effect.fail(new BackendError({ message: `Backend exited with code ${code}` })),
-      ),
-    )
-
-    yield* Effect.raceFirst(waitForBackend(port, token), exited)
-    yield* Deferred.succeed(ready, undefined)
-
-    return yield* exited
-  }).pipe(Effect.scoped)
-
-  const supervisor = yield* keepRunning(run, (error, delay) =>
+  return yield* keepRunning(run, (error, delay) =>
     note("ERROR", `${error.message}; restarting in ${Duration.format(delay)}`),
   ).pipe(
     Effect.tapError((error) => note("ERROR", `${error.message}; giving up`)),
     Effect.raceFirst(log.failed),
-    Effect.forkScoped,
   )
-
-  const failed = Fiber.join(supervisor)
-
-  yield* Effect.raceFirst(Deferred.await(ready), failed)
-
-  return {
-    endpoint: { url: `ws://127.0.0.1:${port}${RPC_PATH}`, token } satisfies BackendEndpoint,
-    failed,
-  }
 })
 
 export const runBackend = ({
@@ -168,8 +223,11 @@ export const runBackend = ({
   readonly logFile: string
   readonly dataDirectory: string
   readonly onReady: (endpoint: BackendEndpoint) => void
+  readonly onDown: () => void
   readonly onFailure: (kind: BackendFailure["kind"], message: string) => void
 }) => {
+  let started = false
+
   const program = Effect.gen(function* () {
     if (app.isPackaged && process.platform !== "win32") {
       yield* prependLoginShellPath(process.env, [
@@ -178,10 +236,13 @@ export const runBackend = ({
       ])
     }
 
-    const backend = yield* startBackend(options)
-
-    onReady(backend.endpoint)
-    onFailure("crash", (yield* Effect.flip(backend.failed)).message)
+    return yield* superviseBackend({
+      ...options,
+      onReady: (endpoint) => {
+        started = true
+        onReady(endpoint)
+      },
+    })
   }).pipe(
     Effect.scoped,
     Effect.catchCause((cause) =>
@@ -189,7 +250,7 @@ export const runBackend = ({
         if (Cause.hasInterruptsOnly(cause)) return
 
         Option.match(Cause.findErrorOption(cause), {
-          onSome: (error) => onFailure("start", error.message),
+          onSome: (error) => onFailure(started ? "crash" : "start", error.message),
           onNone: () => {
             console.error(Cause.pretty(cause))
             onFailure("start", "Unexpected error while starting the backend")
