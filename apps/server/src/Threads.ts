@@ -36,6 +36,7 @@ import {
   type Transcript,
   type TranscriptUpdate,
   type TurnEnd,
+  type UnseenTurn,
   type SentMessage,
 } from "@glass/contracts"
 import {
@@ -191,6 +192,7 @@ export class Threads extends Context.Service<
     readonly watch: () => Stream.Stream<ReadonlyArray<Thread>, ThreadError>
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<WaitingThread>>
     readonly watchFinished: () => Stream.Stream<ReadonlyArray<FinishedThread>>
+    readonly watchUnseenTurns: () => Stream.Stream<ReadonlyArray<UnseenTurn>>
     readonly watchWorking: () => Stream.Stream<ReadonlyArray<string>>
     readonly keptGoing: Stream.Stream<ReadonlyMap<string, DateTime.Utc>>
     readonly bringBack: (threadId: string) => Effect.Effect<void, ThreadNotFound | ThreadError>
@@ -1104,6 +1106,21 @@ export class Threads extends Context.Service<
         ),
       )
 
+      const watchFinished = () =>
+        Stream.zipLatest(placed, transcripts.unseen).pipe(
+          Stream.map(([current, unseen]) =>
+            current.flatMap(({ thread }): ReadonlyArray<FinishedThread> => {
+              const end = unseen.get(thread.id)
+
+              return end === undefined ||
+                thread.forReview ||
+                Predicate.isTagged(end.ended.ending, "Stopped")
+                ? []
+                : [{ thread, ...end }]
+            }),
+          ),
+        )
+
       return Threads.of({
         keptGoing: SubscriptionRef.changes(keptGoing),
         bringBack,
@@ -1172,18 +1189,11 @@ export class Threads extends Context.Service<
               }),
             ),
           ),
-        watchFinished: () =>
-          Stream.zipLatest(placed, transcripts.unseen).pipe(
-            Stream.map(([current, unseen]) =>
-              current.flatMap(({ thread }) => {
-                const end = unseen.get(thread.id)
-
-                return end === undefined ||
-                  thread.forReview ||
-                  Predicate.isTagged(end.ended.ending, "Stopped")
-                  ? []
-                  : [{ thread, ...end }]
-              }),
+        watchFinished,
+        watchUnseenTurns: () =>
+          watchFinished().pipe(
+            Stream.map((finished) =>
+              finished.map(({ thread, ended }) => ({ threadId: thread.id, ended })),
             ),
           ),
         watchWorking: () =>

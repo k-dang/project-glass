@@ -144,34 +144,41 @@ const reasonsOf = (
   standings: ReadonlyArray<PullRequestStanding>,
 ) => {
   const reasons: Array<PullRequestReason> = []
-  const triedBy: Array<TriedThread> = []
   const held = subscribed === null ? null : heldBack(subscribed)
 
-  const handled = (reason: OpenReason) => {
-    const standing = standings.filter(
-      (candidate) =>
-        candidate.reason === reason && referenceKey(candidate.pullRequest) === referenceKey(ref),
-    )
+  const standingOn = (reason: OpenReason, holds: boolean) => {
+    const standing = holds
+      ? standings.filter(
+          (candidate) =>
+            candidate.reason === reason &&
+            referenceKey(candidate.pullRequest) === referenceKey(ref),
+        )
+      : []
 
-    if (standing.some(({ state }) => state === "handling")) return true
+    const handled = standing.some(({ state }) => state === "handling")
 
-    triedBy.push(...standing.map(({ thread }) => ({ threadId: thread.id, name: thread.name })))
-
-    return false
+    return {
+      handled,
+      triedBy: handled
+        ? []
+        : standing.map(({ thread }): TriedThread => ({ threadId: thread.id, name: thread.name })),
+    }
   }
 
   const changesRequested = attention?.changesRequested === true
   const checksFailing = checks === "failing"
   const awaitingReply = attention?.awaitingReply ?? 0
+  const changes = standingOn("changes-requested", changesRequested)
+  const failing = standingOn("failing-checks", checksFailing)
+  const feedback = standingOn("review-feedback", awaitingReply > 0)
 
-  if (changesRequested && (!handled("changes-requested") || held?.changesRequested === true))
+  if (changesRequested && (!changes.handled || held?.changesRequested === true))
     reasons.push(ChangesRequested.make({}))
 
-  if (checksFailing && !handled("failing-checks"))
+  if (checksFailing && !failing.handled)
     reasons.push(ChecksFailing.make({ failing: attention?.failingChecks ?? [] }))
 
-  const reviewThreads =
-    awaitingReply > 0 && handled("review-feedback") ? (held?.reviewThreads ?? 0) : awaitingReply
+  const reviewThreads = feedback.handled ? (held?.reviewThreads ?? 0) : awaitingReply
 
   if (reviewThreads > 0) reasons.push(AwaitingReply.make({ reviewThreads }))
 
@@ -186,7 +193,10 @@ const reasonsOf = (
 
   return {
     reasons,
-    triedBy: Arr.dedupeWith(triedBy, (a, b) => a.threadId === b.threadId),
+    triedBy: Arr.dedupeWith(
+      [changes, failing, feedback].flatMap(({ triedBy }) => triedBy),
+      (a, b) => a.threadId === b.threadId,
+    ),
   }
 }
 
