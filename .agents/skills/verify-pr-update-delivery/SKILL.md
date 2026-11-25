@@ -1,11 +1,11 @@
 ---
 name: verify-pr-update-delivery
-description: Model-check how a subscribed Thread is sent PR updates - only when idle, once per state of the PR, giving up after three, three at a time, across a Glass restart (subscription.last_told, RUN_AT_ONCE, GIVES_UP_AFTER). Use when a change touches PullRequestUpdates, pullRequestUpdateDecision, recordTold or toldAbout in Subscriptions, or lastMessageTurn, runningPullRequestUpdates or startIfIdle in Transcripts.
+description: Model-check how a subscribed Thread is sent PR updates - only when idle, once per state of the PR, giving up after three, three at a time, across a Glass restart (subscription.last_told, RUN_AT_ONCE, GIVES_UP_AFTER). Use when a change touches PullRequestUpdates, pullRequestUpdateDecision, recordTold or toldAbout in Subscriptions, lastMessageTurn, runningPullRequestUpdates or startIfIdle in Transcripts, or the sender stepThread gives a Turn in threadState.
 ---
 
 # Verify PR update delivery
 
-A Thread with a Subscription to a PR is sent a PR update when the PR has something new for it. Glass decides what to send from the PR's state in the mirror and the Subscription's `last_told`, which holds what the Thread was last told, how many PR updates in a row each reason got, and the last Turn a message of yours reached when that was written. The decision and the Turn's start are one transaction per Thread, run only while the Thread is idle. [`model/PullRequestUpdates.tla`](model/PullRequestUpdates.tla) models two Threads, each subscribed to its own PR for failing checks, and checks every order of check results, decisions, your messages, Turn endings, and one Glass restart.
+A Thread with a Subscription to a PR is sent a PR update when the PR has something new for it. Glass decides what to send from the PR's state in the mirror and the Subscription's `last_told`, which holds what the Thread was last told, how many PR updates in a row each reason got, and the last Turn a message of yours reached when that was written. The decision and the Turn's start are one transaction per Thread, run only while the Thread is idle. [`model/PullRequestUpdates.tla`](model/PullRequestUpdates.tla) models two Threads, each subscribed to its own PR for failing checks, and checks every order of check results, decisions, your messages, other agents' messages, Turn endings, and one Glass restart.
 
 ## The rules
 
@@ -24,25 +24,26 @@ A Thread with a Subscription to a PR is sent a PR update when the PR has somethi
 node tools/tla/tlc.ts .agents/skills/verify-pr-update-delivery/model/PullRequestUpdates.tla --mutants
 ```
 
-Expect `Result: ok`: every rule holds and every mutant is caught. A run takes about half a minute. [`tools/tla/README.md`](../../../tools/tla/README.md) explains the output. Read a counterexample, or chart the model, with the `/statechart` skill.
+Expect `Result: ok`: every rule holds and every mutant is caught. A run takes about two minutes. [`tools/tla/README.md`](../../../tools/tla/README.md) explains the output. Read a counterexample, or chart the model, with the `/statechart` skill.
 
 ## Coverage
 
-Synced with the code at commit `ef87435e698aa4de4c48f4ecfd9298aeda35aec8`. Before you trust a result, run `git diff ef87435e -- <files below>`. If a covered function changed, compare it with its actions first.
+Synced with the code at commit `3e583f314cf915f22c032b875cc71e796b35a2da`. Before you trust a result, run `git diff 3e583f31 -- <files below>`. If a covered function changed, compare it with its actions first.
 
 | Model | Code |
 | --- | --- |
-| `ChecksFail`, `ChecksRunAgain`, `ChecksPass` | What a read of the PR mirror shows: `subscribedTo` in `apps/server/src/PullRequestUpdates.ts` |
+| `ChecksFail`, `ChecksRunAgain`, `NewPushHasNoChecksYet`, `ChecksPass` | What a read of the PR mirror shows: `subscribedNow` in `apps/server/src/PullRequestUpdates.ts` |
 | `Decide` | One `threads.whenIdle` transaction in `sendUpdate` in `PullRequestUpdates.ts`; `whenIdle` in `apps/server/src/ThreadTurns.ts`; `idle` in `apps/server/src/Transcripts.ts` |
-| `IsNew`, `DecideNothingHolds`, `Count(t) < GivesUpAfter` | `decide`, its `part`, and `failingChecks` in `apps/server/src/pullRequestUpdateDecision.ts` (`cleared` returns the count to zero, `unsettled` keeps it) |
+| `IsNew`, `DecideNothingHolds`, `Count(t) < GivesUpAfter` | `decide`, its `decideReason`, and `failingChecks` in `apps/server/src/pullRequestUpdateDecision.ts` (`cleared` returns the count to zero; `unsettled` keeps it, both while checks run again and while a new push has none yet) |
 | `SlotFree` | `runningPullRequestUpdates` in `Transcripts.ts`, compared with `RUN_AT_ONCE` in `PullRequestUpdates.ts` |
 | `StartUpdate` | `startIfIdle` in `Transcripts.ts`, with `recordTold` in `apps/server/src/Subscriptions.ts` in the same transaction |
-| `afterNewMessage`, `MessageReaches` | `lastMessageTurn` in `Transcripts.ts` against `afterMessage` in `last_told`; `toldAbout` in `Subscriptions.ts` and `countedAfresh` in `pullRequestUpdateDecision.ts` |
-| `YouSendMessage`, `YouQueueMessage`, `QueuedMessageStarts`, `TurnEnds`, `StoppedQueueStarts` | `stepThread` in `apps/server/src/threadState.ts` |
+| `afterNewMessage`, `MessageReaches` | `lastMessageTurn` in `Transcripts.ts`, which reads the Turns your message started (`started_by = 'user'`) and your Steers, against `afterMessage` in `last_told`; `toldAbout` in `Subscriptions.ts` and `countedAfresh` in `pullRequestUpdateDecision.ts` |
+| `YouSendMessage`, `YouQueueMessage`, `AgentSendsMessage`, `AgentQueuesMessage`, `QueuedMessageStarts`, `TurnEnds`, `StoppedQueueStarts` | `stepThread` in `apps/server/src/threadState.ts`, which gives the Turn a message starts that message's sender |
+| `AgentMessageReaches` | A Turn another agent's message started (`started_by` is `creator` or `agent`), which `lastMessageTurn` leaves out |
 | `YouSteer` | The Steer part the Agent harness reports, which `lastMessageTurn` reads |
 | `GlassRestarts` | Nothing but the wait order lives in memory (`waiting` in `PullRequestUpdates.ts`). A local Thread's Turn is interrupted in `serve` in `ThreadTurns.ts`; a Sandbox Thread's Turn keeps running |
 
-Each mutant in `model/mutants.json` is one way to break this code: skipping the idle check, saving `last_told` after the Turn starts, sending what was decided before the wait, ignoring the limit or counting running PR updates in memory, never counting, resetting the count while checks run again, keeping the count in memory, and ignoring your messages.
+Each mutant in `model/mutants.json` is one way to break this code: skipping the idle check, saving `last_told` after the Turn starts, sending what was decided before the wait, ignoring the limit or counting running PR updates in memory, never counting, resetting the count while checks run again or while a new push has no checks yet, counting another agent's message as yours, keeping the count in memory, and ignoring your messages.
 
 ## When a change touches this code
 
@@ -53,7 +54,7 @@ Each mutant in `model/mutants.json` is one way to break this code: skipping the 
 
 ## Scope
 
-Bounds: 2 Threads, 1 PR update at once (the code runs 3), giving up after 2 (the code gives up after 3), 3 failing states per PR, 2 messages of yours, 1 restart. Each Thread has one Subscription covering failing checks; review feedback, requested changes and a merge conflict go through the same `part` in `decide`.
+Bounds: 2 Threads, 1 PR update at once (the code runs 3), giving up after 2 (the code gives up after 3), 3 failing states per PR, 2 messages (yours or another agent's), 1 restart. Each Thread has one Subscription covering failing checks; review feedback, requested changes and a merge conflict go through the same `decideReason` in `decide`.
 
 Left out: the order in which waiting Threads start (tested in `apps/server/src/PullRequestUpdateLimits.test.ts`), what the Inbox shows, the PR update about a PR merging or closing, several Subscriptions in one PR update, a canceled Queued message, and a failure GitHub reports again unchanged after reporting none.
 
