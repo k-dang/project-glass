@@ -72,6 +72,10 @@ export interface DogfoodReportDetails {
 
 export const BACKEND_ENDPOINT_CHANNEL = "glass:backend-endpoint"
 
+export const BACKEND_READY = "ready"
+
+export const STOP_BACKEND = "stop"
+
 export const BACKEND_FAILURE_CHANNEL = "glass:backend-failure"
 
 export const RELAUNCH_CHANNEL = "glass:relaunch"

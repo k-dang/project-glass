@@ -17,7 +17,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "dmovr0q7qhg",
+            "request_id": "9xbcjw5rid",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -29,7 +29,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "dmovr0q7qhg",
+              "request_id": "9xbcjw5rid",
               "response": {
                 "commands": [
                   {

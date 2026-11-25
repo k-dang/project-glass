@@ -1,9 +1,9 @@
 import { NodeServices } from "@effect/platform-node"
-import { assert, it } from "@effect/vitest"
-import { Effect, Stream } from "effect"
+import { assert, it, vi } from "@effect/vitest"
+import { Effect, Predicate, Stream } from "effect"
 import { ChildProcessSpawner } from "effect/process"
-import { writeFile } from "node:fs/promises"
-import { join } from "node:path"
+import { copyFile, mkdir, writeFile } from "node:fs/promises"
+import { isAbsolute, join } from "node:path"
 import { isolatedHome } from "../test/harness"
 import { argumentLength, launchCommand, sdkExecutable } from "./processes"
 
@@ -52,6 +52,47 @@ it.live.skipIf(process.platform !== "win32")(
 
       assert.deepStrictEqual(JSON.parse(output), args)
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+)
+
+it.live.skipIf(process.platform !== "win32")(
+  "never runs a same-named program from the working folder when the command isn't on PATH",
+  () =>
+    Effect.gen(function* () {
+      const home = yield* isolatedHome
+      const checkout = join(home, "checkout")
+      yield* Effect.promise(() => mkdir(checkout))
+      yield* Effect.promise(() =>
+        copyFile("C:\\Windows\\System32\\whoami.exe", join(checkout, "agent.exe")),
+      )
+      vi.stubEnv("NoDefaultCurrentDirectoryInExePath", undefined)
+
+      const error = yield* Effect.flip(
+        (yield* ChildProcessSpawner.ChildProcessSpawner).spawn(
+          launchCommand("agent", [], { cwd: checkout }, windowsHost(home)),
+        ),
+      )
+
+      assert.isTrue(Predicate.isTagged(error.reason, "NotFound"))
+    }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
+)
+
+it.live("hands the Claude SDK a full path when the command isn't on the Windows PATH", () =>
+  Effect.gen(function* () {
+    const folder = yield* isolatedHome
+
+    assert.isTrue(isAbsolute(sdkExecutable("claude", windowsHost(folder))))
+  }),
+)
+
+it.live("finds a command in a quoted Windows PATH folder", () =>
+  Effect.gen(function* () {
+    const folder = yield* isolatedHome
+    yield* installShim(folder, "claude", "bin\\claude.exe")
+
+    const executable = sdkExecutable("claude", windowsHost(`"${folder}"`))
+
+    assert.strictEqual(executable, join(folder, "bin\\claude.exe"))
+  }),
 )
 
 it.live("refuses a line break in an argument to a .cmd shim, which cmd.exe would cut off", () =>

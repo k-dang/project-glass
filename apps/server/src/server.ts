@@ -1,7 +1,7 @@
 import { NodeHttpServer, NodeServices } from "@effect/platform-node"
 import { GlassRpcs, RPC_PATH, TOKEN_PARAM } from "@glass/contracts"
 import { Effect, type FileSystem, Layer } from "effect"
-import { HttpRouter, HttpServerResponse, UrlParams } from "effect/http"
+import { HttpRouter, HttpServer, HttpServerResponse, UrlParams } from "effect/http"
 import type { ChildProcessSpawner } from "effect/process"
 import { RpcSerialization, RpcServer } from "effect/rpc"
 import { createServer } from "node:http"
@@ -21,6 +21,7 @@ import { Threads } from "./Threads"
 import { ThreadTurns } from "./ThreadTurns"
 import { FeedbackNotes } from "./FeedbackNotes"
 import { DatabaseLive } from "./Database"
+import { reportReady } from "./desktopMain"
 import { Changes } from "./Changes"
 import { CheckIns } from "./CheckIns"
 import { Git } from "./git"
@@ -172,20 +173,26 @@ const services = (
       Layer.provideMerge(McpCredentials.layer),
     )
 
+const reportListening = Layer.effectDiscard(HttpServer.HttpServer.pipe(Effect.andThen(reportReady)))
+
 export const serve = (
   agentRunners: AgentRunnersLayer,
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer = AgentCommands.layer,
 ) =>
-  HttpRouter.serve(Layer.mergeAll(RendererRoutes, McpRoutes, OAuthRoutes), {
-    disableLogger: true,
-  }).pipe(
-    // WARNING: Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
-    Layer.provideMerge(NodeServerLive),
-    Layer.provideMerge(services(agentRunners, mcpTools, agentCommands)),
-    Layer.provide(RpcSerialization.layerJson),
-    Layer.provide(NodeServices.layer),
-    Layer.provide(Layer.succeed(UrlParams.CurrentRedactedNames)([TOKEN_PARAM])),
+  reportListening.pipe(
+    Layer.provideMerge(
+      HttpRouter.serve(Layer.mergeAll(RendererRoutes, McpRoutes, OAuthRoutes), {
+        disableLogger: true,
+      }).pipe(
+        // WARNING: Provided first so it listens last: Effect's Node server leaves connections hanging until it serves.
+        Layer.provideMerge(NodeServerLive),
+        Layer.provideMerge(services(agentRunners, mcpTools, agentCommands)),
+        Layer.provide(RpcSerialization.layerJson),
+        Layer.provide(NodeServices.layer),
+        Layer.provide(Layer.succeed(UrlParams.CurrentRedactedNames)([TOKEN_PARAM])),
+      ),
+    ),
   )
 
 export const ServerLive = serve(AgentRunners.layer, GlassMcpTools)

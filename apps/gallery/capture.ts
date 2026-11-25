@@ -87,6 +87,7 @@ const capture = async (app: ElectronApplication) => {
 
       await window
         .getByText(/^Loading\b.*…$/)
+        .filter({ visible: true })
         .first()
         .waitFor({ state: "detached" })
 
@@ -150,12 +151,18 @@ const home = mkdtempSync(join(tmpdir(), "glass-gallery-"))
 try {
   const transcripts = join(home, "transcripts")
   const { ELECTRON_RUN_AS_NODE: _node, VITE_DEV_SERVER_URL: _devServer, ...inherited } = process.env
-  const env = { ...inherited, GLASS_HOME: home, GLASS_FAKE_BACKEND: "1" }
+
+  const env = {
+    ...inherited,
+    GLASS_HOME: home,
+    GLASS_FAKE_BACKEND: "1",
+    GLASS_REPLAYED_TRANSCRIPTS: transcripts,
+  }
 
   console.log("Replaying the recorded Claude Code and pi sessions...")
 
   const replay = spawnSync("pnpm --filter @glass/server exec vp test run Adapter.integration", {
-    env: { ...env, GLASS_TRANSCRIPTS_DIR: transcripts },
+    env,
     encoding: "utf8",
     shell: true,
   })
@@ -178,7 +185,7 @@ try {
       desktopDir,
       `--user-data-dir=${join(home, "user-data")}`,
     ],
-    env: { ...env, GLASS_REPLAYED_TRANSCRIPTS: transcripts },
+    env,
   })
 
   try {

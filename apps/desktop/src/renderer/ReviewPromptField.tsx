@@ -44,8 +44,7 @@ export function ReviewPromptField(props: {
       />
       <div className="flex items-start justify-between gap-3">
         <p id={`${id}-wrapping`} className="text-sm text-muted-foreground">
-          Glass wraps it in its own instructions, which fix the answer format and keep the agent
-          from suggesting a Review decision.
+          Glass wraps it in its own instructions, which fix the answer format.
         </p>
         <Button
           type="button"

@@ -25,18 +25,21 @@ export const EngineSettings = Schema.Struct({ harness: AgentHarness, models: Eng
 
 export type EngineSettings = typeof EngineSettings.Type
 
+const CLAUDE_PROVIDER = "anthropic/"
+
 export const runnerIdentity = ({ harness, models }: EngineSettings): AgentRunnerIdentity => {
-  if (harness === "claude-code") return { harness, model: `anthropic/${models["claude-code"]}` }
+  if (harness === "claude-code")
+    return { harness, model: `${CLAUDE_PROVIDER}${models["claude-code"]}` }
 
   const { provider, modelId } = models[harness]
 
   return { harness, model: `${provider}/${modelId}` }
 }
 
-export const agentModelOf = (settings: EngineSettings) =>
-  settings.harness === "claude-code"
-    ? settings.models["claude-code"]
-    : runnerIdentity(settings).model
+export const threadModelOf = ({ harness, model }: AgentRunnerIdentity) =>
+  harness === "claude-code" && model.startsWith(CLAUDE_PROVIDER)
+    ? model.slice(CLAUDE_PROVIDER.length)
+    : model
 
 export const EngineFeature = Schema.Literals(["tours", "agentReviews"])
 

@@ -158,9 +158,9 @@ const updateWindowTheme = (window: BrowserWindow) => {
 
 const glassHome = process.env["GLASS_HOME"] || homedir()
 
-const logFile = join(glassHome, ".glass", "logs", "backend.log")
-
 const dataDirectory = join(glassHome, ".project-glass")
+
+const logFile = join(dataDirectory, "backend.log")
 
 const dogfoodReports = dogfoodReportWriter(join(dataDirectory, "dogfood-reports"))
 
@@ -277,7 +277,13 @@ const createWindow = () => {
   void window.loadURL(devServerUrl ?? `${APP_ORIGIN}/index.html`)
 }
 
-const backendReady = Promise.withResolvers<BackendEndpoint>()
+let backendEndpoint = Promise.withResolvers<BackendEndpoint>()
+
+const backendUp = (endpoint: BackendEndpoint) => backendEndpoint.resolve(endpoint)
+
+const backendDown = () => {
+  backendEndpoint = Promise.withResolvers()
+}
 
 const backendFailed = Promise.withResolvers<BackendFailure>()
 
@@ -285,7 +291,7 @@ const reportFailure = (kind: BackendFailure["kind"], message: string) =>
   backendFailed.resolve({ kind, message, logFile })
 
 void app.whenReady().then(() => {
-  ipcMain.handle(BACKEND_ENDPOINT_CHANNEL, () => backendReady.promise)
+  ipcMain.handle(BACKEND_ENDPOINT_CHANNEL, () => backendEndpoint.promise)
   ipcMain.handle(BACKEND_FAILURE_CHANNEL, () => backendFailed.promise)
   ipcMain.handle(RESOURCE_USAGE_CHANNEL, () => summarizeResourceUsage(app.getAppMetrics()))
   ipcMain.handle(SET_APPEARANCE_CHANNEL, (_event, next: Appearance) => {
@@ -346,7 +352,7 @@ void app.whenReady().then(() => {
     threadFileUrl: async (place, file) => {
       const [{ threadFileUrl }, endpoint] = await Promise.all([
         import("./backend"),
-        backendReady.promise,
+        backendEndpoint.promise,
       ])
 
       return threadFileUrl(endpoint, place, file)
@@ -356,7 +362,7 @@ void app.whenReady().then(() => {
   protocol.handle(VISUALIZATION_SCHEME, async (request) => {
     const [{ visualizationUrl }, endpoint] = await Promise.all([
       import("./backend"),
-      backendReady.promise,
+      backendEndpoint.promise,
     ])
 
     const url = visualizationUrl(endpoint, new URL(request.url).hostname)
@@ -382,7 +388,8 @@ void app.whenReady().then(() => {
         rendererOrigin,
         logFile,
         dataDirectory,
-        onReady: backendReady.resolve,
+        onReady: backendUp,
+        onDown: backendDown,
         onFailure: reportFailure,
       }),
     )

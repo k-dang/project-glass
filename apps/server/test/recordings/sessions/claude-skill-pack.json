@@ -12,13 +12,13 @@
         "--permission-prompt-tool=stdio",
         "--allow-dangerously-skip-permissions",
         "--include-partial-messages",
-        "--plugin-dir-no-mcp=<folder>.skills-81e651e2-52b4-453a-8caa-ca7da9c2ac2c/team"
+        "--plugin-dir-no-mcp=<folder>.skills-cb7efa98-d777-42ed-a332-bcc044ab815a/team"
       ],
       "cwd": "<folder>",
       "frames": [
         {
           "out": {
-            "request_id": "6nx67djbpl4",
+            "request_id": "ggh2pcwpkc",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -30,12 +30,12 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "6nx67djbpl4",
+              "request_id": "ggh2pcwpkc",
               "response": {
                 "commands": [
                   {
                     "name": "announce-pr",
-                    "description": "Watch a PR's CI and draft a paste-ready post (project)",
+                    "description": "Draft a paste-ready Slack post for an open PR (project)",
                     "argumentHint": ""
                   },
                   {
@@ -156,6 +156,11 @@
                   {
                     "name": "implement",
                     "description": "Implement a piece of work based on a spec or set of tickets. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "implement-spec",
+                    "description": "Implement the result of /to-spec and /to-tickets in code. (project)",
                     "argumentHint": ""
                   },
                   {
