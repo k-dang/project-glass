@@ -10,6 +10,7 @@ import {
   Image,
   type MessageDelivery,
   PartAppended,
+  type PullRequestUpdate,
   ThreadBusy,
   QueuedMessagesChanged,
   QueuedMessage,
@@ -165,6 +166,15 @@ const decodeStarts = Schema.decodeUnknownEffect(
 
 export type TurnStarter = "message" | "glass" | "harness"
 
+const decodeRunningContexts = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ threadId: Schema.String, context: ContextJson })),
+)
+
+export interface RunningPullRequestUpdate {
+  readonly threadId: string
+  readonly update: PullRequestUpdate
+}
+
 const decodePositions = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({ first: Schema.NullOr(Schema.Int), last: Schema.NullOr(Schema.Int) }),
@@ -286,6 +296,11 @@ export class Transcripts extends Context.Service<
     readonly runningTurnStarter: (
       threadId: string,
     ) => Effect.Effect<TurnStarter | null, ThreadError>
+    readonly lastMessageTurn: (threadId: string) => Effect.Effect<string | null, ThreadError>
+    readonly runningPullRequestUpdates: Effect.Effect<
+      ReadonlyArray<RunningPullRequestUpdate>,
+      ThreadError
+    >
     readonly startOrQueue: (
       threadId: string,
       input: MessageWithContext,
@@ -1030,6 +1045,47 @@ export class Transcripts extends Context.Service<
               }),
             ),
           ),
+        lastMessageTurn: (threadId) =>
+          withStorageFailure(
+            "read the last Turn a message reached",
+            sql`
+              SELECT t.id FROM thread_turn t
+              WHERE t.thread_id = ${threadId} AND (
+                (
+                  t.started_by_harness = 0
+                  AND json_extract(t.context, '$._tag') IS NOT 'StartedWorkUpdate'
+                  AND json_extract(t.context, '$._tag') IS NOT 'PullRequestUpdate'
+                )
+                OR EXISTS (
+                  SELECT 1 FROM thread_turn_part p
+                  WHERE p.turn_id = t.id AND json_extract(p.part, '$._tag') = 'Steer'
+                )
+              )
+              ORDER BY t.rowid DESC LIMIT 1
+            `.pipe(
+              Effect.flatMap(decodeTurnIds),
+              Effect.map(([turn]) => turn?.id ?? null),
+            ),
+          ),
+        runningPullRequestUpdates: withStorageFailure(
+          "read the running PR updates",
+          Effect.gen(function* () {
+            const threadIds = [...(yield* SubscriptionRef.get(runningThreads))]
+
+            if (threadIds.length === 0) return []
+
+            const running = yield* sql`
+              SELECT thread_id AS threadId, context FROM thread_turn
+              WHERE ${sql.in("thread_id", threadIds)} AND ended IS NULL
+            `.pipe(Effect.flatMap(decodeRunningContexts))
+
+            return running.flatMap(({ threadId, context }) =>
+              Predicate.isTagged(context, "PullRequestUpdate")
+                ? [{ threadId, update: context }]
+                : [],
+            )
+          }),
+        ),
         settleUndelivered: Effect.fnUntraced(function* (threadId, turnId, reason) {
           const retried = yield* withStorageFailure(
             "read whether a Turn retries delivery",

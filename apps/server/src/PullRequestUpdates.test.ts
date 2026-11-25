@@ -3,7 +3,6 @@ import {
   AllowRequest,
   ChangesRequestedReason,
   defaultPullRequestUpdateNote,
-  defaultSubscriptionReasons,
   EventPage,
   FailingChecksReason,
   MergeConflictAppearedEvent,
@@ -11,21 +10,23 @@ import {
   PullRequestMergedEvent,
   PullRequestRef,
   ReviewFeedbackReason,
-  type SubscriptionReason,
   type Turn,
 } from "@glass/contracts"
 import { DateTime, Effect, Option, Predicate, Schema, Stream } from "effect"
-import type { FakeCheck, FakePullRequest } from "../test/fakePullRequest"
 import { gitIn } from "../test/gitRepositories"
 import { connectMcp } from "../test/mcpClient"
 import {
-  calledBy,
-  glassCall,
-  holding,
-  lastSettled,
-  settled,
-  threadsFixture,
-} from "../test/threadsFixture"
+  fail,
+  failed,
+  failedRuns,
+  pass,
+  reasonsTold,
+  running,
+  subscribe,
+  subscribedThread,
+  told,
+} from "../test/pullRequestUpdates"
+import { calledBy, holding, lastSettled, settled, threadsFixture } from "../test/threadsFixture"
 import {
   greeterPullRequest,
   pullRequestFor,
@@ -35,77 +36,6 @@ import { GlobalChatCaller } from "./mcp/McpCredentials"
 import { wideEvents } from "./wideEvents"
 
 type Fixture = Effect.Success<typeof threadsFixture>
-
-const subscribe = (
-  note: string,
-  reasons: ReadonlyArray<SubscriptionReason> = defaultSubscriptionReasons,
-  pullRequest?: FakePullRequest,
-) =>
-  glassCall(
-    "subscribe_to_pull_request",
-    pullRequest === undefined
-      ? { note, reasons }
-      : {
-          note,
-          reasons,
-          pullRequest: {
-            owner: pullRequest.owner,
-            repo: pullRequest.repo,
-            number: pullRequest.number,
-          },
-        },
-  )
-
-const subscribedThread = (note = "Keep it green", reasons?: ReadonlyArray<SubscriptionReason>) =>
-  Effect.gen(function* () {
-    const f = yield* threadWithPullRequest
-    yield* f.send(f.thread.id, subscribe(note, reasons))
-    yield* f.transcript(f.thread.id, settled(2))
-
-    return f
-  })
-
-const failed = (name: string, run = 1): FakeCheck => ({
-  kind: "CheckRun",
-  name,
-  conclusion: "FAILURE",
-  url: `https://ci.test/${name}/${run}`,
-})
-
-const running = (name: string): FakeCheck => ({ kind: "CheckRun", name, status: "IN_PROGRESS" })
-
-const fail = (pullRequest: FakePullRequest, ...checks: ReadonlyArray<FakeCheck>) => {
-  pullRequest.checks = "FAILURE"
-  pullRequest.checkContexts = checks
-}
-
-const pass = (pullRequest: FakePullRequest) => {
-  pullRequest.checks = "SUCCESS"
-  pullRequest.checkContexts = []
-}
-
-const told = (turn: Turn | undefined) =>
-  Predicate.isTagged(turn?.context, "PullRequestUpdate")
-    ? turn.context.pullRequests.map(({ pullRequest, own, note, reasons }) => ({
-        pullRequest: `${pullRequest.repo}#${pullRequest.number}`,
-        own,
-        note,
-        reasons,
-      }))
-    : undefined
-
-const reasonsTold = (turn: Turn | undefined) =>
-  told(turn)?.map(({ pullRequest, reasons }) => [
-    pullRequest,
-    reasons.map(({ _tag }) => _tag).join(),
-  ])
-
-const failedRuns = (turn: Turn | undefined) =>
-  told(turn)?.flatMap(({ reasons }) =>
-    reasons.flatMap((reason) =>
-      Predicate.isTagged(reason, "FailingChecks") ? reason.checks.map(({ url }) => url) : [],
-    ),
-  )
 
 const received = (turn: Turn | undefined) =>
   turn?.parts.flatMap((part) =>

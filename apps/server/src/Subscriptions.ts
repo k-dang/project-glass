@@ -32,7 +32,7 @@ import {
   mirroredPullRequest,
   PullRequestMirror,
 } from "./PullRequestMirror"
-import { nothingTold, Told } from "./pullRequestUpdateDecision"
+import { countedAfresh, nothingTold, Told } from "./pullRequestUpdateDecision"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Transcripts } from "./Transcripts"
 
@@ -55,7 +55,11 @@ type Ended = typeof Ended.Type
 
 const encodeEnded = Schema.encodeSync(Schema.fromJsonString(Ended))
 
-const LastTold = Schema.Struct({ pullRequest: Schema.String, told: Told })
+const LastTold = Schema.Struct({
+  pullRequest: Schema.String,
+  told: Told,
+  afterMessage: Schema.NullOr(Schema.String),
+})
 
 type LastTold = typeof LastTold.Type
 
@@ -104,7 +108,7 @@ const subscriptionOf = ({
 
 export interface SubscriptionState {
   readonly subscription: Subscription
-  readonly toldAbout: (pullRequest: PullRequestRef) => Told
+  readonly toldAbout: (pullRequest: PullRequestRef, lastMessageTurn: string | null) => Told
   readonly ended: Ended | null
 }
 
@@ -117,8 +121,13 @@ export interface ToldSubscription {
 
 const stateOf = (stored: StoredSubscription): SubscriptionState => ({
   subscription: subscriptionOf(stored),
-  toldAbout: (pullRequest) =>
-    stored.lastTold?.pullRequest === referenceKey(pullRequest) ? stored.lastTold.told : nothingTold,
+  toldAbout: (pullRequest, lastMessageTurn) => {
+    const last = stored.lastTold
+
+    if (last?.pullRequest !== referenceKey(pullRequest)) return nothingTold
+
+    return last.afterMessage === lastMessageTurn ? last.told : countedAfresh(last.told)
+  },
   ended: stored.ended,
 })
 
@@ -166,7 +175,10 @@ export class Subscriptions extends Context.Service<
     readonly states: (
       threadId: string,
     ) => Effect.Effect<ReadonlyArray<SubscriptionState>, ThreadError>
-    readonly recordTold: (told: ReadonlyArray<ToldSubscription>) => Effect.Effect<void, ThreadError>
+    readonly recordTold: (
+      told: ReadonlyArray<ToldSubscription>,
+      lastMessageTurn: string | null,
+    ) => Effect.Effect<void, ThreadError>
     readonly toldChanged: Effect.Effect<void>
   }
 >()("@glass/server/Subscriptions") {
@@ -419,13 +431,16 @@ export class Subscriptions extends Context.Service<
             Stream.changesWith(sameSubscriptions),
           ),
         changes: SubscriptionRef.changes(writes),
-        subscribedThreads: sql`SELECT DISTINCT thread_id AS threadId FROM subscription`.pipe(
+        subscribedThreads: sql`
+          SELECT thread_id AS threadId FROM subscription
+          GROUP BY thread_id ORDER BY MIN(created_at), MIN(rowid)
+        `.pipe(
           Effect.flatMap(decodeThreadIds),
           Effect.map((found) => found.map(({ threadId }) => threadId)),
           Effect.catch(storageFailure),
         ),
         states: (threadId) => storedOf(threadId).pipe(Effect.map((found) => found.map(stateOf))),
-        recordTold: (told) =>
+        recordTold: (told, lastMessageTurn) =>
           Effect.forEach(
             told,
             ({ subscriptionId, pullRequest, told: state, ends }) =>
@@ -433,7 +448,11 @@ export class Subscriptions extends Context.Service<
                 ? sql`DELETE FROM subscription WHERE id = ${subscriptionId}`
                 : sql`
                     UPDATE subscription
-                    SET last_told = ${encodeTold({ pullRequest: referenceKey(pullRequest), told: state })}
+                    SET last_told = ${encodeTold({
+                      pullRequest: referenceKey(pullRequest),
+                      told: state,
+                      afterMessage: lastMessageTurn,
+                    })}
                     WHERE id = ${subscriptionId}
                   `,
             { discard: true },

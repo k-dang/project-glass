@@ -1,6 +1,7 @@
 import {
   ChangesRequestedReason,
   type Check,
+  type Checks,
   ClosedReason,
   FailingChecksReason,
   MergeConflictReason,
@@ -13,6 +14,24 @@ import {
 import { Array as Arr, Data, Predicate, Schema } from "effect"
 import type { SubscribedRead } from "./github/repositoryPullRequests"
 
+export const GIVES_UP_AFTER = 3
+
+const Updates = Schema.Struct({
+  "failing-checks": Schema.Int,
+  "review-feedback": Schema.Int,
+  "changes-requested": Schema.Int,
+  "merge-conflict": Schema.Int,
+})
+
+type OpenReason = keyof typeof Updates.Type
+
+const noUpdates: typeof Updates.Type = {
+  "failing-checks": 0,
+  "review-feedback": 0,
+  "changes-requested": 0,
+  "merge-conflict": 0,
+}
+
 export const Told = Schema.Struct({
   failedRuns: Schema.NullOr(
     Schema.Struct({ head: Schema.String, runs: Schema.Array(Schema.String) }),
@@ -20,6 +39,7 @@ export const Told = Schema.Struct({
   reviewComments: Schema.Array(Schema.String),
   changesRequested: Schema.Array(Schema.String),
   conflictBase: Schema.NullOr(Schema.String),
+  updates: Updates,
 })
 
 export type Told = typeof Told.Type
@@ -29,12 +49,16 @@ export const nothingTold: Told = {
   reviewComments: [],
   changesRequested: [],
   conflictBase: null,
+  updates: noUpdates,
 }
+
+export const countedAfresh = (told: Told): Told => ({ ...told, updates: noUpdates })
 
 export const sameTold = Schema.toEquivalence(Told)
 
 export type PullRequestNow = Data.TaggedEnum<{
   Open: {
+    readonly checks: Checks
     readonly failingChecks: ReadonlyArray<Check>
     readonly mergeConflict: boolean | null
     readonly read: SubscribedRead
@@ -49,19 +73,26 @@ export interface Decision {
   readonly told: Told
 }
 
-interface Part<Key extends keyof Told> {
+type Kept = Exclude<keyof Told, "updates">
+
+interface Part<Key extends Kept> {
   readonly told: Told[Key]
   readonly reason: PullRequestUpdateReason | null
+  readonly cleared: boolean
 }
 
 type Open = Extract<PullRequestNow, { _tag: "Open" }>
 
 const runOf = ({ name, url }: Pick<Check, "name" | "url">) => `${name}\n${url ?? ""}`
 
-const failingChecks = ({ failingChecks: failing, read }: Open, told: Told): Part<"failedRuns"> => {
+const failingChecks = (
+  { checks: rollup, failingChecks: failing, read }: Open,
+  told: Told,
+): Part<"failedRuns"> => {
   const checks = failing.map(({ name, url }) => ({ name, url }))
 
-  if (!Arr.isReadonlyArrayNonEmpty(checks)) return { told: null, reason: null }
+  if (!Arr.isReadonlyArrayNonEmpty(checks))
+    return { told: null, reason: null, cleared: rollup !== "running" }
 
   const runs = checks.map(runOf)
   const before = told.failedRuns
@@ -72,6 +103,7 @@ const failingChecks = ({ failingChecks: failing, read }: Open, told: Told): Part
   return {
     told: { head: read.head, runs },
     reason: another ? FailingChecksReason.make({ head: read.head, checks }) : null,
+    cleared: false,
   }
 }
 
@@ -105,6 +137,7 @@ const reviewFeedback = (now: Open, told: Told): Part<"reviewComments"> => {
       waiting.some((comment) => !told.reviewComments.includes(comment))
         ? ReviewFeedbackReason.make({ reviewThreads })
         : null,
+    cleared: reviewThreads.length === 0,
   }
 }
 
@@ -120,6 +153,7 @@ const changesRequested = ({ read }: Open, told: Told): Part<"changesRequested"> 
       reviews.some((review) => !told.changesRequested.includes(review))
         ? ChangesRequestedReason.make({ reviewers })
         : null,
+    cleared: reviewers.length === 0,
   }
 }
 
@@ -127,13 +161,14 @@ const mergeConflict = (
   { mergeConflict: conflict, read }: Open,
   told: Told,
 ): Part<"conflictBase"> => {
-  if (conflict === null) return { told: told.conflictBase, reason: null }
+  if (conflict === null) return { told: told.conflictBase, reason: null, cleared: false }
 
-  if (!conflict) return { told: null, reason: null }
+  if (!conflict) return { told: null, reason: null, cleared: true }
 
   return {
     told: read.base,
     reason: told.conflictBase === read.base ? null : MergeConflictReason.make({ base: read.base }),
+    cleared: false,
   }
 }
 
@@ -150,12 +185,24 @@ export const decide = (
         : [],
     }
 
-  const part = <Key extends keyof Told>(
-    reason: SubscriptionReason,
+  const part = <Key extends Kept>(
+    reason: OpenReason,
     key: Key,
     decided: (now: Open, told: Told) => Part<Key>,
-  ): Part<Key> =>
-    covered.includes(reason) ? decided(now, told) : { told: told[key], reason: null }
+  ) => {
+    const updates = told.updates[reason]
+
+    if (!covered.includes(reason)) return { told: told[key], reason: null, updates }
+
+    const found = decided(now, told)
+
+    if (found.reason === null)
+      return { told: found.told, reason: null, updates: found.cleared ? 0 : updates }
+
+    return updates >= GIVES_UP_AFTER
+      ? { told: told[key], reason: null, updates }
+      : { told: found.told, reason: found.reason, updates: updates + 1 }
+  }
 
   const checks = part("failing-checks", "failedRuns", failingChecks)
   const feedback = part("review-feedback", "reviewComments", reviewFeedback)
@@ -168,6 +215,12 @@ export const decide = (
       reviewComments: feedback.told,
       changesRequested: requested.told,
       conflictBase: conflict.told,
+      updates: {
+        "failing-checks": checks.updates,
+        "review-feedback": feedback.updates,
+        "changes-requested": requested.updates,
+        "merge-conflict": conflict.updates,
+      },
     },
     reasons: [checks, feedback, requested, conflict].flatMap(({ reason }) =>
       reason === null ? [] : [reason],
