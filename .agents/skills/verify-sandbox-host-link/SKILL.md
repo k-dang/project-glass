@@ -38,7 +38,7 @@ Expect `Result: ok`: every rule but `RanTurnsEndCutOff` holds, `RanTurnsEndCutOf
 
 ## Coverage
 
-Synced with the code at commit `608fb56fc287c6b29036581dc8021cb449628b40`. Before you trust a result, run `git diff 608fb56f -- <files below>`. If a covered function changed, compare it with its actions first.
+Synced with the code at commit `b204060a3653274172343636724f824fe6f69899`. Before you trust a result, run `git diff b204060a -- <files below>`. If a covered function changed, compare it with its actions first.
 
 | Model | Code (`apps/server/src/Sandboxes.ts` unless named) |
 | --- | --- |
