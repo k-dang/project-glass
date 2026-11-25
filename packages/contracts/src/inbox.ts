@@ -1,5 +1,6 @@
 import { Match, Predicate, Schema } from "effect"
 import { CheckIn } from "./checkIn"
+import { OutsideAgentRequest } from "./outsideAgent"
 import { Thread, PermissionRequestPart, QuestionPart, TurnEnd } from "./thread"
 import { Check } from "./pullRequest"
 import { PullRequestSummary } from "./pullRequestList"
@@ -118,6 +119,7 @@ export const InboxItem = Schema.Union([
   InboxPullRequest,
   OutsideQuestion,
   CheckIn,
+  OutsideAgentRequest,
   InboxGlobalChat,
 ])
 
@@ -135,6 +137,7 @@ export const inboxGroupOf = (item: InboxItem): InboxGroup =>
   Match.valueTags(item, {
     OutsideQuestion: () => "stopped" as const,
     CheckIn: () => "stopped" as const,
+    OutsideAgentRequest: () => "stopped" as const,
     GlobalChat: () => "stopped" as const,
     Thread: ({ reasons }) =>
       reasons.some(Predicate.isTagged("WaitingRequests"))

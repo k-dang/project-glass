@@ -1,6 +1,26 @@
-import { Clock, Context, Effect, FileSystem, Layer, Option, Ref, Schema } from "effect"
+import {
+  type OutsideAgentDecision,
+  OutsideAgentRequest,
+  OutsideAgentRequestNotWaiting,
+} from "@glass/contracts"
+import {
+  Clock,
+  Context,
+  Data,
+  DateTime,
+  Duration,
+  Effect,
+  FileSystem,
+  Layer,
+  Option,
+  Ref,
+  Schema,
+  Scope,
+  Stream,
+  SubscriptionRef,
+} from "effect"
 import type { HttpServerRequest } from "effect/http"
-import { createHash, createHmac, randomBytes } from "node:crypto"
+import { createHash, createHmac, randomBytes, randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { writeDataFile } from "../dataFiles"
 import { mintBearer, timingSafeSameSecret } from "./McpCredentials"
@@ -9,6 +29,10 @@ import { ServerConfig } from "../ServerConfig"
 const SIGNING_KEY = "mcp-oauth.key"
 
 const CODE_TTL_MS = 60_000
+
+const REQUEST_TTL = Duration.minutes(10)
+
+const DECISION_POLL_SECONDS = 1
 
 const MAX_CLIENT_NAME_LENGTH = 100
 
@@ -213,10 +237,38 @@ interface PendingCode {
   readonly expiresAt: number
 }
 
-type CsrfFields = Pick<
-  Authorization,
-  "clientId" | "redirectUri" | "codeChallenge" | "state" | "resource"
->
+interface WaitingRequest {
+  readonly request: OutsideAgentRequest
+  readonly authorization: Authorization
+}
+
+interface DecidedRequest {
+  readonly id: string
+  readonly authorization: Authorization
+  readonly decision: OutsideAgentDecision
+}
+
+interface Requests {
+  readonly waiting: ReadonlyArray<WaitingRequest>
+  readonly decided: ReadonlyArray<DecidedRequest>
+}
+
+type Found = readonly [DecidedRequest | undefined, WaitingRequest | undefined]
+
+export type CollectedDecision = Data.TaggedEnum<{
+  Waiting: { readonly request: OutsideAgentRequest }
+  Decided: { readonly redirect: string }
+}>
+
+const CollectedDecision = Data.taggedEnum<CollectedDecision>()
+
+const sameAuthorization = (a: Authorization, b: Authorization) =>
+  a.clientId === b.clientId &&
+  a.redirectUri === b.redirectUri &&
+  a.codeChallenge === b.codeChallenge &&
+  a.state === b.state &&
+  a.issuer === b.issuer &&
+  a.resource === b.resource
 
 const escapeHtml = (value: string) =>
   value.replace(/[&<>"']/g, (char) => {
@@ -235,9 +287,6 @@ const escapeHtml = (value: string) =>
         return char
     }
   })
-
-const hidden = (name: string, value: string) =>
-  `<input type="hidden" name="${escapeHtml(name)}" value="${escapeHtml(value)}">`
 
 export const renderError = (description: string) => `<!doctype html>
 <html lang="en">
@@ -260,42 +309,30 @@ export const renderError = (description: string) => `<!doctype html>
 </body>
 </html>`
 
-export const renderApproval = (authorization: Authorization, csrf: string) => {
-  const name = escapeHtml(authorization.name)
-  const host = escapeHtml(new URL(authorization.redirectUri).host)
+export const renderWaiting = (request: OutsideAgentRequest) => {
+  const name = escapeHtml(request.name)
+  const host = escapeHtml(request.redirectHost)
+  const next = escapeHtml(`/oauth/mcp/decision?request=${encodeURIComponent(request.id)}`)
 
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Connect ${name} to Glass</title>
+<meta http-equiv="refresh" content="${DECISION_POLL_SECONDS};url=${next}">
+<title>Approve ${name} in Glass</title>
 <style>
   body { margin: 0; min-height: 100vh; display: grid; place-items: center; background: #f6f5f2; color: #1c1915; font: 16px/1.5 ui-sans-serif, system-ui, sans-serif; }
   main { width: min(34rem, calc(100% - 2rem)); }
   h1 { font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; margin: 0 0 0.75rem; overflow-wrap: anywhere; }
   p { margin: 0 0 0.75rem; }
-  form { display: flex; gap: 0.75rem; margin-top: 1.25rem; }
-  button { font: inherit; border-radius: 0.6rem; padding: 0.55rem 1rem; cursor: pointer; }
-  button[value="approve"] { background: #1c1915; color: #f6f5f2; border: 1px solid #1c1915; }
-  button[value="deny"] { background: transparent; color: #1c1915; border: 1px solid #c9c4bb; }
 </style>
 </head>
 <body>
 <main>
-  <h1>${name} wants to connect</h1>
-  <p>${name} will be able to read your pull requests, to-dos, and agents, start and message agents, start a review, and, in the Inbox, ask you a question or ask you to read the changes in a folder on this computer. The connection lasts 30 days. You can disconnect it in Settings.</p>
-  <p>Glass sends this approval back to <strong>${host}</strong>. Approve only a sign-in you just started.</p>
-  <form method="post" action="/oauth/mcp/decision">
-    ${hidden("client_id", authorization.clientId)}
-    ${hidden("redirect_uri", authorization.redirectUri)}
-    ${hidden("code_challenge", authorization.codeChallenge)}
-    ${hidden("state", authorization.state)}
-    ${hidden("resource", authorization.resource)}
-    ${hidden("csrf", csrf)}
-    <button type="submit" name="decision" value="approve">Approve</button>
-    <button type="submit" name="decision" value="deny">Deny</button>
-  </form>
+  <h1>Approve ${name} in Glass</h1>
+  <p>${name} is asking to connect. Open Glass and answer it in the Inbox. This page carries on once you approve or deny it.</p>
+  <p>Glass sends the approval back to <strong>${host}</strong>. Approve only a sign-in you just started.</p>
 </main>
 </body>
 </html>`
@@ -307,6 +344,13 @@ export const redirectForError = (error: OAuthRedirectError, issuer: string) =>
     error_description: error.description,
     state: error.state,
     iss: issuer,
+  })
+
+const deny = (authorization: Authorization) =>
+  redirectWith(authorization.redirectUri, {
+    error: "access_denied",
+    state: authorization.state,
+    iss: authorization.issuer,
   })
 
 const tokenError = (error: OAuthTokenError["error"], description: string) =>
@@ -329,10 +373,13 @@ export class McpOAuth extends Context.Service<
       readonly urls: OAuthUrls
       readonly request: AuthorizationQuery
     }) => Effect.Effect<Authorization, OAuthPageError | OAuthRedirectError>
-    readonly csrfMatches: (fields: CsrfFields, given: string) => boolean
-    readonly csrfFor: (fields: CsrfFields) => string
-    readonly approve: (authorization: Authorization) => Effect.Effect<string>
-    readonly deny: (authorization: Authorization) => string
+    readonly open: (authorization: Authorization) => Effect.Effect<OutsideAgentRequest>
+    readonly answer: (
+      id: string,
+      decision: OutsideAgentDecision,
+    ) => Effect.Effect<void, OutsideAgentRequestNotWaiting>
+    readonly collect: (id: string) => Effect.Effect<CollectedDecision, OAuthPageError>
+    readonly watchRequests: () => Stream.Stream<ReadonlyArray<OutsideAgentRequest>>
     readonly exchange: (input: {
       readonly urls: OAuthUrls
       readonly grantType: string | undefined
@@ -368,22 +415,12 @@ export class McpOAuth extends Context.Service<
 
       if (Option.isNone(stored)) yield* writeDataFile(fs, keyPath, key.toString("base64"))
 
+      const scope = yield* Scope.Scope
       const codes = yield* Ref.make(new Map<string, PendingCode>())
+      const requests = yield* SubscriptionRef.make<Requests>({ waiting: [], decided: [] })
 
       const sign = (purpose: string, value: string) =>
         createHmac("sha256", key).update(`${purpose}.${value}`).digest("base64url")
-
-      const csrfFor = (fields: CsrfFields) =>
-        sign(
-          "mcp-csrf",
-          JSON.stringify([
-            fields.clientId,
-            fields.redirectUri,
-            fields.codeChallenge,
-            fields.state,
-            fields.resource,
-          ]),
-        )
 
       const parseClientId = (clientId: string): RegisteredClient | undefined => {
         const dot = clientId.lastIndexOf(".")
@@ -610,18 +647,112 @@ export class McpOAuth extends Context.Service<
           return { name: pending.name }
         })
 
+      const forget = (id: string) =>
+        SubscriptionRef.update(requests, ({ waiting, decided }) => ({
+          waiting: waiting.filter((entry) => entry.request.id !== id),
+          decided: decided.filter((entry) => entry.id !== id),
+        }))
+
+      const open = (authorization: Authorization) =>
+        Effect.gen(function* () {
+          const created = OutsideAgentRequest.make({
+            id: randomUUID(),
+            name: authorization.name,
+            redirectHost: new URL(authorization.redirectUri).host,
+            since: yield* DateTime.now,
+          })
+
+          const found = yield* SubscriptionRef.modify(requests, (state) => {
+            const same = state.waiting.find((entry) =>
+              sameAuthorization(entry.authorization, authorization),
+            )
+
+            return same === undefined
+              ? ([
+                  created,
+                  { ...state, waiting: [...state.waiting, { request: created, authorization }] },
+                ] as const)
+              : ([same.request, state] as const)
+          })
+
+          if (found === created) {
+            yield* Effect.sleep(REQUEST_TTL).pipe(
+              Effect.andThen(forget(created.id)),
+              Effect.forkIn(scope),
+            )
+          }
+
+          return found
+        })
+
+      const answer = (id: string, decision: OutsideAgentDecision) =>
+        SubscriptionRef.modify(requests, (state) => {
+          const found = state.waiting.find((entry) => entry.request.id === id)
+
+          return found === undefined
+            ? ([false, state] as const)
+            : ([
+                true,
+                {
+                  waiting: state.waiting.filter((entry) => entry !== found),
+                  decided: [...state.decided, { id, authorization: found.authorization, decision }],
+                },
+              ] as const)
+        }).pipe(
+          Effect.flatMap((answered) =>
+            answered ? Effect.void : Effect.fail(new OutsideAgentRequestNotWaiting()),
+          ),
+        )
+
+      const collect = (id: string) =>
+        Effect.gen(function* () {
+          const [decided, waiting] = yield* SubscriptionRef.modify(
+            requests,
+            (state): readonly [Found, Requests] => {
+              const found = state.decided.find((entry) => entry.id === id)
+
+              return found === undefined
+                ? ([
+                    [undefined, state.waiting.find((entry) => entry.request.id === id)],
+                    state,
+                  ] as const)
+                : ([
+                    [found, undefined],
+                    { ...state, decided: state.decided.filter((entry) => entry !== found) },
+                  ] as const)
+            },
+          )
+
+          if (decided !== undefined) {
+            const redirect =
+              decided.decision === "approve"
+                ? yield* approve(decided.authorization)
+                : deny(decided.authorization)
+
+            return CollectedDecision.Decided({ redirect })
+          }
+
+          if (waiting === undefined) {
+            return yield* new OAuthPageError({
+              description: "This sign-in has ended. Start it again from the app.",
+            })
+          }
+
+          return CollectedDecision.Waiting({ request: waiting.request })
+        })
+
       return McpOAuth.of({
         register,
         validateAuthorization,
-        csrfFor,
-        csrfMatches: (fields, given) => timingSafeSameSecret(csrfFor(fields), given),
-        approve,
-        deny: (authorization) =>
-          redirectWith(authorization.redirectUri, {
-            error: "access_denied",
-            state: authorization.state,
-            iss: authorization.issuer,
-          }),
+        open,
+        answer,
+        collect,
+        watchRequests: () =>
+          SubscriptionRef.changes(requests).pipe(
+            Stream.map(({ waiting }) => waiting),
+            Stream.changesWith((a, b) => a === b),
+            Stream.map((waiting) => waiting.map(({ request }) => request)),
+          ),
         exchange,
       })
     }),

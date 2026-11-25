@@ -16,6 +16,8 @@ import {
   emptyTranscript,
   GitHubConnection,
   type InboxItems,
+  OutsideAgentRequest,
+  type OutsideAgentDecision,
   OutsideChoice,
   OutsideQuestion,
   OutsideText,
@@ -412,6 +414,33 @@ it("answers an outside question in Stopped on you", async () => {
   await setInbox(inbox, [finishedReview])
   expect(await screen.findByRole("heading", { name: "Retry flaky upload" })).toBeTruthy()
   expect(screen.queryByRole("option", { name: /Ship the retry change/ })).toBeNull()
+})
+
+it("approves an Outside agent request in Stopped on you", async () => {
+  const answers: Array<{ id: string; decision: OutsideAgentDecision }> = []
+
+  const request = OutsideAgentRequest.make({
+    id: "sign-in-1",
+    name: "Claude Code",
+    redirectHost: "127.0.0.1:53682",
+    since: ago({ minutes: 1 }),
+  })
+
+  const inbox = inboxRef([request, finishedReview])
+
+  const user = mount(inbox, {
+    AnswerOutsideAgentRequest: (payload) => Effect.sync(() => void answers.push(payload)),
+  })
+
+  const stopped = await screen.findByRole("region", { name: "Stopped on you" })
+  expect(within(stopped).getByRole("option", { name: /Claude Code wants to connect/ })).toBeTruthy()
+  expect(within(stopped).getByText("Sends the approval to 127.0.0.1:53682")).toBeTruthy()
+
+  await user.click(
+    within(articleOf("Claude Code wants to connect")).getByRole("button", { name: "Approve" }),
+  )
+
+  expect(answers).toEqual([{ id: "sign-in-1", decision: "approve" }])
 })
 
 it("opens a Check-in's changes on their own page and approves them, with the notes left on them", async () => {

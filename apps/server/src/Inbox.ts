@@ -11,6 +11,7 @@ import {
   canRunQueueWork,
   type InboxItem,
   InboxItems,
+  type OutsideAgentRequest,
   type OutsideQuestion,
   InboxPullRequest,
   type PullRequestReason,
@@ -38,6 +39,7 @@ import { AgentReviews } from "./AgentReviews"
 import { CheckIns } from "./CheckIns"
 import { Threads, type FinishedThread, type WaitingThread } from "./Threads"
 import { GlobalChat } from "./GlobalChat"
+import { McpOAuth } from "./mcp/McpOAuth"
 import { OutsideQuestions } from "./OutsideQuestions"
 import {
   type Mirror,
@@ -106,6 +108,7 @@ interface Waiting {
   readonly pullRequests: ReadonlyArray<WaitingPullRequest>
   readonly questions: ReadonlyArray<OutsideQuestion>
   readonly checkIns: ReadonlyArray<CheckIn>
+  readonly outsideAgentRequests: ReadonlyArray<OutsideAgentRequest>
   readonly global: ReadonlyArray<WaitingRequest>
 }
 
@@ -116,6 +119,7 @@ const inboxOf = (waiting: Waiting): InboxItems =>
       ...waiting.finished.map(finishedItem),
       ...waiting.questions,
       ...waiting.checkIns,
+      ...waiting.outsideAgentRequests,
       ...globalItem(waiting.global),
       ...pullRequestItems(waiting.pullRequests),
     ],
@@ -190,6 +194,7 @@ export class Inbox extends Context.Service<
       const checkIns = yield* CheckIns
       const mirror = yield* PullRequestMirror
       const globalChat = yield* GlobalChat
+      const oauth = yield* McpOAuth
 
       const finishedReviewOf = (pullRequest: PullRequestSummary) =>
         agentReviews.watch(pullRequest.ref).pipe(
@@ -252,15 +257,17 @@ export class Inbox extends Context.Service<
             waitingPullRequests,
             questions.watch(),
             checkIns.watch(),
+            oauth.watchRequests(),
             globalChat.waiting,
           ).pipe(
-            Stream.map(([waiting, finished, pullRequests, asked, checkingIn, global]) =>
+            Stream.map(([waiting, finished, pullRequests, asked, checkingIn, connecting, global]) =>
               inboxOf({
                 threads: waiting,
                 finished,
                 pullRequests,
                 questions: asked,
                 checkIns: checkingIn,
+                outsideAgentRequests: connecting,
                 global,
               }),
             ),

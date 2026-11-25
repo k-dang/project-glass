@@ -14,7 +14,14 @@ import {
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Match, Predicate, Schema } from "effect"
-import { CircleHelp, FileDiff, GitPullRequest, MessagesSquare, Sparkles } from "lucide-react"
+import {
+  CircleHelp,
+  FileDiff,
+  GitPullRequest,
+  MessagesSquare,
+  PlugZap,
+  Sparkles,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { fileName } from "./fileName"
 import { ago } from "./PullRequestRow"
@@ -43,6 +50,7 @@ export const inboxItemKey = (item: InboxItem): string =>
     Thread: ({ thread }) => `thread:${thread.id}`,
     OutsideQuestion: ({ id }) => `ask:${id}`,
     CheckIn: ({ id }) => `check-in:${id}`,
+    OutsideAgentRequest: ({ id }) => `outside-agent:${id}`,
     PullRequest: ({ pullRequest }) => `pr:${referenceKey(pullRequest.ref)}`,
     GlobalChat: () => "global",
   })
@@ -113,6 +121,7 @@ const reasonsOf = (item: InboxItem): ReadonlyArray<Reason> =>
         ),
       OutsideQuestion: () => [{ label: "Question", tone: toneClass.warning }],
       CheckIn: () => [{ label: "Check-in", tone: toneClass.warning }],
+      OutsideAgentRequest: () => [{ label: "Outside agent", tone: toneClass.warning }],
       PullRequest: ({ reasons }) => reasons.map(pullRequestReason),
       GlobalChat: ({ requests }) => requests.map(requestReason),
     }),
@@ -136,6 +145,7 @@ export function ItemIcon(props: { item: InboxItem; className: string }) {
     Thread: () => <Sparkles className={props.className} aria-hidden />,
     OutsideQuestion: () => <CircleHelp className={props.className} aria-hidden />,
     CheckIn: () => <FileDiff className={props.className} aria-hidden />,
+    OutsideAgentRequest: () => <PlugZap className={props.className} aria-hidden />,
     PullRequest: () => <GitPullRequest className={props.className} aria-hidden />,
     GlobalChat: () => <MessagesSquare className={props.className} aria-hidden />,
   })
@@ -152,6 +162,7 @@ const requestsOf = (item: InboxItem): ReadonlyArray<RequestPart> =>
       ),
     OutsideQuestion: () => [],
     CheckIn: () => [],
+    OutsideAgentRequest: () => [],
     PullRequest: () => [],
     GlobalChat: ({ requests }) => requests,
   })
@@ -167,6 +178,7 @@ export const firstPermission = (item: InboxItem) =>
     },
     OutsideQuestion: () => null,
     CheckIn: () => null,
+    OutsideAgentRequest: () => null,
     PullRequest: () => null,
     GlobalChat: () => null,
   })
@@ -184,6 +196,7 @@ export const titleOf = (item: InboxItem) =>
     Thread: ({ thread }) => thread.name,
     OutsideQuestion: ({ question }) => question,
     CheckIn: ({ folder, summary }) => summaryParts(summary)?.title ?? fileName(folder),
+    OutsideAgentRequest: ({ name }) => `${name} wants to connect`,
     PullRequest: ({ pullRequest }) => pullRequest.title,
     GlobalChat: () => "Global chat",
   })
@@ -193,6 +206,7 @@ export const contextOf = (item: InboxItem) =>
     Thread: ({ thread }) => `${thread.repository.owner}/${thread.repository.repo}`,
     OutsideQuestion: ({ askedBy }) => `Asked by ${askedBy}`,
     CheckIn: ({ askedBy, folder }) => `${folder} · Asked by ${askedBy}`,
+    OutsideAgentRequest: ({ redirectHost }) => `Sends the approval to ${redirectHost}`,
     GlobalChat: () => "",
     PullRequest: ({ pullRequest }) =>
       `${referenceText(pullRequest.ref)}${pullRequest.isDraft ? " · Draft" : ""}`,
