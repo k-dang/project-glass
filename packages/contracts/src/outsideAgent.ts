@@ -11,3 +11,21 @@ export class OutsideAgentNotFound extends Schema.TaggedError<OutsideAgentNotFoun
   "OutsideAgentNotFound",
   {},
 ) {}
+
+export const OutsideAgentRequest = Schema.TaggedStruct("OutsideAgentRequest", {
+  id: Schema.String,
+  name: Schema.String,
+  redirectHost: Schema.String,
+  since: Schema.DateTimeUtcFromString,
+})
+
+export type OutsideAgentRequest = typeof OutsideAgentRequest.Type
+
+export const OutsideAgentDecision = Schema.Literals(["approve", "deny"])
+
+export type OutsideAgentDecision = typeof OutsideAgentDecision.Type
+
+export class OutsideAgentRequestNotWaiting extends Schema.TaggedError<OutsideAgentRequestNotWaiting>()(
+  "OutsideAgentRequestNotWaiting",
+  {},
+) {}

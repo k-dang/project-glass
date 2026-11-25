@@ -62,7 +62,12 @@ import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { MergeAction, MergePullRequestError } from "./merge"
 import { InboxItems, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./inbox"
-import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
+import {
+  OutsideAgent,
+  OutsideAgentDecision,
+  OutsideAgentNotFound,
+  OutsideAgentRequestNotWaiting,
+} from "./outsideAgent"
 import {
   LoadPullRequestError,
   PullRequestRef,
@@ -441,6 +446,10 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("GetMcpEndpoint", { success: Schema.Struct({ url: Schema.String }) }),
   Rpc.make("WatchOutsideAgents", { success: Schema.Array(OutsideAgent), stream: true }),
+  Rpc.make("AnswerOutsideAgentRequest", {
+    payload: { id: Schema.String, decision: OutsideAgentDecision },
+    error: OutsideAgentRequestNotWaiting,
+  }),
   Rpc.make("RevokeOutsideAgent", {
     payload: { id: Schema.String },
     error: OutsideAgentNotFound,

@@ -193,6 +193,10 @@ export const describeError = (error: BackendError): Problem =>
         detail: "That Check-in was answered already, or the wait ended.",
       }),
       CheckInError: ({ message }) => ({ title: "Couldn't finish the Check-in", detail: message }),
+      OutsideAgentRequestNotWaiting: () => ({
+        title: "Already settled",
+        detail: "That request was answered already, or it ended.",
+      }),
       OutsideAgentNotFound: () => ({
         title: "That agent is already disconnected",
         detail: "It is no longer in the list of connected outside agents.",

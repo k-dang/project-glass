@@ -16,6 +16,7 @@ import { OutsideAgents } from "./OutsideAgents"
 import { OutsideQuestions } from "./OutsideQuestions"
 import { CheckIns } from "./CheckIns"
 import { McpCredentials } from "./mcp/McpCredentials"
+import { McpOAuth } from "./mcp/McpOAuth"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
@@ -57,6 +58,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const outsideAgents = yield* OutsideAgents
+    const oauth = yield* McpOAuth
     const mcpCredentials = yield* McpCredentials
 
     const handingBack =
@@ -215,6 +217,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       AnswerCheckIn: ({ checkInId, answer }) => checkIns.answer(checkInId, answer),
       GetMcpEndpoint: () => mcpCredentials.endpoint.pipe(Effect.map((url) => ({ url }))),
       WatchOutsideAgents: () => outsideAgents.watch(),
+      AnswerOutsideAgentRequest: ({ id, decision }) => oauth.answer(id, decision),
       RevokeOutsideAgent: ({ id }) => outsideAgents.revoke(id),
       ChangeThreadModel: ({ threadId, model, effort }) =>
         threads.changeModel(threadId, { model, effort }),
