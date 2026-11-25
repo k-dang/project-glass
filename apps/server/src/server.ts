@@ -7,6 +7,7 @@ import { RpcSerialization, RpcServer } from "effect/rpc"
 import { createServer } from "node:http"
 import { RendererAccess } from "./access"
 import { ActivityLog } from "./ActivityLog"
+import { EventLog } from "./EventLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
 import { BrowserPages } from "./BrowserPages"
@@ -158,7 +159,7 @@ const services = (
       Layer.provide(agentRunners),
       Layer.provide(BrowserPages.layer),
       Layer.provide(agentCommands),
-      Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
+      Layer.provide(Layer.mergeAll(ActivityLog.layer, EventLog.layer, Storage.layer)),
       Layer.provideMerge(OutsideAgents.layer),
       Layer.provideMerge(McpOAuth.layer),
       Layer.provide(GlassToolRelay.layer),

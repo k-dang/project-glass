@@ -30,6 +30,8 @@ export * from "./draft"
 
 export * from "./engine"
 
+export * from "./event"
+
 export * from "./feedbackNote"
 
 export * from "./pageMessages"
