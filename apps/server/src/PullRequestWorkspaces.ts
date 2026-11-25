@@ -66,8 +66,13 @@ export class PullRequestWorkspaces extends Context.Service<
         if (opened.has(key)) return
 
         const current = prefetches.get(key)
+        const settled = current?.fiber.pollUnsafe()
 
-        if (current !== undefined && DateTime.isGreaterThanOrEqualTo(current.updatedAt, updatedAt))
+        if (
+          current !== undefined &&
+          (settled === undefined || Exit.isSuccess(settled)) &&
+          DateTime.isGreaterThanOrEqualTo(current.updatedAt, updatedAt)
+        )
           return
 
         yield* drop(key)
