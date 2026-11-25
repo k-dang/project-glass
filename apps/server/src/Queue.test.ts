@@ -261,6 +261,9 @@ it.live(
 const operations = (github: FakeGitHub) =>
   github.graphQLRequests.map(({ operationName }) => operationName)
 
+const pullRequestReads = (github: FakeGitHub) =>
+  operations(github).filter((name) => name === "PullRequest").length
+
 it.live("opens a queued PR from the read Glass started when it was queued", () =>
   Effect.gen(function* () {
     const { github, start } = yield* startSignedIn
@@ -272,12 +275,9 @@ it.live("opens a queued PR from the read Glass started when it was queued", () =
     const workspace = yield* client.LoadPullRequest({ pullRequest: ref(pr) })
 
     assert.strictEqual(workspace.pullRequest.title, "Read ahead")
-    assert.strictEqual(operations(github).filter((name) => name === "PullRequest").length, 1)
+    assert.strictEqual(pullRequestReads(github), 1)
   }),
 )
-
-const pullRequestReads = (github: FakeGitHub) =>
-  operations(github).filter((name) => name === "PullRequest").length
 
 it.live("reads a queued PR ahead again once the Queue sees it changed", () =>
   Effect.gen(function* () {

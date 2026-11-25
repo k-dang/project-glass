@@ -15,9 +15,9 @@ const PREFETCH_SLOTS = 2
 
 type ReadError = PullRequestNotFound | PullRequestAccessDenied | ConnectionError
 
-export type WorkspaceHolder = "lists" | "queue"
+type WorkspaceHolder = "lists" | "queue"
 
-export interface HeldPullRequest {
+interface HeldPullRequest {
   readonly ref: PullRequestRef
   readonly updatedAt: DateTime.Utc
 }
@@ -52,19 +52,26 @@ export class PullRequestWorkspaces extends Context.Service<
 
       const isHeld = (key: string) => [...held.values()].some((keys) => keys.has(key))
 
+      const take = (key: string) => {
+        const taken = prefetches.get(key)
+        prefetches.delete(key)
+
+        return taken
+      }
+
       const drop = (key: string) =>
         Effect.suspend(() => {
-          const dropped = prefetches.get(key)
-          prefetches.delete(key)
+          const dropped = take(key)
 
           return dropped === undefined ? Effect.void : Fiber.interrupt(dropped.fiber)
         })
 
       const prefetchOne = Effect.fnUntraced(function* ({ ref, updatedAt }: HeldPullRequest) {
         const key = referenceKey(ref)
-        const current = prefetches.get(key)
 
         if (opened.has(key)) return
+
+        const current = prefetches.get(key)
 
         if (current !== undefined && DateTime.isGreaterThanOrEqualTo(current.updatedAt, updatedAt))
           return
@@ -80,13 +87,6 @@ export class PullRequestWorkspaces extends Context.Service<
           slots.withPermits(1),
           Effect.provideService(BackgroundGitHubRequest, true),
           Effect.tapError((error) => Effect.logWarning("Couldn't prefetch a PR", error)),
-          Effect.onExit((exit) =>
-            Effect.sync(() => {
-              if (Exit.isFailure(exit) && prefetches.get(key)?.reading === reading) {
-                prefetches.delete(key)
-              }
-            }),
-          ),
           Effect.withSpan("PullRequestWorkspaces.prefetch", {
             root: true,
             attributes: { pr: key },
@@ -105,7 +105,7 @@ export class PullRequestWorkspaces extends Context.Service<
           yield* Effect.forEach(
             [...prefetches.keys()].filter((key) => !isHeld(key)),
             drop,
-            { discard: true },
+            { discard: true, concurrency: "unbounded" },
           )
 
           yield* Effect.forEach(pullRequests, prefetchOne, { discard: true })
@@ -125,9 +125,8 @@ export class PullRequestWorkspaces extends Context.Service<
 
       const open = Effect.fn("PullRequestWorkspaces.open")(function* (ref: PullRequestRef) {
         const key = referenceKey(ref)
-        const taken = prefetches.get(key)
+        const taken = take(key)
 
-        prefetches.delete(key)
         opened.add(key)
 
         const ready = taken === undefined ? null : yield* usable(taken)

@@ -144,9 +144,12 @@ export class Queue extends Context.Service<
         Effect.ignore,
       )
 
-      const announce = Effect.ensuring(
-        keepQueuedReady.pipe(Effect.andThen(SubscriptionRef.update(writes, (count) => count + 1))),
+      yield* SubscriptionRef.changes(writes).pipe(
+        Stream.runForEach(() => keepQueuedReady),
+        Effect.forkScoped,
       )
+
+      const announce = Effect.ensuring(SubscriptionRef.update(writes, (count) => count + 1))
 
       const logSaveFailure = Effect.tapError((cause: unknown) =>
         Effect.logWarning("Couldn't save the Queue", cause),
