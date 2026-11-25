@@ -17,6 +17,7 @@ import {
   type TurnEnding,
   TurnEnded,
   TurnInterrupted,
+  TurnStarted,
   TurnStopped,
 } from "@glass/contracts"
 import { DateTime, Deferred, Duration, Effect, Fiber, Option, Predicate, Stream } from "effect"
@@ -372,6 +373,44 @@ it.live("warns before removing a Sandbox Thread with uncommitted work in its San
 
     yield* f.sandboxes.stopHost(thread.id)
     assert.equal((yield* f.threads.removalWarnings(thread.id)).uncommittedChanges, "unchecked")
+  }),
+)
+
+it.live("saves nothing a Sandbox's agent host journals for another Thread", () =>
+  Effect.gen(function* () {
+    const f = yield* threadServicesFixture
+    const local = yield* f.create(null, "pi")
+    const localTurn = yield* f.started
+    yield* reply(localTurn, ["Working"])
+    const before = yield* f.transcript(local.id, ({ turns }) => texts(turns[0]).length === 1)
+
+    const sandboxed = yield* createSandboxed(f)
+    const sandboxTurn = yield* f.started
+    const journal = yield* f.sandboxes.journal(sandboxed.id)
+    const at = yield* DateTime.now
+
+    yield* Effect.forEach(
+      [
+        TurnStarted.make({
+          turnId: "forged",
+          message: "Injected",
+          images: [],
+          context: null,
+          feedback: [],
+          sentAt: at,
+        }),
+        PartSet.make({ turnId: localTurn.turnId, index: 1, part: waitingPermission }),
+        {
+          ...TurnEnded.make({ turnId: localTurn.turnId, ended: { at, ending: TurnDone.make({}) } }),
+          steersNotTakenIn: [{ message: "Injected", images: [], context: null }],
+        },
+      ],
+      (event) => journal.append(local.id, event),
+    )
+    yield* end(sandboxTurn)
+    yield* f.transcript(sandboxed.id, settled(1))
+
+    assert.deepStrictEqual(yield* f.transcript(local.id, ({ turns }) => turns.length > 0), before)
   }),
 )
 

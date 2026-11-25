@@ -22,7 +22,7 @@ import type { Changes } from "../src/Changes"
 import type { FolderFiles } from "../src/agentHost/FolderFiles"
 import type { HostThreads } from "../src/agentHost/HostThreads"
 import type { HostGlassTools } from "../src/agentHost/HostGlassTools"
-import type { Journal } from "../src/agentHost/Journal"
+import { Journal } from "../src/agentHost/Journal"
 import { SHUTDOWN_PATH } from "../src/agentHost/hostAddress"
 import { Hello } from "../src/agentHost/protocol"
 import { hostServer } from "../src/agentHost/server"
@@ -120,6 +120,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       readonly scope: Scope.Closeable
       readonly sockets: ReadonlySet<Socket>
       readonly token: string
+      readonly journal: Journal["Service"] | undefined
     }
   >()
 
@@ -198,7 +199,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
     const services = await runPromise(
       Layer.buildWithScope(
         (kind.kind === "current"
-          ? hostServer({ token: Redacted.make(token), shutDown }).pipe(Layer.provide(host()))
+          ? hostServer({ token: Redacted.make(token), shutDown }).pipe(Layer.provideMerge(host()))
           : otherHost(kind, shutDown)
         ).pipe(
           Layer.provideMerge(NodeHttpServer.layer(() => server, { port: 0, host: "127.0.0.1" })),
@@ -207,7 +208,12 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       ),
     )
 
-    hosts.set(threadId, { scope, sockets, token })
+    hosts.set(threadId, {
+      scope,
+      sockets,
+      token,
+      journal: Context.getOrUndefined(services, Journal),
+    })
     shutDowns.set(threadId, shutDown)
     urls.set(
       threadId,
@@ -343,6 +349,8 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
           Effect.andThen(Effect.promise(() => serveHost(threadId, running.token, kind))),
         )
       }),
+    journal: (threadId: string) =>
+      Effect.suspend(() => Effect.fromNullishOr(hosts.get(threadId)?.journal)).pipe(Effect.orDie),
     connections: (threadId: string) => hosts.get(threadId)?.sockets.size ?? 0,
     reclaim,
     setGone: (threadId: string, isGone: boolean) => {
