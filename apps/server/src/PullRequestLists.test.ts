@@ -38,7 +38,6 @@ import { FollowedRepositories } from "./FollowedRepositories"
 import { GitHubClient } from "./github/GitHubClient"
 import { PullRequestLists } from "./PullRequestLists"
 import { type Mirror, type MirroredPullRequest, PullRequestMirror } from "./PullRequestMirror"
-import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 
 const base = { sha: "b0", files: {} }
 
@@ -141,15 +140,6 @@ const watching = (client: Client) => latestOf(client.WatchPullRequests())
 
 const operations = (github: FakeGitHub) =>
   github.graphQLRequests.map((request) => request.operationName)
-
-const workspaceReads = new Set([
-  "PullRequest",
-  "PullRequestReviewThreads",
-  "PullRequestComments",
-  "PullRequestReviews",
-  "PullRequestViewedFiles",
-  "PullRequestRevision",
-])
 
 const drafts = {
   drafts: [{ path: "README.md", line: 1, side: "RIGHT" as const, diffHunk: "", body: "Hmm" }],
@@ -680,7 +670,7 @@ describe("Keeping up with GitHub", () => {
       assert.deepStrictEqual(
         operations(github)
           .slice(firstSync)
-          .filter((name) => !workspaceReads.has(name)),
+          .filter((name) => name === "SearchPullRequests" || name === "PullRequestChecks"),
         ["SearchPullRequests", "PullRequestChecks", "PullRequestChecks"],
       )
     }),
@@ -1000,7 +990,6 @@ describe("Watching", () => {
                 saved: SubscriptionRef.get(mirror),
                 changes: SubscriptionRef.changes(mirror),
               }),
-              Layer.mock(PullRequestWorkspaces)({}),
             ]),
           ),
         ),

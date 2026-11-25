@@ -4,12 +4,15 @@ import { GitHubAuth } from "../src/github/GitHubAuth"
 import { GitHubClient } from "../src/github/GitHubClient"
 import { ServerConfig } from "../src/ServerConfig"
 
+export const fakeAuth = (token: string) =>
+  GitHubAuth.of({
+    resolveToken: Effect.succeed({ token: Redacted.make(token), source: "gh" }),
+    forgetToken: Effect.void,
+  })
+
 export const clientWith = Effect.fnUntraced(function* (
   fetch: typeof globalThis.fetch,
-  auth: GitHubAuth["Service"] = {
-    resolveToken: Effect.succeed({ token: Redacted.make("test-token"), source: "gh" as const }),
-    forgetToken: Effect.void,
-  },
+  auth: GitHubAuth["Service"] = fakeAuth("test-token"),
 ) {
   const services = yield* Layer.build(
     GitHubClient.layer.pipe(

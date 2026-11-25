@@ -27,7 +27,6 @@ import { SqlClient } from "effect/sql"
 import { AgentReviews } from "./AgentReviews"
 import { GitHubClient } from "./github/GitHubClient"
 import type { LookedUpPullRequest } from "./github/queuedPullRequests"
-import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { queueWorkOf, SettingsStore, withQueueWork } from "./SettingsStore"
 import { Tours } from "./Tours"
 
@@ -100,11 +99,12 @@ export class Queue extends Context.Service<
       const github = yield* GitHubClient
       const tours = yield* Tours
       const agentReviews = yield* AgentReviews
-      const workspaces = yield* PullRequestWorkspaces
       const settings = yield* SettingsStore
       const workToggleLock = yield* Semaphore.make(1)
       const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
       const writes = yield* SubscriptionRef.make(0)
+
+      const announce = Effect.ensuring(SubscriptionRef.update(writes, (count) => count + 1))
 
       const read = Effect.gen(function* () {
         const rows = yield* sql`
@@ -133,23 +133,6 @@ export class Queue extends Context.Service<
         Effect.tapError((cause) => Effect.logWarning("Couldn't load the Queue", cause)),
         Effect.mapError(loadFailed),
       )
-
-      const keepQueuedReady = read.pipe(
-        Effect.flatMap((queued) =>
-          workspaces.keep(
-            "queue",
-            queued.flatMap(({ pullRequest, problem }) => (problem === null ? [pullRequest] : [])),
-          ),
-        ),
-        Effect.ignore,
-      )
-
-      yield* SubscriptionRef.changes(writes).pipe(
-        Stream.runForEach(() => keepQueuedReady),
-        Effect.forkScoped,
-      )
-
-      const announce = Effect.ensuring(SubscriptionRef.update(writes, (count) => count + 1))
 
       const logSaveFailure = Effect.tapError((cause: unknown) =>
         Effect.logWarning("Couldn't save the Queue", cause),

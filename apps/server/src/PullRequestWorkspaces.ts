@@ -6,16 +6,16 @@ import {
   type PullRequestWorkspace,
   referenceKey,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, Exit, Fiber, Layer, Scope, Semaphore } from "effect"
+import { Context, DateTime, Effect, Exit, Fiber, Layer, Scope, Semaphore, Stream } from "effect"
 import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
+import { PullRequestLists } from "./PullRequestLists"
+import { Queue } from "./Queue"
 import { annotateUnit } from "./wideEvents"
 
 const PREFETCH_SLOTS = 2
 
 type ReadError = PullRequestNotFound | PullRequestAccessDenied | ConnectionError
-
-type WorkspaceHolder = "lists" | "queue"
 
 interface HeldPullRequest {
   readonly ref: PullRequestRef
@@ -31,10 +31,6 @@ interface Prefetch {
 export class PullRequestWorkspaces extends Context.Service<
   PullRequestWorkspaces,
   {
-    readonly keep: (
-      holder: WorkspaceHolder,
-      pullRequests: ReadonlyArray<HeldPullRequest>,
-    ) => Effect.Effect<void>
     readonly open: (ref: PullRequestRef) => Effect.Effect<PullRequestWorkspace, ReadError>
   }
 >()("@glass/server/PullRequestWorkspaces") {
@@ -42,15 +38,13 @@ export class PullRequestWorkspaces extends Context.Service<
     PullRequestWorkspaces,
     Effect.gen(function* () {
       const github = yield* GitHubClient
+      const lists = yield* PullRequestLists
+      const queue = yield* Queue
       const scope = yield* Scope.Scope
       const slots = yield* Semaphore.make(PREFETCH_SLOTS)
-      const lock = yield* Semaphore.make(1)
-      const held = new Map<WorkspaceHolder, ReadonlySet<string>>()
       const prefetches = new Map<string, Prefetch>()
       // WARNING: GitHub doesn't move updatedAt for some of Glass's own writes, such as viewed files, so a workspace is served from here at most once.
       const opened = new Set<string>()
-
-      const isHeld = (key: string) => [...held.values()].some((keys) => keys.has(key))
 
       const take = (key: string) => {
         const taken = prefetches.get(key)
@@ -98,18 +92,31 @@ export class PullRequestWorkspaces extends Context.Service<
         else prefetches.set(key, { updatedAt, fiber, reading })
       })
 
-      const keep = (holder: WorkspaceHolder, pullRequests: ReadonlyArray<HeldPullRequest>) =>
-        Effect.gen(function* () {
-          held.set(holder, new Set(pullRequests.map(({ ref }) => referenceKey(ref))))
+      const keep = Effect.fnUntraced(function* (pullRequests: ReadonlyArray<HeldPullRequest>) {
+        const held = new Set(pullRequests.map(({ ref }) => referenceKey(ref)))
 
-          yield* Effect.forEach(
-            [...prefetches.keys()].filter((key) => !isHeld(key)),
-            drop,
-            { discard: true, concurrency: "unbounded" },
-          )
+        yield* Effect.forEach(
+          [...prefetches.keys()].filter((key) => !held.has(key)),
+          drop,
+          { discard: true, concurrency: "unbounded" },
+        )
 
-          yield* Effect.forEach(pullRequests, prefetchOne, { discard: true })
-        }).pipe(lock.withPermits(1))
+        yield* Effect.forEach(pullRequests, prefetchOne, { discard: true })
+      })
+
+      const readyInQueue = queue.watch().pipe(
+        Stream.map((pullRequests) =>
+          pullRequests.flatMap(({ pullRequest, problem }) =>
+            problem === null ? [pullRequest] : [],
+          ),
+        ),
+        Stream.catch(() => Stream.make([])),
+      )
+
+      yield* Stream.zipLatestAll(lists.shown, readyInQueue).pipe(
+        Stream.runForEach(([listed, queued]) => keep([...listed, ...queued])),
+        Effect.forkScoped,
+      )
 
       const usable = Effect.fnUntraced(function* ({ fiber, reading }: Prefetch) {
         if (!reading.holdsSlot) {
@@ -136,7 +143,7 @@ export class PullRequestWorkspaces extends Context.Service<
         return ready ?? (yield* github.pullRequest(ref))
       })
 
-      return PullRequestWorkspaces.of({ keep, open })
+      return PullRequestWorkspaces.of({ open })
     }),
   )
 }
