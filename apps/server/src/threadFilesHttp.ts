@@ -1,4 +1,4 @@
-import { THREAD_FILES_PATH, type ThreadFile } from "@glass/contracts"
+import { THREAD_FILES_PATH, type ThreadFile, ThreadNotFound } from "@glass/contracts"
 import { Effect, Match } from "effect"
 import { HttpRouter, type HttpServerRequest, HttpServerResponse } from "effect/http"
 import { extname } from "node:path"
@@ -43,10 +43,13 @@ const served = (path: string, file: ThreadFile) =>
 
 const fileOf = (request: HttpServerRequest.HttpServerRequest) => {
   const { pathname } = new URL(request.url, "http://127.0.0.1")
-  const [threadId = "", ...segments] = pathname.slice(THREAD_FILES_PATH.length + 1).split("/")
+
+  const [place = "", threadId = "", ...segments] = pathname
+    .slice(THREAD_FILES_PATH.length + 1)
+    .split("/")
 
   try {
-    return { threadId, path: segments.map(decodeURIComponent).join("/") }
+    return { place, threadId, path: segments.map(decodeURIComponent).join("/") }
   } catch {
     return null
   }
@@ -61,7 +64,12 @@ export const ThreadFileRoutes = HttpRouter.add("GET", `${THREAD_FILES_PATH}/*`, 
 
     const threads = yield* Threads
 
-    return yield* threads.file(file.threadId, file.path).pipe(
+    return yield* threads.placeOf(file.threadId).pipe(
+      Effect.filterOrFail(
+        (place) => place._tag === file.place,
+        () => new ThreadNotFound({ threadId: file.threadId }),
+      ),
+      Effect.andThen(threads.file(file.threadId, file.path)),
       Effect.map((found) => served(file.path, found)),
       Effect.catchTags({
         ThreadNotFound: () => Effect.succeed(refuse(404, "This Thread is gone.")),

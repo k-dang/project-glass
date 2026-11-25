@@ -97,6 +97,27 @@ it.live("hands its harness only the Turns Glass started, not one the Thread star
   }).pipe(Effect.scoped, Effect.provide(transcriptsLayer)),
 )
 
+it.live("writes nothing through a Turn another Thread owns", () =>
+  Effect.gen(function* () {
+    const transcripts = yield* Transcripts
+    yield* transcripts.startOrQueue("agent-1", { message: "Build it", images: [], context: null })
+    const turnId = (yield* transcripts.runningTurn("agent-1")) ?? ""
+    yield* transcripts.save("agent-1", [
+      PartSet.make({ turnId, index: 0, part: TextPart.make({ text: "Mine" }) }),
+    ])
+    const before = yield* transcripts.read("agent-1")
+
+    yield* transcripts.save("agent-2", [
+      PartSet.make({ turnId, index: 0, part: TextPart.make({ text: "Forged" }) }),
+      PartSet.make({ turnId, index: 1, part: TextPart.make({ text: "Forged" }) }),
+      PartAppended.make({ turnId, index: 0, text: " and forged" }),
+      TurnEnded.make({ turnId, ended: { at: yield* DateTime.now, ending: TurnDone.make({}) } }),
+    ])
+
+    assert.deepStrictEqual(yield* transcripts.read("agent-1"), before)
+  }).pipe(Effect.provide(transcriptsLayer)),
+)
+
 it.live("shows a Thread's Agent statuses until Glass loses the Thread", () =>
   Effect.gen(function* () {
     const transcripts = yield* Transcripts

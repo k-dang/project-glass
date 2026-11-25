@@ -54,6 +54,19 @@ it.live.skipIf(process.platform !== "win32")(
     }).pipe(Effect.scoped, Effect.provide(NodeServices.layer)),
 )
 
+it.live("refuses a line break in an argument to a .cmd shim, which cmd.exe would cut off", () =>
+  Effect.gen(function* () {
+    const folder = yield* isolatedHome
+    yield* installShim(folder, "agent", "cli.js")
+
+    for (const argument of ["line one\nline two", "line one\rline two"])
+      assert.throws(
+        () => launchCommand("agent", ["--a", argument, "--after"], {}, windowsHost(folder)),
+        /line break/,
+      )
+  }),
+)
+
 it.live("measures an argument as the launched process receives it", () =>
   Effect.gen(function* () {
     const folder = yield* isolatedHome

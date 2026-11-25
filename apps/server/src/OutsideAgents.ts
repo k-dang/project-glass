@@ -65,20 +65,20 @@ export class OutsideAgents extends Context.Service<
 
       const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
 
-      const liveAgent = Effect.fnUntraced(function* (id: string) {
+      const liveAgent = (id: string) => {
         const existing = live.get(id)
 
         if (existing !== undefined) return existing
 
         const created: LiveAgent = {
           ownedSessions: new Set(),
-          revoked: yield* Deferred.make<void>(),
+          revoked: Deferred.makeUnsafe<void>(),
         }
 
         live.set(id, created)
 
         return created
-      })
+      }
 
       const connected = Effect.gen(function* () {
         const rows = yield* sql`
@@ -101,13 +101,10 @@ export class OutsideAgents extends Context.Service<
             const expiresAt = DateTime.addDuration(issuedAt, OUTSIDE_AGENT_TTL)
             const token = mintBearer()
 
-            const spent = yield* sql`
+            yield* sql`
               DELETE FROM outside_agent
               WHERE revoked_at IS NOT NULL OR expires_at <= ${DateTime.formatIso(issuedAt)}
-              RETURNING id
             `.pipe(Effect.orDie)
-
-            for (const { id } of yield* decodeIds(spent).pipe(Effect.orDie)) live.delete(id)
 
             yield* sql`
               INSERT INTO outside_agent (id, name, token_digest, issued_at, expires_at)
@@ -141,7 +138,7 @@ export class OutsideAgents extends Context.Service<
 
             if (agent === undefined) return Option.none<McpCredential>()
 
-            const { ownedSessions, revoked } = yield* liveAgent(agent.id)
+            const { ownedSessions, revoked } = liveAgent(agent.id)
 
             return Option.some<McpCredential>({
               caller: new OutsideAgentCaller({
@@ -166,11 +163,9 @@ export class OutsideAgents extends Context.Service<
               return yield* new OutsideAgentNotFound()
             }
 
-            const session = live.get(id)
+            const { revoked } = liveAgent(id)
 
-            live.delete(id)
-
-            if (session !== undefined) yield* Deferred.succeed(session.revoked, undefined)
+            yield* Deferred.succeed(revoked, undefined)
 
             return yield* bump
           }),

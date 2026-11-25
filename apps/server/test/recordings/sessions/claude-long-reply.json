@@ -19,58 +19,10 @@
       "frames": [
         {
           "out": {
-            "request_id": "l554d10cu0g",
+            "request_id": "hfv96h5aqoh",
             "type": "control_request",
             "request": {
-              "subtype": "initialize",
-              "sdkMcpServers": ["glass"],
-              "sdkMcpServerManifests": {
-                "glass": {
-                  "initializeResult": {
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {
-                      "tools": {
-                        "listChanged": true
-                      }
-                    },
-                    "serverInfo": {
-                      "name": "glass",
-                      "version": "1.0.0"
-                    }
-                  },
-                  "toolsListResult": {
-                    "tools": [
-                      {
-                        "name": "draw_diagram",
-                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
-                        "inputSchema": {
-                          "$schema": "http://json-schema.org/draft-07/schema#",
-                          "type": "object",
-                          "properties": {
-                            "title": {
-                              "type": "string",
-                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
-                            },
-                            "kind": {
-                              "type": "string",
-                              "enum": ["existing", "proposed", "uncertain"],
-                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
-                            },
-                            "mermaid": {
-                              "type": "string",
-                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
-                            }
-                          },
-                          "required": ["title", "kind", "mermaid"]
-                        },
-                        "execution": {
-                          "taskSupport": "forbidden"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
+              "subtype": "initialize"
             }
           }
         },
@@ -79,7 +31,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "l554d10cu0g",
+              "request_id": "hfv96h5aqoh",
               "response": {
                 "commands": [
                   {
@@ -711,9 +663,6 @@
                 "current_permission_mode": "default",
                 "hook_on_failure_supported": true,
                 "other_hook_ask_outranks_host": true,
-                "sdk_mcp_manifests_parked": {
-                  "glass": "parked"
-                },
                 "feedback_mode": {
                   "kind": "disabled"
                 },
@@ -739,13 +688,95 @@
         },
         {
           "out": {
+            "request_id": "zjrajvahech",
+            "type": "control_request",
+            "request": {
+              "subtype": "mcp_set_servers",
+              "servers": {
+                "glass": {
+                  "type": "sdk",
+                  "name": "glass"
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "zjrajvahech",
+              "response": {
+                "added": ["glass"],
+                "removed": [],
+                "errors": {}
+              }
+            }
+          }
+        },
+        {
+          "out": {
             "type": "user",
             "message": {
               "role": "user",
               "content": "Reply with exactly this text and nothing else: Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece."
             },
             "parent_tool_use_id": null,
-            "uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884"
+            "uuid": "1cc52d78-b054-4942-9d0d-0130aec350e2"
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "7d018b83-36f8-4dbd-88ac-3d7d649ba342",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "initialize",
+                "params": {
+                  "protocolVersion": "2025-11-25",
+                  "capabilities": {},
+                  "clientInfo": {
+                    "name": "claude-code",
+                    "title": "Claude Code",
+                    "description": "Anthropic's agentic coding tool",
+                    "websiteUrl": "https://claude.com/claude-code",
+                    "version": "2.1.322"
+                  }
+                },
+                "jsonrpc": "2.0",
+                "id": 0
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "7d018b83-36f8-4dbd-88ac-3d7d649ba342",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {
+                      "tools": {
+                        "listChanged": true
+                      }
+                    },
+                    "serverInfo": {
+                      "name": "glass",
+                      "version": "1.0.0"
+                    }
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 0
+                }
+              }
+            }
           }
         },
         {
@@ -754,25 +785,116 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "459d6cbc-a739-4bc7-b606-4850007a9266",
+            "uuid": "c368ada6-7885-48f6-9d00-5e3161b97e1d",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
+            "command_uuid": "1cc52d78-b054-4942-9d0d-0130aec350e2",
             "state": "queued",
-            "uuid": "d60bad29-1ed9-4e6c-9986-cf0f8146c342",
+            "uuid": "ba398cd7-e576-4d88-83d9-a5185ffb5768",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
+            "type": "control_request",
+            "request_id": "e17e2f0d-8618-4213-aeb0-d1a9e33fff82",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized"
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "e17e2f0d-8618-4213-aeb0-d1a9e33fff82",
+              "response": {
+                "mcp_response": {
+                  "jsonrpc": "2.0",
+                  "result": {},
+                  "id": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "996cc045-1ed0-4548-8785-e2eae2d4a7a5",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "tools/list",
+                "jsonrpc": "2.0",
+                "id": 1
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "996cc045-1ed0-4548-8785-e2eae2d4a7a5",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "tools": [
+                      {
+                        "name": "draw_diagram",
+                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                        "inputSchema": {
+                          "$schema": "http://json-schema.org/draft-07/schema#",
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["existing", "proposed", "uncertain"],
+                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                            },
+                            "mermaid": {
+                              "type": "string",
+                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                            }
+                          },
+                          "required": ["title", "kind", "mermaid"]
+                        },
+                        "execution": {
+                          "taskSupport": "forbidden"
+                        }
+                      }
+                    ]
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
             "type": "command_lifecycle",
-            "command_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
+            "command_uuid": "1cc52d78-b054-4942-9d0d-0130aec350e2",
             "state": "started",
-            "uuid": "492c868b-9305-4766-8ce6-719d6a44325d",
+            "uuid": "a98b27dd-e4d6-4bf7-803b-afb7fb0c9957",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1032,13 +1154,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "0ae7c55d-166f-4f3b-8b92-08054f496ffc",
+            "uuid": "fb26d5ca-32aa-4fa3-bcda-5562f7bb0b82",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-9711d676819c981bee3ffbb81ae503ba",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-13753ee14acf54115687a17d16c2a8e3",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -1046,7 +1168,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["009205b0-a91c-4bb2-a5ee-7499d9128884"]
+            "user_message_uuids": ["1cc52d78-b054-4942-9d0d-0130aec350e2"]
           }
         },
         {
@@ -1055,8 +1177,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "4a987391-044f-4bf8-9bcf-e6cddc7b2630",
-            "user_message_uuids": ["009205b0-a91c-4bb2-a5ee-7499d9128884"]
+            "uuid": "41d953b0-bbb8-46bc-8cb2-64f7b2f0daa7",
+            "user_message_uuids": ["1cc52d78-b054-4942-9d0d-0130aec350e2"]
           }
         },
         {
@@ -1066,7 +1188,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChNbxRmf8Tmy7tw8yAmAA",
+                "id": "msg_011ChPBoEwjtgj8ftpqM1CWA",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1094,12 +1216,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "7d1e0bd2-8286-4790-a402-586e49837de7",
-            "ttft_ms": 752,
+            "uuid": "341f7594-c8bf-4a79-a6fe-eac94b3f6a1e",
+            "ttft_ms": 824,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA",
-            "user_message_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
-            "user_message_uuids": ["009205b0-a91c-4bb2-a5ee-7499d9128884"]
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA",
+            "user_message_uuid": "1cc52d78-b054-4942-9d0d-0130aec350e2",
+            "user_message_uuids": ["1cc52d78-b054-4942-9d0d-0130aec350e2"]
           }
         },
         {
@@ -1115,8 +1237,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c2943628-37f2-414a-b5ad-95bcf7196f4d",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "3070e407-83e5-41f5-b5f2-2112d15be93e",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1127,13 +1249,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "Every word of this reply streams"
+                "text": "Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c29d1d24-771a-41ad-95fb-efcd3b3715a1",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "cba66abc-ec09-4bfe-9d79-ba9d805c1bda",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1144,13 +1266,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " in its own small piece."
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4770dd78-b231-42f9-a36a-9c2747f6b402",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "b67a8031-6221-4cf9-ad4f-b304b6e3c5e3",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1161,13 +1283,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " Every word of this reply streams"
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a5a75134-69bf-4c6c-a0dd-33ecb812ce1d",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "7c659f32-02ab-4928-8f62-578533fd8c5b",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1178,13 +1300,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " in its own small piece."
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0dc2cf3a-fc07-4cca-8c7f-0be9df6cc2a9",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "37139d26-40e7-411f-a082-73f08112a45d",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1195,13 +1317,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " Every word of this reply streams"
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2da2b281-1ebc-48f7-ba6d-dbcbdb6f60f8",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "e34c0b0b-50bf-4f74-8abf-95ce2eb62f14",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1212,13 +1334,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " in its own small piece."
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "7b8a5352-78e9-4e04-81b8-d31899960625",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "39361b51-ec1d-4ac7-8bbf-979cc4ecbf5f",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1229,13 +1351,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " Every word of this reply streams"
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "957ea681-0309-41ac-8a1c-67241b19848c",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "7bca37eb-35dc-45d2-a322-cc4173734e53",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1246,13 +1368,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " in its own small piece."
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "9957de20-8908-4656-8356-b346cec61ee6",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "5c31a5f4-0173-4d60-96d1-03a5b35b8910",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1263,13 +1385,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " Every word of this reply streams"
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a3656e39-8bf5-4b05-ad54-b067a8bbf192",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "0087b476-e370-45ed-8318-873d50cf82f6",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1280,13 +1402,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " in its own small piece."
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1a8f5835-f143-4072-a344-5b602f7d084f",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "402a94ff-8315-41f0-aec4-e4e197072cd2",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1297,13 +1419,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " Every word of this reply streams"
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "11b3ed9e-64f0-402d-be9a-d7aa82bf6025",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "104e1d3f-a355-49b4-be9a-d6f1414b548a",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1314,13 +1436,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " in its own small piece."
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "52a7ace7-fd09-4825-b556-bfbf313cbe94",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "d8ca8298-b06d-4f18-a246-dcdd15719ff6",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1331,13 +1453,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " Every word of this reply streams"
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f4eb04f3-0095-4894-a304-7df4d34c76ef",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "25482f66-7e89-4cd4-8981-7debf2e54bc7",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1348,13 +1470,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " in its own small piece."
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0e116280-7d39-4854-b2d0-88076e742bfb",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "b4add9f9-b12c-41c4-b594-2f40586cbcce",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1365,13 +1487,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " Every word of this reply streams"
+                "text": " Every word of this reply stre"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "42c51d7c-cf9d-4ab3-94c1-e94ff454a058",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "37e7bafb-5222-495f-ae60-4cf6b1ff895d",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1382,13 +1504,13 @@
               "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": " in its own small piece."
+                "text": "ams in its own small piece."
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "72c6b799-a8a3-4125-bd92-997b54ed9a1d",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "3be198a9-ccf7-43dd-965e-1ed0999b2c26",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1396,7 +1518,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbxRmf8Tmy7tw8yAmAA",
+              "id": "msg_011ChPBoEwjtgj8ftpqM1CWA",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -1428,11 +1550,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "7e433a49-a796-4e24-b4e8-941c23e291ad",
-            "timestamp": "2026-11-24T23:15:14.174Z",
-            "request_id": "req_011ChNbxRdj6GqdmxDDssVdb",
-            "user_message_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
-            "user_message_uuids": ["009205b0-a91c-4bb2-a5ee-7499d9128884"]
+            "uuid": "d020b2ce-bfd3-44cf-b8ed-9be691c39758",
+            "timestamp": "2026-11-25T06:39:01.512Z",
+            "request_id": "req_011ChPBoEmZktKXHxsVN7USh",
+            "user_message_uuid": "1cc52d78-b054-4942-9d0d-0130aec350e2",
+            "user_message_uuids": ["1cc52d78-b054-4942-9d0d-0130aec350e2"]
           }
         },
         {
@@ -1444,8 +1566,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8c17141c-9892-484e-ba9b-0c9a7446794a",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "bbf650c9-a157-43f5-b458-4311fd3f9894",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1474,8 +1596,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "be6b65b7-8200-46d4-a7f0-d173b3d286c4",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "b6a3d748-5cee-421c-a8ca-6e7ebfe4aa59",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
@@ -1486,21 +1608,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0d792bd0-fc3d-4be2-a7fd-b27f2454bb4d",
-            "api_message_id": "msg_011ChNbxRmf8Tmy7tw8yAmAA"
+            "uuid": "d9b44680-0f3d-462d-b95b-9cf5e1396530",
+            "api_message_id": "msg_011ChPBoEwjtgj8ftpqM1CWA"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "bc8900dc-44a9-45bf-b7d5-dc047ac34619",
+            "uuid": "aecb48ff-f423-49b8-9531-1af5a027aaec",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 1118,
+            "duration_api_ms": 1173,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -1578,16 +1700,16 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece. Every word of this reply streams in its own small piece.",
-            "ttft_ms": 1165,
+            "ttft_ms": 1219,
             "type": "result",
-            "duration_ms": 1173,
-            "uuid": "4aacf4a6-b419-4139-b2f4-4e69fe551757",
-            "ttft_stream_ms": 806,
-            "time_to_request_ms": 57,
-            "first_content_frame_ms": 807,
-            "user_message_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
-            "user_message_uuids": ["009205b0-a91c-4bb2-a5ee-7499d9128884"],
-            "request_sent_wall_ms": 1795562113067,
+            "duration_ms": 1228,
+            "uuid": "65a7cf7b-2b65-4a28-8ca0-822dffca907b",
+            "ttft_stream_ms": 878,
+            "time_to_request_ms": 56,
+            "first_content_frame_ms": 878,
+            "user_message_uuid": "1cc52d78-b054-4942-9d0d-0130aec350e2",
+            "user_message_uuids": ["1cc52d78-b054-4942-9d0d-0130aec350e2"],
+            "request_sent_wall_ms": 1795588740349,
             "first_request_input_tokens": 0,
             "first_request_cache_read_input_tokens": 13041,
             "queued_turn_count": 0,
@@ -1615,9 +1737,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "009205b0-a91c-4bb2-a5ee-7499d9128884",
+            "command_uuid": "1cc52d78-b054-4942-9d0d-0130aec350e2",
             "state": "completed",
-            "uuid": "a590b7ca-622f-4476-878f-d433bfa49d86",
+            "uuid": "17ba7689-a75a-485a-bd6b-29ce1abb85cc",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1627,7 +1749,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "95912812-f9e7-464b-b70d-6e1d31e3377f",
+            "uuid": "f836fda1-4f07-4564-ab4e-d638068ad31f",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

@@ -7,8 +7,11 @@ and approve them or send feedback. Questions and Check-ins show up in the Inbox 
 you, under the app's name.
 
 The sign-in is an OAuth authorization code with PKCE. Glass listens on this computer only, so the
-approval page opens here and names the app and what it will be able to do. A token from that
-approval works on the MCP endpoint for 30 days. It does not work as a Thread Glass launched,
+sign-in page opens here, in your browser, and asks you to answer in Glass. Glass shows the request
+in the Inbox under Stopped on you, with the app's name and what it will be able to do. Only Glass's
+window can approve it: any program on this computer can open the sign-in page, so the page itself
+has no Approve button. Once you answer, the page sends your answer back to the app. A token from
+that approval works on the MCP endpoint for 30 days. It does not work as a Thread Glass launched,
 and it does not work on any other Glass route. Disconnect it in Settings → Outside agents.
 
 ## Connect Claude Code
@@ -23,12 +26,12 @@ claude mcp add --transport http glass http://127.0.0.1:<port>/mcp
 claude mcp login glass
 ```
 
-Claude Code opens the approval page. Approve it, then the agent can call `ask_user` and
-`check_in`. Neither waits for you: each returns an id at once, and you answer in the Inbox, now or
-days later, or set it aside. The agent reads your answer with `read_answer` and that id, from any
-of its sessions; Glass doesn't wake it, so tell it when you've answered. A new session that doesn't
-have the id calls `list_answers`, which lists the questions and Check-ins whose answer the agent
-hasn't read yet.
+Claude Code opens the sign-in page in your browser. Approve the request in Glass's Inbox, then the
+agent can call `ask_user` and `check_in`. Neither waits for you: each returns an id at once, and you
+answer in the Inbox, now or days later, or set it aside. The agent reads your answer with
+`read_answer` and that id, from any of its sessions; Glass doesn't wake it, so tell it when you've
+answered. A new session that doesn't have the id calls `list_answers`, which lists the questions
+and Check-ins whose answer the agent hasn't read yet.
 
 `claude mcp login glass` is the sign-in step. If your Claude Code build uses a different command,
 run `claude mcp --help` and use the login or authenticate command it lists for an HTTP server.
@@ -38,8 +41,9 @@ run `claude mcp --help` and use the login or authenticate command it lists for a
 Approving lets that app read your pull requests, to-dos, and agents, start and message agents,
 start a review, ask you a question, and have Glass read the changes in any git folder on this
 computer it names, for you to read in the Inbox, until the token expires or you disconnect it.
-Approve only a sign-in you just started. The page says where Glass will send the approval. That address has to
-be on this computer (`127.0.0.1`, `localhost`, or `[::1]`).
+Approve only a sign-in you just started. The request says where Glass will send the approval. That
+address has to be on this computer (`127.0.0.1`, `localhost`, or `[::1]`). A request you leave
+unanswered ends after 10 minutes.
 
 ## Check in on an agent's changes
 

@@ -18,8 +18,8 @@ view offers, jumping to a PR or Thread by name, and starting a Thread from what 
 _Avoid_: Command palette, quick open (a Command is something an Agent harness runs)
 
 **Inbox**:
-The Area listing the Threads, questions, Check-ins, and PRs waiting on the user now, grouped by
-why they wait.
+The Area listing the Threads, questions, Check-ins, Outside agent requests, and PRs waiting on the
+user now, grouped by why they wait.
 _Avoid_: Needs you
 
 ### Resuming work
@@ -311,6 +311,10 @@ the answer reaches the agent later. It stays open until the user answers it or s
 An agent Glass did not launch that the user has approved to use Glass's MCP tools on this
 computer.
 _Avoid_: Session, client, login
+
+**Outside agent request**:
+An app asking, from the Inbox, for the user to approve it as an Outside agent.
+_Avoid_: Consent request, login request
 
 **Check-in**:
 An Outside agent asking the user to read the changes in a folder on this computer and approve them

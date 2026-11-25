@@ -3,6 +3,7 @@ import { Config, Effect } from "effect"
 import { claudeAdapter } from "./agentHost/claudeAdapter"
 import { piAdapter } from "./agentHost/piAdapter"
 import { serveAgentHost } from "./agentHost/serve"
+import { takeGlassVariables } from "./glassVariables"
 import { jsonLogsToStdout, runMain } from "./wideEvents"
 
 const harnesses = Effect.gen(function* () {
@@ -20,6 +21,6 @@ const harnesses = Effect.gen(function* () {
 
 serveAgentHost(harnesses).pipe(
   Effect.scoped,
-  Effect.provide(NodeServices.layer),
+  Effect.provide([NodeServices.layer, takeGlassVariables()]),
   runMain(jsonLogsToStdout("agent-host")),
 )

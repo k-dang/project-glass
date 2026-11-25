@@ -162,50 +162,50 @@ interface PiFile {
   readonly source: string
 }
 
-interface PiExtension extends PiFile {
-  readonly besideIt?: ReadonlyArray<PiFile>
+interface PiFlagFile extends PiFile {
+  readonly flag: "--extension" | "--append-system-prompt"
+  readonly besideIt: ReadonlyArray<PiFile>
 }
 
-const writtenExtensions = Effect.fnUntraced(function* (
+const extension = (
+  name: string,
+  source: string,
+  besideIt: ReadonlyArray<PiFile> = [],
+): PiFlagFile => ({ flag: "--extension", name, source, besideIt })
+
+const instructions = (source: string): PiFlagFile => ({
+  flag: "--append-system-prompt",
+  name: "instructions.md",
+  source,
+  besideIt: [],
+})
+
+const writtenFiles = Effect.fnUntraced(function* (
   folder: string,
-  extensions: ReadonlyArray<PiExtension>,
+  files: ReadonlyArray<PiFlagFile>,
 ) {
   const fs = yield* FileSystem.FileSystem
   const directory = yield* scopedFolder(`${folder}.pi`)
 
-  const flags = yield* Effect.forEach(extensions, ({ name, source, besideIt = [] }) => {
+  const flags = yield* Effect.forEach(files, ({ flag, name, source, besideIt }) => {
     const file = join(directory, name)
 
     return Effect.forEach(besideIt, (data) =>
       fs.writeFileString(join(directory, data.name), data.source),
-    ).pipe(Effect.andThen(fs.writeFileString(file, source)), Effect.as(["--extension", file]))
+    ).pipe(Effect.andThen(fs.writeFileString(file, source)), Effect.as([flag, file]))
   })
 
-  return { directory, flags: flags.flat() }
+  return flags.flat()
 })
 
-const lockedDownFlags = Effect.fnUntraced(function* (
+const lockedDownFlags = (
   folder: string,
   tools: ReadonlyArray<string>,
-  extensions: ReadonlyArray<PiExtension>,
-  instructionsText: string,
-) {
-  const fs = yield* FileSystem.FileSystem
-  const { directory, flags } = yield* writtenExtensions(folder, extensions)
-
-  const instructions = join(directory, "instructions.md")
-
-  yield* fs.writeFileString(instructions, instructionsText)
-
-  return [
-    "--tools",
-    tools.join(","),
-    ...piLoadsNothing,
-    ...flags,
-    "--append-system-prompt",
-    instructions,
-  ]
-})
+  files: ReadonlyArray<PiFlagFile>,
+) =>
+  writtenFiles(folder, files).pipe(
+    Effect.map((flags) => ["--tools", tools.join(","), ...piLoadsNothing, ...flags]),
+  )
 
 const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
   skills.flatMap((plugin) => plugin.skills.flatMap((skill) => ["--skill", skill]))
@@ -219,38 +219,29 @@ const roleFlags = (
   Match.value(role).pipe(
     Match.tagsExhaustive({
       Work: () =>
-        writtenExtensions(folder, [
-          { name: "draw-diagram.mjs", source: piDrawDiagramSource },
-          { name: "subagent-status.js", source: piSubagentStatusExtension },
+        writtenFiles(folder, [
+          extension("draw-diagram.mjs", piDrawDiagramSource),
+          extension("subagent-status.js", piSubagentStatusExtension),
           ...(glassTools === undefined
             ? []
-            : [{ name: "glass-tools.js", source: piGlassToolsExtension }]),
-        ]).pipe(
-          Effect.map(({ flags }) => [
-            ...skillFlags(skills),
-            ...flags,
-            ...(glassTools === undefined ? [] : ["--append-system-prompt", workInstructions]),
-          ]),
-        ),
+            : [extension("glass-tools.js", piGlassToolsExtension), instructions(workInstructions)]),
+        ]).pipe(Effect.map((flags) => [...skillFlags(skills), ...flags])),
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,
           [...piTools.shell, SUGGEST_DRAFT_TOOL],
           [
-            {
-              name: "suggest-draft.mjs",
-              source: piSuggestDraftSource,
-              besideIt: [{ name: PI_DIFF_LINES, source: JSON.stringify(brief.diffLines) }],
-            },
+            extension("suggest-draft.mjs", piSuggestDraftSource, [
+              { name: PI_DIFF_LINES, source: JSON.stringify(brief.diffLines) },
+            ]),
+            instructions(brief.instructions),
           ],
-          brief.instructions,
         ),
       Global: () =>
         lockedDownFlags(
           folder,
           [PI_GLASS_TOOLS],
-          [{ name: "glass-tools.js", source: piGlassToolsExtension }],
-          globalInstructions,
+          [extension("glass-tools.js", piGlassToolsExtension), instructions(globalInstructions)],
         ),
     }),
   )

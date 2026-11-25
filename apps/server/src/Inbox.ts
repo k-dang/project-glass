@@ -14,6 +14,7 @@ import {
   canRunQueueWork,
   type InboxItem,
   InboxItems,
+  type OutsideAgentRequest,
   OutsideQuestion,
   InboxPullRequest,
   type PullRequestReason,
@@ -41,6 +42,7 @@ import { AgentReviews } from "./AgentReviews"
 import { CheckIns } from "./CheckIns"
 import { Threads, type FinishedThread, type WaitingThread } from "./Threads"
 import { GlobalChat } from "./GlobalChat"
+import { McpOAuth } from "./mcp/McpOAuth"
 import { type AskedQuestion, Questions } from "./Questions"
 import {
   type Mirror,
@@ -151,6 +153,7 @@ interface Waiting {
   readonly pullRequests: ReadonlyArray<WaitingPullRequest>
   readonly questions: ReadonlyArray<AskedQuestion>
   readonly checkIns: ReadonlyArray<CheckIn>
+  readonly outsideAgentRequests: ReadonlyArray<OutsideAgentRequest>
   readonly global: ReadonlyArray<WaitingRequest>
 }
 
@@ -164,6 +167,7 @@ const inboxOf = (waiting: Waiting): InboxItems =>
       ]),
       ...outsideQuestions(waiting.questions),
       ...waiting.checkIns,
+      ...waiting.outsideAgentRequests,
       ...globalItem(waiting.global, waiting.questions),
       ...pullRequestItems(waiting.pullRequests),
     ],
@@ -245,6 +249,7 @@ export class Inbox extends Context.Service<
       const checkIns = yield* CheckIns
       const mirror = yield* PullRequestMirror
       const globalChat = yield* GlobalChat
+      const oauth = yield* McpOAuth
 
       const finishedReviewOf = (pullRequest: PullRequestSummary) =>
         agentReviews.watch(pullRequest.ref).pipe(
@@ -321,18 +326,21 @@ export class Inbox extends Context.Service<
             waitingPullRequests,
             questions.open,
             checkIns.watch(),
+            oauth.watchRequests(),
             globalChat.waiting,
           ).pipe(
-            Stream.map(([asking, waiting, finished, pullRequests, asked, checkingIn, global]) =>
-              inboxOf({
-                asking,
-                threads: waiting,
-                finished,
-                pullRequests,
-                questions: asked,
-                checkIns: checkingIn,
-                global,
-              }),
+            Stream.map(
+              ([asking, waiting, finished, pullRequests, asked, checkingIn, connecting, global]) =>
+                inboxOf({
+                  asking,
+                  threads: waiting,
+                  finished,
+                  pullRequests,
+                  questions: asked,
+                  checkIns: checkingIn,
+                  outsideAgentRequests: connecting,
+                  global,
+                }),
             ),
             Stream.changesWith(Schema.toEquivalence(InboxItems)),
           ),

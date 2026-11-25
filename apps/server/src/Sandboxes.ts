@@ -592,7 +592,14 @@ export class Sandboxes extends Context.Service<
               const position = yield* followFrom(threadId, host)
 
               const following = yield* followHost(client, position, {
-                save: transcripts.save,
+                save: (journaled, events, journal) =>
+                  journaled === threadId
+                    ? transcripts.save(threadId, events, journal)
+                    : Effect.logWarning(
+                        "Dropped a Sandbox's journal entries for another Thread",
+                        threadId,
+                        journaled,
+                      ),
                 alreadySaved: () => position.saved,
                 relay,
                 origin: ToolCallOrigin.Sandbox({ threadId }),

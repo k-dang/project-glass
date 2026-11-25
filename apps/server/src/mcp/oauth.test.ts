@@ -22,8 +22,13 @@ const askedUser = Schema.decodeUnknownSync(AskedUser)
 
 const questionState = Schema.decodeUnknownSync(QuestionState)
 
-const connectedThreads = (client: Effect.Success<ReturnType<typeof startBackend>>["client"]) =>
+type Client = Effect.Success<ReturnType<typeof startBackend>>["client"]
+
+const connectedThreads = (client: Client) =>
   client.WatchOutsideAgents().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+const inboxNow = (client: Client) =>
+  client.WatchInbox().pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
 const TokenResponse = Schema.Struct({
   access_token: Schema.String,
@@ -98,91 +103,125 @@ const postJson = (
     }),
   )
 
-const signIn = (baseUrl: string, name: string) =>
-  Effect.gen(function* () {
-    const redirectUri = "http://127.0.0.1:9/callback"
-    const { verifier, challenge } = verifierPair()
+const signInRequests = (items: InboxItems) =>
+  items.filter((item) => Predicate.isTagged(item, "OutsideAgentRequest"))
 
+const authorizeUrl = (
+  baseUrl: string,
+  input: {
+    readonly clientId: string
+    readonly redirectUri: string
+    readonly challenge: string
+    readonly state: string
+  },
+) => {
+  const authorize = new URL(`${baseUrl}/oauth/mcp/authorize`)
+
+  authorize.searchParams.set("response_type", "code")
+  authorize.searchParams.set("client_id", input.clientId)
+  authorize.searchParams.set("redirect_uri", input.redirectUri)
+  authorize.searchParams.set("code_challenge", input.challenge)
+  authorize.searchParams.set("code_challenge_method", "S256")
+  authorize.searchParams.set("state", input.state)
+
+  return authorize
+}
+
+const register = (baseUrl: string, name: string, redirectUri: string) =>
+  Effect.gen(function* () {
     const registered = yield* postJson(`${baseUrl}/oauth/mcp/register`, {
       client_name: name,
       redirect_uris: [redirectUri],
     })
 
-    const registration = decodeRegistration(yield* read(registered))
-
     assert.strictEqual(registered.status, 201)
 
-    const authorize = new URL(`${baseUrl}/oauth/mcp/authorize`)
+    return decodeRegistration(yield* read(registered)).client_id
+  })
 
-    authorize.searchParams.set("response_type", "code")
-    authorize.searchParams.set("client_id", registration.client_id)
-    authorize.searchParams.set("redirect_uri", redirectUri)
-    authorize.searchParams.set("code_challenge", challenge)
-    authorize.searchParams.set("code_challenge_method", "S256")
-    authorize.searchParams.set("state", "sign-in")
-
-    const page = yield* Effect.promise(() => fetch(authorize))
+const openAuthorize = (authorize: URL) =>
+  Effect.gen(function* () {
+    const page = yield* Effect.promise(() => fetch(authorize, { redirect: "manual" }))
     const html = yield* Effect.promise(() => page.text())
-    const csrf = html.match(/name="csrf" value="([^"]+)"/)?.[1]
+    const requestId = /request=([0-9a-f-]+)/.exec(html)?.[1]
 
     assert.strictEqual(page.status, 200)
-    assert.ok(csrf !== undefined)
-    assert.ok(html.includes(name))
+    assert.ok(requestId !== undefined)
 
-    const decision = yield* Effect.promise(() =>
-      fetch(`${baseUrl}/oauth/mcp/decision`, {
-        method: "POST",
-        redirect: "manual",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({
-          client_id: registration.client_id,
-          redirect_uri: redirectUri,
-          code_challenge: challenge,
-          code_challenge_method: "S256",
-          response_type: "code",
-          state: "sign-in",
-          resource: `${baseUrl}/mcp`,
-          csrf,
-          decision: "approve",
-        }),
-      }),
-    )
+    return { html, requestId }
+  })
 
-    const location = decision.headers.get("location") ?? ""
-    const code = new URL(location).searchParams.get("code")
+const pollDecision = (baseUrl: string, requestId: string) =>
+  Effect.promise(() =>
+    fetch(`${baseUrl}/oauth/mcp/decision?request=${requestId}`, { redirect: "manual" }),
+  )
 
-    assert.strictEqual(decision.status, 302)
+const shownInInbox = (client: Client, requestId: string) =>
+  client.WatchInbox().pipe(
+    Stream.map((items) => signInRequests(items).find(({ id }) => id === requestId)),
+    Stream.filter(Predicate.isNotUndefined),
+    Stream.runHead,
+    Effect.map(Option.getOrThrow),
+  )
+
+const answerInGlass = (client: Client, requestId: string, decision: "approve" | "deny") =>
+  Effect.gen(function* () {
+    yield* shownInInbox(client, requestId)
+    yield* client.AnswerOutsideAgentRequest({ id: requestId, decision })
+  })
+
+const approvedCode = (client: Client, baseUrl: string, authorize: URL) =>
+  Effect.gen(function* () {
+    const { requestId } = yield* openAuthorize(authorize)
+
+    yield* answerInGlass(client, requestId, "approve")
+
+    const decided = yield* pollDecision(baseUrl, requestId)
+    const code = new URL(decided.headers.get("location") ?? "").searchParams.get("code")
+
+    assert.strictEqual(decided.status, 302)
     assert.ok(code !== null)
 
-    const granted = yield* Effect.promise(() =>
-      fetch(`${baseUrl}/oauth/mcp/token`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/x-www-form-urlencoded",
-          accept: "application/json",
-        },
-        body: new URLSearchParams({
-          grant_type: "authorization_code",
-          code,
-          redirect_uri: redirectUri,
-          client_id: registration.client_id,
-          code_verifier: verifier,
-          resource: `${baseUrl}/mcp`,
-        }),
-      }),
+    return code
+  })
+
+const exchange = (baseUrl: string, fields: Record<string, string>) =>
+  Effect.promise(() =>
+    fetch(`${baseUrl}/oauth/mcp/token`, {
+      method: "POST",
+      headers: {
+        "content-type": "application/x-www-form-urlencoded",
+        accept: "application/json",
+      },
+      body: new URLSearchParams({ grant_type: "authorization_code", ...fields }),
+    }),
+  )
+
+const signIn = (baseUrl: string, client: Client, name: string) =>
+  Effect.gen(function* () {
+    const redirectUri = "http://127.0.0.1:9/callback"
+    const { verifier, challenge } = verifierPair()
+    const clientId = yield* register(baseUrl, name, redirectUri)
+
+    const code = yield* approvedCode(
+      client,
+      baseUrl,
+      authorizeUrl(baseUrl, { clientId, redirectUri, challenge, state: "sign-in" }),
     )
+
+    const granted = yield* exchange(baseUrl, {
+      code,
+      redirect_uri: redirectUri,
+      client_id: clientId,
+      code_verifier: verifier,
+      resource: `${baseUrl}/mcp`,
+    })
 
     const token = decodeToken(yield* read(granted))
 
     assert.strictEqual(granted.status, 200)
 
-    return {
-      token: Redacted.make(token.access_token),
-      expiresIn: token.expires_in,
-      clientId: registration.client_id,
-      redirectUri,
-      challenge,
-    }
+    return { token: Redacted.make(token.access_token), expiresIn: token.expires_in }
   })
 
 describe("MCP OAuth", () => {
@@ -246,7 +285,7 @@ describe("MCP OAuth", () => {
         Effect.forkChild,
       )
 
-      const { token, expiresIn } = yield* signIn(baseUrl, "Claude Code")
+      const { token, expiresIn } = yield* signIn(baseUrl, client, "Claude Code")
       const mcp = yield* connectMcp(baseUrl, token)
 
       const asked = askedUser(
@@ -289,108 +328,97 @@ describe("MCP OAuth", () => {
     }),
   )
 
-  it.live("rejects a bad or missing PKCE verifier", () =>
+  it.live("gives a scripted sign-in no code until the user approves it in Glass", () =>
     Effect.gen(function* () {
-      const { baseUrl } = yield* start
+      const { baseUrl, client } = yield* start
       const redirectUri = "http://127.0.0.1:9/callback"
+      const { verifier, challenge } = verifierPair()
+      const clientId = yield* register(baseUrl, "Claude Code", redirectUri)
+      const authorize = authorizeUrl(baseUrl, { clientId, redirectUri, challenge, state: "forged" })
+      const { html, requestId } = yield* openAuthorize(authorize)
+      const reloaded = yield* openAuthorize(authorize)
+      const waiting = yield* shownInInbox(client, requestId)
+      const polled = yield* pollDecision(baseUrl, requestId)
 
-      const registered = yield* postJson(`${baseUrl}/oauth/mcp/register`, {
-        client_name: "Claude Code",
-        redirect_uris: [redirectUri],
+      const traded = yield* exchange(baseUrl, {
+        code: requestId,
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        code_verifier: verifier,
       })
 
-      const clientId = decodeRegistration(yield* read(registered)).client_id
+      assert.ok(html.includes("Approve Claude Code in Glass"))
+      assert.strictEqual(reloaded.requestId, requestId)
+      assert.deepStrictEqual(
+        { name: waiting.name, redirectHost: waiting.redirectHost },
+        { name: "Claude Code", redirectHost: "127.0.0.1:9" },
+      )
+      assert.strictEqual(polled.status, 200)
+      assert.strictEqual(polled.headers.get("location"), null)
+      assert.strictEqual(traded.status, 400)
+      assert.strictEqual(decodeError(yield* read(traded)).error, "invalid_grant")
+      assert.deepStrictEqual(yield* connectedThreads(client), [])
+    }),
+  )
 
-      const approve = (challenge: string) =>
-        Effect.gen(function* () {
-          const authorize = new URL(`${baseUrl}/oauth/mcp/authorize`)
+  it.live("sends a sign-in the user denies in Glass back with access_denied", () =>
+    Effect.gen(function* () {
+      const { baseUrl, client } = yield* start
+      const redirectUri = "http://127.0.0.1:9/callback"
+      const { challenge } = verifierPair()
+      const clientId = yield* register(baseUrl, "Claude Code", redirectUri)
 
-          authorize.searchParams.set("response_type", "code")
-          authorize.searchParams.set("client_id", clientId)
-          authorize.searchParams.set("redirect_uri", redirectUri)
-          authorize.searchParams.set("code_challenge", challenge)
-          authorize.searchParams.set("code_challenge_method", "S256")
+      const { requestId } = yield* openAuthorize(
+        authorizeUrl(baseUrl, { clientId, redirectUri, challenge, state: "denied" }),
+      )
 
-          const page = yield* Effect.promise(() => fetch(authorize))
-          const html = yield* Effect.promise(() => page.text())
-          const csrf = html.match(/name="csrf" value="([^"]+)"/)?.[1]
+      yield* answerInGlass(client, requestId, "deny")
 
-          assert.ok(csrf !== undefined)
+      const decided = yield* pollDecision(baseUrl, requestId)
+      const location = new URL(decided.headers.get("location") ?? redirectUri)
+      const again = yield* pollDecision(baseUrl, requestId)
 
-          const decision = yield* Effect.promise(() =>
-            fetch(`${baseUrl}/oauth/mcp/decision`, {
-              method: "POST",
-              redirect: "manual",
-              headers: { "content-type": "application/x-www-form-urlencoded" },
-              body: new URLSearchParams({
-                client_id: clientId,
-                redirect_uri: redirectUri,
-                code_challenge: challenge,
-                code_challenge_method: "S256",
-                response_type: "code",
-                state: "",
-                resource: `${baseUrl}/mcp`,
-                csrf,
-                decision: "approve",
-              }),
-            }),
-          )
+      assert.strictEqual(decided.status, 302)
+      assert.strictEqual(location.searchParams.get("error"), "access_denied")
+      assert.strictEqual(location.searchParams.get("state"), "denied")
+      assert.strictEqual(location.searchParams.get("code"), null)
+      assert.strictEqual(again.status, 400)
+      assert.deepStrictEqual(signInRequests(yield* inboxNow(client)), [])
+    }),
+  )
 
-          return new URL(decision.headers.get("location") ?? "").searchParams.get("code")
-        })
-
+  it.live("rejects a bad or missing PKCE verifier", () =>
+    Effect.gen(function* () {
+      const { baseUrl, client } = yield* start
+      const redirectUri = "http://127.0.0.1:9/callback"
+      const clientId = yield* register(baseUrl, "Claude Code", redirectUri)
       const { verifier, challenge } = verifierPair()
-      const code = yield* approve(challenge)
 
-      const wrong = yield* Effect.promise(() =>
-        fetch(`${baseUrl}/oauth/mcp/token`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/x-www-form-urlencoded",
-            accept: "application/json",
-          },
-          body: new URLSearchParams({
-            grant_type: "authorization_code",
-            code: code ?? "",
-            redirect_uri: redirectUri,
-            client_id: clientId,
-            code_verifier: `${verifier}x`,
-          }),
-        }),
+      const code = yield* approvedCode(
+        client,
+        baseUrl,
+        authorizeUrl(baseUrl, { clientId, redirectUri, challenge, state: "" }),
       )
 
-      const spent = yield* Effect.promise(() =>
-        fetch(`${baseUrl}/oauth/mcp/token`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/x-www-form-urlencoded",
-            accept: "application/json",
-          },
-          body: new URLSearchParams({
-            grant_type: "authorization_code",
-            code: code ?? "",
-            redirect_uri: redirectUri,
-            client_id: clientId,
-            code_verifier: verifier,
-          }),
-        }),
-      )
+      const wrong = yield* exchange(baseUrl, {
+        code,
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        code_verifier: `${verifier}x`,
+      })
 
-      const missing = yield* Effect.promise(() =>
-        fetch(`${baseUrl}/oauth/mcp/token`, {
-          method: "POST",
-          headers: {
-            "content-type": "application/x-www-form-urlencoded",
-            accept: "application/json",
-          },
-          body: new URLSearchParams({
-            grant_type: "authorization_code",
-            code: "missing-verifier-is-not-a-code",
-            redirect_uri: redirectUri,
-            client_id: clientId,
-          }),
-        }),
-      )
+      const spent = yield* exchange(baseUrl, {
+        code,
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        code_verifier: verifier,
+      })
+
+      const missing = yield* exchange(baseUrl, {
+        code: "missing-verifier-is-not-a-code",
+        redirect_uri: redirectUri,
+        client_id: clientId,
+      })
 
       const withoutChallenge = new URL(`${baseUrl}/oauth/mcp/authorize`)
 
@@ -436,8 +464,8 @@ describe("MCP OAuth", () => {
 
   it.live("rejects an MCP client token on a non-MCP route", () =>
     Effect.gen(function* () {
-      const { baseUrl } = yield* start
-      const { token } = yield* signIn(baseUrl, "Claude Code")
+      const { baseUrl, client } = yield* start
+      const { token } = yield* signIn(baseUrl, client, "Claude Code")
 
       const health = yield* Effect.promise(() =>
         fetch(`${baseUrl}/health`, {
@@ -452,7 +480,7 @@ describe("MCP OAuth", () => {
   it.live("rejects a revoked token and an expired token", () =>
     Effect.gen(function* () {
       const { baseUrl, client, home } = yield* start
-      const { token } = yield* signIn(baseUrl, "Claude Code")
+      const { token } = yield* signIn(baseUrl, client, "Claude Code")
       const mcp = yield* connectMcp(baseUrl, token)
       const [thread] = yield* connectedThreads(client)
 
@@ -464,7 +492,7 @@ describe("MCP OAuth", () => {
       assert.strictEqual((yield* mcp.request("tools/list", {}).response).status, 401)
       assert.deepStrictEqual(yield* connectedThreads(client), [])
 
-      const again = yield* signIn(baseUrl, "Claude Code")
+      const again = yield* signIn(baseUrl, client, "Claude Code")
 
       yield* Effect.sync(() => {
         const database = new DatabaseSync(join(home, ".project-glass", "glass.db"))
@@ -476,75 +504,6 @@ describe("MCP OAuth", () => {
       const expired = yield* mcpPost(baseUrl, initialize, { bearer: again.token })
 
       assert.strictEqual(expired.status, 401)
-    }),
-  )
-
-  it.live("approves when the browser withholds its origin, and rejects a foreign one", () =>
-    Effect.gen(function* () {
-      const { baseUrl } = yield* start
-      const redirectUri = "http://127.0.0.1:9/callback"
-      const { challenge } = verifierPair()
-
-      const registered = yield* postJson(`${baseUrl}/oauth/mcp/register`, {
-        client_name: "Claude Code",
-        redirect_uris: [redirectUri],
-      })
-
-      const clientId = decodeRegistration(yield* read(registered)).client_id
-      const authorize = new URL(`${baseUrl}/oauth/mcp/authorize`)
-
-      authorize.searchParams.set("response_type", "code")
-      authorize.searchParams.set("client_id", clientId)
-      authorize.searchParams.set("redirect_uri", redirectUri)
-      authorize.searchParams.set("code_challenge", challenge)
-      authorize.searchParams.set("code_challenge_method", "S256")
-      authorize.searchParams.set("state", "chrome")
-
-      const page = yield* Effect.promise(() => fetch(authorize))
-      const html = yield* Effect.promise(() => page.text())
-      const csrf = html.match(/name="csrf" value="([^"]+)"/)?.[1]
-
-      assert.strictEqual(page.status, 200)
-      assert.ok(csrf !== undefined)
-
-      const policy = page.headers.get("content-security-policy") ?? ""
-
-      assert.match(policy, /form-action[^;]*http:\/\/127\.0\.0\.1:\*/)
-      assert.match(policy, /form-action[^;]*http:\/\/localhost:\*/)
-      assert.notMatch(policy, /https:/)
-
-      const form = new URLSearchParams({
-        client_id: clientId,
-        redirect_uri: redirectUri,
-        code_challenge: challenge,
-        code_challenge_method: "S256",
-        response_type: "code",
-        state: "chrome",
-        resource: `${baseUrl}/mcp`,
-        csrf,
-        decision: "approve",
-      })
-
-      const post = (origin: string) =>
-        Effect.promise(() =>
-          fetch(`${baseUrl}/oauth/mcp/decision`, {
-            method: "POST",
-            redirect: "manual",
-            headers: { "content-type": "application/x-www-form-urlencoded", origin },
-            body: form,
-          }),
-        )
-
-      const foreign = yield* post("https://evil.example")
-
-      assert.strictEqual(foreign.status, 400)
-      assert.strictEqual(foreign.headers.get("location"), null)
-
-      const withheld = yield* post("null")
-      const location = withheld.headers.get("location") ?? ""
-
-      assert.strictEqual(withheld.status, 302)
-      assert.ok(new URL(location).searchParams.get("code") !== null)
     }),
   )
 
@@ -632,23 +591,13 @@ describe("MCP OAuth", () => {
         "text/plain",
       )
 
-      const csrf = /name="csrf" value="([^"]+)"/.exec(authorized.body)?.[1] ?? "missing"
+      const requestId = /request=([0-9a-f-]+)/.exec(authorized.body)?.[1] ?? "missing"
 
       const decided = yield* send(
-        "POST",
-        "/oauth/mcp/decision",
-        new URLSearchParams({
-          client_id: clientId,
-          redirect_uri: redirect,
-          code_challenge: challenge,
-          code_challenge_method: "S256",
-          response_type: "code",
-          state: "rebind",
-          resource: `http://rebind.example:${target.port}/mcp`,
-          csrf,
-          decision: "approve",
-        }).toString(),
-        "application/x-www-form-urlencoded",
+        "GET",
+        `/oauth/mcp/decision?request=${requestId}`,
+        "",
+        "text/plain",
       )
 
       const code =

@@ -19,58 +19,10 @@
       "frames": [
         {
           "out": {
-            "request_id": "7ib1fnkiqq3",
+            "request_id": "8dhx6n3pk4v",
             "type": "control_request",
             "request": {
-              "subtype": "initialize",
-              "sdkMcpServers": ["glass"],
-              "sdkMcpServerManifests": {
-                "glass": {
-                  "initializeResult": {
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {
-                      "tools": {
-                        "listChanged": true
-                      }
-                    },
-                    "serverInfo": {
-                      "name": "glass",
-                      "version": "1.0.0"
-                    }
-                  },
-                  "toolsListResult": {
-                    "tools": [
-                      {
-                        "name": "draw_diagram",
-                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
-                        "inputSchema": {
-                          "$schema": "http://json-schema.org/draft-07/schema#",
-                          "type": "object",
-                          "properties": {
-                            "title": {
-                              "type": "string",
-                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
-                            },
-                            "kind": {
-                              "type": "string",
-                              "enum": ["existing", "proposed", "uncertain"],
-                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
-                            },
-                            "mermaid": {
-                              "type": "string",
-                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
-                            }
-                          },
-                          "required": ["title", "kind", "mermaid"]
-                        },
-                        "execution": {
-                          "taskSupport": "forbidden"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
+              "subtype": "initialize"
             }
           }
         },
@@ -79,7 +31,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "7ib1fnkiqq3",
+              "request_id": "8dhx6n3pk4v",
               "response": {
                 "commands": [
                   {
@@ -711,9 +663,6 @@
                 "current_permission_mode": "default",
                 "hook_on_failure_supported": true,
                 "other_hook_ask_outranks_host": true,
-                "sdk_mcp_manifests_parked": {
-                  "glass": "parked"
-                },
                 "feedback_mode": {
                   "kind": "disabled"
                 },
@@ -739,7 +688,36 @@
         },
         {
           "out": {
-            "request_id": "p6qn4gygs9e",
+            "request_id": "c1jdfox3emq",
+            "type": "control_request",
+            "request": {
+              "subtype": "mcp_set_servers",
+              "servers": {
+                "glass": {
+                  "type": "sdk",
+                  "name": "glass"
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "c1jdfox3emq",
+              "response": {
+                "added": ["glass"],
+                "removed": [],
+                "errors": {}
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "request_id": "lw1cxvzir7c",
             "type": "control_request",
             "request": {
               "subtype": "set_model",
@@ -749,10 +727,93 @@
         },
         {
           "in": {
+            "type": "control_request",
+            "request_id": "bace346e-b1df-4b07-8fbf-2cfb830fab1c",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "initialize",
+                "params": {
+                  "protocolVersion": "2025-11-25",
+                  "capabilities": {},
+                  "clientInfo": {
+                    "name": "claude-code",
+                    "title": "Claude Code",
+                    "description": "Anthropic's agentic coding tool",
+                    "websiteUrl": "https://claude.com/claude-code",
+                    "version": "2.1.322"
+                  }
+                },
+                "jsonrpc": "2.0",
+                "id": 0
+              }
+            }
+          }
+        },
+        {
+          "out": {
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "p6qn4gygs9e",
+              "request_id": "bace346e-b1df-4b07-8fbf-2cfb830fab1c",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {
+                      "tools": {
+                        "listChanged": true
+                      }
+                    },
+                    "serverInfo": {
+                      "name": "glass",
+                      "version": "1.0.0"
+                    }
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "3f94b221-31d2-446c-8539-e01a393bb9d0",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized"
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "3f94b221-31d2-446c-8539-e01a393bb9d0",
+              "response": {
+                "mcp_response": {
+                  "jsonrpc": "2.0",
+                  "result": {},
+                  "id": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "lw1cxvzir7c",
               "response": {
                 "model": "claude-haiku-5-5"
               }
@@ -761,7 +822,7 @@
         },
         {
           "out": {
-            "request_id": "uifvp3e68n",
+            "request_id": "dx4jug83ika",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
@@ -776,13 +837,13 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "uifvp3e68n"
+              "request_id": "dx4jug83ika"
             }
           }
         },
         {
           "out": {
-            "request_id": "5y2lrly8t9",
+            "request_id": "t51z2q797s8",
             "type": "control_request",
             "request": {
               "subtype": "set_permission_mode",
@@ -792,10 +853,71 @@
         },
         {
           "in": {
+            "type": "control_request",
+            "request_id": "2ecb555c-761d-42c1-b273-4bb7fb9a5d36",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "tools/list",
+                "jsonrpc": "2.0",
+                "id": 1
+              }
+            }
+          }
+        },
+        {
+          "out": {
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "5y2lrly8t9",
+              "request_id": "2ecb555c-761d-42c1-b273-4bb7fb9a5d36",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "tools": [
+                      {
+                        "name": "draw_diagram",
+                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                        "inputSchema": {
+                          "$schema": "http://json-schema.org/draft-07/schema#",
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["existing", "proposed", "uncertain"],
+                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                            },
+                            "mermaid": {
+                              "type": "string",
+                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                            }
+                          },
+                          "required": ["title", "kind", "mermaid"]
+                        },
+                        "execution": {
+                          "taskSupport": "forbidden"
+                        }
+                      }
+                    ]
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "t51z2q797s8",
               "response": {
                 "mode": "default"
               }
@@ -810,7 +932,7 @@
               "content": "Use the Bash tool to run exactly `touch compatible.txt` and nothing else, then reply with exactly: DONE"
             },
             "parent_tool_use_id": null,
-            "uuid": "72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef"
+            "uuid": "2d0ee06a-42db-43bc-9e63-99e5945c73b5"
           }
         },
         {
@@ -819,25 +941,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "a7ebf42e-33e7-4e34-81b1-603267039df6",
+            "uuid": "89d983d4-f930-4652-98c6-2d5ebf05dff2",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef",
+            "command_uuid": "2d0ee06a-42db-43bc-9e63-99e5945c73b5",
             "state": "queued",
-            "uuid": "74a71696-0ff8-4f31-ad33-4df308ba7c7b",
+            "uuid": "b45f9314-55ae-4263-9cdd-2bee7b44064c",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef",
+            "command_uuid": "2d0ee06a-42db-43bc-9e63-99e5945c73b5",
             "state": "started",
-            "uuid": "f29a0f6d-7103-4d24-aac4-8b7e40e480a2",
+            "uuid": "693b5fd1-7345-481e-851f-98ee4733585b",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1097,13 +1219,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "bce57794-95a0-4a5d-b7e0-bcc095312771",
+            "uuid": "680ff71f-77a0-4cee-8f08-ebb87103f224",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-8bbe54c6bccef23b54fc59f926908dfb",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-83cc756807bfcda9f77823d902cdeb6e",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -1111,7 +1233,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef"]
+            "user_message_uuids": ["2d0ee06a-42db-43bc-9e63-99e5945c73b5"]
           }
         },
         {
@@ -1120,8 +1242,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "1ded6c78-97bf-4097-bbf3-8d2d5377c529",
-            "user_message_uuids": ["72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef"]
+            "uuid": "c8500ca2-f976-482c-84e1-974089dc1377",
+            "user_message_uuids": ["2d0ee06a-42db-43bc-9e63-99e5945c73b5"]
           }
         },
         {
@@ -1131,7 +1253,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChNbwsHY6ozEJUpCyM68c",
+                "id": "msg_011ChPBiVQzfof5BtUtDY622",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1159,12 +1281,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "acb04dd3-9dcf-46bf-a7b9-31a83c0cd7fd",
-            "ttft_ms": 826,
+            "uuid": "6970e3e4-7b53-4caa-8a95-b37b7974dea4",
+            "ttft_ms": 977,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c",
-            "user_message_uuid": "72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef",
-            "user_message_uuids": ["72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef"]
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622",
+            "user_message_uuid": "2d0ee06a-42db-43bc-9e63-99e5945c73b5",
+            "user_message_uuids": ["2d0ee06a-42db-43bc-9e63-99e5945c73b5"]
           }
         },
         {
@@ -1175,7 +1297,7 @@
               "index": 0,
               "content_block": {
                 "type": "tool_use",
-                "id": "toolu_016J6VWwSJhtQiaEk8c2Kg7K",
+                "id": "toolu_01AWw5yrvtpZDs9i57dhmpQy",
                 "name": "Bash",
                 "input": {},
                 "caller": {
@@ -1185,8 +1307,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0115d653-fda8-4d23-92b2-0e33fdbe1f58",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "b4a1ce62-1f43-4614-95bf-13d2870f7a58",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1202,8 +1324,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3d341a8f-a15a-4a25-ab59-3db7acfcccf6",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "ac762e10-2b61-4d3f-bff2-e4c71675e5f4",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1219,8 +1341,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4b1ab68a-67de-40bd-a402-bbbc362cd776",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "20e5c7b9-b952-4c41-a00d-0d4ccf915e72",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1236,8 +1358,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "62166f03-a023-4be2-a1a3-852539649f7e",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "1bc1bdea-c0a0-45db-ad32-0cdd5af91466",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1253,8 +1375,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "22a4ebc8-3d87-4c8d-bbf5-74a81de00e92",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "ad46b405-3946-49f0-bdc9-4afdaa6120cc",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1270,8 +1392,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "303e755b-6513-4a0b-8ad3-d7d0db2610f3",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "ad6d734f-2669-4a74-84c9-c1bbe4569958",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1287,8 +1409,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8e01f2ac-a2e5-409c-ab71-8e3aff68043f",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "c8d98c4c-214a-4825-8ba3-d2094d785ea7",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1304,8 +1426,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2ceb584c-7006-486d-bdaa-417f4e69402f",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "7e288238-df2d-4b6d-a485-7b73ffb0ecd4",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1321,8 +1443,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "73fbffe3-ca0c-40d5-a58a-a9a2f256aca9",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "3ae5d043-4b90-42cf-80b7-e633789230c2",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1338,8 +1460,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "20bec5ae-e9e9-4de0-abbe-15d78f2f7ca4",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "bcb432ed-bab3-4da5-a80a-f37f046c2232",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1355,8 +1477,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1aceaf0c-268f-49ae-9b9c-f990703dab70",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "29145905-9e53-49ba-82a1-379b92247e4c",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1372,8 +1494,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1248c8a9-ed01-45e6-a263-8605fcad9d3e",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "21b4b342-5591-4d1e-a472-d325d06151d8",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1384,13 +1506,13 @@
               "index": 0,
               "delta": {
                 "type": "input_json_delta",
-                "partial_json": ".txt fi"
+                "partial_json": ".txt vi"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "cde42865-0195-4a47-9765-1c42ecd934b1",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "0bffceb6-7a69-4bcc-bdd0-a51a8604ec25",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1401,13 +1523,13 @@
               "index": 0,
               "delta": {
                 "type": "input_json_delta",
-                "partial_json": "le via "
+                "partial_json": "a touch"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "073d4039-598b-47f0-b66d-43a63a808593",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "f7a74e8a-5a06-4e0d-afdb-3a7348b7d831",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1418,13 +1540,13 @@
               "index": 0,
               "delta": {
                 "type": "input_json_delta",
-                "partial_json": "touch\"}"
+                "partial_json": "\"}"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "028f1838-4537-4349-9762-9385c5798a40",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "1e70f78e-d81f-4d4f-9eb2-5349851ee6d4",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1432,17 +1554,17 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbwsHY6ozEJUpCyM68c",
+              "id": "msg_011ChPBiVQzfof5BtUtDY622",
               "type": "message",
               "role": "assistant",
               "content": [
                 {
                   "type": "tool_use",
-                  "id": "toolu_016J6VWwSJhtQiaEk8c2Kg7K",
+                  "id": "toolu_01AWw5yrvtpZDs9i57dhmpQy",
                   "name": "Bash",
                   "input": {
                     "command": "touch compatible.txt",
-                    "description": "Create compatible.txt file via touch"
+                    "description": "Create compatible.txt via touch"
                   },
                   "caller": {
                     "type": "direct"
@@ -1472,11 +1594,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "bc9a90a9-a024-4376-9357-01450b9b019b",
-            "timestamp": "2026-11-24T23:15:06.504Z",
-            "request_id": "req_011ChNbws9burP3Vq44eXCgZ",
-            "user_message_uuid": "72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef",
-            "user_message_uuids": ["72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef"]
+            "uuid": "7a29fb6e-2860-4985-9fa2-56b4755cfeaf",
+            "timestamp": "2026-11-25T06:37:56.995Z",
+            "request_id": "req_011ChPBiV4QmfjMtm9i8J5Sy",
+            "user_message_uuid": "2d0ee06a-42db-43bc-9e63-99e5945c73b5",
+            "user_message_uuids": ["2d0ee06a-42db-43bc-9e63-99e5945c73b5"]
           }
         },
         {
@@ -1488,8 +1610,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c12ff232-06c9-480a-927f-0897520b2372",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "e82b9280-b0ee-47ae-aa6a-817e15496c36",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1498,23 +1620,23 @@
             "subtype": "session_state_changed",
             "state": "requires_action",
             "sdk_host_only": true,
-            "uuid": "0336b50d-70d8-4dbc-9f19-8a62fd915f40",
+            "uuid": "4ad9faeb-93ad-4e2b-a3b9-cf02deed1d69",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "control_request",
-            "request_id": "86ca3cdb-238d-4677-a630-c0347b654c84",
+            "request_id": "54f88948-dc50-4132-9236-6c3cb86c62b3",
             "request": {
               "subtype": "can_use_tool",
               "tool_name": "Bash",
               "display_name": "Bash",
               "input": {
                 "command": "touch compatible.txt",
-                "description": "Create compatible.txt file via touch"
+                "description": "Create compatible.txt via touch"
               },
-              "description": "Create compatible.txt file via touch",
+              "description": "Create compatible.txt via touch",
               "permission_suggestions": [
                 {
                   "type": "addRules",
@@ -1539,7 +1661,7 @@
                 }
               ],
               "blocked_path": "<folder>/compatible.txt",
-              "tool_use_id": "toolu_016J6VWwSJhtQiaEk8c2Kg7K"
+              "tool_use_id": "toolu_01AWw5yrvtpZDs9i57dhmpQy"
             }
           }
         },
@@ -1548,14 +1670,14 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "86ca3cdb-238d-4677-a630-c0347b654c84",
+              "request_id": "54f88948-dc50-4132-9236-6c3cb86c62b3",
               "response": {
                 "behavior": "allow",
                 "updatedInput": {
                   "command": "touch compatible.txt",
-                  "description": "Create compatible.txt file via touch"
+                  "description": "Create compatible.txt via touch"
                 },
-                "toolUseID": "toolu_016J6VWwSJhtQiaEk8c2Kg7K"
+                "toolUseID": "toolu_01AWw5yrvtpZDs9i57dhmpQy"
               }
             }
           }
@@ -1586,8 +1708,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "446cf129-9b2e-4a48-a967-56d44a08875a",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "ab1c1936-a974-40de-ba41-16bebe54fa80",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
@@ -1598,15 +1720,15 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "af93a62f-10f8-4683-89ae-3653efd21175",
-            "api_message_id": "msg_011ChNbwsHY6ozEJUpCyM68c"
+            "uuid": "4bf7fa90-d2c4-4715-a3ba-c4fd1a6dda2a",
+            "api_message_id": "msg_011ChPBiVQzfof5BtUtDY622"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "a1094700-d6c5-4705-8c7c-418d14a53bf5",
+            "uuid": "525b2f79-64e7-48d1-80fe-be8310509d68",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1616,7 +1738,7 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "b6c73731-22d2-4c65-94cc-ed9ca24b8d95",
+            "uuid": "6d10406c-3a2c-45ec-b122-d39651b1f827",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1627,7 +1749,7 @@
               "role": "user",
               "content": [
                 {
-                  "tool_use_id": "toolu_016J6VWwSJhtQiaEk8c2Kg7K",
+                  "tool_use_id": "toolu_01AWw5yrvtpZDs9i57dhmpQy",
                   "type": "tool_result",
                   "content": "Shell cwd was reset to <folder>",
                   "is_error": false
@@ -1636,8 +1758,8 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "12306c49-8d99-4e15-84bb-d888fb1bb466",
-            "timestamp": "2026-11-24T23:15:07.528Z",
+            "uuid": "811e43d0-cce9-4947-af9c-8fe41789abbd",
+            "timestamp": "2026-11-25T06:37:58.101Z",
             "tool_use_result": {
               "stdout": "",
               "stderr": "\nShell cwd was reset to <folder>",
@@ -1647,7 +1769,7 @@
             },
             "tool_result_meta": [
               {
-                "id": "toolu_016J6VWwSJhtQiaEk8c2Kg7K",
+                "id": "toolu_01AWw5yrvtpZDs9i57dhmpQy",
                 "permission_decision": {
                   "decision": "accept",
                   "source": "user_temporary"
@@ -1662,8 +1784,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "fad5d407-8798-4551-b177-2f1014299e90",
-            "user_message_uuids": ["72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef"]
+            "uuid": "c289f8ba-42ab-4ad1-8361-ea8755e575bb",
+            "user_message_uuids": ["2d0ee06a-42db-43bc-9e63-99e5945c73b5"]
           }
         },
         {
@@ -1673,7 +1795,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChNbx24dcJktLiET1BBjM",
+                "id": "msg_011ChPBieoo5v85KPrUvDwKq",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1701,10 +1823,10 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "038b5b54-1d96-4241-8ed7-1288463964f5",
-            "ttft_ms": 1119,
+            "uuid": "ea8f1221-8bb3-4860-b494-b198999cf6a7",
+            "ttft_ms": 696,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbx24dcJktLiET1BBjM"
+            "api_message_id": "msg_011ChPBieoo5v85KPrUvDwKq"
           }
         },
         {
@@ -1720,8 +1842,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "503c2252-bdaa-4469-9370-0f339c403fef",
-            "api_message_id": "msg_011ChNbx24dcJktLiET1BBjM"
+            "uuid": "78090dd6-e96c-450c-b832-b5bb5c6fe65e",
+            "api_message_id": "msg_011ChPBieoo5v85KPrUvDwKq"
           }
         },
         {
@@ -1737,8 +1859,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8bd87cfa-ebb0-482a-a10b-d2e8a942bbe5",
-            "api_message_id": "msg_011ChNbx24dcJktLiET1BBjM"
+            "uuid": "bf841e38-755d-441d-9626-f55826e12f39",
+            "api_message_id": "msg_011ChPBieoo5v85KPrUvDwKq"
           }
         },
         {
@@ -1746,7 +1868,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbx24dcJktLiET1BBjM",
+              "id": "msg_011ChPBieoo5v85KPrUvDwKq",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -1778,9 +1900,9 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "4118fa49-d93f-490b-a8dd-084597e08754",
-            "timestamp": "2026-11-24T23:15:08.656Z",
-            "request_id": "req_011ChNbx1vwo8FbUR8BCv8SN"
+            "uuid": "095cb20f-6695-4b1b-95fa-630c5fddd0ea",
+            "timestamp": "2026-11-25T06:37:58.808Z",
+            "request_id": "req_011ChPBieecxQo3xT7GiTFfz"
           }
         },
         {
@@ -1792,8 +1914,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "79d39151-507e-4607-8c0b-2c60e93b7138",
-            "api_message_id": "msg_011ChNbx24dcJktLiET1BBjM"
+            "uuid": "dedc7121-d68a-42a2-8720-1ba9f0608e7f",
+            "api_message_id": "msg_011ChPBieoo5v85KPrUvDwKq"
           }
         },
         {
@@ -1822,8 +1944,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "6c7eb0d8-198c-497e-9949-1aadca0f1410",
-            "api_message_id": "msg_011ChNbx24dcJktLiET1BBjM"
+            "uuid": "ac9fd63a-8ba1-49b6-9e11-13e8b9405458",
+            "api_message_id": "msg_011ChPBieoo5v85KPrUvDwKq"
           }
         },
         {
@@ -1834,13 +1956,13 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "80a6140a-988d-4927-a392-d891ac773f0f",
-            "api_message_id": "msg_011ChNbx24dcJktLiET1BBjM"
+            "uuid": "497d12cb-b8b2-4c5c-a557-59b6f693ee52",
+            "api_message_id": "msg_011ChPBieoo5v85KPrUvDwKq"
           }
         },
         {
           "in": {
-            "duration_api_ms": 2222,
+            "duration_api_ms": 1964,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -1918,16 +2040,16 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "DONE",
-            "ttft_ms": 1097,
+            "ttft_ms": 1264,
             "type": "result",
-            "duration_ms": 3255,
-            "uuid": "ee945a84-4323-4c6a-b02d-3cc32ea31391",
-            "ttft_stream_ms": 878,
-            "time_to_request_ms": 54,
-            "first_content_frame_ms": 879,
-            "user_message_uuid": "72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef",
-            "user_message_uuids": ["72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef"],
-            "request_sent_wall_ms": 1795562105461,
+            "duration_ms": 3082,
+            "uuid": "c336f8ca-b8fc-4a1e-8f18-49fc019a7635",
+            "ttft_stream_ms": 1035,
+            "time_to_request_ms": 61,
+            "first_content_frame_ms": 1036,
+            "user_message_uuid": "2d0ee06a-42db-43bc-9e63-99e5945c73b5",
+            "user_message_uuids": ["2d0ee06a-42db-43bc-9e63-99e5945c73b5"],
+            "request_sent_wall_ms": 1795588675793,
             "first_request_input_tokens": 0,
             "first_request_cache_read_input_tokens": 13041,
             "queued_turn_count": 0,
@@ -1960,15 +2082,15 @@
               "content": "If you have a tool named AskUserQuestion, reply with exactly HAS_IT. Otherwise reply with exactly NO_SUCH_TOOL. Don't call any tool."
             },
             "parent_tool_use_id": null,
-            "uuid": "2897936a-8209-4fc3-98cf-28d46bbafe74"
+            "uuid": "25d7353f-562a-41de-9c28-785a5ee07fa1"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "72b2a0d7-49bd-4c14-b1b3-d0ab946f5aef",
+            "command_uuid": "2d0ee06a-42db-43bc-9e63-99e5945c73b5",
             "state": "completed",
-            "uuid": "a0023c12-5b59-4f9a-995b-6f409ac40e59",
+            "uuid": "51b008a0-e19a-40f4-9c3f-6dc9f2e8386a",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1978,7 +2100,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "250fd9c3-adbd-4ba3-8e7c-9623695febc1",
+            "uuid": "57e79461-d01d-45d9-b08d-d82bef491873",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1988,25 +2110,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "a788a7b1-da93-4f5d-b3a6-f3ac99742e74",
+            "uuid": "7004fdab-0e9b-47db-a438-f4a84219cf14",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "2897936a-8209-4fc3-98cf-28d46bbafe74",
+            "command_uuid": "25d7353f-562a-41de-9c28-785a5ee07fa1",
             "state": "queued",
-            "uuid": "cea6d22d-65cf-4de9-a9f3-0439a7ba3c8f",
+            "uuid": "dd86a295-a017-4524-aea1-febca4e30fc8",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "2897936a-8209-4fc3-98cf-28d46bbafe74",
+            "command_uuid": "25d7353f-562a-41de-9c28-785a5ee07fa1",
             "state": "started",
-            "uuid": "d11ff095-005c-4968-9aa3-25f93adcf0c0",
+            "uuid": "0acaac4e-3cca-48df-bd51-6695d49401aa",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2266,13 +2388,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "d35ab56e-e063-47fd-87a5-0159e6100f25",
+            "uuid": "f7174fa3-eab6-4d57-a5b4-b6e028c0407d",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-8bbe54c6bccef23b54fc59f926908dfb",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-83cc756807bfcda9f77823d902cdeb6e",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -2280,7 +2402,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["2897936a-8209-4fc3-98cf-28d46bbafe74"]
+            "user_message_uuids": ["25d7353f-562a-41de-9c28-785a5ee07fa1"]
           }
         },
         {
@@ -2289,8 +2411,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "25707fad-a4a4-4d1d-a276-a5520eacc81e",
-            "user_message_uuids": ["2897936a-8209-4fc3-98cf-28d46bbafe74"]
+            "uuid": "b37c6198-3ee8-4fb0-8d7e-d4e9738bc334",
+            "user_message_uuids": ["25d7353f-562a-41de-9c28-785a5ee07fa1"]
           }
         },
         {
@@ -2300,7 +2422,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChNbx6xKL3E9dNyRFVvP9",
+                "id": "msg_011ChPBihsMMqVDC67mMpy8f",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -2328,12 +2450,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "60ae134e-67e0-4348-8218-8f260246ad90",
-            "ttft_ms": 1197,
+            "uuid": "dcbacfc6-3e5b-4b1a-a098-acf95fe6e197",
+            "ttft_ms": 804,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9",
-            "user_message_uuid": "2897936a-8209-4fc3-98cf-28d46bbafe74",
-            "user_message_uuids": ["2897936a-8209-4fc3-98cf-28d46bbafe74"]
+            "api_message_id": "msg_011ChPBihsMMqVDC67mMpy8f",
+            "user_message_uuid": "25d7353f-562a-41de-9c28-785a5ee07fa1",
+            "user_message_uuids": ["25d7353f-562a-41de-9c28-785a5ee07fa1"]
           }
         },
         {
@@ -2342,162 +2464,6 @@
             "event": {
               "type": "content_block_start",
               "index": 0,
-              "content_block": {
-                "type": "thinking",
-                "thinking": "",
-                "signature": ""
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "99679dc0-0b94-4a58-a098-041e3dc63fca",
-            "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
-          }
-        },
-        {
-          "in": {
-            "type": "system",
-            "subtype": "thinking_tokens",
-            "estimated_tokens": 0,
-            "estimated_tokens_delta": 0,
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "54dc9085-b1c6-4781-85a9-c0eb36c13998",
-            "user_message_uuid": "2897936a-8209-4fc3-98cf-28d46bbafe74"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "thinking_delta",
-                "thinking": "",
-                "estimated_tokens": 0
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "6f26031e-ff79-452f-a7e6-df784ef0236a",
-            "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "thinking_delta",
-                "thinking": "",
-                "estimated_tokens": null
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "40893d53-2089-4c0d-a832-6a09354bd36f",
-            "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
-          }
-        },
-        {
-          "in": {
-            "type": "system",
-            "subtype": "thinking_tokens",
-            "estimated_tokens": 0,
-            "estimated_tokens_delta": 0,
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "515672a4-dd04-43b4-b481-f3446d999d83",
-            "user_message_uuid": "2897936a-8209-4fc3-98cf-28d46bbafe74"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "signature_delta",
-                "signature": "CAQSgwcKEAgUGAI4AUIIdGhpbmtpbmcSDBPtr6ziuysogLKiYRoMQYo/vMXHwluuMKsHIjCdlraMbgDs/0Q25/6YMa2p9gT5u0+sjW6wcDPJqnB0OK72Yb5xEIB/zUucBQYekdwqoAZdPbtH3SUGqIcBrDyoQ7cx/xHRM+yvcSBZI7X6vN6xNZASIpuhN58HWNMpM0jjVjnycf9EO1BHFl5yplhxV/g4U1ztqbKAjO9qR74M0js7PR7jZz0jfnWtiPPqrtz6Q7ONNRjzO/xgE9DasfaPvwadr6+3LOI8i4fPQQnpTMvwKaD3v5TFiKz+C5Dfx8Pl+HaEWHvXMjMORRR48OONshM6D2dAt997mLmEPuVHX3fwItAmlk68DQYsoec5d6jynBtzEssEto336ttfSqNOcLKPo68ajN0CfICFw+t79gpn2auwXadbphsLA1cWugWxttjCs4p4IbF2E2CzsVoYLIeFKNHAA7vC5TfngRBJQOhh/iQZD4g/8JTu2nwXbl7i7p/0m2ZxuKDNYXtyUfJ+cgGfWK0WP4EspZM1iWVpDECUJbgUEwc603KOojN7kUDihqg5aRRC1f1TGyoUCc5pZzVGJ/KpQGHMkgPiAn8prnCjPvkXje4eQOoFvQ3a5+1R/LBMZ8+mfH26aOoxv1y3zGTNRXLvvb4e9sXXhL0o6IOaM8gfOYOFRoX2J5Vpu6xr1Ywl0jHKmDdg5hJw5ToCj/CQnmn5j70qVwUeby/VkFUhjUslTE+MoNKxwhb/VzMs824WBn5eCmcMgGWCnAWHjI34wAAJPvjpnFC7qFv/bwYTaJszxg/CHkD55pQlepvfwG9DX6qyadW1ERxmXz2YrY3U7mTLM3KcO67dA1z9pBd38FpC68NI2HAlxRA/hcVla2rXuooAgvDMKJSEkf1AYjglBTqECfCfhPdSMLenVtStGo+p0iYgRfQbdRmyWO2Nhp+7lCY7DkDcoaBBp2hY0tIlwh8hnDztgQvdmw5rJco3dp4cS5pnFbAUzMvW+w+I650EUR66LWq5yNj/KlAgY11WxiRyQp2ccqr5u+5XgKD8aoResED5C9E8hkKueI2Bn+0QctPktE1MbTOVLhj/YYiCRzRrD+Ts59tys55Df6BW9ZZ2+CRPUmdBCVbL5Q0INEs3wDDtrhjQ4Y9iyaF1sLLS8B0Q+tqaXXVaYQD4JVZmExgB"
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "cf54de21-566a-400c-affe-3eaa8d499c54",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
-          }
-        },
-        {
-          "in": {
-            "type": "assistant",
-            "message": {
-              "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbx6xKL3E9dNyRFVvP9",
-              "type": "message",
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "thinking",
-                  "thinking": "",
-                  "signature": "CAQSgwcKEAgUGAI4AUIIdGhpbmtpbmcSDBPtr6ziuysogLKiYRoMQYo/vMXHwluuMKsHIjCdlraMbgDs/0Q25/6YMa2p9gT5u0+sjW6wcDPJqnB0OK72Yb5xEIB/zUucBQYekdwqoAZdPbtH3SUGqIcBrDyoQ7cx/xHRM+yvcSBZI7X6vN6xNZASIpuhN58HWNMpM0jjVjnycf9EO1BHFl5yplhxV/g4U1ztqbKAjO9qR74M0js7PR7jZz0jfnWtiPPqrtz6Q7ONNRjzO/xgE9DasfaPvwadr6+3LOI8i4fPQQnpTMvwKaD3v5TFiKz+C5Dfx8Pl+HaEWHvXMjMORRR48OONshM6D2dAt997mLmEPuVHX3fwItAmlk68DQYsoec5d6jynBtzEssEto336ttfSqNOcLKPo68ajN0CfICFw+t79gpn2auwXadbphsLA1cWugWxttjCs4p4IbF2E2CzsVoYLIeFKNHAA7vC5TfngRBJQOhh/iQZD4g/8JTu2nwXbl7i7p/0m2ZxuKDNYXtyUfJ+cgGfWK0WP4EspZM1iWVpDECUJbgUEwc603KOojN7kUDihqg5aRRC1f1TGyoUCc5pZzVGJ/KpQGHMkgPiAn8prnCjPvkXje4eQOoFvQ3a5+1R/LBMZ8+mfH26aOoxv1y3zGTNRXLvvb4e9sXXhL0o6IOaM8gfOYOFRoX2J5Vpu6xr1Ywl0jHKmDdg5hJw5ToCj/CQnmn5j70qVwUeby/VkFUhjUslTE+MoNKxwhb/VzMs824WBn5eCmcMgGWCnAWHjI34wAAJPvjpnFC7qFv/bwYTaJszxg/CHkD55pQlepvfwG9DX6qyadW1ERxmXz2YrY3U7mTLM3KcO67dA1z9pBd38FpC68NI2HAlxRA/hcVla2rXuooAgvDMKJSEkf1AYjglBTqECfCfhPdSMLenVtStGo+p0iYgRfQbdRmyWO2Nhp+7lCY7DkDcoaBBp2hY0tIlwh8hnDztgQvdmw5rJco3dp4cS5pnFbAUzMvW+w+I650EUR66LWq5yNj/KlAgY11WxiRyQp2ccqr5u+5XgKD8aoResED5C9E8hkKueI2Bn+0QctPktE1MbTOVLhj/YYiCRzRrD+Ts59tys55Df6BW9ZZ2+CRPUmdBCVbL5Q0INEs3wDDtrhjQ4Y9iyaF1sLLS8B0Q+tqaXXVaYQD4JVZmExgB"
-                }
-              ],
-              "container": null,
-              "stop_reason": null,
-              "stop_sequence": null,
-              "stop_details": null,
-              "usage": {
-                "input_tokens": 0,
-                "cache_creation_input_tokens": 0,
-                "cache_read_input_tokens": 0,
-                "cache_creation": {
-                  "ephemeral_5m_input_tokens": 0,
-                  "ephemeral_1h_input_tokens": 0
-                },
-                "output_tokens": 0,
-                "service_tier": "standard",
-                "inference_geo": "global",
-                "speed": "standard"
-              },
-              "input_transformations": [],
-              "diagnostics": null,
-              "context_management": null
-            },
-            "parent_tool_use_id": null,
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "f37ab067-6764-4de2-913a-d4b7f331467f",
-            "timestamp": "2026-11-24T23:15:10.395Z",
-            "request_id": "req_011ChNbx6pdCKuqG45bJS3ry",
-            "thinking_duration_ms": 522,
-            "thinking_display": "updates",
-            "user_message_uuid": "2897936a-8209-4fc3-98cf-28d46bbafe74",
-            "user_message_uuids": ["2897936a-8209-4fc3-98cf-28d46bbafe74"]
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_stop",
-              "index": 0
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "1345886e-02cc-40b8-a467-630604938a13",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_start",
-              "index": 1,
               "content_block": {
                 "type": "text",
                 "text": ""
@@ -2505,8 +2471,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3407c2a4-7dde-428c-8633-2a78301d14b7",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
+            "uuid": "b0807cac-4a18-493b-9200-d009ba5abf3c",
+            "api_message_id": "msg_011ChPBihsMMqVDC67mMpy8f"
           }
         },
         {
@@ -2514,7 +2480,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
                 "text": "NO_SUCH_"
@@ -2522,8 +2488,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "74d5e366-dc30-4e37-826d-d5e2cbb6b9b1",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
+            "uuid": "397f4c74-f718-4513-8268-a5079e5b1467",
+            "api_message_id": "msg_011ChPBihsMMqVDC67mMpy8f"
           }
         },
         {
@@ -2531,7 +2497,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
                 "text": "TOOL"
@@ -2539,8 +2505,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8204c1b5-517b-4697-9a8a-a9b820de0de8",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
+            "uuid": "83a61738-9496-485a-afe0-8dc786241433",
+            "api_message_id": "msg_011ChPBihsMMqVDC67mMpy8f"
           }
         },
         {
@@ -2548,7 +2514,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbx6xKL3E9dNyRFVvP9",
+              "id": "msg_011ChPBihsMMqVDC67mMpy8f",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -2580,9 +2546,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "f604ea6c-7dcb-48b2-b563-7207c035f1b6",
-            "timestamp": "2026-11-24T23:15:10.416Z",
-            "request_id": "req_011ChNbx6pdCKuqG45bJS3ry"
+            "uuid": "e9ddbcb5-5e47-492f-9304-87ab5b62ae5f",
+            "timestamp": "2026-11-25T06:37:59.799Z",
+            "request_id": "req_011ChPBihivX25XcdKrFsQYe",
+            "user_message_uuid": "25d7353f-562a-41de-9c28-785a5ee07fa1",
+            "user_message_uuids": ["25d7353f-562a-41de-9c28-785a5ee07fa1"]
           }
         },
         {
@@ -2590,12 +2558,12 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_stop",
-              "index": 1
+              "index": 0
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "544f0c33-12e6-4be8-a9d3-d12fc81c5277",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
+            "uuid": "67f1daa1-0c44-49bc-9d08-33253dcb0c65",
+            "api_message_id": "msg_011ChPBihsMMqVDC67mMpy8f"
           }
         },
         {
@@ -2624,8 +2592,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ac51f579-a075-4d3f-8711-66288761fbf8",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
+            "uuid": "3b9e4fdc-28f1-4526-980f-310215c810e5",
+            "api_message_id": "msg_011ChPBihsMMqVDC67mMpy8f"
           }
         },
         {
@@ -2636,13 +2604,13 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "7befdcbb-0cdc-4c6a-857b-dbd1725eb6a9",
-            "api_message_id": "msg_011ChNbx6xKL3E9dNyRFVvP9"
+            "uuid": "1d5c0533-c5e8-4c03-bdbb-40f86ff2be97",
+            "api_message_id": "msg_011ChPBihsMMqVDC67mMpy8f"
           }
         },
         {
           "in": {
-            "duration_api_ms": 3967,
+            "duration_api_ms": 2937,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -2720,18 +2688,18 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "NO_SUCH_TOOL",
-            "ttft_ms": 1729,
+            "ttft_ms": 979,
             "type": "result",
-            "duration_ms": 1755,
-            "uuid": "7c32fa2c-0530-4937-aa27-f9abb4cab212",
-            "ttft_stream_ms": 1207,
-            "time_to_request_ms": 11,
-            "first_content_frame_ms": 1207,
-            "user_message_uuid": "2897936a-8209-4fc3-98cf-28d46bbafe74",
-            "user_message_uuids": ["2897936a-8209-4fc3-98cf-28d46bbafe74"],
-            "request_sent_wall_ms": 1795562108678,
+            "duration_ms": 987,
+            "uuid": "f95322af-2988-43ae-80bb-8daa1c56c28e",
+            "ttft_stream_ms": 818,
+            "time_to_request_ms": 15,
+            "first_content_frame_ms": 818,
+            "user_message_uuid": "25d7353f-562a-41de-9c28-785a5ee07fa1",
+            "user_message_uuids": ["25d7353f-562a-41de-9c28-785a5ee07fa1"],
+            "request_sent_wall_ms": 1795588678835,
             "first_request_input_tokens": 0,
-            "first_request_cache_read_input_tokens": 22638,
+            "first_request_cache_read_input_tokens": 22637,
             "queued_turn_count": 0,
             "result_index": 1,
             "model_usage_since_last_result": {
@@ -2757,9 +2725,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "2897936a-8209-4fc3-98cf-28d46bbafe74",
+            "command_uuid": "25d7353f-562a-41de-9c28-785a5ee07fa1",
             "state": "completed",
-            "uuid": "bcdde6bc-acbd-47f2-8ffa-59a882ce5a06",
+            "uuid": "b0749881-49eb-4e29-87d4-6ce587990665",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2769,7 +2737,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "3cfbb48e-208c-4c04-94c7-1a88896b9e71",
+            "uuid": "32a50338-67ba-4b09-9f2c-6371834d98d9",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

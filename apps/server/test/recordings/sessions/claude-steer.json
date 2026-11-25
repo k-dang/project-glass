@@ -19,58 +19,10 @@
       "frames": [
         {
           "out": {
-            "request_id": "vk5w6j9k18c",
+            "request_id": "1xihiqjz3v1h",
             "type": "control_request",
             "request": {
-              "subtype": "initialize",
-              "sdkMcpServers": ["glass"],
-              "sdkMcpServerManifests": {
-                "glass": {
-                  "initializeResult": {
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {
-                      "tools": {
-                        "listChanged": true
-                      }
-                    },
-                    "serverInfo": {
-                      "name": "glass",
-                      "version": "1.0.0"
-                    }
-                  },
-                  "toolsListResult": {
-                    "tools": [
-                      {
-                        "name": "draw_diagram",
-                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
-                        "inputSchema": {
-                          "$schema": "http://json-schema.org/draft-07/schema#",
-                          "type": "object",
-                          "properties": {
-                            "title": {
-                              "type": "string",
-                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
-                            },
-                            "kind": {
-                              "type": "string",
-                              "enum": ["existing", "proposed", "uncertain"],
-                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
-                            },
-                            "mermaid": {
-                              "type": "string",
-                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
-                            }
-                          },
-                          "required": ["title", "kind", "mermaid"]
-                        },
-                        "execution": {
-                          "taskSupport": "forbidden"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
+              "subtype": "initialize"
             }
           }
         },
@@ -79,7 +31,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "vk5w6j9k18c",
+              "request_id": "1xihiqjz3v1h",
               "response": {
                 "commands": [
                   {
@@ -711,9 +663,6 @@
                 "current_permission_mode": "default",
                 "hook_on_failure_supported": true,
                 "other_hook_ask_outranks_host": true,
-                "sdk_mcp_manifests_parked": {
-                  "glass": "parked"
-                },
                 "feedback_mode": {
                   "kind": "disabled"
                 },
@@ -739,7 +688,36 @@
         },
         {
           "out": {
-            "request_id": "26exivo7009",
+            "request_id": "70tsmawhfws",
+            "type": "control_request",
+            "request": {
+              "subtype": "mcp_set_servers",
+              "servers": {
+                "glass": {
+                  "type": "sdk",
+                  "name": "glass"
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "70tsmawhfws",
+              "response": {
+                "added": ["glass"],
+                "removed": [],
+                "errors": {}
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "request_id": "cgiwjfhte7",
             "type": "control_request",
             "request": {
               "subtype": "set_model",
@@ -749,10 +727,93 @@
         },
         {
           "in": {
+            "type": "control_request",
+            "request_id": "c0ca6033-1ee6-4cf9-a835-e10fdd7349b0",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "initialize",
+                "params": {
+                  "protocolVersion": "2025-11-25",
+                  "capabilities": {},
+                  "clientInfo": {
+                    "name": "claude-code",
+                    "title": "Claude Code",
+                    "description": "Anthropic's agentic coding tool",
+                    "websiteUrl": "https://claude.com/claude-code",
+                    "version": "2.1.322"
+                  }
+                },
+                "jsonrpc": "2.0",
+                "id": 0
+              }
+            }
+          }
+        },
+        {
+          "out": {
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "26exivo7009",
+              "request_id": "c0ca6033-1ee6-4cf9-a835-e10fdd7349b0",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {
+                      "tools": {
+                        "listChanged": true
+                      }
+                    },
+                    "serverInfo": {
+                      "name": "glass",
+                      "version": "1.0.0"
+                    }
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "92960f65-2cbf-4b57-9f70-3f6bf3e464a6",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized"
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "92960f65-2cbf-4b57-9f70-3f6bf3e464a6",
+              "response": {
+                "mcp_response": {
+                  "jsonrpc": "2.0",
+                  "result": {},
+                  "id": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "cgiwjfhte7",
               "response": {
                 "model": "claude-haiku-5-5"
               }
@@ -761,7 +822,7 @@
         },
         {
           "out": {
-            "request_id": "x39sbhp66js",
+            "request_id": "59m20s3tyku",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
@@ -776,13 +837,13 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "x39sbhp66js"
+              "request_id": "59m20s3tyku"
             }
           }
         },
         {
           "out": {
-            "request_id": "53ob8eycwyu",
+            "request_id": "i9ve0z2fuu",
             "type": "control_request",
             "request": {
               "subtype": "set_permission_mode",
@@ -792,10 +853,71 @@
         },
         {
           "in": {
+            "type": "control_request",
+            "request_id": "edfbe273-a087-4a39-8824-807bb3e76e93",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "tools/list",
+                "jsonrpc": "2.0",
+                "id": 1
+              }
+            }
+          }
+        },
+        {
+          "out": {
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "53ob8eycwyu",
+              "request_id": "edfbe273-a087-4a39-8824-807bb3e76e93",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "tools": [
+                      {
+                        "name": "draw_diagram",
+                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                        "inputSchema": {
+                          "$schema": "http://json-schema.org/draft-07/schema#",
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["existing", "proposed", "uncertain"],
+                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                            },
+                            "mermaid": {
+                              "type": "string",
+                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                            }
+                          },
+                          "required": ["title", "kind", "mermaid"]
+                        },
+                        "execution": {
+                          "taskSupport": "forbidden"
+                        }
+                      }
+                    ]
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "i9ve0z2fuu",
               "response": {
                 "mode": "default"
               }
@@ -810,7 +932,7 @@
               "content": "Use the Bash tool to run exactly `touch steer.txt` and nothing else, then reply with exactly: FIRST"
             },
             "parent_tool_use_id": null,
-            "uuid": "56a013fb-fc43-431f-9ac8-457d38ce708a"
+            "uuid": "d2204840-bdc4-43c5-b5c7-15774af96134"
           }
         },
         {
@@ -819,25 +941,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "8b15e177-a2dc-486a-b4ce-5f50e8f88244",
+            "uuid": "177e8149-3101-4db7-8f35-d3babbfe9ee1",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "56a013fb-fc43-431f-9ac8-457d38ce708a",
+            "command_uuid": "d2204840-bdc4-43c5-b5c7-15774af96134",
             "state": "queued",
-            "uuid": "bdacd887-5b09-4698-8ad7-9645b2c79c26",
+            "uuid": "454e6569-5601-406e-a612-458a4c9ac7ac",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "56a013fb-fc43-431f-9ac8-457d38ce708a",
+            "command_uuid": "d2204840-bdc4-43c5-b5c7-15774af96134",
             "state": "started",
-            "uuid": "b30a7e3c-d233-46ce-b4c9-b6e8beeb7d30",
+            "uuid": "80b8eba5-6d74-407c-9a96-0ee75f9c9f75",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1097,13 +1219,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "74889698-2f45-40aa-94fd-e02b56cebf63",
+            "uuid": "574186bf-3c31-4a5c-880a-56f306efa076",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-7339604b21fcb89856223bb9fa28709f",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-c6a52ed1aed3eb95d16730052da4ef4a",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -1111,7 +1233,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["56a013fb-fc43-431f-9ac8-457d38ce708a"]
+            "user_message_uuids": ["d2204840-bdc4-43c5-b5c7-15774af96134"]
           }
         },
         {
@@ -1120,8 +1242,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "46363562-92e4-4c6c-a4b1-92a2fada1daf",
-            "user_message_uuids": ["56a013fb-fc43-431f-9ac8-457d38ce708a"]
+            "uuid": "127cff89-c5d9-49e5-96b5-64cb0269e142",
+            "user_message_uuids": ["d2204840-bdc4-43c5-b5c7-15774af96134"]
           }
         },
         {
@@ -1131,7 +1253,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChNbwRSXb9U5PdwzbpULW",
+                "id": "msg_011ChPBnJs6yBJJNmTGNi42Y",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1159,12 +1281,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0a3804d7-60f6-4b4f-b1d2-3ea75f34846b",
-            "ttft_ms": 755,
+            "uuid": "3238bf9a-c5b8-4fed-8e07-1c797da7bd2c",
+            "ttft_ms": 953,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW",
-            "user_message_uuid": "56a013fb-fc43-431f-9ac8-457d38ce708a",
-            "user_message_uuids": ["56a013fb-fc43-431f-9ac8-457d38ce708a"]
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y",
+            "user_message_uuid": "d2204840-bdc4-43c5-b5c7-15774af96134",
+            "user_message_uuids": ["d2204840-bdc4-43c5-b5c7-15774af96134"]
           }
         },
         {
@@ -1173,124 +1295,9 @@
             "event": {
               "type": "content_block_start",
               "index": 0,
-              "content_block": {
-                "type": "thinking",
-                "thinking": "",
-                "signature": ""
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "d8ca528b-c1af-46e1-b653-35773e72b03a",
-            "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "thinking_delta",
-                "thinking": "",
-                "estimated_tokens": null
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "c4757c5c-e194-460b-9b6c-6a1cdcca30f1",
-            "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "signature_delta",
-                "signature": "CAQS8gUKEAgUGAI4AUIIdGhpbmtpbmcSDNer/lmMnTEDeLOjmBoMpEVUuDAc91Z3gbZXIjBylREqGixaKdOf0OMLgLhMdcUSgmki8phPbMT70zmWLvv4Hqpg3vunD30kvuTk/FcqjwVWO2WoP34GiJINxwaqprV3IBVulQGAOKkunEM2knlT26vtiJlmRKBkY71BqyidPjBDv1SRpNy1XOz7sqpKTg9LEGK/t6n5vs4Yp8V2zKNKV5pl4d2ys3G2btPFZVvU8JuYfHywScR4oYkkEwiTZLa/xyykrixkhyZuRjXyy0Ru+s35twQFjg3k0uGQjQARWxSQ6OHeeomF3bBLCtzXIXcmgjtPlJ5S090BhJdNvswqik5jE3Ae4vaDk8VkLxtGnsv9vcHVPqJEnknKr5S/j7GZDcMYxdPjE0zk6w72UsKveWhS2bpzqm2a6RZ0dmY7O4x7cQuJYGdh5HKFHf4CqOV42/k5/CJ15GUqTgH5/TgK8yfl7TXOGG+wkQ5ZKrvhFgUjWZ4rkcO3hNa8GkW/Snr3ZMMJWMjbS4WDP370Nc0/QOBpVCu66MOQ/+dj/dn9egQN9rQB1C5ubfWF78gHmdI40P26lOoq0nmvyN8dUIX2t2WmDxJZh8WhZVIZIWqhuhmSxAvVbpwdo4E6r1VN9DcHaE64LoS85m/FzNNyAoDqK8rghLpjrZvCYdGDdrO/oicAUIDPPa8+rXMEQp2w5Kp2nkM730vOBJcfMVxk9T7SfIMkGM+0mHAncAcYSBg2BIbd4QxYtvzCmOugEiU2vPHRZQUS0Ehi+FJ2tXvmC74i3m720+gJM8JtBKj228eUKx7hR6xEQx8G0hvCV4ZKPiwUekutv0WjxZfEeLs15pyEQ/BH6SiMuZYGDR9Cs9btPQKZ7VY9Fesyu/dZhv1xcSxX9rY5JJaXY4jxhxelO+FyWmGe2hbjeXl6hmqWnoqQbDEXd4IOOqACufnYLWaTJ9/40VTeMwYor1OFLsPX3euPGAE="
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "1d43b19f-7a8e-4d3a-a35d-da630aa1d271",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
-          }
-        },
-        {
-          "in": {
-            "type": "assistant",
-            "message": {
-              "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbwRSXb9U5PdwzbpULW",
-              "type": "message",
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "thinking",
-                  "thinking": "",
-                  "signature": "CAQS8gUKEAgUGAI4AUIIdGhpbmtpbmcSDNer/lmMnTEDeLOjmBoMpEVUuDAc91Z3gbZXIjBylREqGixaKdOf0OMLgLhMdcUSgmki8phPbMT70zmWLvv4Hqpg3vunD30kvuTk/FcqjwVWO2WoP34GiJINxwaqprV3IBVulQGAOKkunEM2knlT26vtiJlmRKBkY71BqyidPjBDv1SRpNy1XOz7sqpKTg9LEGK/t6n5vs4Yp8V2zKNKV5pl4d2ys3G2btPFZVvU8JuYfHywScR4oYkkEwiTZLa/xyykrixkhyZuRjXyy0Ru+s35twQFjg3k0uGQjQARWxSQ6OHeeomF3bBLCtzXIXcmgjtPlJ5S090BhJdNvswqik5jE3Ae4vaDk8VkLxtGnsv9vcHVPqJEnknKr5S/j7GZDcMYxdPjE0zk6w72UsKveWhS2bpzqm2a6RZ0dmY7O4x7cQuJYGdh5HKFHf4CqOV42/k5/CJ15GUqTgH5/TgK8yfl7TXOGG+wkQ5ZKrvhFgUjWZ4rkcO3hNa8GkW/Snr3ZMMJWMjbS4WDP370Nc0/QOBpVCu66MOQ/+dj/dn9egQN9rQB1C5ubfWF78gHmdI40P26lOoq0nmvyN8dUIX2t2WmDxJZh8WhZVIZIWqhuhmSxAvVbpwdo4E6r1VN9DcHaE64LoS85m/FzNNyAoDqK8rghLpjrZvCYdGDdrO/oicAUIDPPa8+rXMEQp2w5Kp2nkM730vOBJcfMVxk9T7SfIMkGM+0mHAncAcYSBg2BIbd4QxYtvzCmOugEiU2vPHRZQUS0Ehi+FJ2tXvmC74i3m720+gJM8JtBKj228eUKx7hR6xEQx8G0hvCV4ZKPiwUekutv0WjxZfEeLs15pyEQ/BH6SiMuZYGDR9Cs9btPQKZ7VY9Fesyu/dZhv1xcSxX9rY5JJaXY4jxhxelO+FyWmGe2hbjeXl6hmqWnoqQbDEXd4IOOqACufnYLWaTJ9/40VTeMwYor1OFLsPX3euPGAE="
-                }
-              ],
-              "container": null,
-              "stop_reason": null,
-              "stop_sequence": null,
-              "stop_details": null,
-              "usage": {
-                "input_tokens": 0,
-                "cache_creation_input_tokens": 0,
-                "cache_read_input_tokens": 0,
-                "cache_creation": {
-                  "ephemeral_5m_input_tokens": 0,
-                  "ephemeral_1h_input_tokens": 0
-                },
-                "output_tokens": 0,
-                "service_tier": "standard",
-                "inference_geo": "global",
-                "speed": "standard"
-              },
-              "input_transformations": [],
-              "diagnostics": null,
-              "context_management": null
-            },
-            "parent_tool_use_id": null,
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "3ee3263f-c30d-4138-a88b-be9098dbdfcd",
-            "timestamp": "2026-11-24T23:15:00.563Z",
-            "request_id": "req_011ChNbwRJMTGJo7YXya9oK1",
-            "thinking_duration_ms": 385,
-            "thinking_display": "updates",
-            "user_message_uuid": "56a013fb-fc43-431f-9ac8-457d38ce708a",
-            "user_message_uuids": ["56a013fb-fc43-431f-9ac8-457d38ce708a"]
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_stop",
-              "index": 0
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "74223991-1ebb-4d65-81db-a0f81fc7cd9f",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_start",
-              "index": 1,
               "content_block": {
                 "type": "tool_use",
-                "id": "toolu_01Gyyp2i39z6wqXySrYQAdVm",
+                "id": "toolu_01CGxxYhixKSBR6MvRbmY4N3",
                 "name": "Bash",
                 "input": {},
                 "caller": {
@@ -1300,8 +1307,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d876d11d-5c8c-4521-a355-0aca025b29db",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "05684f71-8881-4f94-be74-44152e338a95",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1309,7 +1316,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": ""
@@ -1317,8 +1324,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "d775903e-f91d-4283-8119-1875a71ca2f8",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "4dfcf4b9-9f0c-4739-affa-eaf5861dbc7b",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1326,7 +1333,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": "{\"comma"
@@ -1334,8 +1341,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "16b14804-23d5-4074-96bf-934281dd765b",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "a5f9ea83-9f7e-4cc4-a99a-e2309235b519",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1343,7 +1350,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": "nd\": \"t"
@@ -1351,8 +1358,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2e7aa6d2-4ccb-4e27-adde-5ae17fd0d32d",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "055aab21-eb7f-49b2-b1dd-c0e85b3173e6",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1360,7 +1367,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": "ouch st"
@@ -1368,8 +1375,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ca03cc4f-931b-473f-8052-2fb4b1bbc223",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "de7f567e-e737-4342-8a65-20e09b9d5952",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1377,7 +1384,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": "eer.txt"
@@ -1385,8 +1392,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "86d31c70-8cb5-497e-a283-d99776688cd8",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "e5c851d8-43c1-49db-a40e-a878be8b0229",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1394,7 +1401,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": "\""
@@ -1402,8 +1409,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "7a5116cd-5397-4b20-a3d8-50b5d3e0fe6c",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "303da5aa-e591-4885-a3c7-3bb9d0135a11",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1411,7 +1418,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": ", \"desc"
@@ -1419,8 +1426,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "42126cba-59a3-4856-bd36-01fe9ac8257b",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "9e299938-a9a9-4a07-9452-73df790c46fb",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1428,7 +1435,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": "ription"
@@ -1436,8 +1443,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1b659d8e-788d-4852-8239-5e3786d9017b",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "3212252a-d389-4b83-8fe1-9b94946fd977",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1445,7 +1452,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": "\": \"Cre"
@@ -1453,8 +1460,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "3e75671a-b7a2-4d89-b072-1ae647d07c67",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "d5e13b2c-4986-4cad-a50d-eab418d1d209",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1462,7 +1469,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": "ate ste"
@@ -1470,8 +1477,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "e3f53385-f7f7-4167-b01e-9a01361a4eac",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "0e0e0b3b-a209-4379-8870-2c796badd3cb",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1479,7 +1486,7 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
                 "partial_json": "er.txt "
@@ -1487,8 +1494,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "acb5a9a7-c998-4c31-8919-9e57bde51a4a",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "767f814f-ff07-4636-bdaf-daebc8e1f864",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1496,16 +1503,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
-                "partial_json": "in the "
+                "partial_json": "file wi"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "be507324-1309-46e2-b05b-c5a2e9c94f61",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "fc21d496-df42-4d92-9309-97934866cd9b",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1513,16 +1520,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
-                "partial_json": "working"
+                "partial_json": "th touc"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "5353bcf3-735c-42fe-8868-8e6f603c5374",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "bcb18b79-61c5-47d3-8c7e-828ad7e413a0",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1530,33 +1537,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "input_json_delta",
-                "partial_json": " direct"
+                "partial_json": "h\"}"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "6a12f1b6-face-4f3a-a371-7f779cc03bc8",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 1,
-              "delta": {
-                "type": "input_json_delta",
-                "partial_json": "ory\"}"
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "49ac3369-6513-49e9-b89f-0e3b0aeb753c",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "1c2a204a-86eb-4ddc-b65a-e73f416380ae",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1564,17 +1554,17 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbwRSXb9U5PdwzbpULW",
+              "id": "msg_011ChPBnJs6yBJJNmTGNi42Y",
               "type": "message",
               "role": "assistant",
               "content": [
                 {
                   "type": "tool_use",
-                  "id": "toolu_01Gyyp2i39z6wqXySrYQAdVm",
+                  "id": "toolu_01CGxxYhixKSBR6MvRbmY4N3",
                   "name": "Bash",
                   "input": {
                     "command": "touch steer.txt",
-                    "description": "Create steer.txt in the working directory"
+                    "description": "Create steer.txt file with touch"
                   },
                   "caller": {
                     "type": "direct"
@@ -1604,9 +1594,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "f2b68518-3cb4-44c1-ae31-48d2b32ccdd9",
-            "timestamp": "2026-11-24T23:15:00.633Z",
-            "request_id": "req_011ChNbwRJMTGJo7YXya9oK1"
+            "uuid": "f3aeb53a-1929-4977-bb72-2d7cd36e6eda",
+            "timestamp": "2026-11-25T06:38:48.876Z",
+            "request_id": "req_011ChPBnJigEgmf1yHYMQTz1",
+            "user_message_uuid": "d2204840-bdc4-43c5-b5c7-15774af96134",
+            "user_message_uuids": ["d2204840-bdc4-43c5-b5c7-15774af96134"]
           }
         },
         {
@@ -1614,12 +1606,12 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_stop",
-              "index": 1
+              "index": 0
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "91fd33b6-2c1c-40f6-8bfe-800d10ad3e16",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "3a2cd32e-3050-42e4-a734-dd3c70d213aa",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1628,23 +1620,23 @@
             "subtype": "session_state_changed",
             "state": "requires_action",
             "sdk_host_only": true,
-            "uuid": "cb4ec5ad-77d5-42d9-8a90-9527700e5f89",
+            "uuid": "5b803538-066e-4a2f-b13a-22bfc661e549",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "control_request",
-            "request_id": "9ad509a3-5a7d-4495-84ee-223d94fb90ce",
+            "request_id": "d4368501-792f-42f9-b694-87b05d51da1a",
             "request": {
               "subtype": "can_use_tool",
               "tool_name": "Bash",
               "display_name": "Bash",
               "input": {
                 "command": "touch steer.txt",
-                "description": "Create steer.txt in the working directory"
+                "description": "Create steer.txt file with touch"
               },
-              "description": "Create steer.txt in the working directory",
+              "description": "Create steer.txt file with touch",
               "permission_suggestions": [
                 {
                   "type": "addRules",
@@ -1669,7 +1661,7 @@
                 }
               ],
               "blocked_path": "<folder>/steer.txt",
-              "tool_use_id": "toolu_01Gyyp2i39z6wqXySrYQAdVm"
+              "tool_use_id": "toolu_01CGxxYhixKSBR6MvRbmY4N3"
             }
           }
         },
@@ -1678,14 +1670,14 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "9ad509a3-5a7d-4495-84ee-223d94fb90ce",
+              "request_id": "d4368501-792f-42f9-b694-87b05d51da1a",
               "response": {
                 "behavior": "allow",
                 "updatedInput": {
                   "command": "touch steer.txt",
-                  "description": "Create steer.txt in the working directory"
+                  "description": "Create steer.txt file with touch"
                 },
-                "toolUseID": "toolu_01Gyyp2i39z6wqXySrYQAdVm"
+                "toolUseID": "toolu_01CGxxYhixKSBR6MvRbmY4N3"
               }
             }
           }
@@ -1698,7 +1690,7 @@
               "content": "Change course: reply with exactly STEERED instead."
             },
             "parent_tool_use_id": null,
-            "uuid": "f7f391a4-d3ea-49fe-b3fc-f9fee1a875ce",
+            "uuid": "66d7d304-6133-49bc-98ca-87aa1bed4258",
             "priority": "next"
           }
         },
@@ -1728,8 +1720,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4b016d3f-7e22-43af-bd52-3b3e94d4cd7f",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "ee264714-6652-4bcc-9b8b-2c50e1b2410f",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
@@ -1740,15 +1732,15 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "7560d992-552a-412a-96a8-4a116d0e136b",
-            "api_message_id": "msg_011ChNbwRSXb9U5PdwzbpULW"
+            "uuid": "ae6f8123-01d6-467a-a0c8-1ed6fc6535b9",
+            "api_message_id": "msg_011ChPBnJs6yBJJNmTGNi42Y"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "e38cd0d3-671b-48d1-83e2-26d0b6f13e08",
+            "uuid": "29316f92-09f4-4eea-9f8f-fb22cd225ecd",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1758,16 +1750,16 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "61ca0881-2c25-4f65-a384-e9916b94b2b4",
+            "uuid": "5856639b-c4df-46dd-bde2-c761228d8061",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "f7f391a4-d3ea-49fe-b3fc-f9fee1a875ce",
+            "command_uuid": "66d7d304-6133-49bc-98ca-87aa1bed4258",
             "state": "queued",
-            "uuid": "c437e437-9731-4e3c-af4c-5e2bb57da573",
+            "uuid": "c4956585-4ab1-4cc6-a7f2-b23db75643b6",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1778,7 +1770,7 @@
               "role": "user",
               "content": [
                 {
-                  "tool_use_id": "toolu_01Gyyp2i39z6wqXySrYQAdVm",
+                  "tool_use_id": "toolu_01CGxxYhixKSBR6MvRbmY4N3",
                   "type": "tool_result",
                   "content": "Shell cwd was reset to <folder>",
                   "is_error": false
@@ -1787,8 +1779,8 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "50f0f665-af20-4265-8ce4-df20db887857",
-            "timestamp": "2026-11-24T23:15:01.757Z",
+            "uuid": "87adfa56-f30b-4b1c-a033-b75259b4a464",
+            "timestamp": "2026-11-25T06:38:50.065Z",
             "tool_use_result": {
               "stdout": "",
               "stderr": "\nShell cwd was reset to <folder>",
@@ -1798,7 +1790,7 @@
             },
             "tool_result_meta": [
               {
-                "id": "toolu_01Gyyp2i39z6wqXySrYQAdVm",
+                "id": "toolu_01CGxxYhixKSBR6MvRbmY4N3",
                 "permission_decision": {
                   "decision": "accept",
                   "source": "user_temporary"
@@ -1810,9 +1802,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "f7f391a4-d3ea-49fe-b3fc-f9fee1a875ce",
+            "command_uuid": "66d7d304-6133-49bc-98ca-87aa1bed4258",
             "state": "started",
-            "uuid": "41229f86-b426-4672-8ef7-37f791bc1c18",
+            "uuid": "081576ca-83be-49ef-bf24-211c2c99de78",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1822,10 +1814,10 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "650fec2c-b371-4d56-bc58-7430715b316e",
+            "uuid": "fcc566d3-fcc9-42cc-9db6-09f5d9fc5f6c",
             "user_message_uuids": [
-              "56a013fb-fc43-431f-9ac8-457d38ce708a",
-              "f7f391a4-d3ea-49fe-b3fc-f9fee1a875ce"
+              "d2204840-bdc4-43c5-b5c7-15774af96134",
+              "66d7d304-6133-49bc-98ca-87aa1bed4258"
             ]
           }
         },
@@ -1836,7 +1828,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChNbwbTJ1eN2rUH7Bj2JL",
+                "id": "msg_011ChPBnUyKh4JaftkwQ5LV5",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1864,10 +1856,10 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "78519fef-3d41-4874-9e2a-1144841faac0",
-            "ttft_ms": 704,
+            "uuid": "f548f789-e1e9-4004-8709-55607aa8b8ca",
+            "ttft_ms": 724,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbwbTJ1eN2rUH7Bj2JL"
+            "api_message_id": "msg_011ChPBnUyKh4JaftkwQ5LV5"
           }
         },
         {
@@ -1883,8 +1875,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8e6890f6-1a0a-43be-9311-955d6e9d4dcd",
-            "api_message_id": "msg_011ChNbwbTJ1eN2rUH7Bj2JL"
+            "uuid": "7b2d0ab2-b348-4ad5-b5ba-f4111b275d07",
+            "api_message_id": "msg_011ChPBnUyKh4JaftkwQ5LV5"
           }
         },
         {
@@ -1900,8 +1892,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0ae9b5cd-57e6-4d4b-b448-308f096846de",
-            "api_message_id": "msg_011ChNbwbTJ1eN2rUH7Bj2JL"
+            "uuid": "6a129455-4330-41cd-a005-f46338b9d13c",
+            "api_message_id": "msg_011ChPBnUyKh4JaftkwQ5LV5"
           }
         },
         {
@@ -1909,7 +1901,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbwbTJ1eN2rUH7Bj2JL",
+              "id": "msg_011ChPBnUyKh4JaftkwQ5LV5",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -1941,9 +1933,9 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "fa2977dd-9330-4883-9087-8d3df1a3f046",
-            "timestamp": "2026-11-24T23:15:02.481Z",
-            "request_id": "req_011ChNbwbJrT3oVE7UzWF36t"
+            "uuid": "df6352b7-ae89-4cdd-b918-28f789c3ef54",
+            "timestamp": "2026-11-25T06:38:50.801Z",
+            "request_id": "req_011ChPBnUoA9vDqE81oMNdSU"
           }
         },
         {
@@ -1955,8 +1947,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "52a5d3e2-ad04-48a4-b56c-c4887703c26e",
-            "api_message_id": "msg_011ChNbwbTJ1eN2rUH7Bj2JL"
+            "uuid": "becb865d-aef4-472f-82b7-3304c1935fce",
+            "api_message_id": "msg_011ChPBnUyKh4JaftkwQ5LV5"
           }
         },
         {
@@ -1985,8 +1977,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "65a7fd12-01af-4f3a-bd08-c5c26160945d",
-            "api_message_id": "msg_011ChNbwbTJ1eN2rUH7Bj2JL"
+            "uuid": "3cd9de18-dfcd-456a-9d27-64e87a3fbc12",
+            "api_message_id": "msg_011ChPBnUyKh4JaftkwQ5LV5"
           }
         },
         {
@@ -1997,22 +1989,22 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8e850dfa-e37f-4022-a2e3-32912cd01b70",
-            "api_message_id": "msg_011ChNbwbTJ1eN2rUH7Bj2JL"
+            "uuid": "1f7d3862-5994-482f-868f-4352dc0e72c3",
+            "api_message_id": "msg_011ChPBnUyKh4JaftkwQ5LV5"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "f7f391a4-d3ea-49fe-b3fc-f9fee1a875ce",
+            "command_uuid": "66d7d304-6133-49bc-98ca-87aa1bed4258",
             "state": "completed",
-            "uuid": "e6863725-d5f0-4d66-b930-556b430d3c4a",
+            "uuid": "3989615e-1238-4edd-8229-17823d1b2b9e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 1979,
+            "duration_api_ms": 1976,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -2090,19 +2082,19 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "STEERED",
-            "ttft_ms": 1192,
+            "ttft_ms": 1240,
             "type": "result",
-            "duration_ms": 3117,
-            "uuid": "3e08db5f-a07e-41df-a63b-7587bc7cb36c",
-            "ttft_stream_ms": 806,
-            "time_to_request_ms": 53,
-            "first_content_frame_ms": 806,
-            "user_message_uuid": "56a013fb-fc43-431f-9ac8-457d38ce708a",
+            "duration_ms": 3170,
+            "uuid": "3d9c32d4-7621-4c03-be50-146b34fa84a3",
+            "ttft_stream_ms": 1009,
+            "time_to_request_ms": 58,
+            "first_content_frame_ms": 1010,
+            "user_message_uuid": "d2204840-bdc4-43c5-b5c7-15774af96134",
             "user_message_uuids": [
-              "56a013fb-fc43-431f-9ac8-457d38ce708a",
-              "f7f391a4-d3ea-49fe-b3fc-f9fee1a875ce"
+              "d2204840-bdc4-43c5-b5c7-15774af96134",
+              "66d7d304-6133-49bc-98ca-87aa1bed4258"
             ],
-            "request_sent_wall_ms": 1795562099424,
+            "request_sent_wall_ms": 1795588727695,
             "first_request_input_tokens": 0,
             "first_request_cache_read_input_tokens": 13041,
             "queued_turn_count": 0,
@@ -2130,9 +2122,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "56a013fb-fc43-431f-9ac8-457d38ce708a",
+            "command_uuid": "d2204840-bdc4-43c5-b5c7-15774af96134",
             "state": "completed",
-            "uuid": "d7c44b3d-a57e-4dde-be2e-974c012f2b38",
+            "uuid": "7775a6ec-0e17-43ba-a4d7-556c37da1d9e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2142,7 +2134,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "aeeaa9da-7261-4c84-bcfc-abb19b65f847",
+            "uuid": "4071ee33-9248-4596-b7a9-b7709d13b9b8",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

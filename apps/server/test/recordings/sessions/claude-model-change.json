@@ -19,58 +19,10 @@
       "frames": [
         {
           "out": {
-            "request_id": "jsvhh9f644",
+            "request_id": "g1cnmiy73ws",
             "type": "control_request",
             "request": {
-              "subtype": "initialize",
-              "sdkMcpServers": ["glass"],
-              "sdkMcpServerManifests": {
-                "glass": {
-                  "initializeResult": {
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {
-                      "tools": {
-                        "listChanged": true
-                      }
-                    },
-                    "serverInfo": {
-                      "name": "glass",
-                      "version": "1.0.0"
-                    }
-                  },
-                  "toolsListResult": {
-                    "tools": [
-                      {
-                        "name": "draw_diagram",
-                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
-                        "inputSchema": {
-                          "$schema": "http://json-schema.org/draft-07/schema#",
-                          "type": "object",
-                          "properties": {
-                            "title": {
-                              "type": "string",
-                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
-                            },
-                            "kind": {
-                              "type": "string",
-                              "enum": ["existing", "proposed", "uncertain"],
-                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
-                            },
-                            "mermaid": {
-                              "type": "string",
-                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
-                            }
-                          },
-                          "required": ["title", "kind", "mermaid"]
-                        },
-                        "execution": {
-                          "taskSupport": "forbidden"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
+              "subtype": "initialize"
             }
           }
         },
@@ -79,7 +31,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "jsvhh9f644",
+              "request_id": "g1cnmiy73ws",
               "response": {
                 "commands": [
                   {
@@ -711,9 +663,6 @@
                 "current_permission_mode": "default",
                 "hook_on_failure_supported": true,
                 "other_hook_ask_outranks_host": true,
-                "sdk_mcp_manifests_parked": {
-                  "glass": "parked"
-                },
                 "feedback_mode": {
                   "kind": "disabled"
                 },
@@ -739,7 +688,36 @@
         },
         {
           "out": {
-            "request_id": "4w7m08tguav",
+            "request_id": "byr4x6sph2o",
+            "type": "control_request",
+            "request": {
+              "subtype": "mcp_set_servers",
+              "servers": {
+                "glass": {
+                  "type": "sdk",
+                  "name": "glass"
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "byr4x6sph2o",
+              "response": {
+                "added": ["glass"],
+                "removed": [],
+                "errors": {}
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "request_id": "6xnx2k1epno",
             "type": "control_request",
             "request": {
               "subtype": "set_model",
@@ -749,10 +727,93 @@
         },
         {
           "in": {
+            "type": "control_request",
+            "request_id": "b1f181cd-c567-4fa9-b1b6-2d6674783f8d",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "initialize",
+                "params": {
+                  "protocolVersion": "2025-11-25",
+                  "capabilities": {},
+                  "clientInfo": {
+                    "name": "claude-code",
+                    "title": "Claude Code",
+                    "description": "Anthropic's agentic coding tool",
+                    "websiteUrl": "https://claude.com/claude-code",
+                    "version": "2.1.322"
+                  }
+                },
+                "jsonrpc": "2.0",
+                "id": 0
+              }
+            }
+          }
+        },
+        {
+          "out": {
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "4w7m08tguav",
+              "request_id": "b1f181cd-c567-4fa9-b1b6-2d6674783f8d",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {
+                      "tools": {
+                        "listChanged": true
+                      }
+                    },
+                    "serverInfo": {
+                      "name": "glass",
+                      "version": "1.0.0"
+                    }
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "51703798-3b76-4270-bf00-8cc746b0b086",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized"
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "51703798-3b76-4270-bf00-8cc746b0b086",
+              "response": {
+                "mcp_response": {
+                  "jsonrpc": "2.0",
+                  "result": {},
+                  "id": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "6xnx2k1epno",
               "response": {
                 "model": "claude-haiku-5-5"
               }
@@ -761,7 +822,7 @@
         },
         {
           "out": {
-            "request_id": "g0dz0nucpi8",
+            "request_id": "3f00afmgsu1",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
@@ -776,7 +837,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "g0dz0nucpi8"
+              "request_id": "3f00afmgsu1"
             }
           }
         },
@@ -788,7 +849,68 @@
               "content": "Reply with exactly: FIRST"
             },
             "parent_tool_use_id": null,
-            "uuid": "3e18aa47-c4ac-41de-8ed5-7c209a12ea36"
+            "uuid": "ce924a8c-87aa-42f5-ace1-a972bb37d64d"
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "5712b494-bd20-4181-8bff-b59f300e875a",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "tools/list",
+                "jsonrpc": "2.0",
+                "id": 1
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "5712b494-bd20-4181-8bff-b59f300e875a",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "tools": [
+                      {
+                        "name": "draw_diagram",
+                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                        "inputSchema": {
+                          "$schema": "http://json-schema.org/draft-07/schema#",
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["existing", "proposed", "uncertain"],
+                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                            },
+                            "mermaid": {
+                              "type": "string",
+                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                            }
+                          },
+                          "required": ["title", "kind", "mermaid"]
+                        },
+                        "execution": {
+                          "taskSupport": "forbidden"
+                        }
+                      }
+                    ]
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 1
+                }
+              }
+            }
           }
         },
         {
@@ -797,25 +919,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "29a62011-d59b-4dca-bad3-c5987af14bbe",
+            "uuid": "77d3d663-5cdf-48c6-b233-3dd6af8db74b",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3e18aa47-c4ac-41de-8ed5-7c209a12ea36",
+            "command_uuid": "ce924a8c-87aa-42f5-ace1-a972bb37d64d",
             "state": "queued",
-            "uuid": "da50f5fd-263d-42ba-86f8-57a56e47007d",
+            "uuid": "8f793868-2610-4aa8-90d5-3ea3c03b04fd",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3e18aa47-c4ac-41de-8ed5-7c209a12ea36",
+            "command_uuid": "ce924a8c-87aa-42f5-ace1-a972bb37d64d",
             "state": "started",
-            "uuid": "973a6e24-102c-449b-bc83-cb4d1cf9951f",
+            "uuid": "ae77cdc9-f641-4fd1-b485-55bcfb809140",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1075,13 +1197,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "fcca8129-6ba1-4209-ae15-a62d9fd7a8fe",
+            "uuid": "70cc2b5f-a014-42a8-88a6-f6caf90cd66e",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-be3a3db1e20a1702974a6fccb099380a",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-e0dc61bafb5e52342e5c517cde8e76b8",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -1089,7 +1211,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["3e18aa47-c4ac-41de-8ed5-7c209a12ea36"]
+            "user_message_uuids": ["ce924a8c-87aa-42f5-ace1-a972bb37d64d"]
           }
         },
         {
@@ -1098,8 +1220,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "4a6fa448-6796-46e3-831e-2c83cff5fbd6",
-            "user_message_uuids": ["3e18aa47-c4ac-41de-8ed5-7c209a12ea36"]
+            "uuid": "8e7c747d-e82c-4eb2-9946-2c0ea083de0e",
+            "user_message_uuids": ["ce924a8c-87aa-42f5-ace1-a972bb37d64d"]
           }
         },
         {
@@ -1109,7 +1231,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChNbwgxSAFiuJ1R6bNqv3",
+                "id": "msg_011ChPBmyFe8ZFsfbbmcHBRe",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1137,12 +1259,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b3d4c16f-9168-463d-9a1b-0d062d27e89f",
-            "ttft_ms": 737,
+            "uuid": "d62fdb7e-c3f9-4e35-8b7a-bbdc922923e9",
+            "ttft_ms": 748,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3",
-            "user_message_uuid": "3e18aa47-c4ac-41de-8ed5-7c209a12ea36",
-            "user_message_uuids": ["3e18aa47-c4ac-41de-8ed5-7c209a12ea36"]
+            "api_message_id": "msg_011ChPBmyFe8ZFsfbbmcHBRe",
+            "user_message_uuid": "ce924a8c-87aa-42f5-ace1-a972bb37d64d",
+            "user_message_uuids": ["ce924a8c-87aa-42f5-ace1-a972bb37d64d"]
           }
         },
         {
@@ -1151,121 +1273,6 @@
             "event": {
               "type": "content_block_start",
               "index": 0,
-              "content_block": {
-                "type": "thinking",
-                "thinking": "",
-                "signature": ""
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "0d32efb8-2af8-46a9-940c-5abf82156dbf",
-            "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "thinking_delta",
-                "thinking": "",
-                "estimated_tokens": null
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "072376c6-3b66-4208-bc7f-46d00eb74ae8",
-            "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_delta",
-              "index": 0,
-              "delta": {
-                "type": "signature_delta",
-                "signature": "CAQSwwUKEAgUGAI4AUIIdGhpbmtpbmcSDHzotA7vYxZ21t9whBoM0vZbOMSrWuIsQv+cIjAeI71pMTLXZXVvcA+FGsilUFvT6kJfXcdF98m7YD11f2wC62b9puvWOc5+0vfbtv4q4ARMM8rsrGNw1C2ZQ9XQYcLcDB3V+ipIwWkaRlsQ+gv65+WGBYZmQeK3QoE7izO34t5sKGzEnBPWZFI5CNFH/Y8JsP2ujZvlhvKfhWTjfxN1L9F0/bKVm0o7xRQm1LGqfRlthn1TJdk2/K53XAUU7fwDyDH9+j46lKl7M8iU1WooPN6cM5XZieXfjyv4pT4jn2kZ6f2dzs87QXLI3inmMrUELWPFQnLsj6ceECS81NTZHcsQxc2WL/N+w43ES1a3hmOXNxt5KMn8ElY6mBAGehTCSS3uNpoXw4xq6UJ3xRMcGVXgSIDgNqezWnAgJM0HfWP4ZyL8xMLVreylEMQEKEJmEUaahr8v7qhZ8SKdi8ZJ7cfEko7ZC3IKnd8z3u7pVG4AMXOjBZuS9Ve/H+EuajWHzmH2dKPJfMT/3cbOd8+O3oe/0KRH346uUDYKwGoxwjOMrcpeh8CA7Tsn2LcbRJZb5rGgHitcIpytJ7JY1rLMcRAB4FtcXzZc4amBqFwMNuoJxGCVQqVBwb2QYhYgpWo2Qjq/EXaF5DuL7ADdF/3dyGw3TQ6cItzmFFkfXEzh/oXxI6FtUIr6p2PYQVPRsZmIDCpCjIGPJZPcUw2mGxDTehRzL3XOemd4Z2e6EHCXrdc7+CHY3D/8GG7qgU3ywL9aFoVr5BN5bNIXJF7ABKwxmUERBp5djBOkCYMDPdS8sxUbqXehiKyTZWeHaI1rUViPCVTUDPXCAOeFqjAUWZr8xnpfNgbxOj2cf48P4EnY/mrEVfGNdw1XOt1x6qIXO15y2bpfe75WmV+cm0mp6J+nAxgB"
-              }
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "8a09f218-2005-403e-a65f-a08ae51b78b9",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3"
-          }
-        },
-        {
-          "in": {
-            "type": "assistant",
-            "message": {
-              "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbwgxSAFiuJ1R6bNqv3",
-              "type": "message",
-              "role": "assistant",
-              "content": [
-                {
-                  "type": "thinking",
-                  "thinking": "",
-                  "signature": "CAQSwwUKEAgUGAI4AUIIdGhpbmtpbmcSDHzotA7vYxZ21t9whBoM0vZbOMSrWuIsQv+cIjAeI71pMTLXZXVvcA+FGsilUFvT6kJfXcdF98m7YD11f2wC62b9puvWOc5+0vfbtv4q4ARMM8rsrGNw1C2ZQ9XQYcLcDB3V+ipIwWkaRlsQ+gv65+WGBYZmQeK3QoE7izO34t5sKGzEnBPWZFI5CNFH/Y8JsP2ujZvlhvKfhWTjfxN1L9F0/bKVm0o7xRQm1LGqfRlthn1TJdk2/K53XAUU7fwDyDH9+j46lKl7M8iU1WooPN6cM5XZieXfjyv4pT4jn2kZ6f2dzs87QXLI3inmMrUELWPFQnLsj6ceECS81NTZHcsQxc2WL/N+w43ES1a3hmOXNxt5KMn8ElY6mBAGehTCSS3uNpoXw4xq6UJ3xRMcGVXgSIDgNqezWnAgJM0HfWP4ZyL8xMLVreylEMQEKEJmEUaahr8v7qhZ8SKdi8ZJ7cfEko7ZC3IKnd8z3u7pVG4AMXOjBZuS9Ve/H+EuajWHzmH2dKPJfMT/3cbOd8+O3oe/0KRH346uUDYKwGoxwjOMrcpeh8CA7Tsn2LcbRJZb5rGgHitcIpytJ7JY1rLMcRAB4FtcXzZc4amBqFwMNuoJxGCVQqVBwb2QYhYgpWo2Qjq/EXaF5DuL7ADdF/3dyGw3TQ6cItzmFFkfXEzh/oXxI6FtUIr6p2PYQVPRsZmIDCpCjIGPJZPcUw2mGxDTehRzL3XOemd4Z2e6EHCXrdc7+CHY3D/8GG7qgU3ywL9aFoVr5BN5bNIXJF7ABKwxmUERBp5djBOkCYMDPdS8sxUbqXehiKyTZWeHaI1rUViPCVTUDPXCAOeFqjAUWZr8xnpfNgbxOj2cf48P4EnY/mrEVfGNdw1XOt1x6qIXO15y2bpfe75WmV+cm0mp6J+nAxgB"
-                }
-              ],
-              "container": null,
-              "stop_reason": null,
-              "stop_sequence": null,
-              "stop_details": null,
-              "usage": {
-                "input_tokens": 0,
-                "cache_creation_input_tokens": 0,
-                "cache_read_input_tokens": 0,
-                "cache_creation": {
-                  "ephemeral_5m_input_tokens": 0,
-                  "ephemeral_1h_input_tokens": 0
-                },
-                "output_tokens": 0,
-                "service_tier": "standard",
-                "inference_geo": "global",
-                "speed": "standard"
-              },
-              "input_transformations": [],
-              "diagnostics": null,
-              "context_management": null
-            },
-            "parent_tool_use_id": null,
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "4b1644b0-b114-449c-80f3-29a1bcd8ea1d",
-            "timestamp": "2026-11-24T23:15:03.863Z",
-            "request_id": "req_011ChNbwgoFksH1DZCbG7fc7",
-            "thinking_duration_ms": 89,
-            "thinking_display": "updates",
-            "user_message_uuid": "3e18aa47-c4ac-41de-8ed5-7c209a12ea36",
-            "user_message_uuids": ["3e18aa47-c4ac-41de-8ed5-7c209a12ea36"]
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_stop",
-              "index": 0
-            },
-            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "parent_tool_use_id": null,
-            "uuid": "629ac3d3-578c-4160-8c28-757386fa8d7c",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3"
-          }
-        },
-        {
-          "in": {
-            "type": "stream_event",
-            "event": {
-              "type": "content_block_start",
-              "index": 1,
               "content_block": {
                 "type": "text",
                 "text": ""
@@ -1273,8 +1280,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1f84818b-4feb-4826-a5f0-9464fc3fcd38",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3"
+            "uuid": "8fbf1784-df43-4a1c-a358-80f7bf5dd714",
+            "api_message_id": "msg_011ChPBmyFe8ZFsfbbmcHBRe"
           }
         },
         {
@@ -1282,16 +1289,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "FI"
+                "text": "F"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0852ca84-6d8d-4e93-9621-3c3c9f2c71ed",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3"
+            "uuid": "f2d9de53-c9c2-4cd9-b651-965c6c7b4c7c",
+            "api_message_id": "msg_011ChPBmyFe8ZFsfbbmcHBRe"
           }
         },
         {
@@ -1299,16 +1306,16 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_delta",
-              "index": 1,
+              "index": 0,
               "delta": {
                 "type": "text_delta",
-                "text": "RST"
+                "text": "IRST"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "483348e4-fb32-416a-87a3-87a3d7776d95",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3"
+            "uuid": "48abc142-1654-443d-8991-57db187512b6",
+            "api_message_id": "msg_011ChPBmyFe8ZFsfbbmcHBRe"
           }
         },
         {
@@ -1316,7 +1323,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbwgxSAFiuJ1R6bNqv3",
+              "id": "msg_011ChPBmyFe8ZFsfbbmcHBRe",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -1348,9 +1355,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "f791e14c-77ab-42ec-a5d8-d7bfdab20ea4",
-            "timestamp": "2026-11-24T23:15:03.974Z",
-            "request_id": "req_011ChNbwgoFksH1DZCbG7fc7"
+            "uuid": "c3c3bcb9-dd0c-4a9a-808e-e7f89a2e5683",
+            "timestamp": "2026-11-25T06:38:44.044Z",
+            "request_id": "req_011ChPBmy8DGah49m9qwHFuD",
+            "user_message_uuid": "ce924a8c-87aa-42f5-ace1-a972bb37d64d",
+            "user_message_uuids": ["ce924a8c-87aa-42f5-ace1-a972bb37d64d"]
           }
         },
         {
@@ -1358,12 +1367,12 @@
             "type": "stream_event",
             "event": {
               "type": "content_block_stop",
-              "index": 1
+              "index": 0
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c516d45b-7613-4b6a-bcd5-21e55408c955",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3"
+            "uuid": "48df7602-f512-4de7-a7f8-20e17643a976",
+            "api_message_id": "msg_011ChPBmyFe8ZFsfbbmcHBRe"
           }
         },
         {
@@ -1392,8 +1401,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4a4b4f41-9e36-4d7b-955d-df3c62c2bd23",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3"
+            "uuid": "72e017bd-8c08-463c-9161-8092f7e7fcbf",
+            "api_message_id": "msg_011ChPBmyFe8ZFsfbbmcHBRe"
           }
         },
         {
@@ -1404,21 +1413,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "88766b48-8ca9-48f4-8451-64d5a84708cf",
-            "api_message_id": "msg_011ChNbwgxSAFiuJ1R6bNqv3"
+            "uuid": "807cd64b-0ced-47d9-98ff-fb6b4aa5aab3",
+            "api_message_id": "msg_011ChPBmyFe8ZFsfbbmcHBRe"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "226e38cb-6615-45d5-aeb7-8a447b58b6d0",
+            "uuid": "06cc4e95-652e-45b5-a308-15566a329497",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 946,
+            "duration_api_ms": 942,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -1496,16 +1505,16 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "FIRST",
-            "ttft_ms": 878,
+            "ttft_ms": 984,
             "type": "result",
-            "duration_ms": 998,
-            "uuid": "03f6c947-af5f-4274-8acd-84699b3fbfba",
-            "ttft_stream_ms": 788,
-            "time_to_request_ms": 53,
-            "first_content_frame_ms": 788,
-            "user_message_uuid": "3e18aa47-c4ac-41de-8ed5-7c209a12ea36",
-            "user_message_uuids": ["3e18aa47-c4ac-41de-8ed5-7c209a12ea36"],
-            "request_sent_wall_ms": 1795562103038,
+            "duration_ms": 993,
+            "uuid": "c78f964b-5201-442d-87e9-73d4d70d22d3",
+            "ttft_stream_ms": 799,
+            "time_to_request_ms": 52,
+            "first_content_frame_ms": 799,
+            "user_message_uuid": "ce924a8c-87aa-42f5-ace1-a972bb37d64d",
+            "user_message_uuids": ["ce924a8c-87aa-42f5-ace1-a972bb37d64d"],
+            "request_sent_wall_ms": 1795588723113,
             "first_request_input_tokens": 0,
             "first_request_cache_read_input_tokens": 13041,
             "queued_turn_count": 0,
@@ -1532,7 +1541,7 @@
         },
         {
           "out": {
-            "request_id": "8jdustchjn",
+            "request_id": "7wtojsago0r",
             "type": "control_request",
             "request": {
               "subtype": "set_model",
@@ -1543,9 +1552,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "3e18aa47-c4ac-41de-8ed5-7c209a12ea36",
+            "command_uuid": "ce924a8c-87aa-42f5-ace1-a972bb37d64d",
             "state": "completed",
-            "uuid": "0148eb5c-b84c-4605-ab8f-f65b1857851b",
+            "uuid": "23b0f1c7-2435-4e3c-a9ed-813ec9d0ffcd",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1555,7 +1564,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "6c04ad08-c671-427f-879b-84886f3ce79d",
+            "uuid": "92f1c904-cf18-4cdf-9f95-e4ff76c72360",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1564,7 +1573,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "8jdustchjn",
+              "request_id": "7wtojsago0r",
               "response": {
                 "model": "claude-haiku-5-5"
               }
@@ -1573,7 +1582,7 @@
         },
         {
           "out": {
-            "request_id": "ue9a0vetv3l",
+            "request_id": "t4nynfxia7s",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
@@ -1588,7 +1597,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "ue9a0vetv3l"
+              "request_id": "t4nynfxia7s"
             }
           }
         },
@@ -1600,7 +1609,7 @@
               "content": "Reply with exactly: SECOND"
             },
             "parent_tool_use_id": null,
-            "uuid": "6b145f53-2bb3-4fa4-9ed0-9aca1c903136"
+            "uuid": "2cbe0027-0b5d-4db6-87d0-f33f1f92e296"
           }
         },
         {
@@ -1609,25 +1618,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "d50ed03e-3587-4add-9ecc-f4a9fff65812",
+            "uuid": "42f6146e-ff2d-4e0c-814c-f90f307b63f4",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "6b145f53-2bb3-4fa4-9ed0-9aca1c903136",
+            "command_uuid": "2cbe0027-0b5d-4db6-87d0-f33f1f92e296",
             "state": "queued",
-            "uuid": "6a228046-92c1-4ed9-ae7b-8f9f8f7dc11a",
+            "uuid": "9cf0cad0-dd47-4a04-b93b-75980fa17397",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "6b145f53-2bb3-4fa4-9ed0-9aca1c903136",
+            "command_uuid": "2cbe0027-0b5d-4db6-87d0-f33f1f92e296",
             "state": "started",
-            "uuid": "a4b71262-6a17-4f6f-9791-dac394e22149",
+            "uuid": "f102d9d7-47a8-4d27-b3a5-fe48a56b5590",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1887,13 +1896,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "9727c736-9ae4-4bd1-9ac3-9f391a939e86",
+            "uuid": "8b36c6ac-25c4-47ae-9e50-6dc55a5132d3",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-be3a3db1e20a1702974a6fccb099380a",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-e0dc61bafb5e52342e5c517cde8e76b8",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -1901,7 +1910,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["6b145f53-2bb3-4fa4-9ed0-9aca1c903136"]
+            "user_message_uuids": ["2cbe0027-0b5d-4db6-87d0-f33f1f92e296"]
           }
         },
         {
@@ -1910,8 +1919,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "49928f27-dfd2-4d8f-a4b2-f4e48d6b2efe",
-            "user_message_uuids": ["6b145f53-2bb3-4fa4-9ed0-9aca1c903136"]
+            "uuid": "2fb79e06-acee-40d0-a81d-1d87456939aa",
+            "user_message_uuids": ["2cbe0027-0b5d-4db6-87d0-f33f1f92e296"]
           }
         },
         {
@@ -1921,7 +1930,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChNbwm4jeRG3VqD5yYGsV",
+                "id": "msg_011ChPBn3PSdNujNk924YFQs",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1943,18 +1952,22 @@
                   "speed": "standard"
                 },
                 "input_transformations": [],
-                "diagnostics": null,
+                "diagnostics": {
+                  "cache_miss_reason": {
+                    "type": "unavailable"
+                  }
+                },
                 "context_management": null
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1124ce9d-ca35-46f4-afa4-26609c82dc8b",
-            "ttft_ms": 817,
+            "uuid": "e3211617-43b4-460c-b634-fd96822e908a",
+            "ttft_ms": 896,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbwm4jeRG3VqD5yYGsV",
-            "user_message_uuid": "6b145f53-2bb3-4fa4-9ed0-9aca1c903136",
-            "user_message_uuids": ["6b145f53-2bb3-4fa4-9ed0-9aca1c903136"]
+            "api_message_id": "msg_011ChPBn3PSdNujNk924YFQs",
+            "user_message_uuid": "2cbe0027-0b5d-4db6-87d0-f33f1f92e296",
+            "user_message_uuids": ["2cbe0027-0b5d-4db6-87d0-f33f1f92e296"]
           }
         },
         {
@@ -1970,8 +1983,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "dafb28c7-8088-4ee5-bb53-e91645f5f60e",
-            "api_message_id": "msg_011ChNbwm4jeRG3VqD5yYGsV"
+            "uuid": "f75af7e9-6458-449f-b6c0-7499f59af523",
+            "api_message_id": "msg_011ChPBn3PSdNujNk924YFQs"
           }
         },
         {
@@ -1987,8 +2000,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ebdb42eb-7946-4d1e-9acb-aa5ac143fd7d",
-            "api_message_id": "msg_011ChNbwm4jeRG3VqD5yYGsV"
+            "uuid": "5f37719d-4fcf-495b-af76-094d876cebcc",
+            "api_message_id": "msg_011ChPBn3PSdNujNk924YFQs"
           }
         },
         {
@@ -1996,7 +2009,7 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbwm4jeRG3VqD5yYGsV",
+              "id": "msg_011ChPBn3PSdNujNk924YFQs",
               "type": "message",
               "role": "assistant",
               "content": [
@@ -2023,16 +2036,20 @@
                 "speed": "standard"
               },
               "input_transformations": [],
-              "diagnostics": null,
+              "diagnostics": {
+                "cache_miss_reason": {
+                  "type": "unavailable"
+                }
+              },
               "context_management": null
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "d64bc8c2-3864-4b5e-af30-aa93f722e3c2",
-            "timestamp": "2026-11-24T23:15:04.847Z",
-            "request_id": "req_011ChNbwkvoRd9Y6qvT2LZQh",
-            "user_message_uuid": "6b145f53-2bb3-4fa4-9ed0-9aca1c903136",
-            "user_message_uuids": ["6b145f53-2bb3-4fa4-9ed0-9aca1c903136"]
+            "uuid": "28a12b68-26c0-43f2-8c15-7578615002b3",
+            "timestamp": "2026-11-25T06:38:44.995Z",
+            "request_id": "req_011ChPBn3EGFCUmreHP1u6x6",
+            "user_message_uuid": "2cbe0027-0b5d-4db6-87d0-f33f1f92e296",
+            "user_message_uuids": ["2cbe0027-0b5d-4db6-87d0-f33f1f92e296"]
           }
         },
         {
@@ -2044,8 +2061,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "95da94c2-a358-430d-b2d6-6003e46cdda0",
-            "api_message_id": "msg_011ChNbwm4jeRG3VqD5yYGsV"
+            "uuid": "f49e5f8b-6e59-4c03-aab2-eccffe7a6e39",
+            "api_message_id": "msg_011ChPBn3PSdNujNk924YFQs"
           }
         },
         {
@@ -2074,8 +2091,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1f5c3fef-dbf5-4460-81bb-30f83e2ba282",
-            "api_message_id": "msg_011ChNbwm4jeRG3VqD5yYGsV"
+            "uuid": "4ebc2ea9-bbe9-4e8a-bcd0-d6b3b36c7f5a",
+            "api_message_id": "msg_011ChPBn3PSdNujNk924YFQs"
           }
         },
         {
@@ -2086,13 +2103,13 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ab6265ce-7f80-4ff2-87e1-69750e9f9735",
-            "api_message_id": "msg_011ChNbwm4jeRG3VqD5yYGsV"
+            "uuid": "f5be27a1-0cf6-41cf-aaea-07f54560d1f1",
+            "api_message_id": "msg_011ChPBn3PSdNujNk924YFQs"
           }
         },
         {
           "in": {
-            "duration_api_ms": 1768,
+            "duration_api_ms": 1842,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -2170,18 +2187,18 @@
             "subtype": "success",
             "api_error_status": null,
             "result": "SECOND",
-            "ttft_ms": 832,
+            "ttft_ms": 911,
             "type": "result",
-            "duration_ms": 837,
-            "uuid": "e1f1a0a6-bcf2-45f3-bb90-8ef6266cf8f2",
-            "ttft_stream_ms": 832,
+            "duration_ms": 915,
+            "uuid": "4e3dba26-c2e8-4739-b505-95a410c3da70",
+            "ttft_stream_ms": 910,
             "time_to_request_ms": 16,
-            "first_content_frame_ms": 832,
-            "user_message_uuid": "6b145f53-2bb3-4fa4-9ed0-9aca1c903136",
-            "user_message_uuids": ["6b145f53-2bb3-4fa4-9ed0-9aca1c903136"],
-            "request_sent_wall_ms": 1795562104030,
+            "first_content_frame_ms": 911,
+            "user_message_uuid": "2cbe0027-0b5d-4db6-87d0-f33f1f92e296",
+            "user_message_uuids": ["2cbe0027-0b5d-4db6-87d0-f33f1f92e296"],
+            "request_sent_wall_ms": 1795588724101,
             "first_request_input_tokens": 0,
-            "first_request_cache_read_input_tokens": 22450,
+            "first_request_cache_read_input_tokens": 16304,
             "queued_turn_count": 0,
             "result_index": 1,
             "model_usage_since_last_result": {
@@ -2207,9 +2224,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "6b145f53-2bb3-4fa4-9ed0-9aca1c903136",
+            "command_uuid": "2cbe0027-0b5d-4db6-87d0-f33f1f92e296",
             "state": "completed",
-            "uuid": "68d04a0f-292a-49fd-ba49-ee8510b0c687",
+            "uuid": "05bec6ce-a696-4781-ba4c-4a64379c3a4e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -2219,7 +2236,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "c7ef2796-aba6-4fd0-bad4-7772edcb3b7c",
+            "uuid": "0520a9d4-a7ca-47c1-bc1d-930b6c0b3e28",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

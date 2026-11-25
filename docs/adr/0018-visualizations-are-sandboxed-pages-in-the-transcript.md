@@ -12,8 +12,11 @@ The page is the agent's own HTML and scripts, and Glass's window holds the backe
 page runs in a frame sandboxed to an opaque origin. Main serves it at `glass-visualization://<id>`,
 fetching it from the backend with the secret added there, so the page never sees it in its own
 address. The page's Content Security Policy lets it load scripts, styles and images over https but
-make no requests, and main refuses its loads from this device, as it does a Sandbox Browser pane's,
-so a Sandbox Thread's page can't reach this device. A small script Glass adds to
+make no requests, and main refuses its loads when a name resolves to this device or a private
+network, so a Sandbox Thread's page can't reach this device. Chromium resolves the name again to
+connect, so a name that changes its answer in between still gets through; a Sandbox Browser pane
+closes that gap by connecting through main's proxy, but this page loads in Glass's own session,
+whose traffic to the backend can't go through it. A small script Glass adds to
 the page takes the app's theme as CSS variables, reports the page's height so the frame fits it, and
 hands link clicks to Glass.
 

@@ -213,6 +213,7 @@ export class Threads extends Context.Service<
       threadId: string,
       path: string,
     ) => Effect.Effect<ThreadFile, ThreadNotFound | ThreadError>
+    readonly placeOf: (threadId: string) => Effect.Effect<ThreadPlace, ThreadNotFound>
     readonly create: (input: NewThread) => Effect.Effect<Thread, InvalidLocalCheckout | ThreadError>
     readonly createFrom: (
       parentId: string,
@@ -913,6 +914,9 @@ export class Threads extends Context.Service<
           }),
         ).pipe(Effect.withSpan("Threads.file"))
 
+      const placeOf = (threadId: string): Effect.Effect<ThreadPlace, ThreadNotFound> =>
+        find(threadId).pipe(Effect.map(({ thread }) => thread.place))
+
       const update = Effect.fn("Threads.update")(function* (
         threadId: string,
         change: Partial<Pick<Thread, "model" | "effort" | "permissionMode">>,
@@ -1065,6 +1069,7 @@ export class Threads extends Context.Service<
         files,
         existingFiles,
         file,
+        placeOf,
         create,
         createFrom,
         createForReview,

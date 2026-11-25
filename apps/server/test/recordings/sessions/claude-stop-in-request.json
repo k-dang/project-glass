@@ -19,58 +19,10 @@
       "frames": [
         {
           "out": {
-            "request_id": "z2dwa04xrac",
+            "request_id": "r8avrnbv3a9",
             "type": "control_request",
             "request": {
-              "subtype": "initialize",
-              "sdkMcpServers": ["glass"],
-              "sdkMcpServerManifests": {
-                "glass": {
-                  "initializeResult": {
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {
-                      "tools": {
-                        "listChanged": true
-                      }
-                    },
-                    "serverInfo": {
-                      "name": "glass",
-                      "version": "1.0.0"
-                    }
-                  },
-                  "toolsListResult": {
-                    "tools": [
-                      {
-                        "name": "draw_diagram",
-                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
-                        "inputSchema": {
-                          "$schema": "http://json-schema.org/draft-07/schema#",
-                          "type": "object",
-                          "properties": {
-                            "title": {
-                              "type": "string",
-                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
-                            },
-                            "kind": {
-                              "type": "string",
-                              "enum": ["existing", "proposed", "uncertain"],
-                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
-                            },
-                            "mermaid": {
-                              "type": "string",
-                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
-                            }
-                          },
-                          "required": ["title", "kind", "mermaid"]
-                        },
-                        "execution": {
-                          "taskSupport": "forbidden"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
+              "subtype": "initialize"
             }
           }
         },
@@ -79,7 +31,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "z2dwa04xrac",
+              "request_id": "r8avrnbv3a9",
               "response": {
                 "commands": [
                   {
@@ -711,9 +663,6 @@
                 "current_permission_mode": "default",
                 "hook_on_failure_supported": true,
                 "other_hook_ask_outranks_host": true,
-                "sdk_mcp_manifests_parked": {
-                  "glass": "parked"
-                },
                 "feedback_mode": {
                   "kind": "disabled"
                 },
@@ -739,7 +688,36 @@
         },
         {
           "out": {
-            "request_id": "eyf1l1x40ev",
+            "request_id": "x76osowx6ph",
+            "type": "control_request",
+            "request": {
+              "subtype": "mcp_set_servers",
+              "servers": {
+                "glass": {
+                  "type": "sdk",
+                  "name": "glass"
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "x76osowx6ph",
+              "response": {
+                "added": ["glass"],
+                "removed": [],
+                "errors": {}
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "request_id": "tkemmpobjp",
             "type": "control_request",
             "request": {
               "subtype": "set_model",
@@ -749,10 +727,93 @@
         },
         {
           "in": {
+            "type": "control_request",
+            "request_id": "dea184ae-8c32-4b0b-99b5-97c1478e6640",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "initialize",
+                "params": {
+                  "protocolVersion": "2025-11-25",
+                  "capabilities": {},
+                  "clientInfo": {
+                    "name": "claude-code",
+                    "title": "Claude Code",
+                    "description": "Anthropic's agentic coding tool",
+                    "websiteUrl": "https://claude.com/claude-code",
+                    "version": "2.1.322"
+                  }
+                },
+                "jsonrpc": "2.0",
+                "id": 0
+              }
+            }
+          }
+        },
+        {
+          "out": {
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "eyf1l1x40ev",
+              "request_id": "dea184ae-8c32-4b0b-99b5-97c1478e6640",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {
+                      "tools": {
+                        "listChanged": true
+                      }
+                    },
+                    "serverInfo": {
+                      "name": "glass",
+                      "version": "1.0.0"
+                    }
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "b31d2dfe-7723-4475-b163-ab8a07cd5195",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized"
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "b31d2dfe-7723-4475-b163-ab8a07cd5195",
+              "response": {
+                "mcp_response": {
+                  "jsonrpc": "2.0",
+                  "result": {},
+                  "id": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "tkemmpobjp",
               "response": {
                 "model": "claude-haiku-5-5"
               }
@@ -761,7 +822,7 @@
         },
         {
           "out": {
-            "request_id": "nfvlaw4ukv",
+            "request_id": "xqk348kknq",
             "type": "control_request",
             "request": {
               "subtype": "apply_flag_settings",
@@ -776,13 +837,13 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "nfvlaw4ukv"
+              "request_id": "xqk348kknq"
             }
           }
         },
         {
           "out": {
-            "request_id": "xacc9yzhurl",
+            "request_id": "061p348uxfo3",
             "type": "control_request",
             "request": {
               "subtype": "set_permission_mode",
@@ -792,10 +853,71 @@
         },
         {
           "in": {
+            "type": "control_request",
+            "request_id": "3e54f0db-c175-4927-acb0-b74da6fdc885",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "tools/list",
+                "jsonrpc": "2.0",
+                "id": 1
+              }
+            }
+          }
+        },
+        {
+          "out": {
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "xacc9yzhurl",
+              "request_id": "3e54f0db-c175-4927-acb0-b74da6fdc885",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "tools": [
+                      {
+                        "name": "draw_diagram",
+                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                        "inputSchema": {
+                          "$schema": "http://json-schema.org/draft-07/schema#",
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["existing", "proposed", "uncertain"],
+                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                            },
+                            "mermaid": {
+                              "type": "string",
+                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                            }
+                          },
+                          "required": ["title", "kind", "mermaid"]
+                        },
+                        "execution": {
+                          "taskSupport": "forbidden"
+                        }
+                      }
+                    ]
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "061p348uxfo3",
               "response": {
                 "mode": "default"
               }
@@ -810,7 +932,7 @@
               "content": "Use the Bash tool to run exactly `touch notes.txt` and nothing else, then reply with exactly: DONE"
             },
             "parent_tool_use_id": null,
-            "uuid": "af66d3c8-871a-441e-8e69-3d3dc3affd2f"
+            "uuid": "6c4f32de-b2e7-4eb0-a466-94945557a231"
           }
         },
         {
@@ -819,25 +941,25 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "5a6fdc15-6529-4a93-a5eb-7c04c7802faa",
+            "uuid": "a2cf02dc-a2f5-4cb7-bd7e-8458a9110f5e",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "af66d3c8-871a-441e-8e69-3d3dc3affd2f",
+            "command_uuid": "6c4f32de-b2e7-4eb0-a466-94945557a231",
             "state": "queued",
-            "uuid": "e14f2660-11a6-4406-ab9d-1a836f052160",
+            "uuid": "25673c12-d0ac-429e-bab6-d52b7f396ddb",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "af66d3c8-871a-441e-8e69-3d3dc3affd2f",
+            "command_uuid": "6c4f32de-b2e7-4eb0-a466-94945557a231",
             "state": "started",
-            "uuid": "707741fc-f2e3-483d-99ad-b2a0d6688495",
+            "uuid": "f9c3e73f-174b-49cf-9265-1f2c7d543791",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1097,13 +1219,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "5809e5f7-6d7a-4dfd-94e9-58fa76409292",
+            "uuid": "c2d88615-ed64-46e6-80f5-25bca5f2db5c",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-aef68110c5e2acf0c1fdaf648484a087",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-6f94ec56ba9bd1a5d74c9a80138fe423",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -1111,7 +1233,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["af66d3c8-871a-441e-8e69-3d3dc3affd2f"]
+            "user_message_uuids": ["6c4f32de-b2e7-4eb0-a466-94945557a231"]
           }
         },
         {
@@ -1120,8 +1242,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "e321e3a6-e8e5-49af-a7d2-0dbe78e405a3",
-            "user_message_uuids": ["af66d3c8-871a-441e-8e69-3d3dc3affd2f"]
+            "uuid": "9eddab93-26f8-484a-9bff-c5000d47d61c",
+            "user_message_uuids": ["6c4f32de-b2e7-4eb0-a466-94945557a231"]
           }
         },
         {
@@ -1131,7 +1253,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChNbxJrSGeqEQquMkAWva",
+                "id": "msg_011ChPBnBeXjqJw7b5JE9sQo",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1159,12 +1281,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "368aef11-80fc-4894-a2ed-690784525d25",
-            "ttft_ms": 845,
+            "uuid": "572591b5-52d7-49a5-a970-c38ab2e566d8",
+            "ttft_ms": 827,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva",
-            "user_message_uuid": "af66d3c8-871a-441e-8e69-3d3dc3affd2f",
-            "user_message_uuids": ["af66d3c8-871a-441e-8e69-3d3dc3affd2f"]
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo",
+            "user_message_uuid": "6c4f32de-b2e7-4eb0-a466-94945557a231",
+            "user_message_uuids": ["6c4f32de-b2e7-4eb0-a466-94945557a231"]
           }
         },
         {
@@ -1175,7 +1297,7 @@
               "index": 0,
               "content_block": {
                 "type": "tool_use",
-                "id": "toolu_01PvMFEQiPJLghtimmLKioWY",
+                "id": "toolu_017YNeaVUmnMaaeem6nzRUNV",
                 "name": "Bash",
                 "input": {},
                 "caller": {
@@ -1185,8 +1307,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "b22a1a5e-98b9-48e6-bee5-9cb0c25ff621",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "d3716868-c69f-4fc8-9ca7-5d3fefed1e84",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1202,8 +1324,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "ff601aa5-b5ba-4869-b5fa-72a7d3886c72",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "eeddad34-9604-4ed8-954e-a8a509096f67",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1219,8 +1341,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "40990cf8-f043-4a75-b2dd-5b7b495ba004",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "2cf2489a-1d92-4719-8285-159e6ab34771",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1236,8 +1358,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "90aff1b8-42ba-4ea7-9b25-52ec20a4fd35",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "1daa810b-84e3-404c-a8b9-8a1f9c77e5df",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1253,8 +1375,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8d16eabc-a3eb-4218-b0ba-9c27625c9ccf",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "ccbb5b86-f77c-4837-a32b-03935b861144",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1270,8 +1392,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "15377aba-bd85-4c6c-889a-b77bb4870ebe",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "7235e43f-c999-44e5-9096-8c9c3e2b493b",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1287,8 +1409,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "bd036279-2b07-481b-a9f8-eedc11d44db4",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "bc55afbe-5793-41bc-9d2f-4295efd6dbe8",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1304,8 +1426,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "8630c257-869f-4e81-885b-5ec3eb60c7e4",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "611d603b-c352-40d3-bd6c-a2a3aa2d3fa7",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1321,8 +1443,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "723a7726-e898-4ec1-95bf-7750db6cc4d7",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "9a577b65-e25c-440e-9a16-a30d0b053437",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1338,8 +1460,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f5151c39-bef0-447d-8a9b-388e8c1da9b6",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "a759e8d2-f8c8-4107-9e84-4b4a5243ce0b",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1350,13 +1472,13 @@
               "index": 0,
               "delta": {
                 "type": "input_json_delta",
-                "partial_json": "ate not"
+                "partial_json": "ate emp"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2ce96d2a-1e0a-4724-ae0d-905846d3b5d3",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "51ecc4d2-b525-4549-ad14-85b0531070d6",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1367,13 +1489,13 @@
               "index": 0,
               "delta": {
                 "type": "input_json_delta",
-                "partial_json": "es.txt "
+                "partial_json": "ty note"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a157f5af-d6c5-40e0-b4d6-072a6f8c7fbe",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "21de26b1-370f-48f0-bf15-b39b96d52c9f",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1384,13 +1506,13 @@
               "index": 0,
               "delta": {
                 "type": "input_json_delta",
-                "partial_json": "via tou"
+                "partial_json": "s.txt f"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1eed4009-8b97-4ebb-9b80-ec96e77348bb",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "6d04f060-35e2-446d-930c-0b06f4eb5d81",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1401,13 +1523,13 @@
               "index": 0,
               "delta": {
                 "type": "input_json_delta",
-                "partial_json": "ch\"}"
+                "partial_json": "ile\"}"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c37c6a53-7426-47b4-8234-c7996146648b",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "5c3124a3-4fe0-41dc-9e97-f5f1d77d8ac3",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1415,17 +1537,17 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbxJrSGeqEQquMkAWva",
+              "id": "msg_011ChPBnBeXjqJw7b5JE9sQo",
               "type": "message",
               "role": "assistant",
               "content": [
                 {
                   "type": "tool_use",
-                  "id": "toolu_01PvMFEQiPJLghtimmLKioWY",
+                  "id": "toolu_017YNeaVUmnMaaeem6nzRUNV",
                   "name": "Bash",
                   "input": {
                     "command": "touch notes.txt",
-                    "description": "Create notes.txt via touch"
+                    "description": "Create empty notes.txt file"
                   },
                   "caller": {
                     "type": "direct"
@@ -1455,11 +1577,11 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "986bc8e2-c138-4695-b977-7b91e641c5c9",
-            "timestamp": "2026-11-24T23:15:12.475Z",
-            "request_id": "req_011ChNbxJg1TaENx9z8xxPQQ",
-            "user_message_uuid": "af66d3c8-871a-441e-8e69-3d3dc3affd2f",
-            "user_message_uuids": ["af66d3c8-871a-441e-8e69-3d3dc3affd2f"]
+            "uuid": "db0a4042-84e1-4ae5-95d2-51c67c9799a2",
+            "timestamp": "2026-11-25T06:38:47.075Z",
+            "request_id": "req_011ChPBnBWapvHsQgb6Xaqc2",
+            "user_message_uuid": "6c4f32de-b2e7-4eb0-a466-94945557a231",
+            "user_message_uuids": ["6c4f32de-b2e7-4eb0-a466-94945557a231"]
           }
         },
         {
@@ -1471,8 +1593,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "0e7058ae-22af-43b4-8418-16f384271a4b",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "db62031c-5ead-471e-a45c-0460cdd13f71",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1481,23 +1603,23 @@
             "subtype": "session_state_changed",
             "state": "requires_action",
             "sdk_host_only": true,
-            "uuid": "522e1420-34f7-42ba-85cb-71943157cfcb",
+            "uuid": "2ac60b37-7d25-4f28-8151-11bb268be5a9",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "control_request",
-            "request_id": "5ab4a8c0-bcb0-42e8-8fe4-f23c4d07e1dd",
+            "request_id": "253fec71-7b63-4c2b-96ac-f3446c8a44c5",
             "request": {
               "subtype": "can_use_tool",
               "tool_name": "Bash",
               "display_name": "Bash",
               "input": {
                 "command": "touch notes.txt",
-                "description": "Create notes.txt via touch"
+                "description": "Create empty notes.txt file"
               },
-              "description": "Create notes.txt via touch",
+              "description": "Create empty notes.txt file",
               "permission_suggestions": [
                 {
                   "type": "addRules",
@@ -1522,13 +1644,13 @@
                 }
               ],
               "blocked_path": "<folder>/notes.txt",
-              "tool_use_id": "toolu_01PvMFEQiPJLghtimmLKioWY"
+              "tool_use_id": "toolu_017YNeaVUmnMaaeem6nzRUNV"
             }
           }
         },
         {
           "out": {
-            "request_id": "rbwwirx9k68",
+            "request_id": "uwd10gf2i3",
             "type": "control_request",
             "request": {
               "subtype": "interrupt",
@@ -1562,8 +1684,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "732b7f4a-b9e1-451a-88a7-dadd005cbeee",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "2d17264b-5cb7-4a0b-ad88-1a017bcc4632",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
@@ -1574,22 +1696,22 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "15a66341-6a0a-48df-8106-a1c318dfaa01",
-            "api_message_id": "msg_011ChNbxJrSGeqEQquMkAWva"
+            "uuid": "bc22256b-e95f-4ee5-8d51-c5cc33e11be6",
+            "api_message_id": "msg_011ChPBnBeXjqJw7b5JE9sQo"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "21a2a411-3386-4ca6-a098-d58e17f26114",
+            "uuid": "3d4c3b68-f284-4ddf-aafc-8b157a11b62b",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "control_cancel_request",
-            "request_id": "5ab4a8c0-bcb0-42e8-8fe4-f23c4d07e1dd"
+            "request_id": "253fec71-7b63-4c2b-96ac-f3446c8a44c5"
           }
         },
         {
@@ -1597,7 +1719,7 @@
             "type": "control_response",
             "response": {
               "subtype": "error",
-              "request_id": "5ab4a8c0-bcb0-42e8-8fe4-f23c4d07e1dd",
+              "request_id": "253fec71-7b63-4c2b-96ac-f3446c8a44c5",
               "error": "All fibers interrupted without error"
             }
           }
@@ -1607,7 +1729,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "rbwwirx9k68",
+              "request_id": "uwd10gf2i3",
               "response": {
                 "still_queued": [],
                 "cancelled": []
@@ -1621,7 +1743,7 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "018e81fb-acf3-45bd-b0e7-76dc55dbdda3",
+            "uuid": "121fc5ff-345a-4481-9de2-ccba0ccddb94",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1635,18 +1757,18 @@
                   "type": "tool_result",
                   "content": "The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.",
                   "is_error": true,
-                  "tool_use_id": "toolu_01PvMFEQiPJLghtimmLKioWY"
+                  "tool_use_id": "toolu_017YNeaVUmnMaaeem6nzRUNV"
                 }
               ]
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "2ee1a619-c028-480b-9d3f-b5933330cb02",
-            "timestamp": "2026-11-24T23:15:12.552Z",
+            "uuid": "56169521-f9bf-43aa-95d8-9ae7b2f7a07c",
+            "timestamp": "2026-11-25T06:38:47.134Z",
             "tool_use_result": "User rejected tool use",
             "tool_result_meta": [
               {
-                "id": "toolu_01PvMFEQiPJLghtimmLKioWY",
+                "id": "toolu_017YNeaVUmnMaaeem6nzRUNV",
                 "non_execution_kind": "user-rejected"
               }
             ]
@@ -1666,13 +1788,13 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "fdf2db61-a0a5-45fc-b075-2706840c5d32",
-            "timestamp": "2026-11-24T23:15:12.554Z"
+            "uuid": "f2043006-20eb-458b-904d-8730e22b05a9",
+            "timestamp": "2026-11-25T06:38:47.136Z"
           }
         },
         {
           "in": {
-            "duration_api_ms": 1105,
+            "duration_api_ms": 1106,
             "stop_reason": "tool_use",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -1719,10 +1841,10 @@
             "permission_denials": [
               {
                 "tool_name": "Bash",
-                "tool_use_id": "toolu_01PvMFEQiPJLghtimmLKioWY",
+                "tool_use_id": "toolu_017YNeaVUmnMaaeem6nzRUNV",
                 "tool_input": {
                   "command": "touch notes.txt",
-                  "description": "Create notes.txt via touch"
+                  "description": "Create empty notes.txt file"
                 }
               }
             ],
@@ -1760,11 +1882,11 @@
             "errors": [
               "[ede_diagnostic] result_type=user last_content_type=n/a stop_reason=tool_use"
             ],
-            "user_message_uuid": "af66d3c8-871a-441e-8e69-3d3dc3affd2f",
+            "user_message_uuid": "6c4f32de-b2e7-4eb0-a466-94945557a231",
             "type": "result",
-            "duration_ms": 1182,
-            "uuid": "fc67d6bf-403e-49ff-8306-8947052f365f",
-            "user_message_uuids": ["af66d3c8-871a-441e-8e69-3d3dc3affd2f"],
+            "duration_ms": 1160,
+            "uuid": "aaa63bc6-3528-473a-a002-780a343c4160",
+            "user_message_uuids": ["6c4f32de-b2e7-4eb0-a466-94945557a231"],
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
@@ -1790,9 +1912,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "af66d3c8-871a-441e-8e69-3d3dc3affd2f",
+            "command_uuid": "6c4f32de-b2e7-4eb0-a466-94945557a231",
             "state": "cancelled",
-            "uuid": "2e7f823a-9b74-484d-a215-4e67b50bdc9a",
+            "uuid": "ddd787bc-e54d-4999-96c1-c206ab030a66",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1802,7 +1924,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "1c060d71-878a-41ab-a3aa-e657a1f763aa",
+            "uuid": "f4e219c8-4c3f-4f13-b34c-ea2ceeb47e20",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

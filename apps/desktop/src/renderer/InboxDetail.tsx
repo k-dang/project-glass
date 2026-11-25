@@ -4,6 +4,8 @@ import {
   type InboxThread,
   type InboxGlobalChat,
   type InboxItem,
+  type OutsideAgentDecision,
+  type OutsideAgentRequest,
   type OutsideQuestion,
   type InboxPullRequest,
   referenceKey,
@@ -57,6 +59,9 @@ export function InboxDetail(
       <OutsideQuestionDetail key={item.id} item={item} now={now} actions={actions} />
     ),
     CheckIn: (item) => <CheckInDetail key={item.id} item={item} now={now} actions={actions} />,
+    OutsideAgentRequest: (item) => (
+      <OutsideAgentRequestDetail key={item.id} item={item} now={now} actions={actions} />
+    ),
     PullRequest: (item) => (
       <PullRequestDetail
         item={item}
@@ -140,6 +145,52 @@ function OutsideQuestionDetail(props: DetailProps<OutsideQuestion>) {
 const setCheckInAsideAtom = Atom.family((checkInId: string) =>
   backendRuntime.fn(() => Backend.use((backend) => backend.SetCheckInAside({ checkInId }))),
 )
+
+const answerOutsideAgentRequestAtom = Atom.family((id: string) =>
+  backendRuntime.fn((decision: OutsideAgentDecision) =>
+    Backend.use((backend) => backend.AnswerOutsideAgentRequest({ id, decision })),
+  ),
+)
+
+function OutsideAgentRequestDetail(props: DetailProps<OutsideAgentRequest>) {
+  const { item } = props
+  const answering = answerOutsideAgentRequestAtom(item.id)
+  const sent = useAtomValue(answering)
+  const answer = useAtomSet(answering)
+  const problem = settledProblem(sent)
+
+  return (
+    <DetailShell
+      actions={props.actions}
+      buttons={
+        <>
+          <Button disabled={sent.waiting} onClick={() => answer("approve")}>
+            Approve
+          </Button>
+          <Button variant="outline" disabled={sent.waiting} onClick={() => answer("deny")}>
+            Deny
+          </Button>
+        </>
+      }
+    >
+      <DetailHeader item={item} now={props.now} />
+      <p className="text-sm text-pretty break-words">
+        {item.name} will be able to read your pull requests, to-dos, and agents, start and message
+        agents, start a review, and, in the Inbox, ask you a question or ask you to read the changes
+        in a folder on this computer. The connection lasts 30 days. You can disconnect it in
+        Settings.
+      </p>
+      <p className="text-sm text-pretty break-words text-muted-foreground">
+        Approve only a sign-in you just started.
+      </p>
+      {problem !== null && (
+        <p role="alert" className="text-xs text-destructive">
+          {problem.detail}
+        </p>
+      )}
+    </DetailShell>
+  )
+}
 
 function CheckInDetail(props: DetailProps<CheckIn>) {
   const { item } = props

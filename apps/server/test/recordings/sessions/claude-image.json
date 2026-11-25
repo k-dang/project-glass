@@ -19,58 +19,10 @@
       "frames": [
         {
           "out": {
-            "request_id": "5qyp3uoadni",
+            "request_id": "aovivmwn39e",
             "type": "control_request",
             "request": {
-              "subtype": "initialize",
-              "sdkMcpServers": ["glass"],
-              "sdkMcpServerManifests": {
-                "glass": {
-                  "initializeResult": {
-                    "protocolVersion": "2025-11-25",
-                    "capabilities": {
-                      "tools": {
-                        "listChanged": true
-                      }
-                    },
-                    "serverInfo": {
-                      "name": "glass",
-                      "version": "1.0.0"
-                    }
-                  },
-                  "toolsListResult": {
-                    "tools": [
-                      {
-                        "name": "draw_diagram",
-                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
-                        "inputSchema": {
-                          "$schema": "http://json-schema.org/draft-07/schema#",
-                          "type": "object",
-                          "properties": {
-                            "title": {
-                              "type": "string",
-                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
-                            },
-                            "kind": {
-                              "type": "string",
-                              "enum": ["existing", "proposed", "uncertain"],
-                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
-                            },
-                            "mermaid": {
-                              "type": "string",
-                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
-                            }
-                          },
-                          "required": ["title", "kind", "mermaid"]
-                        },
-                        "execution": {
-                          "taskSupport": "forbidden"
-                        }
-                      }
-                    ]
-                  }
-                }
-              }
+              "subtype": "initialize"
             }
           }
         },
@@ -79,7 +31,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "5qyp3uoadni",
+              "request_id": "aovivmwn39e",
               "response": {
                 "commands": [
                   {
@@ -711,9 +663,6 @@
                 "current_permission_mode": "default",
                 "hook_on_failure_supported": true,
                 "other_hook_ask_outranks_host": true,
-                "sdk_mcp_manifests_parked": {
-                  "glass": "parked"
-                },
                 "feedback_mode": {
                   "kind": "disabled"
                 },
@@ -739,6 +688,35 @@
         },
         {
           "out": {
+            "request_id": "6abcwonwbqr",
+            "type": "control_request",
+            "request": {
+              "subtype": "mcp_set_servers",
+              "servers": {
+                "glass": {
+                  "type": "sdk",
+                  "name": "glass"
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "6abcwonwbqr",
+              "response": {
+                "added": ["glass"],
+                "removed": [],
+                "errors": {}
+              }
+            }
+          }
+        },
+        {
+          "out": {
             "type": "user",
             "message": {
               "role": "user",
@@ -758,7 +736,60 @@
               ]
             },
             "parent_tool_use_id": null,
-            "uuid": "a670dca4-33dc-44ef-a30f-4d019ddd5570"
+            "uuid": "97400c81-6797-4378-95c7-51bd7f9db683"
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "ab2efb4a-7138-4397-b5fd-4078c8b0c5d3",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "initialize",
+                "params": {
+                  "protocolVersion": "2025-11-25",
+                  "capabilities": {},
+                  "clientInfo": {
+                    "name": "claude-code",
+                    "title": "Claude Code",
+                    "description": "Anthropic's agentic coding tool",
+                    "websiteUrl": "https://claude.com/claude-code",
+                    "version": "2.1.322"
+                  }
+                },
+                "jsonrpc": "2.0",
+                "id": 0
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "ab2efb4a-7138-4397-b5fd-4078c8b0c5d3",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "protocolVersion": "2025-11-25",
+                    "capabilities": {
+                      "tools": {
+                        "listChanged": true
+                      }
+                    },
+                    "serverInfo": {
+                      "name": "glass",
+                      "version": "1.0.0"
+                    }
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 0
+                }
+              }
+            }
           }
         },
         {
@@ -767,25 +798,116 @@
             "subtype": "session_state_changed",
             "state": "running",
             "sdk_host_only": true,
-            "uuid": "68b69737-f290-4faa-a676-2291c5dc629d",
+            "uuid": "0adc92e1-11b3-4fc5-8d21-7182bf8862e1",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "a670dca4-33dc-44ef-a30f-4d019ddd5570",
+            "command_uuid": "97400c81-6797-4378-95c7-51bd7f9db683",
             "state": "queued",
-            "uuid": "746325af-b14c-405f-bb69-dbbe64d48fa7",
+            "uuid": "b1a069e7-f726-4290-a72b-26c150afb0f6",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
+            "type": "control_request",
+            "request_id": "88134b0d-a90f-4832-a034-78fab9911f7a",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "jsonrpc": "2.0",
+                "method": "notifications/initialized"
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "88134b0d-a90f-4832-a034-78fab9911f7a",
+              "response": {
+                "mcp_response": {
+                  "jsonrpc": "2.0",
+                  "result": {},
+                  "id": 0
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "control_request",
+            "request_id": "8c8006e3-76ca-44d7-b68d-fa7ec7470191",
+            "request": {
+              "subtype": "mcp_message",
+              "server_name": "glass",
+              "message": {
+                "method": "tools/list",
+                "jsonrpc": "2.0",
+                "id": 1
+              }
+            }
+          }
+        },
+        {
+          "out": {
+            "type": "control_response",
+            "response": {
+              "subtype": "success",
+              "request_id": "8c8006e3-76ca-44d7-b68d-fa7ec7470191",
+              "response": {
+                "mcp_response": {
+                  "result": {
+                    "tools": [
+                      {
+                        "name": "draw_diagram",
+                        "description": "Draw a Diagram beside the Thread in Mermaid, or redraw one. Call it only when the user asks for a diagram or accepts your offer of one, never on your own. Calling it with a Diagram's title again replaces that Diagram, so keep the title when the user asks for changes and pick a new one only for a new Diagram.",
+                        "inputSchema": {
+                          "$schema": "http://json-schema.org/draft-07/schema#",
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string",
+                              "description": "A short name for the Diagram, shown above it. The same title redraws that Diagram."
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": ["existing", "proposed", "uncertain"],
+                              "description": "What the Diagram shows: \"existing\" for how things work now, \"proposed\" for a design that doesn't exist yet, or \"uncertain\" when it rests on inferences you couldn't confirm."
+                            },
+                            "mermaid": {
+                              "type": "string",
+                              "description": "The diagram in Mermaid syntax, such as a flowchart or sequence diagram. Glass draws no links or images."
+                            }
+                          },
+                          "required": ["title", "kind", "mermaid"]
+                        },
+                        "execution": {
+                          "taskSupport": "forbidden"
+                        }
+                      }
+                    ]
+                  },
+                  "jsonrpc": "2.0",
+                  "id": 1
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
             "type": "command_lifecycle",
-            "command_uuid": "a670dca4-33dc-44ef-a30f-4d019ddd5570",
+            "command_uuid": "97400c81-6797-4378-95c7-51bd7f9db683",
             "state": "started",
-            "uuid": "132c229d-ad42-443b-8869-ad2cc8fb80cb",
+            "uuid": "45038889-354c-4c6a-8534-4fdf7a6f34f2",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1045,13 +1167,13 @@
             ],
             "analytics_disabled": true,
             "product_feedback_disabled": false,
-            "uuid": "4588c1fb-c283-4cca-af12-bee80094769a",
+            "uuid": "931b75e3-4e6d-4c01-81da-e11eca8db4ab",
             "memory_paths": {
               "auto": "<folder>/.claude/projects\\<folder>/memory\\"
             },
             "original_cwd": "<folder>",
             "additional_directories": [],
-            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-1e98fa2a2c3aff046e119cf0b1f9cdfa",
+            "messaging_socket_path": "\\\\.\\pipe\\LOCAL\\cc-msg-8489450f15c9ac3d4cfa4f4b50d772ec",
             "fast_mode_state": "off",
             "fast_mode_disabled_reason": "sdk_opt_in_required",
             "per_turn_effort_active": true,
@@ -1059,7 +1181,7 @@
             "ultrathink_typed_raises": false,
             "view_mode": "default",
             "powershell_path": "<redacted>",
-            "user_message_uuids": ["a670dca4-33dc-44ef-a30f-4d019ddd5570"]
+            "user_message_uuids": ["97400c81-6797-4378-95c7-51bd7f9db683"]
           }
         },
         {
@@ -1068,8 +1190,8 @@
             "subtype": "status",
             "status": "requesting",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "c28811c7-d74f-4676-9489-5423c996062f",
-            "user_message_uuids": ["a670dca4-33dc-44ef-a30f-4d019ddd5570"]
+            "uuid": "6ae53bd9-6911-4709-8988-03f59a24bebd",
+            "user_message_uuids": ["97400c81-6797-4378-95c7-51bd7f9db683"]
           }
         },
         {
@@ -1079,7 +1201,7 @@
               "type": "message_start",
               "message": {
                 "model": "claude-haiku-5-5",
-                "id": "msg_011ChNbtuuyBfwdKMasfhTwN",
+                "id": "msg_011ChPBiJ2e4kfbuseQCFQfd",
                 "type": "message",
                 "role": "assistant",
                 "content": [],
@@ -1107,12 +1229,12 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "797b0547-c3ee-4e62-abff-cfc22b15fbba",
-            "ttft_ms": 550,
+            "uuid": "35da946f-b19f-4e05-918e-c086d91211c3",
+            "ttft_ms": 967,
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN",
-            "user_message_uuid": "a670dca4-33dc-44ef-a30f-4d019ddd5570",
-            "user_message_uuids": ["a670dca4-33dc-44ef-a30f-4d019ddd5570"]
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd",
+            "user_message_uuid": "97400c81-6797-4378-95c7-51bd7f9db683",
+            "user_message_uuids": ["97400c81-6797-4378-95c7-51bd7f9db683"]
           }
         },
         {
@@ -1129,9 +1251,9 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2a7c65b7-407f-4c81-b097-67614de393d3",
+            "uuid": "936ff340-6d7d-48c0-8742-310b66b0080e",
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1141,8 +1263,8 @@
             "estimated_tokens": 0,
             "estimated_tokens_delta": 0,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "3a88413d-cd4c-4bfc-9f36-ae66b7c6bc1e",
-            "user_message_uuid": "a670dca4-33dc-44ef-a30f-4d019ddd5570"
+            "uuid": "988d60c2-d285-4a3e-9ac7-e3df88d6ee05",
+            "user_message_uuid": "97400c81-6797-4378-95c7-51bd7f9db683"
           }
         },
         {
@@ -1159,9 +1281,9 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "335a0650-429c-4af4-96e9-455ff42780f4",
+            "uuid": "a1718395-e294-4ae9-b4ce-20a2e5bd69c7",
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1178,9 +1300,9 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f5b07331-f6a8-4394-8c11-93ffb49220f5",
+            "uuid": "a78778c2-43f9-40a1-82d7-bd8cf4ab82ab",
             "thinking_display": "updates",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1190,8 +1312,8 @@
             "estimated_tokens": 0,
             "estimated_tokens_delta": 0,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "ea63ebae-426d-4c19-8bc0-e8ce6663e81f",
-            "user_message_uuid": "a670dca4-33dc-44ef-a30f-4d019ddd5570"
+            "uuid": "9dab4be1-69d2-4534-a424-caf30d77aacf",
+            "user_message_uuid": "97400c81-6797-4378-95c7-51bd7f9db683"
           }
         },
         {
@@ -1202,13 +1324,13 @@
               "index": 0,
               "delta": {
                 "type": "signature_delta",
-                "signature": "CAQS6QkKEAgUGAI4AUIIdGhpbmtpbmcSDDLpuf0nHFYZaoS/kBoMYV7A+vw31zoZ8MLXIjBAhYG8wCEPS5IVmihph8cQVsbZtGJ7JwV7KiMGOYKTZC5bIPNexjQ75OhgMr7h1TIqhgnobX81xPYT5sgEwnI6J48jqwU0toBDp56QMiQ4vXcR88EPTpTN0HPRKZD/dxr0La/01QatlMSc+n1lHL2e4R2EV4dOmAqMtmvovEDpjkIwjM0crpon/cEF9pRSaIaqWrSJyXAJ0Y4H90e2yfYVVtH2KLYkNfReTWdIbeojBDZ+FZbsLaAlftBYPfa/inUqyckrudjuhEJ++pMImukUfyai1ME9Yxy+T2pUVuMDm8HeK9xykMLELVssNBe8dTS2II+WX0hPtcz2UmWNbdrhB8PJs72ex2PU/nh29XZecoAgS0+He2H7sn20pV8bEzD6mUfTGS11S1ey6jO9rDJCKPz1Se/5dhIgMNzXQBE9Q6jKCfke7dgm3/n7eBNu+kArBxY2HwgYxq+BpEm/0uMUGjq37eGq4de30YAOufszcJviLcKSoNLoYqE2nMWva9nHhoVcVBNTptAvzuq8SXWKlVKebR5n/Cm1qZ1M4iQYFmSU+UHzmVaLgIvgMe6ORgI5dkIIwpUwPXBJ6xqkIJc3zrx7l+wlCWq8V13jkHsUmc3p6SPoTxrJxcKUFA6PtPkDWqoC+m6fuv0bwgXrXnED7WjvEj34uxuCW0/l+uIZdoq8numqSJL/LTdIFcwPtTpdN0Xh+6ppul4MMcOxb1x8/8i1JVLqFekntibg2g1VP/LoFe+HSEzrv06AM3O7fOJf1X3Fr3MW+6q5HdH2InR8gkl8qDwfaVXcCCUIB4YbrfBnEeVZnTBgcD2ZIREF5p6+s/V2Iuu26sEWUq1jlHFSdvup8BrFO4DqOInlF2VXerwxbkVPOiuW5DgcSNfY2kgEbysBTi3a23PKawS/9lKjjbBkfLENYI42tmx2tNI0A4t3T7oZEaYs3Rdnvmh6HoVwcJfH7c7ZveK2wkOSMB1RfwDrkMb6zGe0yh64pSZG0eeTiVFCraQQVT9UsBN32SkR6UCkT4+RlESTVhemu0pRVBas1Nt9h8S+WMVtk1DjL3a6FPj7JYN0E3q0tPL51y08p/7B1lzLOt0z0bmWc+pH2Rhxf4AKuT1bqhFsZtN1+PIvNNRyASpHaHNBh7hyKA0jFrbGtfwWxwy1HI+Q0YydqHIG0MTbK2xEl6MebS4khTld7NaLyP41srolmRLTlWzX6EwLh/jy8B4B0musUN7t1ROjSHPU8SXdIAXqDgvP6nYE/LGxxvqitU1Ci+bZL/L7atFyx22aqgzZNU/hRpAQoM9jn4loFAoxvHjSNq/tRVy8+BkN4rR3pyJqXgKQMqz/RmaEru2R09Ns/4Yf3hVyczYGXkx+LYkx34Q/PYQIptEFMuxIzqqqNqkuL6LbehQJ+WIcGFozfAgZFezrtJwqb8eGSXWi9zJbxIxXNNQ8rEAWWGSd8cWpu+JwP5OVry0a5Q+/aTeOGpTcMFHIlvvL7saAw9IzJgqOLUI8/8wuJPQOCgrxHkZIT2UQUNkbyy+Gmxr3KLEyWlJu2wUrcAbaONuuRLX2yOe32qpWtCS2O2hMb6q5j9c6uTUNG+QHBK26iZrWDdL1WEUYAQ=="
+                "signature": "CAQSlwkKEAgUGAI4AUIIdGhpbmtpbmcSDOWq3+LublJTNuiflhoMPjhT1mX4R4YA0TLvIjBHUV8AD65sfwuz+iiUN21NBwy+Fcox0iVgHpgUHxVc1C5UUA8OfhfFwJeYoBm34WQqtAir7cPJTcZeJ43lKcbJBnitjaYikg3YLMK5n5H3ycejYEWZw6SXPEzo1eGrKt1/CN6d1tjFoHkBIqH0oIFKhDzHla2RD3+hjQFjEqSrBcvgQwlrbK1v13MmAcHS1Iq1YfenUCNEnC++cTPijhiTt2EGCMlkfzfVcDRTia86GP55dGHZKa6yPx03cKjBlm0r1HoBA97X0vlWnLtd9Xpff9stsUiouqjjnuqVXUAr+XXX+lZLOEpuAMK5b8APPgWJOX1gGu76h8uv8z/0+CkzvXQ3yafo8m1KzM5UrnLl+tZsKWjG6fN3mvbFKI5o2CPs08MlldQp5XxgHc1TrOoODpSv3UB9XV+qoftbA0BhlLehwFW6dR7j7XOTbMBHXUyPa1q0LCmT2ffWgtBlgs/usGDFyE4zA9tNFuFA9j/V3yTSuHFhxSpWdC+m069Q96HExcHDA8+a8mMxLnESNH2URLWYgV3RYJeRemXrxBXhiMtRvhbaWf+xAI154clHk1xVjOThMj/y9GTRsWBEuyqlF0BLJh12eTKy0EOvr7hE2wSXcN0du/a1kS2GxhVdTuMFcLVfTF2CvSbDlmrkXbXBcHaf5iSFOhpt5PniZVb0A4UY0h0kNRf5SbXbnpAr1sVSJzG5zMTqfxEL4f35Z2VgxzamBW4g7UhExvyudZU+PplbmyQVt39uh4AcirpmjVMWHZg4BP+883zRVLXBIxTjeHhxQupW7pC+bR1y8wiSQmMWcHUCMJ5/KCI1w4plZXwlr2CfTOOIK928NTUKN+py1BumDggQizbny7Iivx/8GlLE/Hrw/0TwpbVeFwyK2lwLe5tHxOu2l9zcGAYjVQLrsy0Y596+REgu6FfWoOJezaWjmikV2m/blnccg0+NunrzsUwlNsemMqg/fqZC8/Rj8r9JRqGJDCwwjF7FEf952m4VScVMxnATKbiBlrn1CkBjzrSu4EMkZF7uuESdcx/V0A23WdqUiqhUhQWFFdhqAC0ab0B0HVo7gd1xgoZFF21dByNxbs1cSMOddDdU5OPciDgkxeylsYmtUYTBgK/Exgs8nrJFNsI1QD8k5k4qVK/G2aubjzBHtOsLoGapCUocF/wD/FV/cbG86v1fJXGdtOXu/JB3HseAHRzCd65eaEI58ay7YBudVWcJnuPjNtpCD/3wMgz/D+MhRHuJTesTgSfs9Zj8tqggfw7Z+KJ6jMC9JjDlOnviWIGUvEP17TFOz2ffbvZAAVHINIW5YJul6w99oKSLramcPzj5tV6hOTFj4xftSbUbpK/FJumZz6/8Ip4FxEYV5DnGD2gv3zP8ZeRpzwxv/2JwxDhiCcVXgH/UB4lPPfuEX0sdUIXIdZ/HeCA0WMmPWqIg2bpCtB2+w+1Ihj6PSZyAvOUlYrDCMCOzyXb/wcwEAGKiE9nUwazVxywe3S5TwxgB"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a2d5e147-b7a2-467c-8694-70ed7619880a",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "4a7d046f-0d3b-4635-9d69-d6468e657b80",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1216,14 +1338,14 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbtuuyBfwdKMasfhTwN",
+              "id": "msg_011ChPBiJ2e4kfbuseQCFQfd",
               "type": "message",
               "role": "assistant",
               "content": [
                 {
                   "type": "thinking",
                   "thinking": "",
-                  "signature": "CAQS6QkKEAgUGAI4AUIIdGhpbmtpbmcSDDLpuf0nHFYZaoS/kBoMYV7A+vw31zoZ8MLXIjBAhYG8wCEPS5IVmihph8cQVsbZtGJ7JwV7KiMGOYKTZC5bIPNexjQ75OhgMr7h1TIqhgnobX81xPYT5sgEwnI6J48jqwU0toBDp56QMiQ4vXcR88EPTpTN0HPRKZD/dxr0La/01QatlMSc+n1lHL2e4R2EV4dOmAqMtmvovEDpjkIwjM0crpon/cEF9pRSaIaqWrSJyXAJ0Y4H90e2yfYVVtH2KLYkNfReTWdIbeojBDZ+FZbsLaAlftBYPfa/inUqyckrudjuhEJ++pMImukUfyai1ME9Yxy+T2pUVuMDm8HeK9xykMLELVssNBe8dTS2II+WX0hPtcz2UmWNbdrhB8PJs72ex2PU/nh29XZecoAgS0+He2H7sn20pV8bEzD6mUfTGS11S1ey6jO9rDJCKPz1Se/5dhIgMNzXQBE9Q6jKCfke7dgm3/n7eBNu+kArBxY2HwgYxq+BpEm/0uMUGjq37eGq4de30YAOufszcJviLcKSoNLoYqE2nMWva9nHhoVcVBNTptAvzuq8SXWKlVKebR5n/Cm1qZ1M4iQYFmSU+UHzmVaLgIvgMe6ORgI5dkIIwpUwPXBJ6xqkIJc3zrx7l+wlCWq8V13jkHsUmc3p6SPoTxrJxcKUFA6PtPkDWqoC+m6fuv0bwgXrXnED7WjvEj34uxuCW0/l+uIZdoq8numqSJL/LTdIFcwPtTpdN0Xh+6ppul4MMcOxb1x8/8i1JVLqFekntibg2g1VP/LoFe+HSEzrv06AM3O7fOJf1X3Fr3MW+6q5HdH2InR8gkl8qDwfaVXcCCUIB4YbrfBnEeVZnTBgcD2ZIREF5p6+s/V2Iuu26sEWUq1jlHFSdvup8BrFO4DqOInlF2VXerwxbkVPOiuW5DgcSNfY2kgEbysBTi3a23PKawS/9lKjjbBkfLENYI42tmx2tNI0A4t3T7oZEaYs3Rdnvmh6HoVwcJfH7c7ZveK2wkOSMB1RfwDrkMb6zGe0yh64pSZG0eeTiVFCraQQVT9UsBN32SkR6UCkT4+RlESTVhemu0pRVBas1Nt9h8S+WMVtk1DjL3a6FPj7JYN0E3q0tPL51y08p/7B1lzLOt0z0bmWc+pH2Rhxf4AKuT1bqhFsZtN1+PIvNNRyASpHaHNBh7hyKA0jFrbGtfwWxwy1HI+Q0YydqHIG0MTbK2xEl6MebS4khTld7NaLyP41srolmRLTlWzX6EwLh/jy8B4B0musUN7t1ROjSHPU8SXdIAXqDgvP6nYE/LGxxvqitU1Ci+bZL/L7atFyx22aqgzZNU/hRpAQoM9jn4loFAoxvHjSNq/tRVy8+BkN4rR3pyJqXgKQMqz/RmaEru2R09Ns/4Yf3hVyczYGXkx+LYkx34Q/PYQIptEFMuxIzqqqNqkuL6LbehQJ+WIcGFozfAgZFezrtJwqb8eGSXWi9zJbxIxXNNQ8rEAWWGSd8cWpu+JwP5OVry0a5Q+/aTeOGpTcMFHIlvvL7saAw9IzJgqOLUI8/8wuJPQOCgrxHkZIT2UQUNkbyy+Gmxr3KLEyWlJu2wUrcAbaONuuRLX2yOe32qpWtCS2O2hMb6q5j9c6uTUNG+QHBK26iZrWDdL1WEUYAQ=="
+                  "signature": "CAQSlwkKEAgUGAI4AUIIdGhpbmtpbmcSDOWq3+LublJTNuiflhoMPjhT1mX4R4YA0TLvIjBHUV8AD65sfwuz+iiUN21NBwy+Fcox0iVgHpgUHxVc1C5UUA8OfhfFwJeYoBm34WQqtAir7cPJTcZeJ43lKcbJBnitjaYikg3YLMK5n5H3ycejYEWZw6SXPEzo1eGrKt1/CN6d1tjFoHkBIqH0oIFKhDzHla2RD3+hjQFjEqSrBcvgQwlrbK1v13MmAcHS1Iq1YfenUCNEnC++cTPijhiTt2EGCMlkfzfVcDRTia86GP55dGHZKa6yPx03cKjBlm0r1HoBA97X0vlWnLtd9Xpff9stsUiouqjjnuqVXUAr+XXX+lZLOEpuAMK5b8APPgWJOX1gGu76h8uv8z/0+CkzvXQ3yafo8m1KzM5UrnLl+tZsKWjG6fN3mvbFKI5o2CPs08MlldQp5XxgHc1TrOoODpSv3UB9XV+qoftbA0BhlLehwFW6dR7j7XOTbMBHXUyPa1q0LCmT2ffWgtBlgs/usGDFyE4zA9tNFuFA9j/V3yTSuHFhxSpWdC+m069Q96HExcHDA8+a8mMxLnESNH2URLWYgV3RYJeRemXrxBXhiMtRvhbaWf+xAI154clHk1xVjOThMj/y9GTRsWBEuyqlF0BLJh12eTKy0EOvr7hE2wSXcN0du/a1kS2GxhVdTuMFcLVfTF2CvSbDlmrkXbXBcHaf5iSFOhpt5PniZVb0A4UY0h0kNRf5SbXbnpAr1sVSJzG5zMTqfxEL4f35Z2VgxzamBW4g7UhExvyudZU+PplbmyQVt39uh4AcirpmjVMWHZg4BP+883zRVLXBIxTjeHhxQupW7pC+bR1y8wiSQmMWcHUCMJ5/KCI1w4plZXwlr2CfTOOIK928NTUKN+py1BumDggQizbny7Iivx/8GlLE/Hrw/0TwpbVeFwyK2lwLe5tHxOu2l9zcGAYjVQLrsy0Y596+REgu6FfWoOJezaWjmikV2m/blnccg0+NunrzsUwlNsemMqg/fqZC8/Rj8r9JRqGJDCwwjF7FEf952m4VScVMxnATKbiBlrn1CkBjzrSu4EMkZF7uuESdcx/V0A23WdqUiqhUhQWFFdhqAC0ab0B0HVo7gd1xgoZFF21dByNxbs1cSMOddDdU5OPciDgkxeylsYmtUYTBgK/Exgs8nrJFNsI1QD8k5k4qVK/G2aubjzBHtOsLoGapCUocF/wD/FV/cbG86v1fJXGdtOXu/JB3HseAHRzCd65eaEI58ay7YBudVWcJnuPjNtpCD/3wMgz/D+MhRHuJTesTgSfs9Zj8tqggfw7Z+KJ6jMC9JjDlOnviWIGUvEP17TFOz2ffbvZAAVHINIW5YJul6w99oKSLramcPzj5tV6hOTFj4xftSbUbpK/FJumZz6/8Ip4FxEYV5DnGD2gv3zP8ZeRpzwxv/2JwxDhiCcVXgH/UB4lPPfuEX0sdUIXIdZ/HeCA0WMmPWqIg2bpCtB2+w+1Ihj6PSZyAvOUlYrDCMCOzyXb/wcwEAGKiE9nUwazVxywe3S5TwxgB"
                 }
               ],
               "container": null,
@@ -1249,13 +1371,13 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "81b7ca90-4bc1-4fe8-8dc5-93b4bb9dd95f",
-            "timestamp": "2026-11-24T23:14:27.010Z",
-            "request_id": "req_011ChNbtucMWotUKy3Sd5LK2",
-            "thinking_duration_ms": 1125,
+            "uuid": "94520b54-d31a-41c1-98c7-8e046266f07f",
+            "timestamp": "2026-11-25T06:37:55.079Z",
+            "request_id": "req_011ChPBiHthnUGbVhArm3cZe",
+            "thinking_duration_ms": 870,
             "thinking_display": "updates",
-            "user_message_uuid": "a670dca4-33dc-44ef-a30f-4d019ddd5570",
-            "user_message_uuids": ["a670dca4-33dc-44ef-a30f-4d019ddd5570"]
+            "user_message_uuid": "97400c81-6797-4378-95c7-51bd7f9db683",
+            "user_message_uuids": ["97400c81-6797-4378-95c7-51bd7f9db683"]
           }
         },
         {
@@ -1267,8 +1389,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "1148c109-68dc-4097-b34e-39a786dbab9b",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "1c365791-0c7f-473b-9a2a-565159558cb6",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1284,8 +1406,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "64be121c-02ab-4575-8543-86c95e522932",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "bdcc3930-17b4-44d8-b7ea-dbc3fb3c899d",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1296,13 +1418,13 @@
               "index": 1,
               "delta": {
                 "type": "text_delta",
-                "text": "It"
+                "text": "The"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "c2387298-9d7b-40b7-bf82-491830a493e2",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "958c42d0-7182-4443-8ee1-6a5df047ac24",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1313,13 +1435,13 @@
               "index": 1,
               "delta": {
                 "type": "text_delta",
-                "text": "'s a small, mostly pl"
+                "text": " image is a small,"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f81c1694-9eec-46f0-91ae-af9fee8b6006",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "984a0037-33ae-4ee9-be03-c5e5927a6496",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1330,13 +1452,13 @@
               "index": 1,
               "delta": {
                 "type": "text_delta",
-                "text": "ain square with a so"
+                "text": " pl"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "a8f29f93-d91d-4508-87bd-43c9af56c87f",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "d4c8bde0-5951-40a0-9813-b69a13c7464a",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1347,13 +1469,13 @@
               "index": 1,
               "delta": {
                 "type": "text_delta",
-                "text": "ft purple-"
+                "text": "ain l"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "81b11bb4-dde8-4d29-a421-8a30dd85314a",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "6a2de5ae-7a0d-4a11-9738-cbbcfabd7fec",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1364,13 +1486,64 @@
               "index": 1,
               "delta": {
                 "type": "text_delta",
-                "text": "to-blue gradient."
+                "text": "avender-"
               }
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "967d163b-b5f7-46e9-ab94-dcd249da0d93",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "01c6af7f-a7c7-4e9a-94b8-4b6c75cbc2fd",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": "pur"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "024bcf8c-ae1f-4d12-b562-abf7bcce2f1f",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": "ple square with no other"
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "e3a52749-0a44-44d2-a439-6aadac2360b0",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
+          }
+        },
+        {
+          "in": {
+            "type": "stream_event",
+            "event": {
+              "type": "content_block_delta",
+              "index": 1,
+              "delta": {
+                "type": "text_delta",
+                "text": " visible content."
+              }
+            },
+            "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
+            "parent_tool_use_id": null,
+            "uuid": "1dabc32a-5416-409d-9546-f54cbcaa3184",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1378,13 +1551,13 @@
             "type": "assistant",
             "message": {
               "model": "claude-haiku-5-5",
-              "id": "msg_011ChNbtuuyBfwdKMasfhTwN",
+              "id": "msg_011ChPBiJ2e4kfbuseQCFQfd",
               "type": "message",
               "role": "assistant",
               "content": [
                 {
                   "type": "text",
-                  "text": "It's a small, mostly plain square with a soft purple-to-blue gradient."
+                  "text": "The image is a small, plain lavender-purple square with no other visible content."
                 }
               ],
               "container": null,
@@ -1410,9 +1583,9 @@
             },
             "parent_tool_use_id": null,
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
-            "uuid": "c99d38db-335f-4bc2-932c-c34d0c975e21",
-            "timestamp": "2026-11-24T23:14:27.114Z",
-            "request_id": "req_011ChNbtucMWotUKy3Sd5LK2"
+            "uuid": "3bf9f1a0-5949-4282-b45a-9cb03ccf128c",
+            "timestamp": "2026-11-25T06:37:55.222Z",
+            "request_id": "req_011ChPBiHthnUGbVhArm3cZe"
           }
         },
         {
@@ -1424,8 +1597,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "2ccf6f13-4be1-4117-b7ad-5c76c0693273",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "089d1804-a9a0-46e3-8ddf-a5527f7323ab",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1454,8 +1627,8 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "4a6619bf-346d-4ae7-90db-be5b0fb778a7",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "b2a9942f-0826-43a9-83f2-3cf09be8d16a",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
@@ -1466,21 +1639,21 @@
             },
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "parent_tool_use_id": null,
-            "uuid": "f71085c2-881f-400a-b30d-fe981773dc1f",
-            "api_message_id": "msg_011ChNbtuuyBfwdKMasfhTwN"
+            "uuid": "091fa4d4-53d2-4818-8505-5c992de4d9ee",
+            "api_message_id": "msg_011ChPBiJ2e4kfbuseQCFQfd"
           }
         },
         {
           "in": {
             "type": "rate_limit_event",
             "rate_limit_info": "<redacted>",
-            "uuid": "719ebb19-4008-465b-ba41-49c637b078e4",
+            "uuid": "082a9e0b-a1c4-48e4-a43f-c824f3a6604f",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
         {
           "in": {
-            "duration_api_ms": 1804,
+            "duration_api_ms": 1989,
             "stop_reason": "end_turn",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b",
             "total_cost_usd": 0,
@@ -1557,19 +1730,19 @@
             "num_turns": 1,
             "subtype": "success",
             "api_error_status": null,
-            "result": "It's a small, mostly plain square with a soft purple-to-blue gradient.",
-            "ttft_ms": 1740,
+            "result": "The image is a small, plain lavender-purple square with no other visible content.",
+            "ttft_ms": 1899,
             "type": "result",
-            "duration_ms": 1868,
-            "uuid": "ad887ddc-1f7a-4540-aeb9-6f4c5ac66e11",
-            "ttft_stream_ms": 614,
-            "time_to_request_ms": 65,
-            "first_content_frame_ms": 614,
-            "user_message_uuid": "a670dca4-33dc-44ef-a30f-4d019ddd5570",
-            "user_message_uuids": ["a670dca4-33dc-44ef-a30f-4d019ddd5570"],
-            "request_sent_wall_ms": 1795562065336,
+            "duration_ms": 2051,
+            "uuid": "6c107177-3b44-4e91-bf7c-5855d6473e5d",
+            "ttft_stream_ms": 1028,
+            "time_to_request_ms": 63,
+            "first_content_frame_ms": 1028,
+            "user_message_uuid": "97400c81-6797-4378-95c7-51bd7f9db683",
+            "user_message_uuids": ["97400c81-6797-4378-95c7-51bd7f9db683"],
+            "request_sent_wall_ms": 1795588673244,
             "first_request_input_tokens": 0,
-            "first_request_cache_read_input_tokens": 0,
+            "first_request_cache_read_input_tokens": 13041,
             "queued_turn_count": 0,
             "result_index": 0,
             "model_usage_since_last_result": {
@@ -1595,9 +1768,9 @@
         {
           "in": {
             "type": "command_lifecycle",
-            "command_uuid": "a670dca4-33dc-44ef-a30f-4d019ddd5570",
+            "command_uuid": "97400c81-6797-4378-95c7-51bd7f9db683",
             "state": "completed",
-            "uuid": "f7e73e06-36d3-46f3-a3ba-cb9df897a0f2",
+            "uuid": "619a2662-19dd-40f9-b939-30872ddf3750",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },
@@ -1607,7 +1780,7 @@
             "subtype": "session_state_changed",
             "state": "idle",
             "sdk_host_only": true,
-            "uuid": "3a25c1a0-49e5-4e7f-989a-939ed9bfe729",
+            "uuid": "0fbfe320-1603-4367-87e9-ff9f0399f4f2",
             "session_id": "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
           }
         },

@@ -1,107 +1,180 @@
 import { assert, it } from "@effect/vitest"
-import type { Options, SDKMessage, SDKUserMessage } from "@anthropic-ai/claude-agent-sdk"
+import type {
+  CanUseTool,
+  McpServerConfig,
+  McpServerProvenance,
+  Options,
+  SDKMessage,
+  SDKUserMessage,
+} from "@anthropic-ai/claude-agent-sdk"
 import { TurnStopped } from "@glass/contracts"
 import { type Cause, Deferred, Effect, Fiber, Predicate, Queue, Redacted, Stream } from "effect"
+import { eventually } from "../../test/eventually"
 import { claudeAdapter, type ClaudeQuery } from "./claudeAdapter"
 import { type GlassToolsAccess, type HostEvent, WorkRole } from "./protocol"
 import { workInstructions } from "./workRole"
+
+const idleQuery = (overrides: Partial<ClaudeQuery> = {}): ClaudeQuery => ({
+  [Symbol.asyncIterator]: () => Stream.toAsyncIterable(Stream.never)[Symbol.asyncIterator](),
+  initializationResult: async () => ({ models: [], commands: [] }),
+  close: () => {},
+  setModel: async () => {},
+  setPermissionMode: async () => {},
+  applyFlagSettings: async () => {},
+  interrupt: async () => undefined,
+  stopTask: async () => {},
+  setMcpServers: async () => ({ added: [], removed: [], errors: {} }),
+  ...overrides,
+})
+
+const startWork = (
+  query: (options: Options | undefined) => ClaudeQuery,
+  {
+    glassTools,
+    report = () => Effect.void,
+  }: { glassTools?: GlassToolsAccess; report?: (event: HostEvent) => Effect.Effect<void> } = {},
+) =>
+  claudeAdapter("claude-test", {
+    query: ({ options }) => query(options),
+    getSessionInfo: async () => undefined,
+  }).start({
+    folder: "checkout",
+    thread: "new",
+    role: WorkRole.make({}),
+    glassTools,
+    skills: [],
+    report,
+  })
+
+const delivered = (text: string) => ({ message: text, images: [], context: null, prompt: text })
 
 it.live("reports a failed SDK handshake as a host error and closes the query", () =>
   Effect.gen(function* () {
     let closed = false
 
-    const query: ClaudeQuery = {
-      [Symbol.asyncIterator]: () => Stream.toAsyncIterable(Stream.never)[Symbol.asyncIterator](),
-      initializationResult: async () => {
-        throw new Error("Handshake failed")
-      },
-      close: () => {
-        closed = true
-      },
-      setModel: async () => {},
-      setPermissionMode: async () => {},
-      applyFlagSettings: async () => {},
-      interrupt: async () => undefined,
-      stopTask: async () => {},
-    }
-
-    const failed = yield* claudeAdapter("claude-test", {
-      query: () => query,
-      getSessionInfo: async () => undefined,
-    })
-      .start({
-        folder: "checkout",
-        thread: "new",
-        role: WorkRole.make({}),
-        glassTools: undefined,
-        skills: [],
-        report: () => Effect.void,
-      })
-      .pipe(Effect.scoped, Effect.flip)
+    const failed = yield* startWork(() =>
+      idleQuery({
+        initializationResult: async () => {
+          throw new Error("Handshake failed")
+        },
+        close: () => {
+          closed = true
+        },
+      }),
+    ).pipe(Effect.scoped, Effect.flip)
 
     assert.equal(failed._tag, "HostThreadError")
     assert.isTrue(closed)
   }),
 )
 
-it.live("gives a Work Thread Glass's tools and how to use them only when it has tools", () =>
-  Effect.gen(function* () {
-    const given: Array<Options> = []
+it.live(
+  "adds a Work Thread's MCP servers only after Claude Code starts, keeping the Glass tools bearer off its command line",
+  () =>
+    Effect.gen(function* () {
+      const started: Array<Options> = []
+      const added: Array<Record<string, McpServerConfig>> = []
 
-    const query: ClaudeQuery = {
-      [Symbol.asyncIterator]: () => Stream.toAsyncIterable(Stream.never)[Symbol.asyncIterator](),
-      initializationResult: async () => {
-        throw new Error("Stop after reading the options")
-      },
-      close: () => {},
-      setModel: async () => {},
-      setPermissionMode: async () => {},
-      applyFlagSettings: async () => {},
-      interrupt: async () => undefined,
-      stopTask: async () => {},
-    }
+      const query = (options: Options | undefined) => {
+        if (options !== undefined) started.push(options)
 
-    const adapter = claudeAdapter("claude-test", {
-      query: ({ options }) => {
-        if (options !== undefined) given.push(options)
+        return idleQuery({
+          setMcpServers: async (servers) => {
+            added.push(servers)
 
-        return query
-      },
-      getSessionInfo: async () => undefined,
-    })
-
-    const start = (glassTools: GlassToolsAccess | undefined) =>
-      adapter
-        .start({
-          folder: "checkout",
-          thread: "new",
-          role: WorkRole.make({}),
-          glassTools,
-          skills: [],
-          report: () => Effect.void,
+            return { added: Object.keys(servers), removed: [], errors: {} }
+          },
         })
-        .pipe(Effect.scoped, Effect.flip)
+      }
 
-    yield* start(undefined)
-    yield* start({ url: "http://127.0.0.1:9/mcp", bearer: Redacted.make("bearer") })
+      yield* startWork(query).pipe(Effect.scoped)
+      yield* startWork(query, {
+        glassTools: { url: "http://127.0.0.1:9/mcp", bearer: Redacted.make("bearer") },
+      }).pipe(Effect.scoped)
 
-    assert.deepStrictEqual(
-      given.map((options) => ({
-        servers: Object.keys(options.mcpServers ?? {}),
-        systemPrompt: options.systemPrompt,
-      })),
-      [
-        { servers: ["glass"], systemPrompt: { type: "preset", preset: "claude_code" } },
-        {
-          servers: ["glass", "glass_tools"],
-          systemPrompt: { type: "preset", preset: "claude_code", append: workInstructions },
-        },
-      ],
-    )
-  }),
+      assert.deepStrictEqual(
+        started.map((options) => ({
+          mcpServers: options.mcpServers,
+          systemPrompt: options.systemPrompt,
+        })),
+        [
+          { mcpServers: undefined, systemPrompt: { type: "preset", preset: "claude_code" } },
+          {
+            mcpServers: undefined,
+            systemPrompt: { type: "preset", preset: "claude_code", append: workInstructions },
+          },
+        ],
+      )
+
+      assert.deepStrictEqual(
+        added.map((servers) => Object.keys(servers)),
+        [["glass"], ["glass", "glass_tools"]],
+      )
+
+      assert.deepStrictEqual(added[1]?.["glass_tools"], {
+        type: "http",
+        url: "http://127.0.0.1:9/mcp",
+        headers: { authorization: "Bearer bearer" },
+      })
+    }),
 )
 
-const delivered = (text: string) => ({ message: text, images: [], context: null, prompt: text })
+it.live("approves without asking only the tools of Glass's own MCP servers", () =>
+  Effect.gen(function* () {
+    const given: Array<CanUseTool> = []
+    const asked: Array<string> = []
+    const approved: Array<string> = []
+
+    const session = yield* startWork(
+      (options) => {
+        if (options?.canUseTool !== undefined) given.push(options.canUseTool)
+
+        return idleQuery()
+      },
+      {
+        report: (event) =>
+          Effect.sync(() => {
+            if (
+              Predicate.isTagged(event, "PartSet") &&
+              Predicate.isTagged(event.part, "PermissionRequest")
+            )
+              asked.push(event.part.requestId)
+          }),
+      },
+    )
+
+    yield* session.startTurn("turn-1", delivered("Use the tools"))
+
+    const [canUseTool] = given
+    assert.isDefined(canUseTool)
+
+    const call = (toolUseID: string, served: { mcpServer?: McpServerProvenance }) => {
+      void canUseTool(
+        "mcp__glass__x__run",
+        {},
+        { signal: new AbortController().signal, toolUseID, requestId: toolUseID, ...served },
+      ).then(
+        (result) => {
+          if (result?.behavior === "allow") approved.push(toolUseID)
+        },
+        () => {},
+      )
+    }
+
+    call("glass", { mcpServer: { name: "glass", source: "sdk" } })
+    call("glass-tools", { mcpServer: { name: "glass_tools", source: "dynamic" } })
+    call("look-alike", { mcpServer: { name: "glass__x", source: "project" } })
+    call("configured-glass-tools", { mcpServer: { name: "glass_tools", source: "project" } })
+    call("unknown-server", {})
+
+    yield* eventually(
+      Effect.sync(() => {
+        assert.deepStrictEqual(approved, ["glass", "glass-tools"])
+        assert.deepStrictEqual(asked, ["look-alike", "configured-glass-tools", "unknown-server"])
+      }),
+    )
+  }).pipe(Effect.scoped),
+)
 
 const stoppableTurn = Effect.fnUntraced(function* () {
   const messages = yield* Queue.unbounded<SDKMessage, Cause.Done>()
@@ -117,19 +190,13 @@ const stoppableTurn = Effect.fnUntraced(function* () {
     return { cancelled }
   }
 
-  const query: ClaudeQuery = {
+  const query = idleQuery({
     [Symbol.asyncIterator]: () =>
       Stream.toAsyncIterable(Stream.fromQueue(messages))[Symbol.asyncIterator](),
-    initializationResult: async () => ({ models: [], commands: [] }),
-    close: () => {},
-    setModel: async () => {},
-    setPermissionMode: async () => {},
-    applyFlagSettings: async () => {},
     // SAFETY: Claude Code's interrupt answers with the queued messages it cancelled, which the SDK's types leave out.
     // oxlint-disable-next-line typescript/no-unsafe-type-assertion, anti-slop/no-chained-type-assertions -- See SAFETY above.
     interrupt: interrupt as unknown as ClaudeQuery["interrupt"],
-    stopTask: async () => {},
-  }
+  })
 
   const session = yield* claudeAdapter("claude-test", {
     query: ({ prompt }) => {
