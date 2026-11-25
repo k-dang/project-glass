@@ -27,7 +27,16 @@ import {
 import { cn } from "cn"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { ArrowUp, FileDiff, Globe, MessageCircle, Workflow, X } from "lucide-react"
+import {
+  ArrowUp,
+  FileDiff,
+  GitPullRequest,
+  Globe,
+  PanelRightClose,
+  PanelRightOpen,
+  Workflow,
+  X,
+} from "lucide-react"
 import {
   Activity,
   Fragment,
@@ -41,17 +50,17 @@ import {
   useState,
 } from "react"
 import { Button } from "@/components/ui/button"
-import { Kbd } from "@/components/ui/kbd"
 import { AgentStatuses } from "./AgentStatuses"
 import { Transcript } from "./Transcript"
 import { BackgroundToolCalls, ToolCallView } from "./TurnParts"
 import { sentFrom } from "./UserMessage"
 import { threadColumn } from "./threadColumn"
-import { ThreadChanges } from "./ThreadChanges"
+import { ChangesPane } from "./ThreadChanges"
 import { ThreadDetailsAction, ThreadFrame } from "./ThreadFrame"
 import { ThreadName } from "./ThreadName"
 import { PullRequestPanes, useThreadPullRequest } from "./ThreadPullRequest"
 import { PullRequestPane } from "./PullRequestPane"
+import { type PaneChoice, PanePicker } from "./PanePicker"
 import { PreloadPullRequest } from "./preloadPullRequest"
 import {
   QueueItem,
@@ -63,7 +72,6 @@ import {
   QueueList,
 } from "@/components/ui/queue"
 import {
-  type ThreadTab,
   threadsAtom,
   transcriptAtom,
   changeModelAtom,
@@ -83,8 +91,7 @@ import { requestElementId } from "./RequestCard"
 import { ProblemAlert } from "./ProblemAlert"
 import { type Problem, problemText, settledProblem, streamProblem } from "./problems"
 import { rememberPlace } from "./savedPlace"
-import { useActions } from "./actions"
-import { shortcutLabel } from "./shortcutLabel"
+import { type Action, useActions } from "./actions"
 import { useStagedFeedback } from "./useStagedFeedback"
 import { DiagramPane, useDiagrams } from "./ThreadDiagrams"
 import { BrowserLinks, type BrowserOpening, BrowserPane } from "./BrowserPane"
@@ -96,25 +103,17 @@ import { markTurnSeenAtom } from "./inboxArea"
 import { useWindowFocused } from "./useWindowFocused"
 
 type SidePane =
+  | { kind: "picker" }
+  | { kind: "changes"; wide: boolean }
   | { kind: "diagram"; title: string }
   | { kind: "file"; path: string }
   | { kind: "browser"; opening: BrowserOpening }
   | { kind: "pullRequest"; pullRequest: PullRequestRef }
   | null
 
-interface ThreadTabs {
-  tab: ThreadTab
-  onTabChange: (tab: ThreadTab) => void
-}
-
 const SAVE_DELAY_MS = 400
 
 const KEPT_THREADS = 4
-
-interface KeptThread {
-  readonly id: string
-  readonly tab: ThreadTab
-}
 
 const lastSent = (
   turns: ReadonlyArray<Turn>,
@@ -127,26 +126,26 @@ const lastSent = (
   return last === undefined || isNothingUnsent(last) ? null : sentOf(last)
 }
 
-function useKeptThreads(shown: KeptThread | null, listed: ReadonlyArray<Thread>) {
-  const [kept, setKept] = useState<ReadonlyArray<KeptThread>>([])
+function useKeptThreads(shown: string | null, listed: ReadonlyArray<Thread>) {
+  const [kept, setKept] = useState<ReadonlyArray<string>>([])
 
-  if (shown !== null && (kept[0]?.id !== shown.id || kept[0].tab !== shown.tab))
+  if (shown !== null && kept[0] !== shown)
     setKept(
       [
         shown,
-        ...kept.filter(({ id }) => id !== shown.id && listed.some((thread) => thread.id === id)),
+        ...kept.filter((id) => id !== shown && listed.some((thread) => thread.id === id)),
       ].slice(0, KEPT_THREADS),
     )
 
   return kept
 }
 
-export function ThreadViews(props: { threadId: string | null } & ThreadTabs) {
-  const { threadId, tab, onTabChange } = props
+export function ThreadViews(props: { threadId: string | null }) {
+  const { threadId } = props
   const threads = useAtomValue(threadsAtom)
   const listed = Option.getOrElse(AsyncResult.value(threads), () => [])
   const listedShown = threadId !== null && listed.some(({ id }) => id === threadId)
-  const kept = useKeptThreads(listedShown ? { id: threadId, tab } : null, listed)
+  const kept = useKeptThreads(listedShown ? threadId : null, listed)
 
   return (
     <>
@@ -165,8 +164,8 @@ export function ThreadViews(props: { threadId: string | null } & ThreadTabs) {
       )}
       {kept
         // WARNING: sorting by recency would move a kept Thread's DOM on a switch, losing its scroll position.
-        .toSorted((a, b) => a.id.localeCompare(b.id))
-        .flatMap(({ id, tab: keptTab }) => {
+        .toSorted()
+        .flatMap((id) => {
           const thread = listed.find((listedThread) => listedThread.id === id)
 
           return thread === undefined
@@ -175,7 +174,7 @@ export function ThreadViews(props: { threadId: string | null } & ThreadTabs) {
                 <Fragment key={id}>
                   <KeepTranscript threadId={id} />
                   <Activity mode={id === threadId ? "visible" : "hidden"}>
-                    <OpenThread thread={thread} tab={keptTab} onTabChange={onTabChange} />
+                    <OpenThread thread={thread} />
                   </Activity>
                 </Fragment>,
               ]
@@ -190,13 +189,12 @@ function KeepTranscript(props: { threadId: string }) {
   return null
 }
 
-const OpenThread = memo(function OpenThread(props: { thread: Thread } & ThreadTabs) {
-  const { thread, tab, onTabChange } = props
+const OpenThread = memo(function OpenThread(props: { thread: Thread }) {
+  const { thread } = props
   const atoms = useMemo(() => threadAtoms(thread.id), [thread.id])
   const loaded = AsyncResult.value(useAtomValue(atoms.transcript))
   const { turns } = Option.getOrElse(loaded, () => emptyTranscript)
 
-  const [changesOpened, setChangesOpened] = useState(tab === "changes")
   const [pane, setPane] = useState<SidePane>(null)
   const openDiagram = useCallback((title: string) => setPane({ kind: "diagram", title }), [setPane])
   const closePane = useCallback(() => setPane(null), [setPane])
@@ -243,39 +241,57 @@ const OpenThread = memo(function OpenThread(props: { thread: Thread } & ThreadTa
   const fileLinks = useFileLinks(thread.id, turns, Option.isSome(loaded), openFile)
 
   const openPullRequestPane = useCallback(
-    (pullRequest: PullRequestRef) => {
-      setPane({ kind: "pullRequest", pullRequest })
-      onTabChange("chat")
-    },
-    [setPane, onTabChange],
+    (pullRequest: PullRequestRef) => setPane({ kind: "pullRequest", pullRequest }),
+    [setPane],
   )
 
-  if (tab === "changes" && !changesOpened) setChangesOpened(true)
+  const openChanges = useCallback(() => setPane({ kind: "changes", wide: false }), [setPane])
 
   const pullRequest = useThreadPullRequest(thread.id)
 
   const registry = useContext(RegistryContext)
 
+  const paneChoices: ReadonlyArray<PaneChoice> = [
+    { id: "changes", label: "Changes", icon: FileDiff, key: "d", open: openChanges },
+    { id: "browser", label: "Browser", icon: Globe, key: "b", open: () => openBrowser(null) },
+    ...(pullRequest === undefined
+      ? []
+      : [
+          {
+            id: "pull-request",
+            label: "Pull request",
+            icon: GitPullRequest,
+            key: "p",
+            open: () => openPullRequestPane(pullRequest.ref),
+          },
+        ]),
+    ...diagrams.titles.map((title) => ({
+      id: `diagram:${title}`,
+      label: title,
+      icon: Workflow,
+      open: () => openDiagram(title),
+    })),
+  ]
+
   useActions([
     {
-      id: "thread-tab",
-      title: tab === "chat" ? "Show Changes" : "Show Chat",
+      id: "thread-pane",
+      title: pane === null ? "Open a pane" : "Close the pane",
       group: "Thread",
-      icon: tab === "chat" ? FileDiff : MessageCircle,
+      icon: pane === null ? PanelRightOpen : PanelRightClose,
       shortcut: { key: "d", mod: true, allowInEditable: true },
-      run: () => onTabChange(tab === "chat" ? "changes" : "chat"),
+      run: () => setPane((current) => (current === null ? { kind: "picker" } : null)),
     },
-    {
-      id: "thread-browser",
-      title: "Open Browser",
+    ...paneChoices.map(({ id, label, icon, open }): Action => ({
+      id: `thread-pane-${id}`,
+      title: `Open ${label}`,
       group: "Thread",
-      icon: Globe,
-      run: () => {
-        openBrowser(null)
-        onTabChange("chat")
-      },
-    },
+      icon,
+      run: open,
+    })),
   ])
+
+  const chatHidden = pane?.kind === "changes" && pane.wide
 
   useEffect(() => {
     rememberPlace(registry, { area: "threads", threadId: thread.id })
@@ -286,9 +302,9 @@ const OpenThread = memo(function OpenThread(props: { thread: Thread } & ThreadTa
   const endedAt = turns.at(-1)?.ended?.at
 
   useEffect(() => {
-    if (focused && tab === "chat" && endedAt !== undefined)
+    if (focused && !chatHidden && endedAt !== undefined)
       markTurnSeen({ threadId: thread.id, endedAt })
-  }, [markTurnSeen, focused, tab, endedAt, thread.id])
+  }, [markTurnSeen, focused, chatHidden, endedAt, thread.id])
 
   return (
     <ThreadAtomsContext value={atoms}>
@@ -299,25 +315,11 @@ const OpenThread = memo(function OpenThread(props: { thread: Thread } & ThreadTa
         <ThreadFrame
           label={thread.name}
           heading={
-            tab === "changes" ? (
-              <>
-                <button
-                  type="button"
-                  className="truncate text-muted-foreground hover:text-foreground"
-                  onClick={() => onTabChange("chat")}
-                >
-                  <ThreadName name={thread.name} />
-                </button>
-                <span className="text-muted-foreground/50">/</span>
-                <h1 className="font-medium">Changes</h1>
-              </>
-            ) : (
-              <h1 className="truncate font-medium">
-                <ThreadName name={thread.name} />
-              </h1>
-            )
+            <h1 className="truncate font-medium">
+              <ThreadName name={thread.name} />
+            </h1>
           }
-          pinnable={tab === "chat" && pane === null}
+          pinnable={pane === null}
           details={{
             place: thread.place,
             repository: repositoryKey(thread.repository),
@@ -326,43 +328,39 @@ const OpenThread = memo(function OpenThread(props: { thread: Thread } & ThreadTa
             pullRequest,
             skillPacks: thread.skillPacks,
             localSkills: thread.localSkills,
-            actions:
-              tab === "chat" ? (
-                <>
-                  <ThreadDetailsAction onNavigate={() => onTabChange("changes")}>
-                    <FileDiff aria-hidden className="text-muted-foreground" />
-                    Changes
-                    <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
-                  </ThreadDetailsAction>
-                  <ThreadDetailsAction onNavigate={() => openBrowser(null)}>
-                    <Globe aria-hidden className="text-muted-foreground" />
-                    Browser
-                  </ThreadDetailsAction>
-                  {diagrams.titles.map((title) => (
-                    <ThreadDetailsAction key={title} onNavigate={() => openDiagram(title)}>
-                      <Workflow aria-hidden className="text-muted-foreground" />
-                      <span className="truncate">{title}</span>
-                    </ThreadDetailsAction>
-                  ))}
-                </>
-              ) : (
-                <ThreadDetailsAction onNavigate={() => onTabChange("chat")}>
-                  <MessageCircle aria-hidden className="text-muted-foreground" />
-                  Back to Chat
-                  <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
-                </ThreadDetailsAction>
-              ),
+            actions: paneChoices.map(({ id, label, icon: Icon, open }) => (
+              <ThreadDetailsAction key={id} onNavigate={open}>
+                <Icon aria-hidden className="text-muted-foreground" />
+                <span className="truncate">{label}</span>
+              </ThreadDetailsAction>
+            )),
           }}
         >
           <TranscriptProblem />
-          <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
-            <ToolCallView value={diagrams.cardOf}>
-              <FileLinks value={fileLinks}>
-                <BrowserLinks value={browserLinks}>
-                  <ThreadChat thread={thread} place="thread" />
-                </BrowserLinks>
-              </FileLinks>
-            </ToolCallView>
+          <div className="flex min-h-0 flex-1">
+            <div hidden={chatHidden} className="flex min-h-0 min-w-0 flex-1">
+              <ToolCallView value={diagrams.cardOf}>
+                <FileLinks value={fileLinks}>
+                  <BrowserLinks value={browserLinks}>
+                    <ThreadChat thread={thread} place="thread" />
+                  </BrowserLinks>
+                </FileLinks>
+              </ToolCallView>
+            </div>
+            {pane?.kind === "picker" && <PanePicker choices={paneChoices} onClose={closePane} />}
+            {pane?.kind === "changes" && (
+              <ChangesPane
+                thread={thread}
+                turns={turns}
+                wide={pane.wide}
+                onWideChange={(wide) =>
+                  setPane((current) =>
+                    current?.kind === "changes" ? { kind: "changes", wide } : current,
+                  )
+                }
+                onClose={closePane}
+              />
+            )}
             {openedDiagram !== undefined && (
               <DiagramPane diagram={openedDiagram} onClose={closePane} />
             )}
@@ -391,19 +389,6 @@ const OpenThread = memo(function OpenThread(props: { thread: Thread } & ThreadTa
               />
             )}
           </div>
-          <section
-            aria-label="Changes"
-            hidden={tab !== "changes"}
-            className="flex min-h-0 min-w-0 flex-1 flex-col"
-          >
-            {changesOpened && (
-              <ThreadChanges
-                thread={thread}
-                turns={turns}
-                onReviewFeedback={() => onTabChange("chat")}
-              />
-            )}
-          </section>
         </ThreadFrame>
       </PullRequestPanes>
     </ThreadAtomsContext>

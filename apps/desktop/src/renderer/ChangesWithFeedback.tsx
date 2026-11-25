@@ -50,6 +50,7 @@ export function ChangesWithFeedback(props: {
   store: LineNotesEditor
   sidebarTab: SidebarTab
   setSidebarTab: (tab: SidebarTab) => void
+  wide: { on: boolean; onChange: (on: boolean) => void } | null
   footer: ReactNode
 }) {
   const { changes, store, sidebarTab, setSidebarTab } = props
@@ -158,7 +159,7 @@ export function ChangesWithFeedback(props: {
           all={all}
           onAllChange={showAll}
           tourOrder={null}
-          fullScreen={null}
+          expand={props.wide && { label: "Full width", ...props.wide }}
           agentWork={null}
         />
         <NoteOpenContext value={feedback.editing}>{props.footer}</NoteOpenContext>

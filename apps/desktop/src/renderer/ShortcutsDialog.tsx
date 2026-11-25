@@ -71,10 +71,10 @@ const groups: ReadonlyArray<ShortcutGroup> = [
   {
     title: "Threads",
     icon: Bot,
-    note: "In Threads. Switching between Chat and Changes needs an open Thread.",
+    note: "In Threads. Panes need an open Thread; the pane picker shows each pane's letter.",
     shortcuts: [
       { label: "Show or hide the Threads panel", keys: ["Mod", "B"] },
-      { label: "Switch between Chat and Changes", keys: ["Mod", "D"] },
+      { label: "Open the pane picker, or close the open pane", keys: ["Mod", "D"] },
     ],
   },
   {

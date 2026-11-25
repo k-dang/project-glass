@@ -1,4 +1,5 @@
 import { useAtom } from "@effect/atom-react"
+import { cn } from "cn"
 import type { Atom } from "effect/reactivity"
 import { X } from "lucide-react"
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef } from "react"
@@ -60,6 +61,7 @@ export function SidePanel(props: {
   heading: ReactNode
   actions?: ReactNode
   width: Atom.Writable<number>
+  wide?: boolean
   onClose: () => void
   children: ReactNode
 }) {
@@ -69,14 +71,19 @@ export function SidePanel(props: {
   return (
     <aside
       aria-label={props.name}
-      style={{ width }}
-      className="relative flex shrink-0 flex-col border-l bg-background"
+      style={props.wide ? undefined : { width }}
+      className={cn(
+        "relative flex flex-col bg-background",
+        props.wide ? "min-w-0 flex-1" : "max-w-[calc(100%-20rem)] shrink-0 border-l",
+      )}
     >
-      <ResizeHandle
-        name={props.name}
-        width={width}
-        onResize={(next) => setWidth(clampWidth(next))}
-      />
+      {!props.wide && (
+        <ResizeHandle
+          name={props.name}
+          width={width}
+          onResize={(next) => setWidth(clampWidth(next))}
+        />
+      )}
       <header className="flex h-12 shrink-0 items-center gap-2 border-b px-5">
         <h2 className="min-w-0 flex-1 truncate font-medium">{props.heading}</h2>
         {props.actions}

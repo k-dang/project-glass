@@ -123,6 +123,7 @@ function CheckInReview(props: { checkIn: CheckIn; onBack: () => void }) {
           store={store}
           sidebarTab={sidebarTab}
           setSidebarTab={setSidebarTab}
+          wide={null}
           footer={
             <AnswerBar
               checkInId={checkIn.id}

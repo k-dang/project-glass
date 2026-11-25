@@ -88,7 +88,9 @@ const openChanges = async (handlers: Parameters<typeof testLayer>[0]) => {
   const user = userEvent.setup()
   await user.click(await screen.findByRole("textbox", { name: "Message" }))
   await user.keyboard("{Control>}d{/Control}")
-  const region = await screen.findByRole("region", { name: "Changes" })
+  await screen.findByRole("complementary", { name: "Pane picker" })
+  await user.keyboard("d")
+  const region = await screen.findByRole("complementary", { name: "Changes" })
   await user.click(await within(region).findByRole("tab", { name: /Feedback/ }))
   const overview = await within(region).findByRole("tabpanel", { name: /Feedback/ })
 
@@ -348,7 +350,7 @@ it("stages Feedback notes beside the unsent text and sends them as one message o
 it("shows sent and Queued Feedback notes with the code they were left on", async () => {
   const feedback = [note("first", "read-1", "Rename B")]
 
-  const { user } = await openChanges({
+  await openChanges({
     WatchTranscript: () =>
       Stream.make(
         TranscriptSnapshot.make({
@@ -371,7 +373,6 @@ it("shows sent and Queued Feedback notes with the code they were left on", async
     GetThreadChanges: () => Effect.succeed(changes("read-1")),
   })
 
-  await user.keyboard("{Control>}d{/Control}")
   const queue = await screen.findByRole("region", { name: "Queued messages" })
   expect(within(queue).getByText("Feedback notes without a message")).toBeTruthy()
   expect(within(queue).getByText("1 Feedback note")).toBeTruthy()
@@ -433,10 +434,8 @@ it("returns a canceled Queued message's Feedback notes beside newer work once a 
   expect(within(attached).getAllByRole("article")).toHaveLength(1)
   expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Also add docs")
 
-  await user.click(screen.getByRole("textbox", { name: "Message" }))
-  await user.keyboard("{Control>}d{/Control}")
-  await user.click(await screen.findByRole("tab", { name: /Feedback/ }))
-  const overview = await screen.findByRole("tabpanel", { name: /Feedback/ })
+  await user.click(within(region).getByRole("tab", { name: /Feedback/ }))
+  const overview = await within(region).findByRole("tabpanel", { name: /Feedback/ })
   const [newer, restored] = await within(overview).findAllByRole("article")
   expect(within(newer!).getByText("Newer")).toBeTruthy()
   expect(within(restored!).getByText("Cap the attempts")).toBeTruthy()

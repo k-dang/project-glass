@@ -12,7 +12,7 @@ test.use({
   },
 })
 
-test("reviews a local Thread's changes on its Changes tab, held still until moved to the latest", async ({
+test("reviews a local Thread's changes in a pane beside its Chat, held still until moved to the latest", async ({
   app,
   home,
   window,
@@ -43,17 +43,13 @@ test("reviews a local Thread's changes on its Changes tab, held still until move
 
   const details = window.getByRole("complementary", { name: "Details" })
   await details.getByRole("button", { name: "Changes" }).click()
-  const changes = window.getByRole("region", { name: "Changes" })
+  const changes = window.getByRole("complementary", { name: "Changes" })
   await expect(changes.getByText("hello from the agent")).toBeVisible()
-  await expect(message).toBeHidden()
 
-  await window.getByRole("button", { name: "Details", exact: true }).click()
-  await window.getByRole("button", { name: "Back to Chat" }).click()
   await message.fill("Write another")
   await message.press("Enter")
   await expect(window.getByText(/^Done in/)).toHaveCount(2)
 
-  await details.getByRole("button", { name: "Changes" }).click()
   await expect(changes.getByRole("note")).toContainText("worked since you opened these changes")
   await expect(changes.getByText("a second note")).toHaveCount(0)
 

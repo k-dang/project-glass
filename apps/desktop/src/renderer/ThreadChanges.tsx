@@ -1,7 +1,7 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import { type Thread, ThreadChanges as Changes, type Turn } from "@glass/contracts"
 import { Option } from "effect"
-import { AsyncResult } from "effect/reactivity"
+import { AsyncResult, Atom } from "effect/reactivity"
 import { FileDiff, MessageSquareText } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
@@ -16,12 +16,47 @@ import { threadChangesAtom, feedbackNotesAtom } from "./threadsArea"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
 import type { Problem } from "./problems"
+import { SidePanel } from "./SidePanel"
+import { useShortcuts } from "./useShortcuts"
 import { type FeedbackNotesStore, lineNotesOf, useFeedbackNotes } from "./useFeedbackNotes"
 
-export function ThreadChanges(props: {
+const paneWidthAtom = Atom.make(720).pipe(Atom.keepAlive)
+
+export function ChangesPane(props: {
   thread: Thread
   turns: ReadonlyArray<Turn>
-  onReviewFeedback: () => void
+  wide: boolean
+  onWideChange: (wide: boolean) => void
+  onClose: () => void
+}) {
+  const { wide, onWideChange } = props
+
+  useShortcuts([
+    { key: "f", run: () => onWideChange(!wide) },
+    ...(wide ? [{ key: "Escape", run: () => onWideChange(false) }] : []),
+  ])
+
+  return (
+    <SidePanel
+      name="Changes"
+      heading="Changes"
+      width={paneWidthAtom}
+      wide={wide}
+      onClose={props.onClose}
+    >
+      <ThreadChanges
+        thread={props.thread}
+        turns={props.turns}
+        wide={{ on: wide, onChange: onWideChange }}
+      />
+    </SidePanel>
+  )
+}
+
+function ThreadChanges(props: {
+  thread: Thread
+  turns: ReadonlyArray<Turn>
+  wide: { on: boolean; onChange: (on: boolean) => void }
 }) {
   const { thread } = props
   const changes = useAtomValue(threadChangesAtom(thread.id))
@@ -73,12 +108,13 @@ export function ThreadChanges(props: {
           store={lineNotes}
           sidebarTab={sidebarTab}
           setSidebarTab={setSidebarTab}
+          wide={props.wide}
           footer={
             lineNotes.notes.length > 0 && (
               <ReviewFeedback
                 count={lineNotes.notes.length}
                 store={store}
-                onStaged={props.onReviewFeedback}
+                onStaged={() => props.wide.onChange(false)}
               />
             )
           }

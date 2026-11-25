@@ -14,7 +14,6 @@ import {
 import { Option, Schema } from "effect"
 import { AsyncResult, type AtomRegistry } from "effect/reactivity"
 import type { ReactNode } from "react"
-import { ThreadSearch } from "./threadsArea"
 import { AppShell } from "./AppShell"
 import { Dashboard } from "./Dashboard"
 import { Connecting, ConnectionProblem } from "./ConnectionProblem"
@@ -185,7 +184,6 @@ const newThreadRoute = createRoute({
 const threadRoute = createRoute({
   getParentRoute: () => threadsRoute,
   path: "$threadId",
-  validateSearch: Schema.toStandardSchemaV1(ThreadSearch),
 })
 
 const settingsRoute = createRoute({
