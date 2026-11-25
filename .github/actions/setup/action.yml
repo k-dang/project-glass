@@ -3,6 +3,6 @@ description: Install the pinned tools and the workspace's dependencies
 runs:
   using: composite
   steps:
-    - uses: jdx/mise-action@v5
+    - uses: jdx/mise-action@924e7c586e33d7d4bae9c14e26c5d22e2beb6e78 # v5.3.0
     - run: pnpm install
       shell: bash
