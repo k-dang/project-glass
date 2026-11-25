@@ -2,6 +2,7 @@ import { Context, Effect, Layer, Schema, Stream } from "effect"
 import { ChildProcess, ChildProcessSpawner } from "effect/process"
 import { resolve } from "node:path"
 import { isolatedGitEnv } from "./gitEnv"
+import { launchCommand } from "./processes"
 
 export class GitFailed extends Schema.TaggedError<GitFailed>()("GitFailed", {
   args: Schema.Array(Schema.String),
@@ -46,7 +47,7 @@ export class Git extends Context.Service<
         const { stdout, stderr, code } = yield* Effect.scoped(
           Effect.gen(function* () {
             const child = yield* spawner.spawn(
-              ChildProcess.make("git", args, { ...options, stdin: "ignore" }),
+              launchCommand("git", args, { ...options, stdin: "ignore" }),
             )
 
             const [out, err, exit] = yield* Effect.all(

@@ -30,7 +30,9 @@ const SIGNING_KEY = "mcp-oauth.key"
 
 const CODE_TTL_MS = 60_000
 
-const REQUEST_TTL = Duration.minutes(10)
+export const REQUEST_TTL = Duration.minutes(10)
+
+export const MAX_WAITING_REQUESTS = 5
 
 const DECISION_POLL_SECONDS = 1
 
@@ -240,11 +242,10 @@ interface PendingCode {
 interface WaitingRequest {
   readonly request: OutsideAgentRequest
   readonly authorization: Authorization
+  readonly expiresAt: number
 }
 
-interface DecidedRequest {
-  readonly id: string
-  readonly authorization: Authorization
+interface DecidedRequest extends WaitingRequest {
   readonly decision: OutsideAgentDecision
 }
 
@@ -252,6 +253,12 @@ interface Requests {
   readonly waiting: ReadonlyArray<WaitingRequest>
   readonly decided: ReadonlyArray<DecidedRequest>
 }
+
+const soonestExpiry = ({ waiting, decided }: Requests) =>
+  Math.min(
+    ...waiting.map(({ expiresAt }) => expiresAt),
+    ...decided.map(({ expiresAt }) => expiresAt),
+  )
 
 type Found = readonly [DecidedRequest | undefined, WaitingRequest | undefined]
 
@@ -647,42 +654,51 @@ export class McpOAuth extends Context.Service<
           return { name: pending.name }
         })
 
-      const forget = (id: string) =>
-        SubscriptionRef.update(requests, ({ waiting, decided }) => ({
-          waiting: waiting.filter((entry) => entry.request.id !== id),
-          decided: decided.filter((entry) => entry.id !== id),
-        }))
+      const expireThrough = (at: number) =>
+        Effect.gen(function* () {
+          const now = yield* Clock.currentTimeMillis
+
+          yield* Effect.sleep(Math.max(0, at - now))
+          yield* SubscriptionRef.update(requests, ({ waiting, decided }) => ({
+            waiting: waiting.filter((entry) => entry.expiresAt > at),
+            decided: decided.filter((entry) => entry.expiresAt > at),
+          }))
+        })
+
+      yield* SubscriptionRef.changes(requests).pipe(
+        Stream.map(soonestExpiry),
+        Stream.changes,
+        Stream.switchMap((at) =>
+          Number.isFinite(at) ? Stream.fromEffect(expireThrough(at)) : Stream.empty,
+        ),
+        Stream.runDrain,
+        Effect.forkIn(scope),
+      )
 
       const open = (authorization: Authorization) =>
         Effect.gen(function* () {
+          const since = yield* DateTime.now
+
           const created = OutsideAgentRequest.make({
             id: randomUUID(),
             name: authorization.name,
             redirectHost: new URL(authorization.redirectUri).host,
-            since: yield* DateTime.now,
+            since,
           })
 
-          const found = yield* SubscriptionRef.modify(requests, (state) => {
+          const expiresAt = DateTime.toEpochMillis(since) + Duration.toMillis(REQUEST_TTL)
+
+          return yield* SubscriptionRef.modify(requests, (state) => {
             const same = state.waiting.find((entry) =>
               sameAuthorization(entry.authorization, authorization),
             )
 
-            return same === undefined
-              ? ([
-                  created,
-                  { ...state, waiting: [...state.waiting, { request: created, authorization }] },
-                ] as const)
-              : ([same.request, state] as const)
+            if (same !== undefined) return [same.request, state] as const
+
+            const waiting = [...state.waiting, { request: created, authorization, expiresAt }]
+
+            return [created, { ...state, waiting: waiting.slice(-MAX_WAITING_REQUESTS) }] as const
           })
-
-          if (found === created) {
-            yield* Effect.sleep(REQUEST_TTL).pipe(
-              Effect.andThen(forget(created.id)),
-              Effect.forkIn(scope),
-            )
-          }
-
-          return found
         })
 
       const answer = (id: string, decision: OutsideAgentDecision) =>
@@ -695,7 +711,7 @@ export class McpOAuth extends Context.Service<
                 true,
                 {
                   waiting: state.waiting.filter((entry) => entry !== found),
-                  decided: [...state.decided, { id, authorization: found.authorization, decision }],
+                  decided: [...state.decided, { ...found, decision }],
                 },
               ] as const)
         }).pipe(
@@ -709,7 +725,7 @@ export class McpOAuth extends Context.Service<
           const [decided, waiting] = yield* SubscriptionRef.modify(
             requests,
             (state): readonly [Found, Requests] => {
-              const found = state.decided.find((entry) => entry.id === id)
+              const found = state.decided.find((entry) => entry.request.id === id)
 
               return found === undefined
                 ? ([

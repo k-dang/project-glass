@@ -1,6 +1,7 @@
 import { NoCredentials, type TokenSource } from "@glass/contracts"
 import { Config, Context, Effect, Exit, Layer, Option, Redacted } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { ChildProcessSpawner } from "effect/process"
+import { launchCommand } from "../processes"
 
 interface ResolvedToken {
   readonly token: Redacted.Redacted
@@ -27,7 +28,7 @@ export class GitHubAuth extends Context.Service<
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
 
-      const fromGhCli = spawner.string(ChildProcess.make("gh", ["auth", "token"])).pipe(
+      const fromGhCli = spawner.string(launchCommand("gh", ["auth", "token"])).pipe(
         Effect.map((output) => output.trim()),
         Effect.map((token) =>
           token.length > 0

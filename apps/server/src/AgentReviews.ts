@@ -2,7 +2,6 @@ import {
   AgentReview,
   AgentReviewFailure,
   type AgentReviewState,
-  agentModelOf,
   type ChangedFile,
   type DiffSide,
   FollowedRepository,
@@ -10,8 +9,8 @@ import {
   LowAttentionFile,
   type PullRequestRef,
   Revision,
-  type AgentRunnerIdentity,
-  runnerIdentity,
+  AgentRunnerIdentity,
+  threadModelOf,
 } from "@glass/contracts"
 import {
   Clock,
@@ -39,12 +38,11 @@ import {
   MAX_HOTSPOTS,
 } from "./agentReviewPrompt"
 import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
-import { followUpInstructions } from "./followUpInstructions"
 import { GitHubClient } from "./github/GitHubClient"
 import { patchLineNumbers, rangeInFiles } from "./github/patchLines"
 import { type JobState, pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
 import { Deadlines, ServerConfig } from "./ServerConfig"
-import { engineSettingsOf, SettingsStore } from "./SettingsStore"
+import { SettingsStore } from "./SettingsStore"
 
 const BACKGROUND_SLOTS = 2
 
@@ -81,6 +79,19 @@ const stored = Schema.Array(
     included_in_started_work_update: Schema.BooleanFromBit,
   }),
 )
+
+const ReviewSession = Schema.Struct({
+  id: Schema.String,
+  runner: AgentRunnerIdentity,
+})
+
+type ReviewSession = typeof ReviewSession.Type
+
+const SessionJson = Schema.fromJsonString(ReviewSession)
+
+const StoredSession = Schema.Array(Schema.Struct({ session: Schema.NullOr(SessionJson) }))
+
+const encodeSession = Schema.encodeSync(SessionJson)
 
 const encodeHotspots = Schema.encodeSync(HotspotsJson)
 
@@ -221,15 +232,26 @@ export class AgentReviews extends Context.Service<
               ),
             )
 
-      const save = (job: Job, pr: PullRequestRef, review: AgentReview) =>
+      const reviewFolder = (session: string) =>
+        join(config.dataDirectory, "agent-review-checkouts", session)
+
+      const sessionOf = (pr: PullRequestRef) =>
+        sql`SELECT session FROM agent_reviews WHERE ${where(pr)}`.pipe(
+          Effect.flatMap(Schema.decodeUnknownEffect(StoredSession)),
+          Effect.map(([row]) => row?.session ?? null),
+          logStorageFailure,
+          Effect.mapError(storageFailure),
+        )
+
+      const save = (job: Job, pr: PullRequestRef, review: AgentReview, session: ReviewSession) =>
         Effect.gen(function* () {
           const replaced = (yield* SubscriptionRef.get(job.state)).output?.threadId ?? null
 
           yield* jobs.commit(
             job,
-            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, thread_id, done, included_in_started_work_update)
-              VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, NULL, 0, 0)
-              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, thread_id = NULL, done = 0, included_in_started_work_update = 0`.pipe(
+            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, thread_id, done, included_in_started_work_update, session)
+              VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, NULL, 0, 0, ${encodeSession(session)})
+              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, thread_id = NULL, done = 0, included_in_started_work_update = 0, session = excluded.session`.pipe(
               logStorageFailure,
               Effect.mapError(storageFailure),
             ),
@@ -239,8 +261,8 @@ export class AgentReviews extends Context.Service<
           yield* removeThread(replaced).pipe(Effect.forkIn(scope))
         })
 
-      const reviewPrompt = settings.read().pipe(
-        Effect.map((saved) => saved.reviewPrompt),
+      const reviewInstructions = settings.read().pipe(
+        Effect.map((saved) => agentReviewInstructions(saved.reviewPrompt)),
         Effect.mapError((error) => failure("not-ready", error.message)),
       )
 
@@ -254,7 +276,8 @@ export class AgentReviews extends Context.Service<
             .select("agentReviews")
             .pipe(Effect.mapError(fromCheckoutRunFailure))
 
-          const prompt = yield* reviewPrompt
+          const session: ReviewSession = { id: randomUUID(), runner: runner.identity }
+          const instructions = yield* reviewInstructions
 
           const { input, answer } = yield* runner
             .run({
@@ -264,9 +287,10 @@ export class AgentReviews extends Context.Service<
               timeout: deadlines.agentReviewMs,
               read: github.reviewInput,
               ready: jobs.progress(job, (progress) => ({ ...progress, runner: runner.identity })),
+              session: { id: session.id, folder: reviewFolder(session.id) },
               task: (material) =>
                 Effect.succeed({
-                  instructions: agentReviewInstructions(prompt),
+                  instructions,
                   prompt: agentReviewPrompt(material, revision),
                   answer: AgentReviewAnswer,
                   tools: "shell",
@@ -274,7 +298,7 @@ export class AgentReviews extends Context.Service<
             })
             .pipe(Effect.mapError(fromCheckoutRunFailure))
 
-          return AgentReview.make({
+          const review = AgentReview.make({
             revision,
             writtenAt: yield* DateTime.now,
             markdown: answer.markdown,
@@ -283,8 +307,10 @@ export class AgentReviews extends Context.Service<
             done: false,
             includedInStartedWorkUpdate: false,
           })
+
+          return { review, session }
         }).pipe(
-          Effect.flatMap((review) => save(job, pr, review)),
+          Effect.flatMap(({ review, session }) => save(job, pr, review, session)),
           jobs.settle(
             job,
             "AgentReview",
@@ -299,16 +325,13 @@ export class AgentReviews extends Context.Service<
         job: Job,
         pr: PullRequestRef,
         review: AgentReview,
+        session: ReviewSession,
         message: string,
-        {
-          runner,
-          model,
-          reviewPrompt: prompt,
-        }: { runner: AgentRunnerIdentity; model: string; reviewPrompt: string },
       ) =>
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
-            const folder = join(config.dataDirectory, "agent-review-checkouts", randomUUID())
+            const instructions = yield* reviewInstructions
+            const folder = reviewFolder(session.id)
 
             const removeFolder = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
               effect.pipe(
@@ -324,21 +347,22 @@ export class AgentReviews extends Context.Service<
                   revision: review.revision,
                   subject: "Follow-up",
                   folder,
-                  read: github.reviewInput,
+                  read: github.tourInput,
                 })
                 .pipe(Effect.mapError(fromCheckoutRunFailure)),
             ).pipe(removeFolder)
 
             const thread = yield* threads
               .createForReview({
+                id: session.id,
                 name: `Follow-ups on ${pr.owner}/${pr.repo}#${pr.number}`,
                 repository: new FollowedRepository({ owner: pr.owner, repo: pr.repo }),
                 revision: review.revision,
-                harness: runner.harness,
-                model,
+                harness: session.runner.harness,
+                model: threadModelOf(session.runner),
                 checkout: folder,
                 review: {
-                  instructions: followUpInstructions(prompt, input, review),
+                  instructions,
                   diffLines: {
                     old: diffLinesOn(input.files, "old"),
                     new: diffLinesOn(input.files, "new"),
@@ -347,7 +371,7 @@ export class AgentReviews extends Context.Service<
                 message,
               })
               .pipe(
-                Effect.mapError(({ message: reason }) => failure("runner", reason, runner)),
+                Effect.mapError(({ message: reason }) => failure("runner", reason, session.runner)),
                 removeFolder,
               )
 
@@ -366,7 +390,7 @@ export class AgentReviews extends Context.Service<
           jobs.settle(
             job,
             "AgentReview.startThread",
-            (error: Option.Option<AgentReviewFailure>): Failed => ({
+            (error: Option.Option<AgentReviewFailure>, { runner }): Failed => ({
               status: "thread-start-failed",
               message,
               reason: Option.getOrElse(error, () => stoppedRunner(runner)),
@@ -417,21 +441,23 @@ export class AgentReviews extends Context.Service<
 
             if (review.threadId !== null) return review.threadId
 
-            const saved = yield* settings
-              .read()
-              .pipe(Effect.mapError((error) => failure("not-ready", error.message)))
+            const session = yield* sessionOf(pr)
 
-            const engineSettings = engineSettingsOf(saved, "agentReviews")
-            const runner = runnerIdentity(engineSettings)
+            if (session === null)
+              return yield* failure(
+                "not-ready",
+                "This Agent review can't take Follow-ups. Review again to follow up.",
+              )
 
             const startedAt = yield* Clock.currentTimeMillis
             yield* replace(
-              { status: "starting-thread", message, startedAt, runner },
-              startThread(job, pr, review, message, {
-                runner,
-                model: agentModelOf(engineSettings),
-                reviewPrompt: saved.reviewPrompt,
-              }),
+              {
+                status: "starting-thread",
+                message,
+                startedAt,
+                runner: session.runner,
+              },
+              startThread(job, pr, review, session, message),
             )
 
             return null
