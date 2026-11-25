@@ -6,38 +6,23 @@ import {
   FailingChecksReason,
   MergeConflictReason,
   MergedReason,
+  type OpenReason,
+  openReasons,
   type PullRequestUpdateReason,
   ReviewFeedbackReason,
   type SubscriptionReason,
   type WaitingReviewThread,
 } from "@glass/contracts"
-import { Array as Arr, Data, Predicate, Schema } from "effect"
+import { Array as Arr, Data, Predicate, Record, Schema } from "effect"
 import type { SubscribedRead } from "./github/repositoryPullRequests"
 
 export const GIVES_UP_AFTER = 3
 
-const Updates = Schema.Struct({
-  "failing-checks": Schema.Int,
-  "review-feedback": Schema.Int,
-  "changes-requested": Schema.Int,
-  "merge-conflict": Schema.Int,
-})
+const Updates = Schema.Record(Schema.Literals(openReasons), Schema.Int)
 
-export type OpenReason = keyof typeof Updates.Type
-
-export const openReasons: ReadonlyArray<OpenReason> = [
-  "failing-checks",
-  "review-feedback",
-  "changes-requested",
-  "merge-conflict",
-]
-
-const noUpdates: typeof Updates.Type = {
-  "failing-checks": 0,
-  "review-feedback": 0,
-  "changes-requested": 0,
-  "merge-conflict": 0,
-}
+const noUpdates = Schema.decodeUnknownSync(Updates)(
+  Object.fromEntries(openReasons.map((reason) => [reason, 0])),
+)
 
 export const Told = Schema.Struct({
   failedRuns: Schema.NullOr(
@@ -87,12 +72,7 @@ export interface Decision {
   readonly standing: Readonly<Record<OpenReason, Standing | null>>
 }
 
-const nothingStanding: Decision["standing"] = {
-  "failing-checks": null,
-  "review-feedback": null,
-  "changes-requested": null,
-  "merge-conflict": null,
-}
+const nothingStanding: Decision["standing"] = Record.map(noUpdates, () => null)
 
 type Kept = Exclude<keyof Told, "updates">
 
@@ -248,32 +228,26 @@ export const decide = (
       : { told: found.told, reason: found.reason, updates: updates + 1, standing: "due" }
   }
 
-  const checks = part("failing-checks", "failedRuns", failingChecks)
-  const feedback = part("review-feedback", "reviewComments", reviewFeedback)
-  const requested = part("changes-requested", "changesRequested", changesRequested)
-  const conflict = part("merge-conflict", "conflictBase", mergeConflict)
+  const decided = {
+    "failing-checks": part("failing-checks", "failedRuns", failingChecks),
+    "review-feedback": part("review-feedback", "reviewComments", reviewFeedback),
+    "changes-requested": part("changes-requested", "changesRequested", changesRequested),
+    "merge-conflict": part("merge-conflict", "conflictBase", mergeConflict),
+  } satisfies Record<OpenReason, unknown>
 
   return {
     told: {
-      failedRuns: checks.told,
-      reviewComments: feedback.told,
-      changesRequested: requested.told,
-      conflictBase: conflict.told,
-      updates: {
-        "failing-checks": checks.updates,
-        "review-feedback": feedback.updates,
-        "changes-requested": requested.updates,
-        "merge-conflict": conflict.updates,
-      },
+      failedRuns: decided["failing-checks"].told,
+      reviewComments: decided["review-feedback"].told,
+      changesRequested: decided["changes-requested"].told,
+      conflictBase: decided["merge-conflict"].told,
+      updates: Record.map(decided, ({ updates }) => updates),
     },
-    reasons: [checks, feedback, requested, conflict].flatMap(({ reason }) =>
-      reason === null ? [] : [reason],
-    ),
-    standing: {
-      "failing-checks": checks.standing,
-      "review-feedback": feedback.standing,
-      "changes-requested": requested.standing,
-      "merge-conflict": conflict.standing,
-    },
+    reasons: openReasons.flatMap((open) => {
+      const { reason } = decided[open]
+
+      return reason === null ? [] : [reason]
+    }),
+    standing: Record.map(decided, ({ standing }) => standing),
   }
 }

@@ -1,22 +1,14 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
-import type {
-  Subscription,
-  SubscriptionReason,
-  ThreadPullRequest as OwnPullRequest,
+import {
+  type Subscription,
+  subscriptionReasonWords,
+  type ThreadPullRequest as OwnPullRequest,
 } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { BellRing, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { endSubscriptionAtom, subscriptionsAtom } from "./threadsArea"
-
-const reasonLabels: Record<SubscriptionReason, string> = {
-  "failing-checks": "failing checks",
-  "review-feedback": "review feedback",
-  "changes-requested": "changes requested",
-  "merge-conflict": "a merge conflict",
-  "merged-or-closed": "merged or closed",
-}
 
 const pullRequestLabel = ({ pullRequest }: Subscription, own: OwnPullRequest | undefined) => {
   if (pullRequest !== null) return `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.number}`
@@ -51,7 +43,7 @@ export function ThreadSubscriptions(props: {
               <div className="min-w-0 flex-1">
                 <div className="truncate">{label}</div>
                 <div className="text-muted-foreground">
-                  {subscription.reasons.map((reason) => reasonLabels[reason]).join(", ")}
+                  {subscription.reasons.map((reason) => subscriptionReasonWords[reason]).join(", ")}
                 </div>
               </div>
               <Button

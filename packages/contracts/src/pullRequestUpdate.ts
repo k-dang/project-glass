@@ -1,6 +1,7 @@
 import { Schema } from "effect"
 import { LoggedEvent } from "./event"
 import { PullRequestRef } from "./pullRequest"
+import type { SubscriptionReason } from "./subscription"
 
 export const FailingCheck = Schema.Struct({
   name: Schema.String,
@@ -55,6 +56,15 @@ export const PullRequestUpdateReason = Schema.Union([
 ])
 
 export type PullRequestUpdateReason = typeof PullRequestUpdateReason.Type
+
+export const subscriptionReasonOf: Record<PullRequestUpdateReason["_tag"], SubscriptionReason> = {
+  FailingChecks: "failing-checks",
+  ReviewFeedback: "review-feedback",
+  ChangesRequested: "changes-requested",
+  MergeConflict: "merge-conflict",
+  Merged: "merged-or-closed",
+  Closed: "merged-or-closed",
+}
 
 export const UpdatedPullRequest = Schema.Struct({
   subscriptionId: Schema.String,

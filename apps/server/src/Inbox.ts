@@ -21,6 +21,7 @@ import {
   referenceKey,
   inboxGroupOf,
   inboxGroups,
+  type OpenReason,
   type TriedThread,
   TurnFinished,
   WaitingRequests,
@@ -49,7 +50,7 @@ import {
   summaryOf,
 } from "./PullRequestMirror"
 import { type PullRequestStanding, PullRequestUpdates } from "./PullRequestUpdates"
-import { heldBack, type OpenReason } from "./pullRequestUpdateDecision"
+import { heldBack } from "./pullRequestUpdateDecision"
 import { Queue } from "./Queue"
 import type { WaitingRequest } from "./Transcripts"
 

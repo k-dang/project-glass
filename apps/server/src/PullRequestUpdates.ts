@@ -2,10 +2,13 @@ import {
   type Event,
   isGone,
   type LoggedEvent,
+  type OpenReason,
+  openReasons,
   type PullRequestRef,
   PullRequestUpdate,
   type PullRequestUpdateReason,
   referenceKey,
+  subscriptionReasonOf,
   type Thread,
   type ThreadPullRequest,
   type UpdatedPullRequest,
@@ -25,13 +28,7 @@ import {
 } from "effect"
 import { EventLog } from "./EventLog"
 import { type Mirror, mirroredPullRequest, PullRequestMirror } from "./PullRequestMirror"
-import {
-  decide,
-  type OpenReason,
-  openReasons,
-  PullRequestNow,
-  sameTold,
-} from "./pullRequestUpdateDecision"
+import { decide, PullRequestNow, sameTold } from "./pullRequestUpdateDecision"
 import { SettingsStore } from "./SettingsStore"
 import { type SubscriptionState, Subscriptions } from "./Subscriptions"
 import { ThreadPullRequests } from "./ThreadPullRequests"
@@ -89,13 +86,6 @@ const eventsBehind = (
   reasons: ReadonlyArray<PullRequestUpdateReason>,
   recent: ReadonlyArray<LoggedEvent>,
 ) => reasons.flatMap((reason) => recent.find(({ event }) => isBehind(reason, event)) ?? [])
-
-const toldReasons: Record<OpenReason, PullRequestUpdateReason["_tag"]> = {
-  "failing-checks": "FailingChecks",
-  "review-feedback": "ReviewFeedback",
-  "changes-requested": "ChangesRequested",
-  "merge-conflict": "MergeConflict",
-}
 
 const changed = (changes: ReadonlyArray<Stream.Stream<unknown, unknown>>) =>
   Stream.mergeAll(
@@ -307,7 +297,7 @@ export class PullRequestUpdates extends Context.Service<
               running?.pullRequests.some(
                 ({ subscriptionId, reasons }) =>
                   subscriptionId === subscription.id &&
-                  reasons.some(({ _tag }) => _tag === toldReasons[reason]),
+                  reasons.some(({ _tag }) => subscriptionReasonOf[_tag] === reason),
               ) === true
 
             return [
