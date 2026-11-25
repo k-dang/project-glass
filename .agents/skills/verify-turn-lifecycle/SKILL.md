@@ -28,7 +28,7 @@ Expect `Result: ok`: every rule holds and every mutant is caught. [`tools/tla/RE
 
 ## Coverage
 
-Synced with the code at commit `0f83944eaba1cd425f5ad1049ae53dbfbbe687ef`. Before you trust a result, run `git diff 0f83944e -- <files below>`. If a covered function changed, compare it with its actions first.
+Synced with the code at commit `608fb56fc287c6b29036581dc8021cb449628b40`. Before you trust a result, run `git diff 608fb56f -- <files below>`. If a covered function changed, compare it with its actions first.
 
 | Model | Code |
 | --- | --- |
