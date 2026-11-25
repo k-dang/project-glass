@@ -31,6 +31,7 @@ import { ActivityLog } from "./ActivityLog"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
+import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import {
   type Mirror,
   type MirroredPullRequest,
@@ -163,6 +164,7 @@ export class PullRequestLists extends Context.Service<
       const github = yield* GitHubClient
       const activity = yield* ActivityLog
       const pullRequests = yield* PullRequestMirror
+      const workspaces = yield* PullRequestWorkspaces
       const lock = yield* Semaphore.make(1)
       const launchedAt = yield* Clock.currentTimeMillis
 
@@ -219,15 +221,18 @@ export class PullRequestLists extends Context.Service<
           if (followed.length === 0) {
             yield* pullRequests.forgetRepositories
             yield* SubscriptionRef.set(lastSync, { failures: new Map(), problem: null })
+            yield* workspaces.keep("lists", [])
           } else {
             const { login } = yield* github.viewer
             const touched = yield* touchedBy(login)
 
-            const { failures } = yield* pullRequests.sync(login, followed, (synced) =>
-              shownIn(classify(synced, followed, viewerOf(synced, login, touched.touched))),
-            )
+            const shown = (synced: Mirror) =>
+              shownIn(classify(synced, followed, viewerOf(synced, login, touched.touched)))
+
+            const { mirror, failures } = yield* pullRequests.sync(login, followed, shown)
 
             yield* SubscriptionRef.set(lastSync, { failures, problem: null })
+            yield* workspaces.keep("lists", shown(mirror))
           }
 
           const latest = yield* derive

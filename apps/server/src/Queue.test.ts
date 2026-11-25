@@ -276,17 +276,38 @@ it.live("opens a queued PR from the read Glass started when it was queued", () =
   }),
 )
 
-it.live("opens a queued PR fresh when it changed after Glass read it ahead", () =>
+const pullRequestReads = (github: FakeGitHub) =>
+  operations(github).filter((name) => name === "PullRequest").length
+
+it.live("reads a queued PR ahead again once the Queue sees it changed", () =>
   Effect.gen(function* () {
     const { github, start } = yield* startSignedIn
     const pr = github.seedPullRequest({ title: "Pushed to", base, head })
     const { client } = yield* start
     yield* client.AddToQueue({ references: [ref(pr)] })
-    yield* eventually(Effect.sync(() => assert.include(operations(github), "PullRequestRevision")))
+    yield* eventually(Effect.sync(() => assert.strictEqual(pullRequestReads(github), 1)))
     pr.push({ head: { sha: "h2", files: {} } })
+    yield* client.RefreshQueue()
+    yield* eventually(Effect.sync(() => assert.strictEqual(pullRequestReads(github), 2)))
 
     const workspace = yield* client.LoadPullRequest({ pullRequest: ref(pr) })
 
     assert.strictEqual(workspace.revision.head, "h2")
+    assert.strictEqual(pullRequestReads(github), 2)
+  }),
+)
+
+it.live("reads a PR from GitHub when it is opened again", () =>
+  Effect.gen(function* () {
+    const { github, start } = yield* startSignedIn
+    const pr = github.seedPullRequest({ title: "Opened twice", base, head })
+    const { client } = yield* start
+    yield* client.AddToQueue({ references: [ref(pr)] })
+    yield* eventually(Effect.sync(() => assert.strictEqual(pullRequestReads(github), 1)))
+    yield* client.LoadPullRequest({ pullRequest: ref(pr) })
+
+    yield* client.LoadPullRequest({ pullRequest: ref(pr) })
+
+    assert.strictEqual(pullRequestReads(github), 2)
   }),
 )

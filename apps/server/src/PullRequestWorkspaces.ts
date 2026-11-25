@@ -6,7 +6,7 @@ import {
   type PullRequestWorkspace,
   referenceKey,
 } from "@glass/contracts"
-import { Context, Effect, Exit, Fiber, Layer, Scope, Semaphore } from "effect"
+import { Context, DateTime, Effect, Exit, Fiber, Layer, Scope, Semaphore } from "effect"
 import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { annotateUnit } from "./wideEvents"
@@ -15,7 +15,15 @@ const PREFETCH_SLOTS = 2
 
 type ReadError = PullRequestNotFound | PullRequestAccessDenied | ConnectionError
 
+export type WorkspaceHolder = "lists" | "queue"
+
+export interface HeldPullRequest {
+  readonly ref: PullRequestRef
+  readonly updatedAt: DateTime.Utc
+}
+
 interface Prefetch {
+  readonly updatedAt: DateTime.Utc
   readonly fiber: Fiber.Fiber<PullRequestWorkspace, ReadError>
   readonly reading: { holdsSlot: boolean }
 }
@@ -23,8 +31,10 @@ interface Prefetch {
 export class PullRequestWorkspaces extends Context.Service<
   PullRequestWorkspaces,
   {
-    readonly prefetch: (refs: ReadonlyArray<PullRequestRef>) => Effect.Effect<void>
-    readonly forget: (ref: PullRequestRef) => Effect.Effect<void>
+    readonly keep: (
+      holder: WorkspaceHolder,
+      pullRequests: ReadonlyArray<HeldPullRequest>,
+    ) => Effect.Effect<void>
     readonly open: (ref: PullRequestRef) => Effect.Effect<PullRequestWorkspace, ReadError>
   }
 >()("@glass/server/PullRequestWorkspaces") {
@@ -34,21 +44,32 @@ export class PullRequestWorkspaces extends Context.Service<
       const github = yield* GitHubClient
       const scope = yield* Scope.Scope
       const slots = yield* Semaphore.make(PREFETCH_SLOTS)
+      const lock = yield* Semaphore.make(1)
+      const held = new Map<WorkspaceHolder, ReadonlySet<string>>()
       const prefetches = new Map<string, Prefetch>()
+      // WARNING: GitHub doesn't move updatedAt for some of Glass's own writes, such as viewed files, so a workspace is served from here at most once.
+      const opened = new Set<string>()
 
-      const take = (ref: PullRequestRef) =>
-        Effect.sync(() => {
-          const key = referenceKey(ref)
-          const taken = prefetches.get(key)
+      const isHeld = (key: string) => [...held.values()].some((keys) => keys.has(key))
+
+      const drop = (key: string) =>
+        Effect.suspend(() => {
+          const dropped = prefetches.get(key)
           prefetches.delete(key)
 
-          return taken
+          return dropped === undefined ? Effect.void : Fiber.interrupt(dropped.fiber)
         })
 
-      const prefetchOne = Effect.fnUntraced(function* (ref: PullRequestRef) {
+      const prefetchOne = Effect.fnUntraced(function* ({ ref, updatedAt }: HeldPullRequest) {
         const key = referenceKey(ref)
+        const current = prefetches.get(key)
 
-        if (prefetches.has(key)) return
+        if (opened.has(key)) return
+
+        if (current !== undefined && DateTime.isGreaterThanOrEqualTo(current.updatedAt, updatedAt))
+          return
+
+        yield* drop(key)
 
         const reading = { holdsSlot: false }
 
@@ -58,7 +79,14 @@ export class PullRequestWorkspaces extends Context.Service<
           Effect.andThen(github.pullRequest(ref)),
           slots.withPermits(1),
           Effect.provideService(BackgroundGitHubRequest, true),
-          Effect.tapError((error) => Effect.logWarning("Couldn't prefetch a queued PR", error)),
+          Effect.tapError((error) => Effect.logWarning("Couldn't prefetch a PR", error)),
+          Effect.onExit((exit) =>
+            Effect.sync(() => {
+              if (Exit.isFailure(exit) && prefetches.get(key)?.reading === reading) {
+                prefetches.delete(key)
+              }
+            }),
+          ),
           Effect.withSpan("PullRequestWorkspaces.prefetch", {
             root: true,
             attributes: { pr: key },
@@ -66,18 +94,22 @@ export class PullRequestWorkspaces extends Context.Service<
           Effect.forkIn(scope),
         )
 
-        prefetches.set(key, { fiber, reading })
+        if (opened.has(key)) yield* Fiber.interrupt(fiber)
+        else prefetches.set(key, { updatedAt, fiber, reading })
       })
 
-      const prefetch = (refs: ReadonlyArray<PullRequestRef>) =>
-        Effect.forEach(refs, prefetchOne, { discard: true })
+      const keep = (holder: WorkspaceHolder, pullRequests: ReadonlyArray<HeldPullRequest>) =>
+        Effect.gen(function* () {
+          held.set(holder, new Set(pullRequests.map(({ ref }) => referenceKey(ref))))
 
-      const forget = (ref: PullRequestRef) =>
-        take(ref).pipe(
-          Effect.flatMap((taken) =>
-            taken === undefined ? Effect.void : Fiber.interrupt(taken.fiber),
-          ),
-        )
+          yield* Effect.forEach(
+            [...prefetches.keys()].filter((key) => !isHeld(key)),
+            drop,
+            { discard: true },
+          )
+
+          yield* Effect.forEach(pullRequests, prefetchOne, { discard: true })
+        }).pipe(lock.withPermits(1))
 
       const usable = Effect.fnUntraced(function* ({ fiber, reading }: Prefetch) {
         if (!reading.holdsSlot) {
@@ -88,15 +120,16 @@ export class PullRequestWorkspaces extends Context.Service<
 
         const exit = yield* Effect.exit(Fiber.join(fiber))
 
-        if (Exit.isFailure(exit)) return null
-
-        const { pullRequest, revision, updatedAt } = exit.value
-
-        return (yield* github.hasChanged(pullRequest.id, revision, updatedAt)) ? null : exit.value
+        return Exit.isSuccess(exit) ? exit.value : null
       })
 
       const open = Effect.fn("PullRequestWorkspaces.open")(function* (ref: PullRequestRef) {
-        const taken = yield* take(ref)
+        const key = referenceKey(ref)
+        const taken = prefetches.get(key)
+
+        prefetches.delete(key)
+        opened.add(key)
+
         const ready = taken === undefined ? null : yield* usable(taken)
 
         yield* annotateUnit({ prefetched: ready !== null })
@@ -104,7 +137,7 @@ export class PullRequestWorkspaces extends Context.Service<
         return ready ?? (yield* github.pullRequest(ref))
       })
 
-      return PullRequestWorkspaces.of({ prefetch, forget, open })
+      return PullRequestWorkspaces.of({ keep, open })
     }),
   )
 }

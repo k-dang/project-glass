@@ -28,6 +28,7 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
 import { watchDeadlines } from "../test/deadlines"
+import { eventually } from "../test/eventually"
 import { type FakeGitHub, startFakeGitHub } from "../test/fakeGitHub"
 import type { FakePullRequest } from "../test/fakePullRequest"
 import { VIEWER } from "../test/fakePullRequest"
@@ -37,6 +38,7 @@ import { FollowedRepositories } from "./FollowedRepositories"
 import { GitHubClient } from "./github/GitHubClient"
 import { PullRequestLists } from "./PullRequestLists"
 import { type Mirror, type MirroredPullRequest, PullRequestMirror } from "./PullRequestMirror"
+import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 
 const base = { sha: "b0", files: {} }
 
@@ -139,6 +141,15 @@ const watching = (client: Client) => latestOf(client.WatchPullRequests())
 
 const operations = (github: FakeGitHub) =>
   github.graphQLRequests.map((request) => request.operationName)
+
+const workspaceReads = new Set([
+  "PullRequest",
+  "PullRequestReviewThreads",
+  "PullRequestComments",
+  "PullRequestReviews",
+  "PullRequestViewedFiles",
+  "PullRequestRevision",
+])
 
 const drafts = {
   drafts: [{ path: "README.md", line: 1, side: "RIGHT" as const, diffHunk: "", body: "Hmm" }],
@@ -666,11 +677,12 @@ describe("Keeping up with GitHub", () => {
           numbers: [added, ...others.toReversed()].map((pr) => pr.number),
         },
       ])
-      assert.deepStrictEqual(operations(github).slice(firstSync), [
-        "SearchPullRequests",
-        "PullRequestChecks",
-        "PullRequestChecks",
-      ])
+      assert.deepStrictEqual(
+        operations(github)
+          .slice(firstSync)
+          .filter((name) => !workspaceReads.has(name)),
+        ["SearchPullRequests", "PullRequestChecks", "PullRequestChecks"],
+      )
     }),
   )
 
@@ -988,6 +1000,7 @@ describe("Watching", () => {
                 saved: SubscriptionRef.get(mirror),
                 changes: SubscriptionRef.changes(mirror),
               }),
+              Layer.mock(PullRequestWorkspaces)({}),
             ]),
           ),
         ),
@@ -1047,6 +1060,34 @@ describe("Watching", () => {
         { repository: "octo-org/glass", numbers: [pr.number] },
       ])
       assert.strictEqual(github.graphQLRequests.length, asked)
+    }),
+  )
+
+  it.live("opens a listed PR from the read Glass started when it listed it", () =>
+    Effect.gen(function* () {
+      const { github, client } = yield* startSignedInBackend
+
+      const pr = github.seedPullRequest({
+        owner: "octo-org",
+        repo: "glass",
+        author: VIEWER.login,
+        title: "Read ahead",
+        base,
+        head,
+      })
+
+      yield* client.FollowRepository({ input: "octo-org/glass" })
+      yield* client.ListPullRequests()
+
+      const pullRequestReads = () =>
+        operations(github).filter((name) => name === "PullRequest").length
+
+      yield* eventually(Effect.sync(() => assert.strictEqual(pullRequestReads(), 1)))
+
+      const workspace = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
+
+      assert.strictEqual(workspace.pullRequest.title, "Read ahead")
+      assert.strictEqual(pullRequestReads(), 1)
     }),
   )
 

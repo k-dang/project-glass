@@ -106,8 +106,6 @@ export class Queue extends Context.Service<
       const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
       const writes = yield* SubscriptionRef.make(0)
 
-      const announce = Effect.ensuring(SubscriptionRef.update(writes, (count) => count + 1))
-
       const read = Effect.gen(function* () {
         const rows = yield* sql`
           SELECT
@@ -134,6 +132,20 @@ export class Queue extends Context.Service<
       }).pipe(
         Effect.tapError((cause) => Effect.logWarning("Couldn't load the Queue", cause)),
         Effect.mapError(loadFailed),
+      )
+
+      const keepQueuedReady = read.pipe(
+        Effect.flatMap((queued) =>
+          workspaces.keep(
+            "queue",
+            queued.flatMap(({ pullRequest, problem }) => (problem === null ? [pullRequest] : [])),
+          ),
+        ),
+        Effect.ignore,
+      )
+
+      const announce = Effect.ensuring(
+        keepQueuedReady.pipe(Effect.andThen(SubscriptionRef.update(writes, (count) => count + 1))),
       )
 
       const logSaveFailure = Effect.tapError((cause: unknown) =>
@@ -191,7 +203,7 @@ export class Queue extends Context.Service<
       const cancelWork = (ref: PullRequestRef) =>
         Effect.forEach(EngineFeature.literals, (feature) => work[feature].cancel(ref), {
           discard: true,
-        }).pipe(Effect.andThen(workspaces.forget(ref)))
+        })
 
       const insert = Effect.fnUntraced(function* (
         queuedAt: DateTime.Utc,
@@ -290,8 +302,6 @@ export class Queue extends Context.Service<
           )
           .pipe(logSaveFailure, Effect.mapError(saveFailed))
 
-        yield* workspaces.prefetch(added.map(({ summary }) => summary.ref))
-
         yield* startWork(
           added.map(({ summary, state, revision }) => ({
             pullRequest: summary,
@@ -354,7 +364,6 @@ export class Queue extends Context.Service<
           { openedAt, missing: queued.problem !== null },
         ).pipe(logSaveFailure, Effect.mapError(saveFailed))
 
-        yield* workspaces.prefetch([queued.pullRequest.ref])
         yield* startWork([queued])
       }, announce)
 
