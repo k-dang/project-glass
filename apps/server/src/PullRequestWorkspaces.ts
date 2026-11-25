@@ -9,7 +9,6 @@ import {
 import { Context, DateTime, Effect, Exit, Fiber, Layer, Scope, Semaphore, Stream } from "effect"
 import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
-import { PullRequestLists } from "./PullRequestLists"
 import { Queue } from "./Queue"
 import { annotateUnit } from "./wideEvents"
 
@@ -38,7 +37,6 @@ export class PullRequestWorkspaces extends Context.Service<
     PullRequestWorkspaces,
     Effect.gen(function* () {
       const github = yield* GitHubClient
-      const lists = yield* PullRequestLists
       const queue = yield* Queue
       const scope = yield* Scope.Scope
       const slots = yield* Semaphore.make(PREFETCH_SLOTS)
@@ -109,17 +107,13 @@ export class PullRequestWorkspaces extends Context.Service<
         yield* Effect.forEach(pullRequests, prefetchOne, { discard: true })
       })
 
-      const readyInQueue = queue.watch().pipe(
-        Stream.map((pullRequests) =>
-          pullRequests.flatMap(({ pullRequest, problem }) =>
-            problem === null ? [pullRequest] : [],
+      yield* queue.watch().pipe(
+        Stream.runForEach((queued) =>
+          keep(
+            queued.flatMap(({ pullRequest, problem }) => (problem === null ? [pullRequest] : [])),
           ),
         ),
-        Stream.catch(() => Stream.make([])),
-      )
-
-      yield* Stream.zipLatestAll(lists.shown, readyInQueue).pipe(
-        Stream.runForEach(([listed, queued]) => keep([...listed, ...queued])),
+        Effect.ignore,
         Effect.forkScoped,
       )
 

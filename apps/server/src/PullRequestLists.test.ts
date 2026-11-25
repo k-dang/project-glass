@@ -28,7 +28,6 @@ import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
 import { watchDeadlines } from "../test/deadlines"
-import { eventually } from "../test/eventually"
 import { type FakeGitHub, startFakeGitHub } from "../test/fakeGitHub"
 import type { FakePullRequest } from "../test/fakePullRequest"
 import { VIEWER } from "../test/fakePullRequest"
@@ -667,12 +666,11 @@ describe("Keeping up with GitHub", () => {
           numbers: [added, ...others.toReversed()].map((pr) => pr.number),
         },
       ])
-      assert.deepStrictEqual(
-        operations(github)
-          .slice(firstSync)
-          .filter((name) => name === "SearchPullRequests" || name === "PullRequestChecks"),
-        ["SearchPullRequests", "PullRequestChecks", "PullRequestChecks"],
-      )
+      assert.deepStrictEqual(operations(github).slice(firstSync), [
+        "SearchPullRequests",
+        "PullRequestChecks",
+        "PullRequestChecks",
+      ])
     }),
   )
 
@@ -1049,34 +1047,6 @@ describe("Watching", () => {
         { repository: "octo-org/glass", numbers: [pr.number] },
       ])
       assert.strictEqual(github.graphQLRequests.length, asked)
-    }),
-  )
-
-  it.live("opens a listed PR from the read Glass started when it listed it", () =>
-    Effect.gen(function* () {
-      const { github, client } = yield* startSignedInBackend
-
-      const pr = github.seedPullRequest({
-        owner: "octo-org",
-        repo: "glass",
-        author: VIEWER.login,
-        title: "Read ahead",
-        base,
-        head,
-      })
-
-      yield* client.FollowRepository({ input: "octo-org/glass" })
-      yield* client.ListPullRequests()
-
-      const pullRequestReads = () =>
-        operations(github).filter((name) => name === "PullRequest").length
-
-      yield* eventually(Effect.sync(() => assert.strictEqual(pullRequestReads(), 1)))
-
-      const workspace = yield* client.LoadPullRequest({ pullRequest: new PullRequestRef(pr) })
-
-      assert.strictEqual(workspace.pullRequest.title, "Read ahead")
-      assert.strictEqual(pullRequestReads(), 1)
     }),
   )
 

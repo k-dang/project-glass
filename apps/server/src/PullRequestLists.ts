@@ -153,7 +153,6 @@ export class PullRequestLists extends Context.Service<
   {
     readonly list: () => Effect.Effect<PullRequestListings, SettingsError | ConnectionError>
     readonly watch: () => Stream.Stream<LatestPullRequestListings>
-    readonly shown: Stream.Stream<ReadonlyArray<MirroredPullRequest>>
     readonly refreshSoon: Effect.Effect<void>
   }
 >()("@glass/server/PullRequestLists") {
@@ -179,8 +178,6 @@ export class PullRequestLists extends Context.Service<
         )
 
       const lastSync = yield* SubscriptionRef.make<LastSync>({ failures: new Map(), problem: null })
-
-      const shown = yield* SubscriptionRef.make<ReadonlyArray<MirroredPullRequest>>([])
 
       const pace = yield* SubscriptionRef.make<Pace>({ watchers: 0, syncedAt: undefined })
 
@@ -222,18 +219,15 @@ export class PullRequestLists extends Context.Service<
           if (followed.length === 0) {
             yield* pullRequests.forgetRepositories
             yield* SubscriptionRef.set(lastSync, { failures: new Map(), problem: null })
-            yield* SubscriptionRef.set(shown, [])
           } else {
             const { login } = yield* github.viewer
             const touched = yield* touchedBy(login)
 
-            const shownBy = (synced: Mirror) =>
-              shownIn(classify(synced, followed, viewerOf(synced, login, touched.touched)))
-
-            const { mirror, failures } = yield* pullRequests.sync(login, followed, shownBy)
+            const { failures } = yield* pullRequests.sync(login, followed, (synced) =>
+              shownIn(classify(synced, followed, viewerOf(synced, login, touched.touched))),
+            )
 
             yield* SubscriptionRef.set(lastSync, { failures, problem: null })
-            yield* SubscriptionRef.set(shown, shownBy(mirror))
           }
 
           const latest = yield* derive
@@ -291,7 +285,6 @@ export class PullRequestLists extends Context.Service<
       return PullRequestLists.of({
         list,
         refreshSoon,
-        shown: SubscriptionRef.changes(shown),
         watch: () =>
           Stream.zipLatestAll(
             pullRequests.changes,
