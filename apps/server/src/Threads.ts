@@ -38,7 +38,6 @@ import {
   type TranscriptUpdate,
   type TurnEnd,
   type SentMessage,
-  type UnsentFeedback,
 } from "@glass/contracts"
 import {
   Array as Arr,
@@ -220,6 +219,9 @@ export class Threads extends Context.Service<
       input: Omit<NewThread, "permissionMode">,
     ) => Effect.Effect<Thread, ThreadNotFound | InvalidLocalCheckout | ThreadError>
     readonly createForReview: (input: NewReviewThread) => Effect.Effect<Thread, ThreadError>
+    readonly refuseReviewFrom: (
+      threadId: string,
+    ) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly send: (
       threadId: string,
       input: SentMessage,
@@ -237,7 +239,10 @@ export class Threads extends Context.Service<
     readonly cancelQueued: (
       threadId: string,
       queuedId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | QueuedMessageStarted | ThreadError>
+    ) => Effect.Effect<
+      ReadonlyArray<FeedbackNote>,
+      ThreadNotFound | QueuedMessageStarted | ThreadError
+    >
     readonly sendQueued: (
       threadId: string,
       queuedId: string,
@@ -247,18 +252,15 @@ export class Threads extends Context.Service<
     ) => Effect.Effect<ThreadChanges, ThreadNotFound | ThreadError>
     readonly feedbackNotes: (
       threadId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
-    readonly stageFeedbackNotes: (
-      threadId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadNotFound | ThreadError>
     readonly saveFeedbackNote: (
       threadId: string,
       note: FeedbackNote,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadNotFound | ThreadError>
     readonly removeFeedbackNote: (
       threadId: string,
       noteId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadNotFound | ThreadError>
     readonly stop: (threadId: string) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly stopBackgroundTask: (
       threadId: string,
@@ -734,6 +736,21 @@ export class Threads extends Context.Service<
         return yield* createWith(input, permissionMode)
       })
 
+      const refuseReviewFrom = Effect.fn("Threads.refuseReviewFrom")(function* (threadId: string) {
+        const starter = (yield* find(threadId)).thread
+
+        yield* refuseReach(
+          starter,
+          { place: localPlace, permissionMode: null },
+          {
+            leavesSandbox:
+              "An Agent review runs on this device, so a Thread in a Sandbox can't start one. Ask the user to.",
+            asksLess:
+              "An Agent review asks the user less than you do, so you can't start one. Ask the user to.",
+          },
+        )
+      })
+
       const findWritable = (threadId: string) =>
         find(threadId).pipe(Effect.tap(() => sandboxes.refuseIfGone(threadId)))
 
@@ -1051,13 +1068,12 @@ export class Threads extends Context.Service<
         create,
         createFrom,
         createForReview,
+        refuseReviewFrom,
         send,
         sendFrom,
         changes,
         feedbackNotes: (threadId) =>
           find(threadId).pipe(Effect.andThen(notes.list(threadNotes(threadId)))),
-        stageFeedbackNotes: (threadId) =>
-          find(threadId).pipe(Effect.andThen(notes.stage(threadNotes(threadId)))),
         saveFeedbackNote: (threadId, note) =>
           find(threadId).pipe(Effect.andThen(notes.save(threadNotes(threadId), note))),
         removeFeedbackNote: (threadId, noteId) =>

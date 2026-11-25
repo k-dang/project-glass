@@ -16,11 +16,12 @@ import {
   calledBy,
   glassCall,
   threadsFixture,
+  threadsFixtureWith,
   holding,
   repository,
   settled,
 } from "../../test/threadsFixture"
-import { startFakeGitHub } from "../../test/fakeGitHub"
+import { type FakeGitHub, startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
 import { connectMcp, toolText } from "../../test/mcpClient"
@@ -247,10 +248,9 @@ describe("Glass's Thread tools over MCP", () => {
 
 const markdown = "**The greeting takes a name.** Nothing blocks it."
 
-const startReviewing = Effect.gen(function* () {
-  const runners = yield* scriptedAgentRunners({ reply: { answer: { markdown } } })
-  const github = yield* startFakeGitHub({ git: true })
+type Client = Effect.Success<ReturnType<typeof startBackend>>["client"]
 
+const seedGreeting = (github: FakeGitHub, client: Client) => {
   const pr = github.seedPullRequest({
     base: { sha: "b0", files: { "greet.ts": "hi\n" } },
     head: { sha: "h1", files: { "greet.ts": "hello name\n" } },
@@ -265,6 +265,20 @@ const startReviewing = Effect.gen(function* () {
     ],
   })
 
+  const pullRequest = { owner: pr.owner, repo: pr.repo, number: pr.number }
+
+  const review = (until: (state: AgentReviewState) => boolean) =>
+    client
+      .WatchAgentReview({ pullRequest: new PullRequestRef(pullRequest) })
+      .pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
+
+  return { pr, pullRequest, revision: { base: pr.base.sha, head: pr.head.sha }, review }
+}
+
+const startReviewing = Effect.gen(function* () {
+  const runners = yield* scriptedAgentRunners({ reply: { answer: { markdown } } })
+  const github = yield* startFakeGitHub({ git: true })
+
   const backend = yield* startBackend(
     { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url, GLASS_GIT_REMOTE: github.gitUrl },
     yield* isolatedHome,
@@ -272,16 +286,8 @@ const startReviewing = Effect.gen(function* () {
   )
 
   const { call } = yield* connectMcp(backend.baseUrl, yield* backend.mcpCredentials.issue(caller))
-  const pullRequest = { owner: pr.owner, repo: pr.repo, number: pr.number }
 
-  const review = (until: (state: AgentReviewState) => boolean) =>
-    backend.client
-      .WatchAgentReview({ pullRequest: new PullRequestRef(pullRequest) })
-      .pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
-
-  const revision = { base: pr.base.sha, head: pr.head.sha }
-
-  return { ...backend, pr, pullRequest, revision, call, review }
+  return { ...backend, ...seedGreeting(github, backend.client), call }
 })
 
 const decodeReview = Schema.decodeUnknownSync(AgentReviewState)
@@ -344,6 +350,15 @@ describe("Glass's Agent review tools over MCP", () => {
       assert.equal(job.status === "failed" && job.reason.reason, "stale-revision")
     }),
   )
+})
+
+const reviewingFromThreads = Effect.gen(function* () {
+  const runners = yield* scriptedAgentRunners({ reply: { answer: { markdown } } })
+  const f = yield* threadsFixtureWith({ agentRunners: runners.layer, git: true })
+  const { pullRequest, revision, review } = seedGreeting(f.github, f.client)
+  const startReview = glassCall("start_agent_review", { pullRequest, revision })
+
+  return { ...f, review, startReview }
 })
 
 const callsIn = (turns: ReadonlyArray<Turn>) =>
@@ -464,6 +479,53 @@ describe("Glass's Thread tools called by a Thread", () => {
         status: "done",
         text: JSON.stringify({ items: [] }),
       })
+    }),
+  )
+})
+
+describe("An Agent review started by a Thread", () => {
+  it.live("is refused to a Thread in a Sandbox, and to a Thread with a Permission mode", () =>
+    Effect.gen(function* () {
+      const f = yield* reviewingFromThreads
+
+      const sandboxed = yield* f.startSandbox(f.startReview)
+
+      const withMode = yield* f.start(f.startReview, {
+        harness: "claude-code",
+        model: null,
+        effort: null,
+        permissionMode: "bypassPermissions",
+      })
+
+      const [fromSandbox] = callsIn(yield* f.transcript(sandboxed.id, callsSettled(1)))
+      const [fromMode] = callsIn(yield* f.transcript(withMode.id, callsSettled(1)))
+
+      assert.deepStrictEqual(
+        [calledBy(fromSandbox), calledBy(fromMode)],
+        [
+          {
+            status: "failed",
+            text: "An Agent review runs on this device, so a Thread in a Sandbox can't start one. Ask the user to.",
+          },
+          {
+            status: "failed",
+            text: "An Agent review asks the user less than you do, so you can't start one. Ask the user to.",
+          },
+        ],
+      )
+      assert.equal((yield* f.review(() => true)).job.status, "idle")
+    }),
+  )
+
+  it.live("starts for a Thread on this device with no Permission mode", () =>
+    Effect.gen(function* () {
+      const f = yield* reviewingFromThreads
+
+      const thread = yield* f.start(f.startReview)
+      const [started] = callsIn(yield* f.transcript(thread.id, callsSettled(1)))
+
+      assert.equal(calledBy(started).status, "done")
+      assert.equal((yield* f.review(({ review }) => review !== null)).review?.markdown, markdown)
     }),
   )
 })

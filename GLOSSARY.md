@@ -175,8 +175,9 @@ and a model and working in one place: a worktree on this device, a Sandbox, or a
 Agent review's Revision. The user starts one, or the Global chat or another
 Thread's agent does for them. Any Thread can create and message other Threads through Glass's
 tools, but never one that asks the user less than it does, and never itself; one in a Sandbox can
-reach only Threads in a Sandbox. A Thread is not a Session, which is one stretch of the Global
-chat.
+reach only Threads in a Sandbox. By the same rule, only a Thread on this device with no Permission
+mode can start an Agent review, which runs on this device and asks the user nothing. A Thread is
+not a Session, which is one stretch of the Global chat.
 _Avoid_: Conversation, chat, bot, box
 
 **Thread's PR**:

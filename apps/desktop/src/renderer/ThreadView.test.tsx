@@ -57,9 +57,9 @@ import {
   TurnStarted,
   TurnStopped,
   QueuedMessageStarted,
-  UnsentFeedback,
   WaitingRequests,
   GitHubUnavailable,
+  type FeedbackNote,
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
@@ -396,7 +396,7 @@ it("sends a message with Enter and clears the composer", async () => {
   expect(composer).toHaveProperty("textContent", "")
 })
 
-it("switches between Chat and Changes with Mod+D, even from the composer", async () => {
+it("picks a pane with Mod+D and a letter, even from the composer, and closes it with Mod+D", async () => {
   const user = mount({
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
@@ -405,11 +405,15 @@ it("switches between Chat and Changes with Mod+D, even from the composer", async
 
   await user.click(await screen.findByRole("textbox", { name: "Message" }))
   await user.keyboard("{Control>}d{/Control}")
-  await screen.findByRole("region", { name: "Changes" })
+  const picker = await screen.findByRole("complementary", { name: "Pane picker" })
+  expect(within(picker).queryByRole("button", { name: /Pull request/ })).toBeNull()
+
+  await user.keyboard("d")
+  await screen.findByRole("complementary", { name: "Changes" })
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy()
 
   await user.keyboard("{Meta>}d{/Meta}")
-  await screen.findByRole("textbox", { name: "Message" })
-  expect(screen.queryByRole("region", { name: "Changes" })).toBeNull()
+  await waitFor(() => expect(screen.queryByRole("complementary", { name: "Changes" })).toBeNull())
 })
 
 it("sends Markdown and HTML exactly as written", async () => {
@@ -851,11 +855,10 @@ it("floats a Thread's details over its chat on a wide window, until the user hid
   const details = await screen.findByRole("complementary", { name: "Details" })
   await user.click(within(details).getByRole("button", { name: /Changes/ }))
 
-  expect(await screen.findByRole("heading", { name: "Changes" })).toBeTruthy()
+  expect(await screen.findByRole("complementary", { name: "Changes" })).toBeTruthy()
   expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull()
 
-  await user.click(screen.getByRole("button", { name: "Details" }))
-  await user.click(await screen.findByRole("button", { name: /Back to Chat/ }))
+  await user.click(screen.getByRole("button", { name: "Close the Changes" }))
   await user.click(await screen.findByRole("button", { name: "Hide details" }))
 
   expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull()
@@ -1641,7 +1644,7 @@ it("lists Queued messages, cancels one, and sends one now once no Turn runs", as
       Effect.sync(() => {
         cancelled.push(queuedMessageId)
 
-        return new UnsentFeedback({ notes: [], staged: [] })
+        return []
       }),
     SendQueuedMessage: ({ queuedMessageId }: { queuedMessageId: string }) =>
       Effect.sync(() => void sentNow.push(queuedMessageId)),
@@ -2410,7 +2413,7 @@ it("shows a Sandbox Thread's Browser pane nothing from this device, not even an 
 })
 
 it("leaves a Feedback note on the part of a page in the Browser pane the page reports, and sends it with the next message", async () => {
-  let unsent = new UnsentFeedback({ notes: [], staged: [] })
+  let unsent: ReadonlyArray<FeedbackNote> = []
   const sent: Array<{ message: string; feedback: ReadonlyArray<string> }> = []
 
   const user = mount({
@@ -2430,14 +2433,7 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
         }),
       ),
     ListFeedbackNotes: () => Effect.sync(() => unsent),
-    SaveFeedbackNote: ({ note }) =>
-      Effect.sync(
-        () =>
-          (unsent = new UnsentFeedback({
-            notes: [...unsent.notes, note],
-            staged: [...unsent.staged, note.id],
-          })),
-      ),
+    SaveFeedbackNote: ({ note }) => Effect.sync(() => (unsent = [...unsent, note])),
     SendMessage: ({ message, feedback }) =>
       Effect.sync(() => void sent.push({ message, feedback })),
   })
@@ -2466,10 +2462,11 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
   await user.keyboard("{Control>}{Enter}{/Control}")
 
   const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
+  await user.click(within(attached).getByText("1 Feedback note attached to this message"))
   expect(within(attached).getByText("docs/plan.html · “refill of five per minute”")).toBeTruthy()
   expect(within(attached).getByText("Make this ten")).toBeTruthy()
 
-  const [note] = unsent.notes
+  const [note] = unsent
   expect(toPage.at(-1)).toEqual({ pick: false, notes: [{ id: note?.id, part }], active: null })
 
   fromPage({ type: "open", id: note!.id, rect: { top: 10, left: 10, bottom: 30, right: 200 } })

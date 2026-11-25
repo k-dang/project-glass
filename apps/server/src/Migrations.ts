@@ -25,8 +25,9 @@ import threads from "./migrations/0023_threads"
 import pageLocations from "./migrations/0024_page_locations"
 import journalTurn from "./migrations/0025_journal_turn"
 import visualizations from "./migrations/0026_visualizations"
-import questions from "./migrations/0027_questions"
-import checkIns from "./migrations/0028_check_ins"
+import dropFeedbackNoteStaged from "./migrations/0027_drop_feedback_note_staged"
+import questions from "./migrations/0028_questions"
+import checkIns from "./migrations/0029_check_ins"
 
 const migrations = {
   "0001_baseline": baseline,
@@ -55,8 +56,9 @@ const migrations = {
   "0024_page_locations": pageLocations,
   "0025_journal_turn": journalTurn,
   "0026_visualizations": visualizations,
-  "0027_questions": questions,
-  "0028_check_ins": checkIns,
+  "0027_drop_feedback_note_staged": dropFeedbackNoteStaged,
+  "0028_questions": questions,
+  "0029_check_ins": checkIns,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

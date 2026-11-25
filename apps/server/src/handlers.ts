@@ -246,7 +246,6 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         threads.saveUnsent(threadId, { message, images }),
       GetThreadChanges: ({ threadId }) => threads.changes(threadId),
       ListFeedbackNotes: ({ threadId }) => threads.feedbackNotes(threadId),
-      StageFeedbackNotes: ({ threadId }) => threads.stageFeedbackNotes(threadId),
       SaveFeedbackNote: ({ threadId, note }) => threads.saveFeedbackNote(threadId, note),
       RemoveFeedbackNote: ({ threadId, noteId }) => threads.removeFeedbackNote(threadId, noteId),
       GetRemovalWarnings: ({ threadId }) => threads.removalWarnings(threadId),

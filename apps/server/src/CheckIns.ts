@@ -165,13 +165,11 @@ export class CheckIns extends Context.Service<
 
       const listedFor = (
         checkInId: string,
-        write: (
-          owner: NotesOwner,
-        ) => Effect.Effect<{ readonly notes: ReadonlyArray<FeedbackNote> }, ThreadError>,
+        write: (owner: NotesOwner) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>,
       ) =>
         waiting(checkInId).pipe(
           Effect.flatMap(({ folder }) => write(folderNotes(folder)).pipe(asCheckInError)),
-          Effect.map(({ notes: listed }) => listed.filter(isLineNote)),
+          Effect.map((listed) => listed.filter(isLineNote)),
         )
 
       const read = Effect.fnUntraced(function* (folder: string, baseRef: string | null) {

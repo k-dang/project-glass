@@ -34,12 +34,14 @@ export const scriptedHost = fileURLToPath(
 export const threadsFixtureWith = ({
   agentHostBundle = scriptedHost,
   agentRunners,
+  git = false,
 }: {
   readonly agentHostBundle?: string
   readonly agentRunners?: Parameters<typeof startBackend>[2]
+  readonly git?: boolean
 } = {}) =>
   Effect.gen(function* () {
-    const github = yield* startFakeGitHub()
+    const github = yield* startFakeGitHub({ git })
     const home = yield* isolatedHome
     const repositories = yield* isolatedHome
     const gates = join(home, "gates")
@@ -60,6 +62,7 @@ export const threadsFixtureWith = ({
     const env = {
       GH_TOKEN: VIEWER.token,
       GLASS_GITHUB_API_URL: github.url,
+      GLASS_GIT_REMOTE: github.gitUrl,
       GLASS_AGENT_HOST_BUNDLE: agentHostBundle,
     }
 

@@ -21,7 +21,7 @@ import { LOCAL_SKILLS_LABEL } from "./skillChoice"
 const fact =
   "flex h-7 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-xs [&_svg]:size-3.5 [&_svg]:shrink-0"
 
-const action = "text-left outline-none hover:bg-accent focus-visible:bg-accent"
+export const actionRow = "text-left outline-none hover:bg-accent focus-visible:bg-accent"
 
 const wideWindow = window.matchMedia("(min-width: 1200px)")
 
@@ -201,7 +201,7 @@ function DetailsPullRequestLink(props: { pullRequest: ThreadPullRequest }) {
       href={pullRequest.url}
       pullRequest={pullRequest.ref}
       onClick={close}
-      className={cn(fact, action)}
+      className={cn(fact, actionRow)}
     >
       {Predicate.isTagged(pullRequest.state, "Open") ? (
         <GitPullRequest aria-hidden className="text-muted-foreground" />
@@ -226,7 +226,7 @@ export function ThreadDetailsAction(props: { onNavigate: () => void; children: R
         close()
         props.onNavigate()
       }}
-      className={cn(fact, action)}
+      className={cn(fact, actionRow)}
     >
       {props.children}
     </button>

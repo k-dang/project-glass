@@ -478,7 +478,7 @@ it.effect(
         refused.message,
         "This Thread's Sandbox expired, so it can't take messages. Its transcript stays until you remove the Thread.",
       )
-      assert.deepStrictEqual((yield* f.threads.feedbackNotes(thread.id)).notes, [note])
+      assert.deepStrictEqual(yield* f.threads.feedbackNotes(thread.id), [note])
     }),
 )
 

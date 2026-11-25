@@ -3,13 +3,9 @@ import {
   ThreadStarted,
   LineNote,
   Merge,
-  PageNote,
-  FilePage,
   PullRequestRef,
-  PageText,
   SandboxPlace,
   TextPatch,
-  UnsentFeedback,
   localPlace,
   toDoMention,
 } from "@glass/contracts"
@@ -291,9 +287,7 @@ it.live(
       assert.notEqual((yield* f.client.GetThreadChanges({ threadId: thread.id })).id, read.id)
 
       const restarted = yield* f.restart
-      assert.deepStrictEqual((yield* restarted.ListFeedbackNotes({ threadId: thread.id })).notes, [
-        edited,
-      ])
+      assert.deepStrictEqual(yield* restarted.ListFeedbackNotes({ threadId: thread.id }), [edited])
 
       yield* restarted.RemoveThread({ threadId: thread.id })
 
@@ -304,48 +298,7 @@ it.live(
 )
 
 it.live(
-  "attaches a Feedback note on a page to the next message as soon as it's saved, beside unstaged notes on changes",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* threadsFixture
-      const thread = yield* f.start("Write a plan")
-      const threadId = thread.id
-      yield* f.transcript(threadId, settled(1))
-
-      const onChanges = new LineNote({
-        id: "line-1",
-        path: "src/retry.ts",
-        side: "new",
-        start: 2,
-        end: 2,
-        code: "attempts++",
-        changesId: "changes-1",
-        text: "Cap the attempts",
-      })
-
-      const onPage = new PageNote({
-        id: "page-1",
-        page: FilePage.make({ path: "docs/plan.html" }),
-        part: PageText.make({
-          selector: "#limits > p",
-          heading: "Limits",
-          excerpt: "five per minute",
-        }),
-        text: "Make this ten",
-      })
-
-      yield* f.client.SaveFeedbackNote({ threadId, note: onChanges })
-      yield* f.client.SaveFeedbackNote({ threadId, note: onPage })
-
-      assert.deepStrictEqual(
-        yield* f.client.ListFeedbackNotes({ threadId }),
-        new UnsentFeedback({ notes: [onChanges, onPage], staged: [onPage.id] }),
-      )
-    }),
-)
-
-it.live(
-  "queues staged Feedback notes for the working Thread as one message, taking only those notes",
+  "queues Feedback notes for the working Thread as one message, taking only the ones sent",
   () =>
     Effect.gen(function* () {
       const f = yield* threadsFixture
@@ -364,32 +317,22 @@ it.live(
 
       const capAttempts = new LineNote({ ...fields, id: "note-1", text: "Cap the attempts" })
       const keepError = new LineNote({ ...fields, id: "note-2", text: "Keep the last error" })
-      const later = new LineNote({ ...fields, id: "note-3", text: "Not staged yet" })
+      const later = new LineNote({ ...fields, id: "note-3", text: "Not sent yet" })
 
-      for (const note of [capAttempts, keepError])
+      for (const note of [capAttempts, keepError, later])
         yield* f.client.SaveFeedbackNote({ threadId, note })
 
-      const staged = [capAttempts.id, keepError.id]
-      assert.deepStrictEqual((yield* f.client.StageFeedbackNotes({ threadId })).staged, staged)
-      yield* f.client.SaveFeedbackNote({ threadId, note: later })
-
-      const unstaged = { threadId, message: "", images: [], feedback: [later.id] }
-      assert.equal((yield* f.client.SendMessage(unstaged).pipe(Effect.flip))._tag, "ThreadError")
-
-      const sent = { threadId, message: "", images: [], feedback: staged }
+      const sent = { threadId, message: "", images: [], feedback: [capAttempts.id, keepError.id] }
       yield* f.client.SendMessage(sent)
 
       const { queued } = yield* f.watch(threadId, (transcript) => transcript.queued.length === 1)
 
       assert.deepStrictEqual(queued[0]?.feedback, [capAttempts, keepError])
-      assert.deepStrictEqual(
-        yield* f.client.ListFeedbackNotes({ threadId }),
-        new UnsentFeedback({ notes: [later], staged: [] }),
-      )
+      assert.deepStrictEqual(yield* f.client.ListFeedbackNotes({ threadId }), [later])
 
       const again = yield* f.client.SendMessage(sent).pipe(Effect.flip)
       assert.equal(again._tag, "ThreadError")
-      assert.lengthOf((yield* f.client.ListFeedbackNotes({ threadId })).notes, 1)
+      assert.lengthOf(yield* f.client.ListFeedbackNotes({ threadId }), 1)
 
       yield* f.release("first")
       yield* f.transcript(threadId, settled(2))
@@ -437,7 +380,6 @@ const queuedFeedback = Effect.gen(function* () {
   ]
 
   for (const note of sent) yield* f.client.SaveFeedbackNote({ threadId, note })
-  yield* f.client.StageFeedbackNotes({ threadId })
   yield* f.client.SendMessage({
     threadId,
     message: "",
@@ -450,7 +392,6 @@ const queuedFeedback = Effect.gen(function* () {
 
   const newer = new LineNote({ ...fields, id: "note-3", text: "Newer" })
   yield* f.client.SaveFeedbackNote({ threadId, note: newer })
-  yield* f.client.StageFeedbackNotes({ threadId })
 
   return { f, threadId, sent, newer, queuedId }
 })
@@ -461,7 +402,7 @@ it.live(
     Effect.gen(function* () {
       const { f, threadId, sent, newer, queuedId } = yield* queuedFeedback
       const cancel = { threadId, queuedMessageId: queuedId }
-      const restored = new UnsentFeedback({ notes: [newer, ...sent], staged: [newer.id] })
+      const restored = [newer, ...sent]
 
       assert.deepStrictEqual(yield* f.client.CancelQueuedMessage(cancel), restored)
       yield* f.watch(threadId, (transcript) => transcript.queued.length === 0)
@@ -484,10 +425,7 @@ it.live("refuses to cancel a Queued message whose Turn started, leaving its feed
       .pipe(Effect.flip)
 
     assert.equal(late._tag, "QueuedMessageStarted")
-    assert.deepStrictEqual(
-      yield* f.client.ListFeedbackNotes({ threadId }),
-      new UnsentFeedback({ notes: [newer], staged: [newer.id] }),
-    )
+    assert.deepStrictEqual(yield* f.client.ListFeedbackNotes({ threadId }), [newer])
     assert.deepStrictEqual((yield* f.transcript(threadId, settled(2)))[1]?.feedback, sent)
   }),
 )
