@@ -48,6 +48,7 @@ export const PULL_REQUEST_ATTENTION_QUERY = `query PullRequestAttention($ids: [I
     ... on PullRequest {
       id
       mergeStateStatus
+      mergeable
       latestOpinionatedReviews(first: 100) { nodes { state } }
       reviewThreads(first: 100) { nodes { isResolved comments(last: 1) { nodes { viewerDidAuthor } } } }
       ${CHECK_CONTEXTS_FIELDS}
@@ -237,6 +238,7 @@ export const PullRequestAttentionData = Schema.Struct({
       Schema.Struct({
         id: Schema.String,
         mergeStateStatus: Schema.String,
+        mergeable: Schema.Literals(["MERGEABLE", "CONFLICTING", "UNKNOWN"]),
         latestOpinionatedReviews: Schema.Struct({
           nodes: Schema.Array(Schema.Struct({ state: ReviewState })),
         }),
@@ -260,6 +262,7 @@ export const Attention = Schema.Struct({
   changesRequested: Schema.Boolean,
   approved: Schema.Boolean,
   mergeClean: Schema.Boolean,
+  mergeConflict: Schema.NullOr(Schema.Boolean),
   awaitingReply: Schema.Int,
   failingChecks: Schema.Array(Check),
 })
@@ -281,6 +284,7 @@ export const toAttention = (
         changesRequested: states.includes("CHANGES_REQUESTED"),
         approved: states.includes("APPROVED"),
         mergeClean: cleanMergeStates.has(node.mergeStateStatus),
+        mergeConflict: node.mergeable === "UNKNOWN" ? null : node.mergeable === "CONFLICTING",
         awaitingReply: node.reviewThreads.nodes.filter(
           ({ isResolved, comments }) =>
             !isResolved && comments.nodes.some(({ viewerDidAuthor }) => !viewerDidAuthor),

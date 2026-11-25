@@ -10,6 +10,7 @@ import {
 import { HttpApiBuilder, HttpApiSecurity } from "effect/http-api"
 import { OutsideAgents } from "../OutsideAgents"
 import { AskProgress } from "./AskProgress"
+import { EventToolHandlers, EventTools } from "./eventTools"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
 import { GlassToolRelay } from "./GlassToolRelay"
 import { BrowserMcpTools } from "./browserTools"
@@ -151,6 +152,8 @@ export const GlassMcpTools = Layer.effectDiscard(
   Layer.provide(SubscriptionToolHandlers),
   Layer.provide(McpServer.toolkit(VisualizationTools)),
   Layer.provide(VisualizationToolHandlers),
+  Layer.provide(McpServer.toolkit(EventTools)),
+  Layer.provide(EventToolHandlers),
   Layer.provide(McpServer.toolkit(GlassTools)),
   Layer.provide(GlassToolHandlers),
 )

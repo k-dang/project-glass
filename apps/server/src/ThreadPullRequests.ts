@@ -1,5 +1,17 @@
 import { type Thread, ThreadPullRequest, PullRequestOpen, repositoryKey } from "@glass/contracts"
-import { Context, DateTime, Effect, Layer, Ref, Schema, Stream, SubscriptionRef } from "effect"
+import {
+  Context,
+  DateTime,
+  Effect,
+  Layer,
+  Predicate,
+  Ref,
+  Schema,
+  Stream,
+  SubscriptionRef,
+} from "effect"
+import { EventLog } from "./EventLog"
+import { endedEvents } from "./gitHubSource"
 import type { Branch, EndedPullRequest } from "./github/branchPullRequests"
 import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
@@ -101,12 +113,14 @@ export class ThreadPullRequests extends Context.Service<
       const lists = yield* PullRequestLists
       const transcripts = yield* Transcripts
       const github = yield* GitHubClient
+      const events = yield* EventLog
       const listed = yield* SubscriptionRef.make<ReadonlyArray<ThreadPullRequest>>([])
       const ended = yield* Ref.make<Ended>(new Map())
 
-      const asked = yield* Ref.make<{ readonly mirrored: Mirror; readonly keys: string } | null>(
-        null,
-      )
+      const asked = yield* Ref.make<{
+        readonly mirrored: Mirror | undefined
+        readonly keys: string
+      }>({ mirrored: yield* mirror.saved, keys: "" })
 
       const afterTurn = (threadId: string) =>
         threads.followBranch(threadId).pipe(
@@ -121,7 +135,10 @@ export class ThreadPullRequests extends Context.Service<
         Effect.forkScoped,
       )
 
-      const lookUpEnded = Effect.fnUntraced(function* (branches: ReadonlyArray<Lookup>) {
+      const lookUpEnded = Effect.fnUntraced(function* (
+        branches: ReadonlyArray<Lookup>,
+        before: Mirror | undefined,
+      ) {
         const known = yield* Ref.get(ended)
 
         const cached = (lookup: Lookup) => endedSince(lookup.since, known.get(branchKey(lookup)))
@@ -131,7 +148,7 @@ export class ThreadPullRequests extends Context.Service<
         const answers = yield* github.endedBranchPullRequests(unknown)
         const found = new Map(unknown.map((branch, index) => [branchKey(branch), answers[index]]))
 
-        yield* Ref.set(
+        const remembered = Ref.set(
           ended,
           new Map(
             branches.flatMap((branch) => {
@@ -142,6 +159,10 @@ export class ThreadPullRequests extends Context.Service<
             }),
           ),
         )
+
+        yield* events
+          .record("github", endedEvents(before, answers.filter(Predicate.isNotNull)))
+          .pipe(Effect.andThen(remembered), Effect.uninterruptible)
       })
 
       const publish = Effect.fnUntraced(function* (
@@ -156,8 +177,8 @@ export class ThreadPullRequests extends Context.Service<
 
         const last = yield* Ref.get(asked)
 
-        if (mirrored !== undefined && (last?.mirrored !== mirrored || last.keys !== keys)) {
-          yield* lookUpEnded(branches).pipe(
+        if (mirrored !== undefined && (last.mirrored !== mirrored || last.keys !== keys)) {
+          yield* lookUpEnded(branches, last.mirrored).pipe(
             Effect.andThen(Ref.set(asked, { mirrored, keys })),
             Effect.provideService(BackgroundGitHubRequest, true),
             Effect.catch((error) =>

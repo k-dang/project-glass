@@ -23,6 +23,8 @@ import {
 } from "effect"
 import { join } from "node:path"
 import { writeDataFile } from "./dataFiles"
+import { EventLog } from "./EventLog"
+import { eventsBetween } from "./gitHubSource"
 import { GitHubClient } from "./github/GitHubClient"
 import {
   Attention,
@@ -126,6 +128,7 @@ export class PullRequestMirror extends Context.Service<
     Effect.gen(function* () {
       const github = yield* GitHubClient
       const fs = yield* FileSystem.FileSystem
+      const events = yield* EventLog
       const { dataDirectory } = yield* ServerConfig
       const path = join(dataDirectory, "pull-requests.json")
       const lock = yield* Semaphore.make(1)
@@ -288,10 +291,18 @@ export class PullRequestMirror extends Context.Service<
             repositories: mirror.repositories.map((repository) => ({
               ...repository,
               pullRequests: repository.pullRequests.map((pr) => {
+                const read = attention.get(pr.id)
+
                 return {
                   ...pr,
                   ...result.checks.get(pr.id),
-                  attention: attention.get(pr.id) ?? pr.attention,
+                  attention:
+                    read === undefined
+                      ? pr.attention
+                      : {
+                          ...read,
+                          mergeConflict: read.mergeConflict ?? pr.attention?.mergeConflict ?? null,
+                        },
                 }
               }),
             })),
@@ -365,6 +376,7 @@ export class PullRequestMirror extends Context.Service<
 
         const { mirror, failures } = yield* withLatestStatus(synced, shown(synced))
         yield* commit(mirror)
+        yield* events.record("github", eventsBetween(previous, mirror))
 
         return {
           mirror,

@@ -60,12 +60,15 @@ const mergeStateStatus = (pr: FakePullRequest) => {
     return "BLOCKED"
   }
 
+  if (pr.mergeStateStatus === "BEHIND") return "BEHIND"
+
   return pr.checks === null || pr.checks === "SUCCESS" ? "CLEAN" : "UNSTABLE"
 }
 
 const attentionNode = (pr: FakePullRequest) => ({
   id: pr.id,
   mergeStateStatus: mergeStateStatus(pr),
+  mergeable: pr.mergeable,
   latestOpinionatedReviews: { nodes: latestOpinionatedReviews(pr) },
   reviewThreads: {
     nodes: pr.reviewThreads.map((reviewThread) => ({
