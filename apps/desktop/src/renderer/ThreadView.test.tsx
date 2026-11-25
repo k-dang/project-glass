@@ -1644,7 +1644,7 @@ it("lists Queued messages, cancels one, and sends one now once no Turn runs", as
       Effect.sync(() => {
         cancelled.push(queuedMessageId)
 
-        return new UnsentFeedback({ notes: [], staged: [] })
+        return new UnsentFeedback({ notes: [] })
       }),
     SendQueuedMessage: ({ queuedMessageId }: { queuedMessageId: string }) =>
       Effect.sync(() => void sentNow.push(queuedMessageId)),
@@ -2413,7 +2413,7 @@ it("shows a Sandbox Thread's Browser pane nothing from this device, not even an 
 })
 
 it("leaves a Feedback note on the part of a page in the Browser pane the page reports, and sends it with the next message", async () => {
-  let unsent = new UnsentFeedback({ notes: [], staged: [] })
+  let unsent = new UnsentFeedback({ notes: [] })
   const sent: Array<{ message: string; feedback: ReadonlyArray<string> }> = []
 
   const user = mount({
@@ -2434,13 +2434,7 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
       ),
     ListFeedbackNotes: () => Effect.sync(() => unsent),
     SaveFeedbackNote: ({ note }) =>
-      Effect.sync(
-        () =>
-          (unsent = new UnsentFeedback({
-            notes: [...unsent.notes, note],
-            staged: [...unsent.staged, note.id],
-          })),
-      ),
+      Effect.sync(() => (unsent = new UnsentFeedback({ notes: [...unsent.notes, note] }))),
     SendMessage: ({ message, feedback }) =>
       Effect.sync(() => void sent.push({ message, feedback })),
   })

@@ -304,7 +304,7 @@ it.live(
 )
 
 it.live(
-  "attaches a Feedback note on a page to the next message as soon as it's saved, beside unstaged notes on changes",
+  "keeps a Thread's Feedback notes on changes and on pages, in the order they were saved",
   () =>
     Effect.gen(function* () {
       const f = yield* threadsFixture
@@ -339,13 +339,13 @@ it.live(
 
       assert.deepStrictEqual(
         yield* f.client.ListFeedbackNotes({ threadId }),
-        new UnsentFeedback({ notes: [onChanges, onPage], staged: [onPage.id] }),
+        new UnsentFeedback({ notes: [onChanges, onPage] }),
       )
     }),
 )
 
 it.live(
-  "queues staged Feedback notes for the working Thread as one message, taking only those notes",
+  "queues Feedback notes for the working Thread as one message, taking only the ones sent",
   () =>
     Effect.gen(function* () {
       const f = yield* threadsFixture
@@ -364,19 +364,12 @@ it.live(
 
       const capAttempts = new LineNote({ ...fields, id: "note-1", text: "Cap the attempts" })
       const keepError = new LineNote({ ...fields, id: "note-2", text: "Keep the last error" })
-      const later = new LineNote({ ...fields, id: "note-3", text: "Not staged yet" })
+      const later = new LineNote({ ...fields, id: "note-3", text: "Not sent yet" })
 
-      for (const note of [capAttempts, keepError])
+      for (const note of [capAttempts, keepError, later])
         yield* f.client.SaveFeedbackNote({ threadId, note })
 
-      const staged = [capAttempts.id, keepError.id]
-      assert.deepStrictEqual((yield* f.client.StageFeedbackNotes({ threadId })).staged, staged)
-      yield* f.client.SaveFeedbackNote({ threadId, note: later })
-
-      const unstaged = { threadId, message: "", images: [], feedback: [later.id] }
-      assert.equal((yield* f.client.SendMessage(unstaged).pipe(Effect.flip))._tag, "ThreadError")
-
-      const sent = { threadId, message: "", images: [], feedback: staged }
+      const sent = { threadId, message: "", images: [], feedback: [capAttempts.id, keepError.id] }
       yield* f.client.SendMessage(sent)
 
       const { queued } = yield* f.watch(threadId, (transcript) => transcript.queued.length === 1)
@@ -384,7 +377,7 @@ it.live(
       assert.deepStrictEqual(queued[0]?.feedback, [capAttempts, keepError])
       assert.deepStrictEqual(
         yield* f.client.ListFeedbackNotes({ threadId }),
-        new UnsentFeedback({ notes: [later], staged: [] }),
+        new UnsentFeedback({ notes: [later] }),
       )
 
       const again = yield* f.client.SendMessage(sent).pipe(Effect.flip)
@@ -437,7 +430,6 @@ const queuedFeedback = Effect.gen(function* () {
   ]
 
   for (const note of sent) yield* f.client.SaveFeedbackNote({ threadId, note })
-  yield* f.client.StageFeedbackNotes({ threadId })
   yield* f.client.SendMessage({
     threadId,
     message: "",
@@ -450,7 +442,6 @@ const queuedFeedback = Effect.gen(function* () {
 
   const newer = new LineNote({ ...fields, id: "note-3", text: "Newer" })
   yield* f.client.SaveFeedbackNote({ threadId, note: newer })
-  yield* f.client.StageFeedbackNotes({ threadId })
 
   return { f, threadId, sent, newer, queuedId }
 })
@@ -461,7 +452,7 @@ it.live(
     Effect.gen(function* () {
       const { f, threadId, sent, newer, queuedId } = yield* queuedFeedback
       const cancel = { threadId, queuedMessageId: queuedId }
-      const restored = new UnsentFeedback({ notes: [newer, ...sent], staged: [newer.id] })
+      const restored = new UnsentFeedback({ notes: [newer, ...sent] })
 
       assert.deepStrictEqual(yield* f.client.CancelQueuedMessage(cancel), restored)
       yield* f.watch(threadId, (transcript) => transcript.queued.length === 0)
@@ -486,7 +477,7 @@ it.live("refuses to cancel a Queued message whose Turn started, leaving its feed
     assert.equal(late._tag, "QueuedMessageStarted")
     assert.deepStrictEqual(
       yield* f.client.ListFeedbackNotes({ threadId }),
-      new UnsentFeedback({ notes: [newer], staged: [newer.id] }),
+      new UnsentFeedback({ notes: [newer] }),
     )
     assert.deepStrictEqual((yield* f.transcript(threadId, settled(2)))[1]?.feedback, sent)
   }),

@@ -243,9 +243,6 @@ export class Threads extends Context.Service<
     readonly feedbackNotes: (
       threadId: string,
     ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
-    readonly stageFeedbackNotes: (
-      threadId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
     readonly saveFeedbackNote: (
       threadId: string,
       note: FeedbackNote,
@@ -1041,8 +1038,6 @@ export class Threads extends Context.Service<
         changes,
         feedbackNotes: (threadId) =>
           find(threadId).pipe(Effect.andThen(notes.list(threadNotes(threadId)))),
-        stageFeedbackNotes: (threadId) =>
-          find(threadId).pipe(Effect.andThen(notes.stage(threadNotes(threadId)))),
         saveFeedbackNote: (threadId, note) =>
           find(threadId).pipe(Effect.andThen(notes.save(threadNotes(threadId), note))),
         removeFeedbackNote: (threadId, noteId) =>

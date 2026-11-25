@@ -1,12 +1,12 @@
 # Thread changes
 
-A local Thread's Changes view shows its worktree diff. The view keeps its Revision until Show latest, even when another Turn changes files. The user can leave Feedback notes on lines of it, kept beside their code across restarts and labelled as an older version after Show latest. Review feedback adds the notes to the Thread's message, which sends them with their code as one message, or queues it while a Turn runs. Canceling queued feedback returns its notes to Changes.
+A local Thread's Changes view shows its worktree diff. The view keeps its Revision until Show latest, even when another Turn changes files. The user can leave Feedback notes on lines of it, kept beside their code across restarts. Each saved note goes straight onto the Thread's message, which sends the notes with their code as one message, or queues it while a Turn runs. After Show latest, earlier notes leave the Changes pane and stay on the message with their code. Canceling queued feedback returns its notes to the message.
 
 ## Sub-features
 
 - Read a Thread's changes in a pane beside its Chat, widen the pane over the Chat and back, and explicitly move to its latest changes.
-- Select lines by keyboard, add a Feedback note, edit it in place, find it under its line after a relaunch, see it move to On an older version with its code after Show latest, and remove it.
-- Review feedback, send it to the idle Thread, and queue more while a Turn runs.
+- Select lines by keyboard, add a Feedback note, edit it in place, find it under its line after a relaunch, see it leave the pane after Show latest while the message keeps it with its code, and remove it.
+- Send a saved note to the idle Thread, and queue more while a Turn runs.
 - Cancel queued feedback, find its note back in Changes, edit it, and send it again.
 
 ## How to get to it (user POV)
@@ -23,16 +23,16 @@ Open a Thread and press Ctrl+D (⌘D on macOS), then D, to open the Changes pane
 
 Feedback notes, from step 3's Changes:
 
-1. `click --role StaticText --name "hello from the agent"`, `press --key ArrowDown --shift`, `wait --text "New line 1"`. Click `Add feedback`, `type --role textbox --name "Feedback on selected code" --text ...`, click `Add note`, and `wait` for the text. Snapshot: `article "Feedback on notes.txt New line 1"` under the line. The pane has no file list or Feedback tab: files without notes start collapsed and notes sit under their lines.
+1. `click --role StaticText --name "hello from the agent"`, `press --key ArrowDown --shift`, `wait --text "New line 1"`. Click `Add feedback`, `type --role textbox --name "Feedback on selected code" --text ...`, click `Add note`, and `wait` for the text. Snapshot: `article "Feedback on notes.txt New line 1"` under the line, and the same note in `region "Feedback attached to this message"` above Message. The pane has no file list or Feedback tab: files without notes start collapsed and notes sit under their lines.
 2. Click `Edit`, type new text, click `Save changes`, `wait` for it.
 3. Run `kill-backend` four times, each once `doctor` shows Backend health OK again, then `wait --text "keeps stopping"` and click `Relaunch Glass`. Reopen the Thread's Changes: notes.txt starts expanded because it has a note, and the edited note is under its line, without an Older version label.
-4. Run step 4 above, then `Show latest` and `wait --text "older version"`. The note moves to `region "On an older version"` above the files, showing `Older version` with `hello from the agent` as its code. Click `Remove`; the group disappears.
+4. Run step 4 above, then `Show latest`. The note leaves the Changes pane; `region "Feedback attached to this message"` still shows it with `hello from the agent` as its code. Click its `Remove`; the attachment disappears.
 
 Sending feedback, from a note added in Changes:
 
-1. Click `Review feedback`. The Chat shows again if the pane was full width; `wait --text "attached to this message"`. Type an instruction in Message, screenshot, and click `Send`. `wait --text "1 Feedback note"`: the demo Thread's reply quotes the `<glass_feedback>` block it received, with the note's code, and the note is gone from Changes.
-2. Send `Please work slowly` (about 17s of reply), then at once add another note in Changes, click `Review feedback` and `Send`. `wait --text "Starts when the agent finishes"` and screenshot the Queued message. `wait --text "All done"`, then the queued feedback starts its own Turn.
-3. To cancel it in time, queue it behind two slow messages: send `Please work slowly`, then `Please work slowly again`, then add a note, click `Review feedback` and `Send`. Type something in Message and click `Cancel: Feedback on the Thread's changes`: the typed text stays. In Changes the note is back under its line; `Edit` it, `Review feedback`, and `Send`. The reply quotes the edited note.
+1. `wait --text "attached to this message"`. Type an instruction in Message, screenshot, and click `Send`. `wait --text "1 Feedback note"`: the demo Thread's reply quotes the `<glass_feedback>` block it received, with the note's code, and the note is gone from Changes and from the message.
+2. Send `Please work slowly` (about 17s of reply), then at once add another note in Changes and click `Send`. `wait --text "Starts when the agent finishes"` and screenshot the Queued message. `wait --text "All done"`, then the queued feedback starts its own Turn.
+3. To cancel it in time, queue it behind two slow messages: send `Please work slowly`, then `Please work slowly again`, then add a note and click `Send`. Type something in Message and click `Cancel: Feedback on the Thread's changes`: the typed text stays. The note is back on the message and under its line in Changes; `Edit` it and click `Send`. The reply quotes the edited note.
 
 ## Gotchas
 
@@ -40,4 +40,4 @@ Sending feedback, from a note added in Changes:
 - These steps need a window at least 1200px wide (`launch` opens one at 1280px), so Details float over the Chat in `complementary "Details"`. They fall back to the `Details` button while any pane is open; `Hide details` in the header hides them.
 - The Changes pane is deliberately pinned while it stays open; closing and reopening it reads the latest changes.
 - Line numbers aren't buttons in the accessibility tree, so select lines with `press --shift` from a clicked code line rather than by clicking a number.
-- Any change to the Thread's files marks every earlier note Older version, even on a file that didn't change.
+- Any change to the Thread's files makes every earlier note older, even on a file that didn't change, so Show latest takes them all off the pane.

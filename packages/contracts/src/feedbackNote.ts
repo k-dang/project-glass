@@ -59,5 +59,4 @@ export const isPageNote = Schema.is(PageNote)
 
 export class UnsentFeedback extends Schema.Class<UnsentFeedback>("UnsentFeedback")({
   notes: Schema.Array(FeedbackNote),
-  staged: Schema.Array(Schema.String),
 }) {}

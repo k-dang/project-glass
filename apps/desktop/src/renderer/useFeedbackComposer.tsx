@@ -261,7 +261,7 @@ export function useFeedbackComposer(props: {
       <FeedbackNoteCard
         key={note.id}
         note={note}
-        olderCode={null}
+        code={null}
         location={rangeLabel(note.side, note.start, note.end)}
         onShow={null}
         onEdit={editing === null ? () => editNote(note, "diff") : null}
@@ -286,10 +286,10 @@ export function useFeedbackComposer(props: {
     onSelectedLinesChange,
   }
 
-  const overviewOf = (notes: ReadonlyArray<LineNote>) => (
+  const overview = (
     <FeedbackOverview
       ready={store.ready}
-      notes={notes}
+      notes={store.notes}
       changesId={changesId}
       editingId={editing?.where === "overview" ? editing.note.id : null}
       editor={editing === null ? null : renderEditor(editing)}
@@ -299,12 +299,9 @@ export function useFeedbackComposer(props: {
     />
   )
 
-  const olderNotes = store.notes.filter((note) => isOlder(note, changesId))
-
   return {
     diffProps,
-    overview: overviewOf(store.notes),
-    olderOverview: olderNotes.length === 0 ? null : overviewOf(olderNotes),
+    overview,
     onKeyDown,
     editing: editing !== null,
   }

@@ -69,13 +69,13 @@ const viewOf = (note: FeedbackNote): NoteView =>
 
 export function FeedbackNoteCard(props: {
   note: FeedbackNote
-  olderCode: string | null
+  code: { readonly text: string; readonly older: boolean } | null
   location: string
   onShow: (() => void) | null
   onEdit: (() => void) | null
   onRemove: () => Promise<Problem | null>
 }) {
-  const { note, olderCode } = props
+  const { note, code } = props
   const [removing, setRemoving] = useState(false)
   const [problem, setProblem] = useState<Problem | null>(null)
 
@@ -104,9 +104,9 @@ export function FeedbackNoteCard(props: {
             {props.location}
           </button>
         )}
-        {olderCode !== null && <OlderVersion />}
+        {code?.older === true && <OlderVersion />}
       </div>
-      {olderCode !== null && <Snippet code={olderCode} />}
+      {code !== null && <Snippet code={code.text} />}
       <p className="whitespace-pre-wrap wrap-anywhere">{note.text}</p>
       {problem !== null && (
         <ProblemAlert problem={problem} action={{ label: "Retry", run: () => void remove() }} />
@@ -138,15 +138,21 @@ export const withText = (note: FeedbackNote, text: string) =>
     PageNote: (page) => new PageNote({ ...page, text }),
   })
 
-export interface StagedEdit {
+const codeOf = (note: FeedbackNote) => {
+  const { code } = viewOf(note)
+
+  return code === null ? null : { text: code, older: false }
+}
+
+export interface AttachedEdit {
   readonly id: string
   readonly draft: string
 }
 
-export function StagedFeedback(props: {
+export function AttachedFeedback(props: {
   notes: ReadonlyArray<FeedbackNote>
-  editing: StagedEdit | null
-  onEditingChange: (editing: StagedEdit | null) => void
+  editing: AttachedEdit | null
+  onEditingChange: (editing: AttachedEdit | null) => void
   onSave: (note: FeedbackNote) => Promise<Problem | null>
   onRemove: (noteId: string) => Promise<Problem | null>
 }) {
@@ -183,7 +189,7 @@ export function StagedFeedback(props: {
             ) : (
               <FeedbackNoteCard
                 note={note}
-                olderCode={null}
+                code={codeOf(note)}
                 location={viewOf(note).location}
                 onShow={null}
                 onEdit={
@@ -371,7 +377,7 @@ export function FeedbackOverview(props: {
             ) : (
               <FeedbackNoteCard
                 note={note}
-                olderCode={older ? note.code : null}
+                code={older ? { text: note.code, older } : null}
                 location={viewOf(note).location}
                 onShow={older ? null : () => props.onShow(note)}
                 onEdit={onEdit === null ? null : () => onEdit(note)}

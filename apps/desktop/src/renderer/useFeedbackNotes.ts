@@ -18,9 +18,7 @@ interface NotesEditor<Note> {
 export type LineNotesEditor = NotesEditor<LineNote>
 
 export interface FeedbackNotesStore extends NotesEditor<FeedbackNote> {
-  readonly staged: ReadonlyArray<FeedbackNote>
   readonly editingOnPage: boolean
-  readonly stage: () => Promise<Problem | null>
   readonly sent: (noteIds: ReadonlyArray<string>) => void
 }
 
@@ -49,12 +47,11 @@ export const notesWriter =
     return null
   }
 
-const noFeedback = new UnsentFeedback({ notes: [], staged: [] })
+const noFeedback = new UnsentFeedback({ notes: [] })
 
 const without = (unsent: UnsentFeedback, noteIds: ReadonlyArray<string>) =>
   new UnsentFeedback({
     notes: unsent.notes.filter(({ id }) => !noteIds.includes(id)),
-    staged: unsent.staged.filter((id) => !noteIds.includes(id)),
   })
 
 export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
@@ -72,7 +69,6 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
     return {
       ready: saved !== null || written !== null,
       notes: unsent.notes,
-      staged: unsent.notes.filter(({ id }) => unsent.staged.includes(id)),
       editingOnPage,
       save: (note) =>
         write(
@@ -83,11 +79,6 @@ export function useFeedbackNotes(threadId: string): FeedbackNotesStore {
         write(
           noteWriteTitles.remove,
           Backend.use((backend) => backend.RemoveFeedbackNote({ threadId, noteId })),
-        ),
-      stage: () =>
-        write(
-          "Couldn't add your feedback to the message",
-          Backend.use((backend) => backend.StageFeedbackNotes({ threadId })),
         ),
       sent: (noteIds) => setWritten((current) => without(current ?? saved ?? noFeedback, noteIds)),
       refresh: () => {

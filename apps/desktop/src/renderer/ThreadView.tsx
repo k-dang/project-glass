@@ -92,7 +92,7 @@ import { ProblemAlert } from "./ProblemAlert"
 import { type Problem, problemText, settledProblem, streamProblem } from "./problems"
 import { rememberPlace } from "./savedPlace"
 import { type Action, useActions } from "./actions"
-import { useStagedFeedback } from "./useStagedFeedback"
+import { useComposerFeedback } from "./useComposerFeedback"
 import { DiagramPane, useDiagrams } from "./ThreadDiagrams"
 import { BrowserLinks, type BrowserOpening, BrowserPane } from "./BrowserPane"
 import { browserPolicyOf, threadFileAddress } from "./browserAddress"
@@ -608,7 +608,7 @@ export function ThreadComposer(props: {
   const canceled = useAtomValue(atoms.cancelQueued)
   const sentNow = useAtomValue(atoms.sendQueued)
 
-  const { editing, ...staged } = useStagedFeedback(
+  const { editing, ...feedback } = useComposerFeedback(
     props.feedback,
     async (message) => Exit.isSuccess(await send(message)),
     async (message) => Exit.isSuccess(await steer(message)),
@@ -637,7 +637,7 @@ export function ThreadComposer(props: {
           props.problem ??
           null
         }
-        {...staged}
+        {...feedback}
         recall={lastSent(turns, props.queued)}
         onStop={running ? () => stop() : null}
         beam={props.beam ?? false}

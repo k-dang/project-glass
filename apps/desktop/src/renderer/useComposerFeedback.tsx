@@ -1,24 +1,24 @@
 import type { ThreadMessageInput, MessageInput } from "@glass/contracts"
 import { useState } from "react"
-import { type StagedEdit, StagedFeedback } from "./FeedbackNotes"
+import { type AttachedEdit, AttachedFeedback } from "./FeedbackNotes"
 import type { FeedbackNotesStore } from "./useFeedbackNotes"
 
-export function useStagedFeedback(
+export function useComposerFeedback(
   store: FeedbackNotesStore | undefined,
   send: (message: ThreadMessageInput) => Promise<boolean>,
   steer: (message: MessageInput) => Promise<boolean>,
 ) {
-  const [editing, setEditing] = useState<StagedEdit | null>(null)
+  const [editing, setEditing] = useState<AttachedEdit | null>(null)
 
-  if (store === undefined || store.staged.length === 0)
+  if (store === undefined || store.notes.length === 0)
     return {
       editing: false,
       send: (message: MessageInput) => send({ ...message, feedback: [] }),
       steer,
     }
 
-  const { staged } = store
-  const included = staged.map(({ id }) => id)
+  const { notes } = store
+  const included = notes.map(({ id }) => id)
   const open = editing !== null && included.includes(editing.id) ? editing : null
 
   return {
@@ -35,8 +35,8 @@ export function useStagedFeedback(
     holdUntilAccepted: true,
     allowEmpty: true,
     attachment: (
-      <StagedFeedback
-        notes={staged}
+      <AttachedFeedback
+        notes={notes}
         editing={open}
         onEditingChange={setEditing}
         onSave={store.save}

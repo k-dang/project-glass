@@ -586,11 +586,6 @@ export class GlassRpcs extends RpcGroup.make(
     success: UnsentFeedback,
     error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
-  Rpc.make("StageFeedbackNotes", {
-    payload: { threadId: Schema.String },
-    success: UnsentFeedback,
-    error: Schema.Union([ThreadNotFound, ThreadError]),
-  }),
   Rpc.make("SaveFeedbackNote", {
     payload: { threadId: Schema.String, note: FeedbackNote },
     success: UnsentFeedback,
