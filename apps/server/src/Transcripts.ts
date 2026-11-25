@@ -465,21 +465,12 @@ export class Transcripts extends Context.Service<
           return Option.some(next)
         })
 
-      const writableTurn = (threadId: string, turnId: string) =>
-        sql`
-          SELECT id FROM thread_turn
-          WHERE id = ${turnId} AND thread_id = ${threadId}
-            AND json_extract(ended, '$.ending._tag') IS NOT 'Failed'
-        `.pipe(Effect.map((rows) => rows.length > 0))
+      const writableTurns = (threadId: string) => sql`
+        SELECT id FROM thread_turn
+        WHERE thread_id = ${threadId} AND json_extract(ended, '$.ending._tag') IS NOT 'Failed'
+      `
 
-      const whenWritable = <E, R>(
-        threadId: string,
-        turnId: string,
-        write: Effect.Effect<boolean, E, R>,
-      ) =>
-        writableTurn(threadId, turnId).pipe(
-          Effect.flatMap((writable) => (writable ? write : Effect.succeed(false))),
-        )
+      const wrote = Effect.map((rows: ReadonlyArray<unknown>) => rows.length > 0)
 
       const insertTurn = (
         threadId: string,
@@ -502,36 +493,29 @@ export class Transcripts extends Context.Service<
           Match.tagsExhaustive({
             TurnStarted: (started) => insertTurn(threadId, started, false),
             PartSet: ({ turnId, index, part }) =>
-              whenWritable(
-                threadId,
-                turnId,
-                sql`
-                  INSERT INTO thread_turn_part ${sql.insert({ turn_id: turnId, position: index, part: encodePart(part) })}
-                  ON CONFLICT (turn_id, position) DO UPDATE SET part = excluded.part
-                `.pipe(Effect.as(true)),
-              ),
+              sql`
+                INSERT INTO thread_turn_part (turn_id, position, part)
+                SELECT ${turnId}, ${index}, ${encodePart(part)}
+                WHERE ${turnId} IN (${writableTurns(threadId)})
+                ON CONFLICT (turn_id, position) DO UPDATE SET part = excluded.part
+                RETURNING turn_id
+              `.pipe(wrote),
             PartAppended: ({ turnId, index, text }) =>
-              whenWritable(
-                threadId,
-                turnId,
-                sql`
-                  UPDATE thread_turn_part
-                  SET part = json_set(part, '$.text', json_extract(part, '$.text') || ${text})
-                  WHERE turn_id = ${turnId} AND position = ${index}
-                `.pipe(Effect.as(true)),
-              ),
+              sql`
+                UPDATE thread_turn_part
+                SET part = json_set(part, '$.text', json_extract(part, '$.text') || ${text})
+                WHERE turn_id = ${turnId} AND position = ${index}
+                  AND turn_id IN (${writableTurns(threadId)})
+                RETURNING turn_id
+              `.pipe(wrote),
             ToolCallStatusSet: ({ toolCallId, status }) =>
               sql`
                 UPDATE thread_turn_part SET part = json_set(part, '$.status', ${status})
                 WHERE json_extract(part, '$._tag') = 'ToolCall'
                   AND json_extract(part, '$.toolCallId') = ${toolCallId}
-                  AND turn_id IN (
-                    SELECT id FROM thread_turn
-                    WHERE thread_id = ${threadId}
-                      AND json_extract(ended, '$.ending._tag') IS NOT 'Failed'
-                  )
+                  AND turn_id IN (${writableTurns(threadId)})
                 RETURNING turn_id
-              `.pipe(Effect.map((rows) => rows.length > 0)),
+              `.pipe(wrote),
             TurnEnded: ({ turnId, ended }) => {
               const conditions = [
                 sql`id = ${turnId}`,
@@ -546,7 +530,7 @@ export class Transcripts extends Context.Service<
                 UPDATE thread_turn SET ended = ${encodeEnd(ended)}
                 WHERE ${sql.and(conditions)}
                 RETURNING id
-              `.pipe(Effect.map((rows) => rows.length > 0))
+              `.pipe(wrote)
             },
           }),
         )

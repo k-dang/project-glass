@@ -121,7 +121,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       readonly scope: Scope.Closeable
       readonly sockets: ReadonlySet<Socket>
       readonly token: string
-      readonly journal: Journal["Service"] | undefined
+      readonly journal: Option.Option<Journal["Service"]>
     }
   >()
 
@@ -213,7 +213,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       scope,
       sockets,
       token,
-      journal: Option.getOrUndefined(Context.getOption(services, Journal)),
+      journal: Context.getOption(services, Journal),
     })
     shutDowns.set(threadId, shutDown)
     urls.set(
@@ -351,13 +351,9 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
         )
       }),
     journal: (threadId: string) =>
-      Effect.suspend(() => {
-        const journal = hosts.get(threadId)?.journal
-
-        return journal === undefined
-          ? Effect.die(`No running host for ${threadId}`)
-          : Effect.succeed(journal)
-      }),
+      Effect.suspend(() => Effect.fromOption(hosts.get(threadId)?.journal ?? Option.none())).pipe(
+        Effect.orDie,
+      ),
     connections: (threadId: string) => hosts.get(threadId)?.sockets.size ?? 0,
     reclaim,
     setGone: (threadId: string, isGone: boolean) => {
