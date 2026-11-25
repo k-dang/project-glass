@@ -89,6 +89,11 @@ export const rerun = (pullRequest: FakePullRequest) => {
   pullRequest.checkContexts = [running("lint")]
 }
 
+export const pushAgain = (pullRequest: FakePullRequest) => {
+  pullRequest.checks = null
+  pullRequest.checkContexts = []
+}
+
 export const failThreeTimes = Effect.fnUntraced(function* (
   f: Pick<Fixture, "client" | "transcript"> & {
     readonly thread: { readonly id: string }

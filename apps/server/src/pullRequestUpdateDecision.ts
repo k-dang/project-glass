@@ -116,7 +116,11 @@ const failingChecks = (
   const checks = failing.map(({ name, url }) => ({ name, url }))
 
   if (!Arr.isReadonlyArrayNonEmpty(checks))
-    return { told: null, reason: null, state: rollup === "running" ? "unsettled" : "cleared" }
+    return {
+      told: null,
+      reason: null,
+      state: rollup === "running" || rollup === "unavailable" ? "unsettled" : "cleared",
+    }
 
   const runs = checks.map(runOf)
   const before = told.failedRuns

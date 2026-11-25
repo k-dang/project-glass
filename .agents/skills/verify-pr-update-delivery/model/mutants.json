@@ -6,6 +6,8 @@
   "CountRunningInMemory": "RunsAtMostTheLimit",
   "NeverCount": "StopsAtTheLimit",
   "RerunResetsCount": "StopsAtTheLimit",
+  "NewPushResetsCount": "StopsAtTheLimit",
+  "AgentMessageCounts": "StopsAtTheLimit",
   "RestartForgetsCount": "StopsAtTheLimit",
   "IgnoreMessages": "MessageLetsItTryAgain"
 }

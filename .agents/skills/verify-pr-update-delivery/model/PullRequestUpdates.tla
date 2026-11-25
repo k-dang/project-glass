@@ -41,7 +41,7 @@ Init ==
     /\ count = [t \in Threads |-> 0]
     /\ afterNewMessage = [t \in Threads |-> FALSE]
     /\ turn = [t \in Threads |-> "idle"]
-    /\ queued = [t \in Threads |-> FALSE]
+    /\ queued = [t \in Threads |-> "none"]
     /\ unsaved = [t \in Threads |-> 0]
     /\ owed = [t \in Threads |-> 0]
     /\ tracked = {}
@@ -54,7 +54,7 @@ Init ==
     /\ streak = [t \in Threads |-> 0]
     /\ sinceMessage = [t \in Threads |-> 0]
 
-Idle(t) == turn[t] = "idle" /\ ~queued[t]
+Idle(t) == turn[t] = "idle" /\ queued[t] = "none"
 
 Running == {t \in Threads : turn[t] = "update"}
 
@@ -76,6 +76,12 @@ ChecksFail(t) ==
 ChecksRunAgain(t) ==
     /\ pr[t] = "failing"
     /\ pr' = [pr EXCEPT ![t] = "rerun"]
+    /\ UNCHANGED <<version, told, count, afterNewMessage, turn, queued, unsaved, owed, tracked,
+                   bounds, ghosts>>
+
+NewPushHasNoChecksYet(t) ==
+    /\ pr[t] \in {"failing", "rerun"}
+    /\ pr' = [pr EXCEPT ![t] = "pushed"]
     /\ UNCHANGED <<version, told, count, afterNewMessage, turn, queued, unsaved, owed, tracked,
                    bounds, ghosts>>
 
@@ -106,7 +112,10 @@ DecideNothingHolds(t) ==
     /\ pr[t] # "failing"
     /\ told' = [told EXCEPT ![t] = 0]
     /\ count' = [count EXCEPT ![t] =
-                    IF pr[t] = "clear" \/ Mutant("RerunResetsCount") THEN 0 ELSE Count(t)]
+                    IF \/ pr[t] = "clear"
+                       \/ pr[t] = "rerun" /\ Mutant("RerunResetsCount")
+                       \/ pr[t] = "pushed" /\ Mutant("NewPushResetsCount")
+                    THEN 0 ELSE Count(t)]
     /\ afterNewMessage' = [afterNewMessage EXCEPT ![t] = FALSE]
     /\ UNCHANGED <<mirror, turn, queued, unsaved, owed, tracked, bounds, ghosts>>
 
@@ -152,6 +161,12 @@ MessageReaches(t) ==
     /\ sinceMessage' = [sinceMessage EXCEPT ![t] = 0]
     /\ UNCHANGED <<sent, toldTwice, cutIn, stale>>
 
+AgentMessageReaches(t) ==
+    /\ afterNewMessage' =
+           IF Mutant("AgentMessageCounts") THEN [afterNewMessage EXCEPT ![t] = TRUE]
+           ELSE afterNewMessage
+    /\ UNCHANGED ghosts
+
 YouSendMessage(t) ==
     /\ messages < MaxMessages
     /\ messages' = messages + 1
@@ -167,21 +182,33 @@ YouSteer(t) ==
     /\ MessageReaches(t)
     /\ UNCHANGED <<mirror, told, count, turn, queued, unsaved, owed, tracked, restarts>>
 
-YouQueueMessage(t) ==
+QueueMessage(t, sender) ==
     /\ messages < MaxMessages
     /\ messages' = messages + 1
     /\ ~Idle(t)
-    /\ ~queued[t]
-    /\ queued' = [queued EXCEPT ![t] = TRUE]
+    /\ queued[t] = "none"
+    /\ queued' = [queued EXCEPT ![t] = sender]
     /\ UNCHANGED <<mirror, told, count, afterNewMessage, turn, unsaved, owed, tracked, restarts,
                    ghosts>>
 
+YouQueueMessage(t) == QueueMessage(t, "user")
+
+AgentSendsMessage(t) ==
+    /\ messages < MaxMessages
+    /\ messages' = messages + 1
+    /\ Idle(t)
+    /\ turn' = [turn EXCEPT ![t] = "agent"]
+    /\ AgentMessageReaches(t)
+    /\ UNCHANGED <<mirror, told, count, queued, unsaved, owed, tracked, restarts>>
+
+AgentQueuesMessage(t) == QueueMessage(t, "agent")
+
 QueuedMessageStarts(t) ==
-    /\ queued[t]
-    /\ queued' = [queued EXCEPT ![t] = FALSE]
-    /\ turn' = [turn EXCEPT ![t] = "user"]
+    /\ queued[t] # "none"
+    /\ queued' = [queued EXCEPT ![t] = "none"]
+    /\ turn' = [turn EXCEPT ![t] = queued[t]]
     /\ tracked' = tracked \ {t}
-    /\ MessageReaches(t)
+    /\ IF queued[t] = "user" THEN MessageReaches(t) ELSE AgentMessageReaches(t)
     /\ UNCHANGED <<mirror, told, count, unsaved, owed, bounds>>
 
 TurnEnds(t) ==
@@ -211,12 +238,15 @@ Next ==
     \/ \E t \in Threads :
            \/ ChecksFail(t)
            \/ ChecksRunAgain(t)
+           \/ NewPushHasNoChecksYet(t)
            \/ ChecksPass(t)
            \/ Decide(t)
            \/ RecordToldLate(t)
            \/ YouSendMessage(t)
            \/ YouSteer(t)
            \/ YouQueueMessage(t)
+           \/ AgentSendsMessage(t)
+           \/ AgentQueuesMessage(t)
            \/ TurnEnds(t)
            \/ StoppedQueueStarts(t)
     \/ GlassRestarts

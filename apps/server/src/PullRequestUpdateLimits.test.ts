@@ -11,6 +11,7 @@ import {
   failedRuns,
   failThreeTimes,
   pass,
+  pushAgain,
   reasonsTold,
   rerun,
   subscribe,
@@ -148,6 +149,31 @@ it.live("counts from zero again once the checks pass, and not while they run aga
 
     assert.deepStrictEqual(turns.slice(2).map(reasonsTold), [
       ...[1, 2, 3, 4, 5].map(() => [["greeter#7", "FailingChecks"]]),
+      [["greeter#7", "MergeConflict"]],
+    ])
+  }),
+)
+
+it.live("keeps the count while a new push has no checks yet", () =>
+  Effect.gen(function* () {
+    const f = yield* subscribedThread()
+
+    for (const run of [1, 2, 3]) {
+      fail(f.pullRequest, failed("lint", run))
+      yield* f.client.ListPullRequests()
+      yield* f.transcript(f.thread.id, settled(2 + run))
+      pushAgain(f.pullRequest)
+      yield* f.client.ListPullRequests()
+    }
+
+    fail(f.pullRequest, failed("lint", 4))
+    yield* f.client.ListPullRequests()
+    f.pullRequest.mergeable = "CONFLICTING"
+    yield* f.client.ListPullRequests()
+    const turns = yield* f.transcript(f.thread.id, settled(6))
+
+    assert.deepStrictEqual(turns.slice(2).map(reasonsTold), [
+      ...[1, 2, 3].map(() => [["greeter#7", "FailingChecks"]]),
       [["greeter#7", "MergeConflict"]],
     ])
   }),
