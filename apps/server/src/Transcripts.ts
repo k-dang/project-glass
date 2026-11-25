@@ -465,15 +465,20 @@ export class Transcripts extends Context.Service<
           return Option.some(next)
         })
 
-      const failedAlready = (turnId: string) =>
+      const writableTurn = (threadId: string, turnId: string) =>
         sql`
           SELECT id FROM thread_turn
-          WHERE id = ${turnId} AND json_extract(ended, '$.ending._tag') = 'Failed'
+          WHERE id = ${turnId} AND thread_id = ${threadId}
+            AND json_extract(ended, '$.ending._tag') IS NOT 'Failed'
         `.pipe(Effect.map((rows) => rows.length > 0))
 
-      const unlessFailed = <E, R>(turnId: string, write: Effect.Effect<boolean, E, R>) =>
-        failedAlready(turnId).pipe(
-          Effect.flatMap((failed) => (failed ? Effect.succeed(false) : write)),
+      const whenWritable = <E, R>(
+        threadId: string,
+        turnId: string,
+        write: Effect.Effect<boolean, E, R>,
+      ) =>
+        writableTurn(threadId, turnId).pipe(
+          Effect.flatMap((writable) => (writable ? write : Effect.succeed(false))),
         )
 
       const insertTurn = (
@@ -497,7 +502,8 @@ export class Transcripts extends Context.Service<
           Match.tagsExhaustive({
             TurnStarted: (started) => insertTurn(threadId, started, false),
             PartSet: ({ turnId, index, part }) =>
-              unlessFailed(
+              whenWritable(
+                threadId,
                 turnId,
                 sql`
                   INSERT INTO thread_turn_part ${sql.insert({ turn_id: turnId, position: index, part: encodePart(part) })}
@@ -505,7 +511,8 @@ export class Transcripts extends Context.Service<
                 `.pipe(Effect.as(true)),
               ),
             PartAppended: ({ turnId, index, text }) =>
-              unlessFailed(
+              whenWritable(
+                threadId,
                 turnId,
                 sql`
                   UPDATE thread_turn_part
@@ -528,6 +535,7 @@ export class Transcripts extends Context.Service<
             TurnEnded: ({ turnId, ended }) => {
               const conditions = [
                 sql`id = ${turnId}`,
+                sql`thread_id = ${threadId}`,
                 sql`(ended IS NULL OR json_extract(ended, '$.ending._tag') = 'CutOff')`,
               ]
 

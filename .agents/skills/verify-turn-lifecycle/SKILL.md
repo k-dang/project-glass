@@ -28,12 +28,12 @@ Expect `Result: ok`: every rule holds and every mutant is caught. [`tools/tla/RE
 
 ## Coverage
 
-Synced with the code at commit `36004428a70b36b190ceba163543adec7771e062`. Before you trust a result, run `git diff 36004428 -- <files below>`. If a covered function changed, compare it with its actions first.
+Synced with the code at commit `0f83944eaba1cd425f5ad1049ae53dbfbbe687ef`. Before you trust a result, run `git diff 0f83944e -- <files below>`. If a covered function changed, compare it with its actions first.
 
 | Model | Code |
 | --- | --- |
 | `YouSend`, `YouSendQueued`, `GlobalChatStartsUpdate`, the queue start in `EndWith` | `stepThread` in `apps/server/src/threadState.ts`; `execute` in `apps/server/src/Transcripts.ts`; `startIfIdle` with `retriesDelivery` in `apps/server/src/StartedWorkUpdates.ts` |
-| `Accepts`, `EndWith`, `GlassSavesJournal` | `writeApplied` (`TurnEnded`, `PartSet`, `PartAppended` and `unlessFailed`) and `save` in `apps/server/src/Transcripts.ts` |
+| `Accepts`, `EndWith`, `GlassSavesJournal` | `writeApplied` (`TurnEnded`, `PartSet`, `PartAppended` and `whenWritable`) and `save` in `apps/server/src/Transcripts.ts` |
 | `HostTakesTurn`, `HostRefusesTurn`, `DeliveryTimesOut` | `deliver`, `dispatch`, `settleUndelivered` in `apps/server/src/ThreadTurns.ts`; `settleUndelivered` in `Transcripts.ts`; `begin` in `apps/server/src/agentHost/turnLoop.ts` |
 | `YouStop` | `stop` and `stopHost` in `ThreadTurns.ts`; `askedToStop` in `Transcripts.ts` (sets `retries_delivery = 0`); `stop` in `turnLoop.ts` |
 | `CutOffRunning`, `GlassLosesHost`, `AgentHostReplaced` | `endUnfinished` in `Transcripts.ts`; `serve` (the `lost` stream) in `ThreadTurns.ts`; `placeLostTurn` in `apps/server/src/Sandboxes.ts`; `stop` in `apps/server/src/LocalAgentHost.ts` |
