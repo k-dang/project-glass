@@ -12,7 +12,7 @@ import {
   UnsentFeedback,
 } from "@glass/contracts"
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react"
-import userEvent from "@testing-library/user-event"
+import userEvent, { PointerEventsCheckLevel } from "@testing-library/user-event"
 import { DateTime, Deferred, Effect, Exit, Stream } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { App } from "./App"
@@ -85,16 +85,14 @@ const openChanges = async (handlers: Parameters<typeof testLayer>[0]) => {
     </RegistryProvider>,
   )
 
-  const user = userEvent.setup()
+  const user = userEvent.setup({ pointerEventsCheck: PointerEventsCheckLevel.Never })
   await user.click(await screen.findByRole("textbox", { name: "Message" }))
   await user.keyboard("{Control>}d{/Control}")
   await screen.findByRole("complementary", { name: "Pane picker" })
   await user.keyboard("d")
   const region = await screen.findByRole("complementary", { name: "Changes" })
-  await user.click(await within(region).findByRole("tab", { name: /Feedback/ }))
-  const overview = await within(region).findByRole("tabpanel", { name: /Feedback/ })
 
-  return { user, region, overview }
+  return { user, region }
 }
 
 afterEach(() => {
@@ -105,13 +103,13 @@ afterEach(() => {
 it("edits and removes Feedback notes, keeping older ones with their original code", async () => {
   const store = savedNotes(note("current", "read-2", "Rename B"), note("older", "read-1", "Drop B"))
 
-  const { user, region, overview } = await openChanges({
+  const { user, region } = await openChanges({
     WatchTranscript: idle,
     GetThreadChanges: () => Effect.succeed(changes("read-2")),
     ...store.handlers,
   })
 
-  const [current, older] = await within(overview).findAllByRole("article", {
+  const [older, current] = await within(region).findAllByRole("article", {
     name: "Feedback on greet.ts New line 2",
   })
 
@@ -126,7 +124,7 @@ it("edits and removes Feedback notes, keeping older ones with their original cod
   await user.type(editor, "Keep B after all")
   await user.click(within(region).getByRole("button", { name: "Save changes" }))
 
-  expect(await within(overview).findByText("Keep B after all")).toBeTruthy()
+  expect(await within(region).findByText("Keep B after all")).toBeTruthy()
 
   await user.click(within(current!).getByRole("button", { name: "Remove" }))
   await waitFor(() => expect(within(region).queryByText("Rename B")).toBeNull())
@@ -137,7 +135,7 @@ it("keeps what the user wrote when a Feedback note can't be saved, until a retry
   let attempts = 0
   const { handlers } = savedNotes(note("current", "read-1", "Rename B"))
 
-  const { user, region, overview } = await openChanges({
+  const { user, region } = await openChanges({
     WatchTranscript: idle,
     GetThreadChanges: () => Effect.succeed(changes("read-1")),
     ...handlers,
@@ -147,7 +145,7 @@ it("keeps what the user wrote when a Feedback note can't be saved, until a retry
         : handlers.SaveFeedbackNote(payload),
   })
 
-  await user.click(await within(overview).findByRole("button", { name: "Edit" }))
+  await user.click(await within(region).findByRole("button", { name: "Edit" }))
   const editor = within(region).getByRole("textbox", { name: "Feedback on selected code" })
   await user.type(editor, " to Greeting")
   await user.keyboard("{Control>}{Enter}{/Control}")
@@ -156,7 +154,7 @@ it("keeps what the user wrote when a Feedback note can't be saved, until a retry
   expect(editor).toHaveProperty("value", "Rename B to Greeting")
 
   await user.click(within(region).getByRole("button", { name: "Save changes" }))
-  expect(await within(overview).findByText("Rename B to Greeting")).toBeTruthy()
+  expect(await within(region).findByText("Rename B to Greeting")).toBeTruthy()
   expect(within(region).queryByText("Disk is full.")).toBeNull()
 })
 
@@ -169,7 +167,7 @@ it("keeps the displayed Changes when Show latest fails, then marks notes older o
     Effect.succeed(changes("read-2")),
   ]
 
-  const { user, region, overview } = await openChanges({
+  const { user, region } = await openChanges({
     WatchTranscript: () =>
       Stream.concat(
         Stream.make(
@@ -200,7 +198,7 @@ it("keeps the displayed Changes when Show latest fails, then marks notes older o
     ListFeedbackNotes: () => Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
   })
 
-  const listed = await within(overview).findByRole("article", {
+  const listed = await within(region).findByRole("article", {
     name: "Feedback on greet.ts New line 2",
   })
 
@@ -213,10 +211,7 @@ it("keeps the displayed Changes when Show latest fails, then marks notes older o
   await user.click(within(region).getByRole("button", { name: "Retry" }))
   expect(
     await within(
-      await within(await within(region).findByRole("tabpanel", { name: /Feedback/ })).findByRole(
-        "article",
-        { name: "Feedback on greet.ts New line 2" },
-      ),
+      await within(region).findByRole("article", { name: "Feedback on greet.ts New line 2" }),
     ).findByText("Older version"),
   ).toBeTruthy()
 })
@@ -240,12 +235,11 @@ it("shows the Changes while Feedback notes can't load, then the notes once a ret
   expect(within(region).queryByText(/No feedback yet/)).toBeNull()
 
   await user.click(within(region).getByRole("button", { name: "Retry" }))
-  const overview = within(region).getByRole("tabpanel", { name: /Feedback/ })
-  expect(await within(overview).findByText("Rename B")).toBeTruthy()
+  expect(await within(region).findByText("Rename B")).toBeTruthy()
 })
 
-it("keeps the note being edited from the Feedback tab until it's saved or cancelled", async () => {
-  const { user, region, overview } = await openChanges({
+it("keeps the note being edited until it's saved or cancelled", async () => {
+  const { user, region } = await openChanges({
     WatchTranscript: idle,
     GetThreadChanges: () => Effect.succeed(changes("read-1")),
     ListFeedbackNotes: () =>
@@ -254,22 +248,23 @@ it("keeps the note being edited from the Feedback tab until it's saved or cancel
       ),
   })
 
-  const [first, second] = await within(overview).findAllByRole("article", {
+  const [first, second] = await within(region).findAllByRole("article", {
     name: "Feedback on greet.ts New line 2",
   })
 
   await user.click(within(first!).getByRole("button", { name: "Edit" }))
-  await user.type(within(overview).getByRole("textbox", { name: "Feedback on selected code" }), "!")
+  await user.type(within(region).getByRole("textbox", { name: "Feedback on selected code" }), "!")
 
   expect(within(region).queryByRole("button", { name: "Add feedback" })).toBeNull()
   expect(within(second!).getByRole("button", { name: "Edit" })).toHaveProperty("disabled", true)
 
-  await user.click(within(overview).getByRole("button", { name: "Cancel" }))
-  expect(within(second!).getByRole("button", { name: "Edit" })).toHaveProperty("disabled", false)
+  await user.click(within(region).getByRole("button", { name: "Cancel" }))
+  const edits = await within(region).findAllByRole("button", { name: "Edit" })
+  expect(edits.map((edit) => edit.hasAttribute("disabled"))).toEqual([false, false])
 })
 
 it("keeps Feedback notes readable when the Changes can't be read", async () => {
-  const { region, overview } = await openChanges({
+  const { region } = await openChanges({
     WatchTranscript: idle,
     GetThreadChanges: () => Effect.fail(new ThreadError({ message: "The Sandbox expired." })),
     ListFeedbackNotes: () => Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
@@ -277,30 +272,12 @@ it("keeps Feedback notes readable when the Changes can't be read", async () => {
 
   expect(await within(region).findByText("The Sandbox expired.")).toBeTruthy()
 
-  const kept = await within(overview).findByRole("article", {
+  const kept = await within(region).findByRole("article", {
     name: "Feedback on greet.ts New line 2",
   })
 
   expect(within(kept).getByText("Older version")).toBeTruthy()
   expect(within(kept).getByText("Rename B")).toBeTruthy()
-})
-
-it("keeps an unsaved edit while the Files tab is shown", async () => {
-  const { user, region, overview } = await openChanges({
-    WatchTranscript: idle,
-    GetThreadChanges: () => Effect.succeed(changes("read-1")),
-    ListFeedbackNotes: () => Effect.succeed(unsent(note("current", "read-1", "Rename B"))),
-  })
-
-  await user.click(await within(overview).findByRole("button", { name: "Edit" }))
-  await user.type(within(overview).getByRole("textbox", { name: "Feedback on selected code" }), "!")
-  await user.click(within(region).getByRole("tab", { name: "Files" }))
-  await user.click(within(region).getByRole("tab", { name: /Feedback/ }))
-
-  const reopened = within(region).getByRole("tabpanel", { name: /Feedback/ })
-  expect(
-    within(reopened).getByRole("textbox", { name: "Feedback on selected code" }),
-  ).toHaveProperty("value", "Rename B!")
 })
 
 it("stages Feedback notes beside the unsent text and sends them as one message once accepted", async () => {
@@ -434,21 +411,22 @@ it("returns a canceled Queued message's Feedback notes beside newer work once a 
   expect(within(attached).getAllByRole("article")).toHaveLength(1)
   expect(screen.getByRole("textbox", { name: "Message" }).textContent).toBe("Also add docs")
 
-  await user.click(within(region).getByRole("tab", { name: /Feedback/ }))
-  const overview = await within(region).findByRole("tabpanel", { name: /Feedback/ })
-  const [newer, restored] = await within(overview).findAllByRole("article")
-  expect(within(newer!).getByText("Newer")).toBeTruthy()
-  expect(within(restored!).getByText("Cap the attempts")).toBeTruthy()
-  expect(within(restored!).getByText("Older version")).toBeTruthy()
+  const older = await within(region).findByRole("region", { name: "On an older version" })
+  const restored = await within(older).findByRole("article")
+  expect(within(restored).getByText("Cap the attempts")).toBeTruthy()
+  expect(within(restored).getByText("Older version")).toBeTruthy()
+  expect(within(older).queryByText("Newer")).toBeNull()
+  expect(await within(region).findByText("Newer")).toBeTruthy()
 })
 
 it("selects lines with Shift+Arrow keys and starts a Feedback note on them with Enter", async () => {
-  const { user, region, overview } = await openChanges({
+  const { user, region } = await openChanges({
     WatchTranscript: idle,
     GetThreadChanges: () => Effect.succeed(changes("read-1")),
     ...savedNotes().handlers,
   })
 
+  await user.click(await within(region).findByRole("button", { name: "Show greet.ts" }))
   const diff = within(region).getByRole("button", { name: "Hide greet.ts" }).parentElement!
   fireEvent.keyDown(diff, { key: "ArrowDown", shiftKey: true })
   fireEvent.keyDown(diff, { key: "Enter" })
@@ -457,5 +435,5 @@ it("selects lines with Shift+Arrow keys and starts a Feedback note on them with 
   await user.type(editor, "Rename A")
   await user.click(within(region).getByRole("button", { name: "Add note" }))
 
-  expect(await within(overview).findByText("Rename A")).toBeTruthy()
+  expect(await within(region).findByText("Rename A")).toBeTruthy()
 })

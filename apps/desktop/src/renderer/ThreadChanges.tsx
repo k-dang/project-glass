@@ -6,12 +6,7 @@ import { FileDiff, MessageSquareText } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
-import {
-  ChangesWithFeedback,
-  LoadProblem,
-  type SidebarTab,
-  useNoteOpen,
-} from "./ChangesWithFeedback"
+import { ChangesWithFeedback, LoadProblem, useNoteOpen } from "./ChangesWithFeedback"
 import { threadChangesAtom, feedbackNotesAtom } from "./threadsArea"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
@@ -72,7 +67,6 @@ function ThreadChanges(props: {
 
   const store = useFeedbackNotes(thread.id)
   const lineNotes = useMemo(() => lineNotesOf(store), [store])
-  const [sidebarTab, setSidebarTab] = useState<SidebarTab>("files")
 
   const showLatest = () => {
     setLastEndedAtSnapshot(lastEnded)
@@ -106,8 +100,7 @@ function ThreadChanges(props: {
           key={shown instanceof Changes ? shown.id : shown}
           changes={shown}
           store={lineNotes}
-          sidebarTab={sidebarTab}
-          setSidebarTab={setSidebarTab}
+          sidebar={null}
           wide={props.wide}
           footer={
             lineNotes.notes.length > 0 && (

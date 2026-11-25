@@ -44,6 +44,7 @@ test("reviews a local Thread's changes in a pane beside its Chat, held still unt
   const details = window.getByRole("complementary", { name: "Details" })
   await details.getByRole("button", { name: "Changes" }).click()
   const changes = window.getByRole("complementary", { name: "Changes" })
+  await changes.getByRole("button", { name: "Show notes.txt" }).click()
   await expect(changes.getByText("hello from the agent")).toBeVisible()
 
   await message.fill("Write another")
@@ -51,9 +52,11 @@ test("reviews a local Thread's changes in a pane beside its Chat, held still unt
   await expect(window.getByText(/^Done in/)).toHaveCount(2)
 
   await expect(changes.getByRole("note")).toContainText("worked since you opened these changes")
-  await expect(changes.getByText("a second note")).toHaveCount(0)
+  await expect(changes.getByText("more.txt")).toHaveCount(0)
 
   await changes.getByRole("button", { name: "Show latest" }).click()
+  await expect(changes.getByText("more.txt")).toBeVisible()
+  await changes.getByRole("button", { name: "Expand all files" }).click()
   await expect(changes.getByText("a second note")).toBeVisible()
   await expect(changes.getByText("hello from the agent")).toBeVisible()
 })

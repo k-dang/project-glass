@@ -5,7 +5,7 @@ A local Thread's Changes view shows its worktree diff. The view keeps its Revisi
 ## Sub-features
 
 - Read a Thread's changes in a pane beside its Chat, widen the pane over the Chat and back, and explicitly move to its latest changes.
-- Select lines by keyboard, add a Feedback note, edit it in place, find it in the Feedback tab after a relaunch, see it marked Older version with its code after Show latest, and remove it.
+- Select lines by keyboard, add a Feedback note, edit it in place, find it under its line after a relaunch, see it move to On an older version with its code after Show latest, and remove it.
 - Review feedback, send it to the idle Thread, and queue more while a Turn runs.
 - Cancel queued feedback, find its note back in Changes, edit it, and send it again.
 
@@ -23,10 +23,10 @@ Open a Thread and press Ctrl+D (⌘D on macOS), then D, to open the Changes pane
 
 Feedback notes, from step 3's Changes:
 
-1. `click --role StaticText --name "hello from the agent"`, `press --key ArrowDown --shift`, `wait --text "New line 1"`. Click `Add feedback`, `type --role textbox --name "Feedback on selected code" --text ...`, click `Add note`, and `wait` for the text. Snapshot: `article "Feedback on notes.txt New line 1"` under the line, `tab "Feedback 1"`, Files still selected.
+1. `click --role StaticText --name "hello from the agent"`, `press --key ArrowDown --shift`, `wait --text "New line 1"`. Click `Add feedback`, `type --role textbox --name "Feedback on selected code" --text ...`, click `Add note`, and `wait` for the text. Snapshot: `article "Feedback on notes.txt New line 1"` under the line. The pane has no file list or Feedback tab: files without notes start collapsed and notes sit under their lines.
 2. Click `Edit`, type new text, click `Save changes`, `wait` for it.
-3. Run `kill-backend` four times, each once `doctor` shows Backend health OK again, then `wait --text "keeps stopping"` and click `Relaunch Glass`. Reopen the Thread's Changes and the `Feedback 1` tab: the edited note is there, without an Older version label.
-4. Run step 4 above, then `Show latest` and `wait --text "older version"`. The note shows `Older version` with `hello from the agent` as its code, and the diff shows `View feedback`. Click `Remove`, `wait --text "No feedback yet"`.
+3. Run `kill-backend` four times, each once `doctor` shows Backend health OK again, then `wait --text "keeps stopping"` and click `Relaunch Glass`. Reopen the Thread's Changes: notes.txt starts expanded because it has a note, and the edited note is under its line, without an Older version label.
+4. Run step 4 above, then `Show latest` and `wait --text "older version"`. The note moves to `region "On an older version"` above the files, showing `Older version` with `hello from the agent` as its code. Click `Remove`; the group disappears.
 
 Sending feedback, from a note added in Changes:
 
