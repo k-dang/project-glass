@@ -87,6 +87,7 @@ const capture = async (app: ElectronApplication) => {
 
       await window
         .getByText(/^Loading\b.*…$/)
+        .filter({ visible: true })
         .first()
         .waitFor({ state: "detached" })
 
