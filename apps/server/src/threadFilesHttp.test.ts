@@ -4,7 +4,7 @@ import { Effect } from "effect"
 import { mkdir, writeFile } from "node:fs/promises"
 import { join } from "node:path"
 import { LAUNCH_TOKEN } from "../test/harness"
-import { threadsFixture } from "../test/threadsFixture"
+import { settled, threadsFixture } from "../test/threadsFixture"
 
 const png = Buffer.from(
   "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==",
@@ -29,7 +29,7 @@ it.live(
       const get = (path: string) =>
         Effect.promise(async () => {
           const response = await fetch(
-            `${f.baseUrl}${THREAD_FILES_PATH}/${thread.id}/${path}?${TOKEN_PARAM}=${LAUNCH_TOKEN}`,
+            `${f.baseUrl}${THREAD_FILES_PATH}/local/${thread.id}/${path}?${TOKEN_PARAM}=${LAUNCH_TOKEN}`,
           )
 
           return {
@@ -54,4 +54,33 @@ it.live(
       assert.equal((yield* get("..%2F..%2Fsecrets.txt")).status, 404)
       assert.equal((yield* get("docs/missing.html")).status, 404)
     }),
+)
+
+it.live("serves a Thread's files only to Browser panes of the place it runs in", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    const local = yield* f.start()
+    const sandboxed = yield* f.startSandbox()
+    yield* f.transcript(local.id, settled(1))
+    yield* f.transcript(sandboxed.id, settled(1))
+
+    const status = (place: string, threadId: string) =>
+      Effect.promise(async () => {
+        const response = await fetch(
+          `${f.baseUrl}${THREAD_FILES_PATH}/${place}/${threadId}/README.md?${TOKEN_PARAM}=${LAUNCH_TOKEN}`,
+        )
+
+        return response.status
+      })
+
+    assert.deepStrictEqual(
+      [
+        yield* status("local", local.id),
+        yield* status("sandbox", local.id),
+        yield* status("sandbox", sandboxed.id),
+        yield* status("local", sandboxed.id),
+      ],
+      [200, 404, 200, 404],
+    )
+  }),
 )

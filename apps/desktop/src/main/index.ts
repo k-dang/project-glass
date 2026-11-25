@@ -343,13 +343,13 @@ void app.whenReady().then(() => {
 
   setUpBrowserPanes({
     preload: join(__dirname, "../browserPreload/index.cjs"),
-    threadFile: async (threadId, pathname) => {
+    threadFileUrl: async (place, file) => {
       const [{ threadFileUrl }, endpoint] = await Promise.all([
         import("./backend"),
         backendReady.promise,
       ])
 
-      return fetch(threadFileUrl(endpoint, threadId, pathname))
+      return threadFileUrl(endpoint, place, file)
     },
   })
   keepVisualizationsOffThisDevice()
@@ -359,8 +359,12 @@ void app.whenReady().then(() => {
       backendReady.promise,
     ])
 
+    const url = visualizationUrl(endpoint, new URL(request.url).hostname)
+
+    if (url === null) return new Response("No such Visualization.", { status: 404 })
+
     try {
-      return await fetch(visualizationUrl(endpoint, new URL(request.url).hostname))
+      return await fetch(url)
     } catch {
       return new Response("Glass's backend isn't answering", { status: 503 })
     }
