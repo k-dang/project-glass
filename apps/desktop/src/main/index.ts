@@ -158,9 +158,9 @@ const updateWindowTheme = (window: BrowserWindow) => {
 
 const glassHome = process.env["GLASS_HOME"] || homedir()
 
-const logFile = join(glassHome, ".glass", "logs", "backend.log")
-
 const dataDirectory = join(glassHome, ".project-glass")
+
+const logFile = join(dataDirectory, "backend.log")
 
 const dogfoodReports = dogfoodReportWriter(join(dataDirectory, "dogfood-reports"))
 

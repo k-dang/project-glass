@@ -105,7 +105,7 @@ const runPaths = (id: string) => {
     userData: join(state, "user-data"),
     home: join(state, "home"),
     electronLog: join(state, "electron.log"),
-    backendLog: join(state, "home", ".glass", "logs", "backend.log"),
+    backendLog: join(state, "home", ".project-glass", "backend.log"),
     evidence: join(dir, "evidence"),
   }
 }
