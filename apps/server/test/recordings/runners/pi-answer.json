@@ -15,11 +15,7 @@
   },
   "spawns": [
     {
-      "args": [
-        "--offline",
-        "--list-models",
-        "anthropic-claude-haiku-5-5"
-      ],
+      "args": ["--offline", "--list-models", "anthropic-claude-haiku-5-5"],
       "cwd": "<workdir>",
       "stdin": "",
       "stdout": "provider  model                       context  max-out  thinking  images\nlitellm   anthropic-claude-haiku-5-5  1M       128K     yes       yes   \n",
