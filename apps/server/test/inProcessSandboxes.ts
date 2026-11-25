@@ -8,7 +8,6 @@ import {
   Exit,
   Fiber,
   Layer,
-  Option,
   Redacted,
   Schema,
   Scope,
@@ -121,7 +120,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       readonly scope: Scope.Closeable
       readonly sockets: ReadonlySet<Socket>
       readonly token: string
-      readonly journal: Option.Option<Journal["Service"]>
+      readonly journal: Journal["Service"] | undefined
     }
   >()
 
@@ -213,7 +212,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
       scope,
       sockets,
       token,
-      journal: Context.getOption(services, Journal),
+      journal: Context.getOrUndefined(services, Journal),
     })
     shutDowns.set(threadId, shutDown)
     urls.set(
@@ -351,9 +350,7 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
         )
       }),
     journal: (threadId: string) =>
-      Effect.suspend(() => Effect.fromOption(hosts.get(threadId)?.journal ?? Option.none())).pipe(
-        Effect.orDie,
-      ),
+      Effect.suspend(() => Effect.fromNullishOr(hosts.get(threadId)?.journal)).pipe(Effect.orDie),
     connections: (threadId: string) => hosts.get(threadId)?.sockets.size ?? 0,
     reclaim,
     setGone: (threadId: string, isGone: boolean) => {

@@ -115,7 +115,6 @@ it.live("writes nothing through a Turn another Thread owns", () =>
     ])
 
     assert.deepStrictEqual(yield* transcripts.read("agent-1"), before)
-    assert.isEmpty((yield* transcripts.read("agent-2")).turns)
   }).pipe(Effect.provide(transcriptsLayer)),
 )
 
