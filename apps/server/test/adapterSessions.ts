@@ -79,7 +79,7 @@ export const waiting = (turns: ReadonlyArray<Turn>) =>
 
 type Work = typeof WorkRole.Type
 
-const transcriptsDirectory = process.env["GLASS_TRANSCRIPTS_DIR"]
+const replayedTranscripts = process.env["GLASS_REPLAYED_TRANSCRIPTS"]
 
 const drive = Effect.fnUntraced(function* <Role extends ThreadRole>(
   scenario: string,
@@ -95,12 +95,12 @@ const drive = Effect.fnUntraced(function* <Role extends ThreadRole>(
   const activity = yield* SubscriptionRef.make(AgentStatusesChanged.make({ agentStatuses: [] }))
   const reported: Array<HostEvent> = []
 
-  if (transcriptsDirectory !== undefined)
+  if (replayedTranscripts !== undefined)
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
-        mkdirSync(transcriptsDirectory, { recursive: true })
+        mkdirSync(replayedTranscripts, { recursive: true })
         writeFileSync(
-          join(transcriptsDirectory, `${scenario}.json`),
+          join(replayedTranscripts, `${scenario}.json`),
           Schema.encodeSync(ReplayedTranscript)({ harness, events: reported }),
         )
       }),
