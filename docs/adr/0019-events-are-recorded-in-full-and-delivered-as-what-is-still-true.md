@@ -2,9 +2,9 @@
 
 Glass reacted to things the user didn't do through hand-wired streams, one per reaction: a Started
 work update, To-dos completing on merge. A Thread handling its own PR would have added more, each
-with its own delivery bookkeeping, and nothing said why a Thread had woken. Now every such thing is
-an Event from a Source, recorded in one SQLite log, and a Subscription tells a Thread or the Global
-chat about some of them in an Update.
+with its own delivery bookkeeping, and nothing said why a Thread had woken. Now what happens to a PR
+is an Event from a Source, recorded in one SQLite log, and a Subscription tells a Thread about some
+of them in an Update. The two older streams still run by themselves.
 
 An Update is not a replay of the log. Glass waits until the target is idle and sends one Update
 carrying what is still true then, so checks that failed and passed again while a Turn ran wake
