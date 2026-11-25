@@ -16,7 +16,7 @@ import {
   subscribe,
   subscribedThread,
 } from "../test/pullRequestUpdates"
-import { holding, settled, threadsFixture } from "../test/threadsFixture"
+import { glassCall, holding, settled, threadsFixture } from "../test/threadsFixture"
 import { pullRequestFor } from "../test/threadWithPullRequest"
 
 it.live(
@@ -56,6 +56,31 @@ it.live("lets the Thread try again once the user sends it a message", () =>
       [
         ["Pin the linter instead", undefined],
         ["", ["https://ci.test/lint/4"]],
+      ],
+    )
+  }),
+)
+
+it.live("stays given up when another Thread's agent sends the Thread a message", () =>
+  Effect.gen(function* () {
+    const f = yield* subscribedThread()
+    yield* failThreeTimes(f)
+
+    yield* f.start(
+      glassCall("send_thread_message", { threadId: f.thread.id, message: "Try again" }),
+    )
+    yield* f.transcript(f.thread.id, settled(6))
+    fail(f.pullRequest, failed("lint", 4))
+    yield* f.client.ListPullRequests()
+    f.pullRequest.mergeable = "CONFLICTING"
+    yield* f.client.ListPullRequests()
+    const turns = yield* f.transcript(f.thread.id, settled(7))
+
+    assert.deepStrictEqual(
+      turns.slice(5).map((turn) => [turn.message, reasonsTold(turn)]),
+      [
+        ["Try again", undefined],
+        ["", [["greeter#7", "MergeConflict"]]],
       ],
     )
   }),

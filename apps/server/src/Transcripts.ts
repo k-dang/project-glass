@@ -1067,11 +1067,11 @@ export class Transcripts extends Context.Service<
           ),
         lastMessageTurn: (threadId) =>
           withStorageFailure(
-            "read the last Turn a message reached",
+            "read the last Turn a message of the user's reached",
             sql`
               SELECT t.id FROM thread_turn t
               WHERE t.thread_id = ${threadId} AND (
-                t.started_by IN ('user', 'creator', 'agent')
+                t.started_by = 'user'
                 OR EXISTS (
                   SELECT 1 FROM thread_turn_part p
                   WHERE p.turn_id = t.id AND json_extract(p.part, '$._tag') = 'Steer'
