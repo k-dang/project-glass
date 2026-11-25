@@ -82,7 +82,6 @@ Hotspots are the places the reviewer should read most closely, most important fi
 Give each other point the reviewer should consider a \`##\` heading in the Markdown with a short title, then explain what is wrong, why it matters, and what would fix it, and say whether it is blocking, should fix, or a nit. Do not repeat a hotspot in the Markdown. Name files and lines in backticks, as paths relative to the checkout root. Prefer fewer, well-supported points over many weak ones, and collect minor ones in a final list.
 List in \`lowAttention\` the changed files that need little attention, such as generated code, wiring, renames, version bumps, and docs that only describe the change, each with its \`path\` and a short \`reason\`. Leave out every file a hotspot is about.
 Do not repeat points the published comments already raise unless you add something new.
-Never suggest a Review decision: do not say whether to approve, request changes, or merge.
 Use no em-dashes or emoji.
 Return only the JSON answer matching the supplied schema, without a code fence or surrounding prose.`
 
