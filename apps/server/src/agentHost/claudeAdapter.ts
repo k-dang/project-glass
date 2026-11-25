@@ -123,7 +123,6 @@ const toolResult = ({ accepted, text }: ToolReply) =>
 const reviewTools = claudeTools.shell
 
 const reviewOptions = (brief: ReviewBrief): Options => ({
-  // WARNING: A review Thread resumes its Agent review's session, and Claude Code keeps that run's system prompt, so these must be the instructions the review ran with.
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
   tools: [...reviewTools],
   settingSources: [],

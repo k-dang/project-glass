@@ -83,7 +83,6 @@ const stored = Schema.Array(
 const ReviewSession = Schema.Struct({
   id: Schema.String,
   runner: AgentRunnerIdentity,
-  instructions: Schema.String,
 })
 
 type ReviewSession = typeof ReviewSession.Type
@@ -262,8 +261,8 @@ export class AgentReviews extends Context.Service<
           yield* removeThread(replaced).pipe(Effect.forkIn(scope))
         })
 
-      const reviewPrompt = settings.read().pipe(
-        Effect.map((saved) => saved.reviewPrompt),
+      const reviewInstructions = settings.read().pipe(
+        Effect.map((saved) => agentReviewInstructions(saved.reviewPrompt)),
         Effect.mapError((error) => failure("not-ready", error.message)),
       )
 
@@ -277,11 +276,8 @@ export class AgentReviews extends Context.Service<
             .select("agentReviews")
             .pipe(Effect.mapError(fromCheckoutRunFailure))
 
-          const session: ReviewSession = {
-            id: randomUUID(),
-            runner: runner.identity,
-            instructions: agentReviewInstructions(yield* reviewPrompt),
-          }
+          const session: ReviewSession = { id: randomUUID(), runner: runner.identity }
+          const instructions = yield* reviewInstructions
 
           const { input, answer } = yield* runner
             .run({
@@ -294,7 +290,7 @@ export class AgentReviews extends Context.Service<
               session: { id: session.id, folder: reviewFolder(session.id) },
               task: (material) =>
                 Effect.succeed({
-                  instructions: session.instructions,
+                  instructions,
                   prompt: agentReviewPrompt(material, revision),
                   answer: AgentReviewAnswer,
                   tools: "shell",
@@ -334,6 +330,7 @@ export class AgentReviews extends Context.Service<
       ) =>
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
+            const instructions = yield* reviewInstructions
             const folder = reviewFolder(session.id)
 
             const removeFolder = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
@@ -365,7 +362,7 @@ export class AgentReviews extends Context.Service<
                 model: threadModelOf(session.runner),
                 checkout: folder,
                 review: {
-                  instructions: session.instructions,
+                  instructions,
                   diffLines: {
                     old: diffLinesOn(input.files, "old"),
                     new: diffLinesOn(input.files, "new"),

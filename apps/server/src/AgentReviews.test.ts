@@ -460,7 +460,6 @@ it.live(
       const f = yield* fixture()
       yield* f.start
       const { review } = yield* f.state(reviewed)
-      yield* f.client.SetReviewPrompt({ prompt: "Review only the tests." })
 
       yield* followUp(f, "show the review")
       const started = yield* f.state(withThread)

@@ -15,10 +15,9 @@ no saved session, such as one written before reviews saved theirs, takes no Foll
 reviewed again, rather than a fresh agent that never saw it. Both harnesses keep a session by its
 folder, which is why the path is fixed. The review and its Follow-ups share one system prompt,
 which covers writing the review and answering about it, so following up reads as one conversation
-rather than an agent handed a new role. Glass saves that prompt with the session: Claude Code keeps a
-resumed session's first system prompt, and pi takes it again on resume. Every
-review's run saves its session whether or not anyone follows up; the sessions are small, so Glass
-leaves them to the harnesses, where Claude Code prunes old ones and pi keeps them.
+rather than an agent handed a new role. Every review's run saves its session whether or not anyone
+follows up; the sessions are small, so Glass leaves them to the harnesses, where Claude Code prunes
+old ones and pi keeps them.
 
 The Thread's agent works in a checkout of the review's Revision from Glass's cached clone,
 with a shell like the review's own (ADR 0006), not a Local checkout worktree (ADR 0008), since it
