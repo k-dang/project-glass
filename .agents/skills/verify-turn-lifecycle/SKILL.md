@@ -33,7 +33,7 @@ Synced with the code at commit `608fb56fc287c6b29036581dc8021cb449628b40`. Befor
 | Model | Code |
 | --- | --- |
 | `YouSend`, `YouSendQueued`, `GlobalChatStartsUpdate`, the queue start in `EndWith` | `stepThread` in `apps/server/src/threadState.ts`; `execute` in `apps/server/src/Transcripts.ts`; `startIfIdle` with `retriesDelivery` in `apps/server/src/StartedWorkUpdates.ts` |
-| `Accepts`, `EndWith`, `GlassSavesJournal` | `writeApplied` (`TurnEnded`, `PartSet`, `PartAppended` and `writableTurns`) and `save` in `apps/server/src/Transcripts.ts` |
+| `Accepts`, `EndWith`, `GlassSavesJournal` | `writeApplied` (`TurnEnded`, `PartSet`, `PartAppended` and `writableTurn`) and `save` in `apps/server/src/Transcripts.ts` |
 | `HostTakesTurn`, `HostRefusesTurn`, `DeliveryTimesOut` | `deliver`, `dispatch`, `settleUndelivered` in `apps/server/src/ThreadTurns.ts`; `settleUndelivered` in `Transcripts.ts`; `begin` in `apps/server/src/agentHost/turnLoop.ts` |
 | `YouStop` | `stop` and `stopHost` in `ThreadTurns.ts`; `askedToStop` in `Transcripts.ts` (sets `retries_delivery = 0`); `stop` in `turnLoop.ts` |
 | `CutOffRunning`, `GlassLosesHost`, `AgentHostReplaced` | `endUnfinished` in `Transcripts.ts`; `serve` (the `lost` stream) in `ThreadTurns.ts`; `placeLostTurn` in `apps/server/src/Sandboxes.ts`; `stop` in `apps/server/src/LocalAgentHost.ts` |

@@ -465,9 +465,12 @@ export class Transcripts extends Context.Service<
           return Option.some(next)
         })
 
-      const writableTurns = (threadId: string) => sql`
-        SELECT id FROM thread_turn
-        WHERE thread_id = ${threadId} AND json_extract(ended, '$.ending._tag') IS NOT 'Failed'
+      const writableTurn = (threadId: string, turnId: string) => sql`
+        EXISTS (
+          SELECT 1 FROM thread_turn
+          WHERE id = ${turnId} AND thread_id = ${threadId}
+            AND json_extract(ended, '$.ending._tag') IS NOT 'Failed'
+        )
       `
 
       const wrote = Effect.map((rows: ReadonlyArray<unknown>) => rows.length > 0)
@@ -496,7 +499,7 @@ export class Transcripts extends Context.Service<
               sql`
                 INSERT INTO thread_turn_part (turn_id, position, part)
                 SELECT ${turnId}, ${index}, ${encodePart(part)}
-                WHERE ${turnId} IN (${writableTurns(threadId)})
+                WHERE ${writableTurn(threadId, turnId)}
                 ON CONFLICT (turn_id, position) DO UPDATE SET part = excluded.part
                 RETURNING turn_id
               `.pipe(wrote),
@@ -505,7 +508,7 @@ export class Transcripts extends Context.Service<
                 UPDATE thread_turn_part
                 SET part = json_set(part, '$.text', json_extract(part, '$.text') || ${text})
                 WHERE turn_id = ${turnId} AND position = ${index}
-                  AND turn_id IN (${writableTurns(threadId)})
+                  AND ${writableTurn(threadId, turnId)}
                 RETURNING turn_id
               `.pipe(wrote),
             ToolCallStatusSet: ({ toolCallId, status }) =>
@@ -513,7 +516,11 @@ export class Transcripts extends Context.Service<
                 UPDATE thread_turn_part SET part = json_set(part, '$.status', ${status})
                 WHERE json_extract(part, '$._tag') = 'ToolCall'
                   AND json_extract(part, '$.toolCallId') = ${toolCallId}
-                  AND turn_id IN (${writableTurns(threadId)})
+                  AND turn_id IN (
+                    SELECT id FROM thread_turn
+                    WHERE thread_id = ${threadId}
+                      AND json_extract(ended, '$.ending._tag') IS NOT 'Failed'
+                  )
                 RETURNING turn_id
               `.pipe(wrote),
             TurnEnded: ({ turnId, ended }) => {
