@@ -143,6 +143,10 @@ export const RepositoryRole = Schema.Union([WorkRole, ReviewRole])
 
 export type RepositoryRole = typeof RepositoryRole.Type
 
+export const RepositoryRoleKind = Schema.Literals(["Work", "Review"])
+
+export type RepositoryRoleKind = typeof RepositoryRoleKind.Type
+
 export type ThreadRole = RepositoryRole | typeof GlobalRole.Type
 
 export const StartOutcome = Schema.Literals(["started", "alreadyRunning"])
@@ -192,7 +196,12 @@ export class AgentHostRpcs extends RpcGroup.make(
     error: HostThreadError,
   }),
   Rpc.make("ListCommands", {
-    payload: { harness: AgentHarness, folder: HostFolder, skills: Schema.Array(SkillSource) },
+    payload: {
+      harness: AgentHarness,
+      folder: HostFolder,
+      role: RepositoryRoleKind,
+      skills: Schema.Array(SkillSource),
+    },
     success: Schema.Array(AgentCommand),
     error: HostThreadError,
   }),

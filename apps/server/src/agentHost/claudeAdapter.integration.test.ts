@@ -14,6 +14,7 @@ import {
   TurnStopped,
 } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
+import { existsSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import {
   claudeSession,
@@ -25,10 +26,18 @@ import {
   writeGreeter,
   writeGreetSkill,
 } from "../../test/adapterSessions"
+import { recordingSessions } from "../../test/sessionTape"
 import { settled } from "../../test/threadsFixture"
 import { ReviewRole } from "./protocol"
 
 const threadId = "6f2c1b9e-3a4d-4e8f-9b7a-1c2d3e4f5a6b"
+
+const toucher = (marker: string) => {
+  const script = `${marker}.cjs`
+  writeFileSync(script, `require("node:fs").writeFileSync(${JSON.stringify(marker)}, "")\n`)
+
+  return script.replaceAll("\\", "/")
+}
 
 const lastText = (turn: Turn | undefined) =>
   turn?.parts.findLast((part) => Predicate.isTagged(part, "Text"))
@@ -76,7 +85,7 @@ it.live("lists a sent Skill pack's skills as `/pack:skill`", () =>
   Effect.gen(function* () {
     const f = yield* claudeSession("claude-skill-pack")
 
-    const commands = yield* f.adapter.commands(f.folder, yield* writeGreetPack(f.folder))
+    const commands = yield* f.adapter.commands(f.folder, "Work", yield* writeGreetPack(f.folder))
 
     assert.deepStrictEqual(
       commands.find(({ name }) => name === "team:greet"),
@@ -142,13 +151,55 @@ it.live("lists the folder's skills among what Claude Code runs as `/name`", () =
     const f = yield* claudeSession("claude-commands")
     yield* writeGreetSkill(join(f.folder, ".claude", "skills"))
 
-    const commands = yield* f.adapter.commands(f.folder, [])
+    const commands = yield* f.adapter.commands(f.folder, "Work", [])
 
     assert.deepStrictEqual(
       commands.find(({ name }) => name === "greet"),
       { name: "greet", description: "Greets the user by name. (user)" },
     )
   }).pipe(Effect.scoped),
+)
+
+it.live(
+  "lists only Glass's skills for a Review, without loading the folder's settings, hooks, or MCP servers",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* claudeSession("claude-review-commands")
+      const hookMarker = join(f.folder, "hook-ran")
+      const mcpMarker = join(f.folder, "mcp-ran")
+      yield* writeGreetSkill(join(f.folder, ".claude", "skills"))
+      writeFileSync(
+        join(f.folder, ".claude", "settings.json"),
+        JSON.stringify({
+          enableAllProjectMcpServers: true,
+          hooks: {
+            SessionStart: [
+              { hooks: [{ type: "command", command: `node "${toucher(hookMarker)}"` }] },
+            ],
+          },
+        }),
+      )
+      writeFileSync(
+        join(f.folder, ".mcp.json"),
+        JSON.stringify({ mcpServers: { marker: { command: "node", args: [toucher(mcpMarker)] } } }),
+      )
+
+      const review = yield* f.adapter.commands(f.folder, "Review", yield* writeGreetPack(f.folder))
+      assert.deepStrictEqual([existsSync(hookMarker), existsSync(mcpMarker)], [false, false])
+      const work = yield* f.adapter.commands(f.folder, "Work", [])
+
+      assert.deepStrictEqual(
+        [review, work].map((commands) =>
+          ["team:greet", "greet"].filter((name) =>
+            commands.some((command) => command.name === name),
+          ),
+        ),
+        [["team:greet"], ["greet"]],
+      )
+
+      if (recordingSessions)
+        assert.deepStrictEqual([existsSync(hookMarker), existsSync(mcpMarker)], [true, true])
+    }).pipe(Effect.scoped),
 )
 
 it.live("starts on the chosen model and effort, and changes the effort for the next Turn", () =>

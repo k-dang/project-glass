@@ -143,7 +143,9 @@ export class LocalPlacement extends Context.Service<
           const { path } = yield* checkouts.get(repository)
 
           return yield* host.client.pipe(
-            Effect.flatMap((client) => client.ListCommands({ harness, folder: path, skills: [] })),
+            Effect.flatMap((client) =>
+              client.ListCommands({ harness, folder: path, role: "Work", skills: [] }),
+            ),
             Effect.mapError(asThreadError),
           )
         }),

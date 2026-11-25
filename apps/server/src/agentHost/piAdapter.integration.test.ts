@@ -374,7 +374,7 @@ it.live("lists the user's skills among what pi runs as `/name`, named as pi take
     const f = yield* piSession("pi-commands")
     yield* writeGreetSkill(join(f.home, ".pi", "agent", "skills"))
 
-    const commands = yield* f.adapter.commands(f.folder, [])
+    const commands = yield* f.adapter.commands(f.folder, "Work", [])
 
     assert.deepStrictEqual(
       commands.find(({ name }) => name === "skill:greet"),
@@ -387,9 +387,9 @@ it.live("lists a sent Skill pack's skills, keeping the user's own skill of the s
   Effect.gen(function* () {
     const f = yield* piSession("pi-skill-pack")
 
-    const sentOnly = yield* f.adapter.commands(f.folder, yield* writeGreetPack(f.folder))
+    const sentOnly = yield* f.adapter.commands(f.folder, "Work", yield* writeGreetPack(f.folder))
     yield* writeGreetSkill(join(f.home, ".pi", "agent", "skills"))
-    const clashing = yield* f.adapter.commands(f.folder, yield* writeGreetPack(f.folder))
+    const clashing = yield* f.adapter.commands(f.folder, "Work", yield* writeGreetPack(f.folder))
 
     assert.deepStrictEqual(
       [sentOnly, clashing].map((commands) => commands.find(({ name }) => name === "skill:greet")),
@@ -399,6 +399,54 @@ it.live("lists a sent Skill pack's skills, keeping the user's own skill of the s
       ],
     )
   }).pipe(Effect.scoped),
+)
+
+it.live(
+  "lists none of a trusted folder's own skills for a Review, without running or changing anything in it",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* piSession("pi-review-commands", {
+        piSettings: { retry: { enabled: false }, defaultProjectTrust: "always" },
+      })
+
+      const marker = join(f.home, "extension-ran")
+      mkdirSync(join(f.folder, ".git"))
+      yield* writeGreetSkill(join(f.folder, ".pi", "skills"))
+      mkdirSync(join(f.folder, ".pi", "extensions"))
+      writeFileSync(
+        join(f.folder, ".pi", "extensions", "marker.js"),
+        `import { writeFileSync } from "node:fs"
+writeFileSync(${JSON.stringify(marker)}, "")
+export default () => {}
+`,
+      )
+
+      const sessions = join(f.home, "checkout-sessions")
+      writeFileSync(
+        join(f.folder, ".pi", "settings.json"),
+        JSON.stringify({ sessionDir: sessions }),
+      )
+      const promptCommands = join(f.folder, ".pi", "commands")
+      mkdirSync(promptCommands)
+
+      const review = yield* f.adapter.commands(f.folder, "Review", [])
+      assert.deepStrictEqual(
+        [existsSync(marker), existsSync(sessions), existsSync(promptCommands)],
+        [false, false, true],
+      )
+      const work = yield* f.adapter.commands(f.folder, "Work", [])
+
+      assert.deepStrictEqual(
+        [review, work].map((commands) => commands.some(({ name }) => name === "skill:greet")),
+        [false, true],
+      )
+
+      if (recordingSessions)
+        assert.deepStrictEqual(
+          [existsSync(marker), existsSync(sessions), existsSync(promptCommands)],
+          [true, true, false],
+        )
+    }).pipe(Effect.scoped),
 )
 
 it.live(

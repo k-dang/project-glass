@@ -57,6 +57,7 @@ import { Input, isFailure, machine } from "./claudeTurn"
 import { agentImages, type DeliveredMessage, type DeliveredTurn } from "./deliveredMessage"
 import {
   type RepositoryRole,
+  type RepositoryRoleKind,
   couldNotSwitch,
   type GlassToolsAccess,
   HostThreadError,
@@ -122,11 +123,14 @@ const toolResult = ({ accepted, text }: ToolReply) =>
 
 const reviewTools = claudeTools.shell
 
+const loadsNothing: Options = { settingSources: [], strictMcpConfig: true }
+
+const listingOptions: Record<RepositoryRoleKind, Options> = { Work: {}, Review: loadsNothing }
+
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
   tools: [...reviewTools],
-  settingSources: [],
-  strictMcpConfig: true,
+  ...loadsNothing,
   mcpServers: {
     [GLASS_MCP_SERVER]: createSdkMcpServer({
       name: GLASS_MCP_SERVER,
@@ -432,8 +436,8 @@ export const claudeAdapter = (
     })
   }).pipe(Effect.scoped),
 
-  commands: (folder, skills) =>
-    handshake(sdk, command, folder, pluginOptions(skills)).pipe(
+  commands: (folder, role, skills) =>
+    handshake(sdk, command, folder, { ...listingOptions[role], ...pluginOptions(skills) }).pipe(
       Effect.map(({ commands }) =>
         commands.map(({ name, description }): AgentCommand => ({ name, description })),
       ),

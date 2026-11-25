@@ -852,11 +852,12 @@ export class Threads extends Context.Service<
 
       const onHost = Effect.fnUntraced(function* <A, E>(
         threadId: string,
+        hosting: (row: PlacedThread) => ThreadHosting,
         call: (host: HostClient, row: PlacedThread) => Effect.Effect<A, HostCallError>,
         absent: Effect.Effect<A, E>,
       ) {
         const row = yield* find(threadId)
-        const host = yield* hostingOf(row).hostIfPrepared(row)
+        const host = yield* hosting(row).hostIfPrepared(row)
 
         if (Option.isNone(host)) return yield* absent
 
@@ -865,34 +866,44 @@ export class Threads extends Context.Service<
 
       const listedByHost = <A>(
         threadId: string,
+        hosting: (row: PlacedThread) => ThreadHosting,
         list: (
           host: HostClient,
           row: PlacedThread,
         ) => Effect.Effect<ReadonlyArray<A>, HostCallError>,
-      ) => onHost(threadId, list, Effect.succeed<ReadonlyArray<A>>([]))
+      ) => onHost(threadId, hosting, list, Effect.succeed<ReadonlyArray<A>>([]))
 
       const commands = (threadId: string) =>
-        listedByHost(threadId, (host, row) =>
-          skillsOf(row.thread).pipe(
-            Effect.flatMap((skills) =>
-              host.ListCommands({ harness: row.thread.harness, folder: row.folder, skills }),
+        listedByHost(
+          threadId,
+          ({ thread }) => placementFor(thread.place),
+          (host, row) =>
+            skillsOf(row.thread).pipe(
+              Effect.flatMap((skills) =>
+                host.ListCommands({
+                  harness: row.thread.harness,
+                  folder: row.folder,
+                  role: row.forReview ? "Review" : "Work",
+                  skills,
+                }),
+              ),
             ),
-          ),
         ).pipe(Effect.withSpan("Threads.commands"))
 
       const files = (threadId: string) =>
-        listedByHost(threadId, (host, row) => host.ListFiles({ folder: row.folder })).pipe(
-          Effect.withSpan("Threads.files"),
-        )
+        listedByHost(threadId, hostingOf, (host, row) =>
+          host.ListFiles({ folder: row.folder }),
+        ).pipe(Effect.withSpan("Threads.files"))
 
       const existingFiles = (threadId: string, paths: ReadonlyArray<string>) =>
-        listedByHost(threadId, (host, row) =>
+        listedByHost(threadId, hostingOf, (host, row) =>
           host.ExistingFiles({ folder: row.folder, paths }),
         ).pipe(Effect.withSpan("Threads.existingFiles"))
 
       const file = (threadId: string, path: string) =>
         onHost(
           threadId,
+          hostingOf,
           (host, row) => host.ReadFile({ folder: row.folder, path }),
           new ThreadError({
             message: "This Thread's folder isn't ready yet. Try again once it's up.",

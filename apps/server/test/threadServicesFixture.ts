@@ -197,7 +197,9 @@ export const threadServicesFixture = Effect.gen(function* () {
         harnesses: AgentHarness.literals,
         models: () => models,
         commands: (harness) =>
-          client.ListCommands({ harness, folder: "checkout", skills: [] }).pipe(Effect.orDie),
+          client
+            .ListCommands({ harness, folder: "checkout", role: "Work", skills: [] })
+            .pipe(Effect.orDie),
         defaultBranch: () => Effect.succeed(null),
         branches: () => Effect.succeed([]),
         files: () => Effect.succeed([]),

@@ -3,6 +3,7 @@ import type { Effect, Scope } from "effect"
 import type { DeliveredMessage, DeliveredTurn } from "./deliveredMessage"
 import type {
   ThreadRole,
+  RepositoryRoleKind,
   GlassToolsAccess,
   HostThreadError,
   HostEvent,
@@ -33,6 +34,7 @@ export interface HarnessAdapter<Role extends ThreadRole = ThreadRole> {
   readonly models: Effect.Effect<AgentModels, HostThreadError>
   readonly commands: (
     folder: string,
+    role: RepositoryRoleKind,
     skills: ReadonlyArray<WrittenSkills>,
   ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostThreadError>
   readonly start: (options: {

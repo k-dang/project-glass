@@ -17,7 +17,8 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
     return AgentHostRpcs.of({
       Hello: () => Effect.succeed({ host: journal.host, protocol: HOST_PROTOCOL }),
       ListModels: ({ harness }) => threads.models(harness),
-      ListCommands: ({ harness, folder, skills }) => threads.commands(harness, folder, skills),
+      ListCommands: ({ harness, folder, role, skills }) =>
+        threads.commands(harness, folder, role, skills),
       StartThread: (start) => threads.start(start),
       StartTurn: ({ threadId, turnId, model, effort, permissionMode, ...message }) =>
         threads.startTurn(threadId, turnId, message, { model, effort, permissionMode }),

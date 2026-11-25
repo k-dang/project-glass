@@ -83,7 +83,12 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
         models: [{ id: "scripted", name: "Scripted", efforts: [] }],
       }),
     ),
-    commands: (_folder, skills) => Effect.succeed(skillCommands(skills)),
+    commands: (folder, role, skills) =>
+      Effect.sync(() => {
+        writeFileSync(join(gates, `listed-${role}`), folder)
+
+        return skillCommands(skills)
+      }),
     start: ({ folder, thread, role, glassTools, skills, report }) =>
       Effect.gen(function* () {
         const review = Predicate.isTagged(role, "Review") ? role.brief : null

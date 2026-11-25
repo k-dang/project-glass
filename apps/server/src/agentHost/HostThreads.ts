@@ -27,6 +27,7 @@ import { Journal } from "./Journal"
 import { writeSentSkills } from "./sentSkills"
 import {
   type RepositoryRole,
+  type RepositoryRoleKind,
   type ThreadStart,
   type StartOutcome,
   HostThreadError,
@@ -68,6 +69,7 @@ export class HostThreads extends Context.Service<
     readonly commands: (
       harness: AgentHarness,
       folder: string,
+      role: RepositoryRoleKind,
       skills: ReadonlyArray<SkillSource>,
     ) => Effect.Effect<ReadonlyArray<AgentCommand>, HostThreadError>
     readonly start: (start: ThreadStart) => Effect.Effect<StartOutcome, HostThreadError>
@@ -272,9 +274,9 @@ export class HostThreads extends Context.Service<
 
         const threads = HostThreads.of({
           models: (harness) => adapters[harness].models,
-          commands: (harness, folder, skills) =>
+          commands: (harness, folder, role, skills) =>
             written(folder, skills).pipe(
-              Effect.flatMap((paths) => adapters[harness].commands(folder, paths)),
+              Effect.flatMap((paths) => adapters[harness].commands(folder, role, paths)),
               Effect.scoped,
             ),
           start,

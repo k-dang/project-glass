@@ -57,6 +57,7 @@ import { globalInstructions, PI_QUESTION_TOOL, piQuestionExtension } from "./glo
 import { PI_GLASS_TOOLS, piGlassToolsExtension } from "./piGlassTools"
 import { workInstructions } from "./workRole"
 import {
+  type RepositoryRoleKind,
   type ThreadRole,
   couldNotSwitch,
   type GlassToolsAccess,
@@ -210,6 +211,17 @@ const lockedDownFlags = (
 const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
   skills.flatMap((plugin) => plugin.skills.flatMap((skill) => ["--skill", skill]))
 
+const listing: Record<
+  RepositoryRoleKind,
+  (
+    folder: string,
+    skills: ReadonlyArray<WrittenSkills>,
+  ) => { readonly folder: string; readonly flags: ReadonlyArray<string> }
+> = {
+  Work: (folder, skills) => ({ folder, flags: skillFlags(skills) }),
+  Review: () => ({ folder: homedir(), flags: piLoadsNothing }),
+}
+
 const roleFlags = (
   folder: string,
   role: ThreadRole,
@@ -296,9 +308,10 @@ export const piAdapter = (command: string) =>
         })
       }).pipe(Effect.scoped),
 
-      commands: (folder: string, skills: ReadonlyArray<WrittenSkills>) =>
+      commands: (folder: string, role: RepositoryRoleKind, skills: ReadonlyArray<WrittenSkills>) =>
         Effect.gen(function* () {
-          const rpc = yield* startPi(folder, undefined, skillFlags(skills))
+          const listed = listing[role](folder, skills)
+          const rpc = yield* startPi(listed.folder, undefined, listed.flags)
 
           const { commands } = yield* rpc.request({ type: "get_commands" }, AvailableCommands).pipe(
             Effect.tapError((error) => Effect.logWarning("pi didn't list its commands", error)),

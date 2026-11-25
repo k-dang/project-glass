@@ -4,6 +4,7 @@ import { join } from "node:path"
 export interface PiSettings {
   readonly defaultModel?: string
   readonly enabledModels?: ReadonlyArray<string>
+  readonly defaultProjectTrust?: "always" | "ask" | "never"
   readonly retry?: {
     readonly enabled: boolean
     readonly maxRetries?: number
