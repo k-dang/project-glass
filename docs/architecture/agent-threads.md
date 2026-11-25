@@ -14,6 +14,9 @@ provider's `create` the bundle's path, port 7310, and an environment carrying `G
 copies the bundle into the Sandbox and starts it (ADR 0011). From then on, local and Sandbox Threads differ only in where their
 host runs (ADR 0007).
 
+The backend and the host each take the `GLASS_` variables they start with out of their environment before
+they run, so nothing either one starts, an agent included, inherits their tokens.
+
 ## When a host is gone or outdated
 
 A local host rereads its record every `RECORD_CHECK_INTERVAL` and stops if the record is gone or
