@@ -61,7 +61,13 @@ import { BrowserControl, BrowserPageAnswer, BrowserPageRequest } from "./browser
 import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { MergeAction, MergePullRequestError } from "./merge"
-import { InboxItems, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./inbox"
+import {
+  InboxItems,
+  OutsideQuestionAnswer,
+  OutsideQuestionNotWaiting,
+  TurnSeen,
+  UnseenTurn,
+} from "./inbox"
 import {
   OutsideAgent,
   OutsideAgentDecision,
@@ -399,6 +405,7 @@ export class GlassRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("WatchWorkingThreads", { success: Schema.Array(Schema.String), stream: true }),
+  Rpc.make("WatchUnseenTurns", { success: Schema.Array(UnseenTurn), stream: true }),
   Rpc.make("WatchBrowserPageRequests", {
     success: Schema.Array(BrowserPageRequest),
     stream: true,

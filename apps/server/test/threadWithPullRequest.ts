@@ -1,4 +1,5 @@
 import { Effect, Stream } from "effect"
+import type { FakePullRequestSeed } from "./fakePullRequest"
 import { gitIn } from "./gitRepositories"
 import { holding, settled, threadsFixture } from "./threadsFixture"
 
@@ -17,6 +18,7 @@ export const pullRequestFor = Effect.fnUntraced(function* (
   f: Fixture,
   number: number,
   harness?: Parameters<Fixture["start"]>[1],
+  seed: Partial<FakePullRequestSeed> = {},
 ) {
   const gate = `open-${number}`
   const headBranch = `feature/own-${number}`
@@ -24,7 +26,11 @@ export const pullRequestFor = Effect.fnUntraced(function* (
   yield* f.transcript(thread.id, holding)
   gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", headBranch)
 
-  const pullRequest = f.github.seedPullRequest(greeterPullRequest(number, headBranch))
+  const pullRequest = f.github.seedPullRequest({
+    ...greeterPullRequest(number, headBranch),
+    ...seed,
+  })
+
   yield* f.release(gate)
   yield* f.transcript(thread.id, settled(1))
 

@@ -265,6 +265,20 @@ it("marks a Thread in the Threads panel as working while its Turn runs", async (
   ).toBeTruthy()
 })
 
+it("marks a Thread in the Threads panel whose PR update finished unseen", async () => {
+  mount(
+    {
+      WatchUnseenTurns: () =>
+        Stream.make([{ threadId: thread.id, ended: { at: sentAt, ending: TurnDone.make({}) } }]),
+    },
+    "/threads",
+  )
+
+  expect(
+    await screen.findByRole("link", { name: thread.name, description: /Finished/ }),
+  ).toBeTruthy()
+})
+
 it("lists Settled Threads apart from the ones still going, in a section that starts collapsed", async () => {
   const broughtBack: Array<string> = []
 

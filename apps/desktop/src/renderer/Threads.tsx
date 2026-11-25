@@ -10,6 +10,7 @@ import {
   type InboxThread,
   isGone,
   isOutOfReach,
+  type TurnEnd,
   type PlaceTag,
   repositoryKey,
   type SandboxStatus,
@@ -58,6 +59,7 @@ import {
   removeSettledThreads,
   settledThreadsAtom,
   settledOpenAtom,
+  unseenTurnsAtom,
   workingThreadsAtom,
 } from "./threadsArea"
 import { AgentHarnessIcon } from "./AgentHarnessIcon"
@@ -81,6 +83,8 @@ import { shortcutLabel } from "./shortcutLabel"
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
 
 const noThreads: ReadonlySet<string> = new Set()
+
+const noUnseenTurns: ReadonlyMap<string, TurnEnd> = new Map()
 
 interface Marker {
   readonly label: string
@@ -479,10 +483,21 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
     () => noThreads,
   ).has(thread.id)
 
-  const showsWorking = inboxThread === undefined && working
+  const unseen = Option.getOrElse(
+    AsyncResult.value(useAtomValue(unseenTurnsAtom)),
+    () => noUnseenTurns,
+  ).get(thread.id)
+
+  const showsWorking = inboxThread === undefined && unseen === undefined && working
 
   const marker =
-    inboxThread !== undefined ? markerOf(inboxThread) : showsWorking ? workingMarker : null
+    inboxThread !== undefined
+      ? markerOf(inboxThread)
+      : unseen !== undefined
+        ? turnEndingLooks[unseen.ending._tag]
+        : showsWorking
+          ? workingMarker
+          : null
 
   const removeNow = () => {
     setConfirming(null)

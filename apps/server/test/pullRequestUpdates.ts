@@ -1,8 +1,10 @@
 import { defaultSubscriptionReasons, type SubscriptionReason, type Turn } from "@glass/contracts"
 import { Effect, Predicate } from "effect"
 import type { FakeCheck, FakePullRequest } from "./fakePullRequest"
-import { glassCall, settled } from "./threadsFixture"
+import { glassCall, settled, type threadsFixture } from "./threadsFixture"
 import { threadWithPullRequest } from "./threadWithPullRequest"
+
+type Fixture = Effect.Success<typeof threadsFixture>
 
 export const subscribe = (
   note: string,
@@ -81,3 +83,23 @@ export const failedRuns = (turn: Turn | undefined) =>
       Predicate.isTagged(reason, "FailingChecks") ? reason.checks.map(({ url }) => url) : [],
     ),
   )
+
+export const rerun = (pullRequest: FakePullRequest) => {
+  pullRequest.checks = "PENDING"
+  pullRequest.checkContexts = [running("lint")]
+}
+
+export const failThreeTimes = Effect.fnUntraced(function* (
+  f: Pick<Fixture, "client" | "transcript"> & {
+    readonly thread: { readonly id: string }
+    readonly pullRequest: FakePullRequest
+  },
+) {
+  for (const run of [1, 2, 3]) {
+    fail(f.pullRequest, failed("lint", run))
+    yield* f.client.ListPullRequests()
+    yield* f.transcript(f.thread.id, settled(2 + run))
+    rerun(f.pullRequest)
+    yield* f.client.ListPullRequests()
+  }
+})

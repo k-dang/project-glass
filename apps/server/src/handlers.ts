@@ -1,5 +1,5 @@
 import { GlassRpcs } from "@glass/contracts"
-import { Effect, Predicate } from "effect"
+import { Effect, Predicate, Stream } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
@@ -207,6 +207,14 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateThread: (input) => threads.create(input),
       WatchWorkingThreads: () => threads.watchWorking(),
+      WatchUnseenTurns: () =>
+        threads
+          .watchFinished()
+          .pipe(
+            Stream.map((finished) =>
+              finished.map(({ thread, ended }) => ({ threadId: thread.id, ended })),
+            ),
+          ),
       WatchBrowserPageRequests: () => browserPages.requests,
       AnswerBrowserPageRequest: ({ id, answer }) => browserPages.answer(id, answer),
       WatchBrowserControl: () => browserPages.control,

@@ -122,7 +122,10 @@ const reasonsOf = (item: InboxItem): ReadonlyArray<Reason> =>
       OutsideQuestion: () => [{ label: "Question", tone: toneClass.warning }],
       CheckIn: () => [{ label: "Check-in", tone: toneClass.warning }],
       OutsideAgentRequest: () => [{ label: "Outside agent", tone: toneClass.warning }],
-      PullRequest: ({ reasons }) => reasons.map(pullRequestReason),
+      PullRequest: ({ reasons, triedBy }) => [
+        ...reasons.map(pullRequestReason),
+        ...(triedBy.length === 0 ? [] : [{ label: "A Thread tried", tone: toneClass.neutral }]),
+      ],
       GlobalChat: ({ requests }) => requests.map(requestReason),
     }),
     (a, b) => a.label === b.label,

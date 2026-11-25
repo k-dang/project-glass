@@ -122,7 +122,13 @@ const decodeWaiting = Schema.decodeUnknownEffect(
 )
 
 const decodeEnds = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ threadId: Schema.String, ended: Schema.fromJsonString(TurnEnd) })),
+  Schema.Array(
+    Schema.Struct({
+      threadId: Schema.String,
+      ended: Schema.fromJsonString(TurnEnd),
+      pullRequestUpdate: Schema.BooleanFromBit,
+    }),
+  ),
 )
 
 export const StoredMessage = Schema.Struct({ ...SentMessage.fields, images: ImagesJson })
@@ -196,7 +202,12 @@ export interface WaitingRequest {
 
 export type WaitingByThread = ReadonlyMap<string, Arr.NonEmptyReadonlyArray<WaitingRequest>>
 
-type UnseenByThread = ReadonlyMap<string, TurnEnd>
+interface UnseenEnd {
+  readonly ended: TurnEnd
+  readonly pullRequestUpdate: boolean
+}
+
+type UnseenByThread = ReadonlyMap<string, UnseenEnd>
 
 export type StartedTurn = typeof TurnStarted.Type & { readonly threadId: string }
 
@@ -419,7 +430,8 @@ export class Transcripts extends Context.Service<
 
       const lastEnds = (conditions: ReadonlyArray<string | Statement.Fragment>) =>
         sql`
-          SELECT a.id AS threadId, t.ended AS ended
+          SELECT a.id AS threadId, t.ended AS ended,
+            json_extract(t.context, '$._tag') IS 'PullRequestUpdate' AS pullRequestUpdate
           FROM (
             SELECT id, turn_seen_at FROM thread
             UNION ALL SELECT id, turn_seen_at FROM global_chat_session WHERE ended_at IS NULL
@@ -440,31 +452,31 @@ export class Transcripts extends Context.Service<
             Effect.catch((cause) =>
               Effect.logWarning("Couldn't read the unseen Turns", cause).pipe(Effect.as([])),
             ),
-          )).map(({ threadId, ended }) => [threadId, ended] as const),
+          )).map(({ threadId, ...end }) => [threadId, end] as const),
         ),
       )
 
-      const setUnseen = (threadId: string, ended: TurnEnd | undefined) =>
+      const setUnseen = (threadId: string, end: UnseenEnd | undefined) =>
         SubscriptionRef.updateSome(unseen, (current) => {
           const before = current.get(threadId)
 
           if (
             before === undefined
-              ? ended === undefined
-              : ended !== undefined && sameEnd(before, ended)
+              ? end === undefined
+              : end !== undefined && sameEnd(before.ended, end.ended)
           )
             return Option.none()
 
           const next = new Map(current)
 
-          if (ended === undefined) next.delete(threadId)
-          else next.set(threadId, ended)
+          if (end === undefined) next.delete(threadId)
+          else next.set(threadId, end)
 
           return Option.some(next)
         })
 
       const refreshUnseen = (threadId: string) =>
-        unseenEnds(threadId).pipe(Effect.flatMap(([row]) => setUnseen(threadId, row?.ended)))
+        unseenEnds(threadId).pipe(Effect.flatMap(([end]) => setUnseen(threadId, end)))
 
       const runningThreads = yield* SubscriptionRef.make<ReadonlySet<string>>(
         new Set(
@@ -1069,22 +1081,16 @@ export class Transcripts extends Context.Service<
           ),
         runningPullRequestUpdates: withStorageFailure(
           "read the running PR updates",
-          Effect.gen(function* () {
-            const threadIds = [...(yield* SubscriptionRef.get(runningThreads))]
-
-            if (threadIds.length === 0) return []
-
-            const running = yield* sql`
-              SELECT thread_id AS threadId, context FROM thread_turn
-              WHERE ${sql.in("thread_id", threadIds)} AND ended IS NULL
-            `.pipe(Effect.flatMap(decodeRunningContexts))
-
-            return running.flatMap(({ threadId, context }) =>
-              Predicate.isTagged(context, "PullRequestUpdate")
-                ? [{ threadId, update: context }]
-                : [],
-            )
-          }),
+          sql`SELECT thread_id AS threadId, context FROM thread_turn WHERE ended IS NULL`.pipe(
+            Effect.flatMap(decodeRunningContexts),
+            Effect.map((running) =>
+              running.flatMap(({ threadId, context }) =>
+                Predicate.isTagged(context, "PullRequestUpdate")
+                  ? [{ threadId, update: context }]
+                  : [],
+              ),
+            ),
+          ),
         ),
         settleUndelivered: Effect.fnUntraced(function* (threadId, turnId, reason) {
           const retried = yield* withStorageFailure(

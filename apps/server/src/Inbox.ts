@@ -21,6 +21,7 @@ import {
   referenceKey,
   inboxGroupOf,
   inboxGroups,
+  type TriedThread,
   TurnFinished,
   WaitingRequests,
 } from "@glass/contracts"
@@ -47,12 +48,15 @@ import {
   PullRequestMirror,
   summaryOf,
 } from "./PullRequestMirror"
+import { type PullRequestStanding, PullRequestUpdates } from "./PullRequestUpdates"
+import { heldBack, type OpenReason } from "./pullRequestUpdateDecision"
 import { Queue } from "./Queue"
 import type { WaitingRequest } from "./Transcripts"
 
 interface WaitingPullRequest {
   readonly pullRequest: PullRequestSummary
   readonly reasons: Arr.NonEmptyReadonlyArray<PullRequestReason>
+  readonly triedBy: ReadonlyArray<TriedThread>
   readonly since: DateTime.Utc
 }
 
@@ -95,6 +99,10 @@ const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
       InboxPullRequest.make({
         pullRequest: group[0].pullRequest,
         reasons: Arr.flatMap(group, ({ reasons }) => reasons),
+        triedBy: Arr.dedupeWith(
+          group.flatMap(({ triedBy }) => triedBy),
+          (a, b) => a.threadId === b.threadId,
+        ),
         since: Arr.min(
           Arr.map(group, ({ since }) => since),
           DateTime.Order,
@@ -116,7 +124,9 @@ const inboxOf = (waiting: Waiting): InboxItems =>
   Arr.sort(
     [
       ...waiting.threads.map(waitingItem),
-      ...waiting.finished.map(finishedItem),
+      ...waiting.finished.flatMap((finished) =>
+        finished.pullRequestUpdate ? [] : [finishedItem(finished)],
+      ),
       ...waiting.questions,
       ...waiting.checkIns,
       ...waiting.outsideAgentRequests,
@@ -126,36 +136,69 @@ const inboxOf = (waiting: Waiting): InboxItems =>
     order,
   )
 
-const reasonsOf = ({
-  attention,
-  checks,
-}: MirroredPullRequest): ReadonlyArray<PullRequestReason> => {
+const reasonsOf = (
+  { attention, checks, subscribed, ref }: MirroredPullRequest,
+  standings: ReadonlyArray<PullRequestStanding>,
+) => {
   const reasons: Array<PullRequestReason> = []
+  const triedBy: Array<TriedThread> = []
+  const held = subscribed === null ? null : heldBack(subscribed)
 
-  if (attention?.changesRequested) reasons.push(ChangesRequested.make({}))
+  const handled = (reason: OpenReason) => {
+    const standing = standings.filter(
+      (candidate) =>
+        candidate.reason === reason && referenceKey(candidate.pullRequest) === referenceKey(ref),
+    )
 
-  if (checks === "failing") {
+    if (standing.some(({ state }) => state === "handling")) return true
+
+    triedBy.push(...standing.map(({ thread }) => ({ threadId: thread.id, name: thread.name })))
+
+    return false
+  }
+
+  const changesRequested = attention?.changesRequested === true
+  const checksFailing = checks === "failing"
+  const awaitingReply = attention?.awaitingReply ?? 0
+
+  if (changesRequested && (!handled("changes-requested") || held?.changesRequested === true))
+    reasons.push(ChangesRequested.make({}))
+
+  if (checksFailing && !handled("failing-checks"))
     reasons.push(ChecksFailing.make({ failing: attention?.failingChecks ?? [] }))
-  }
 
-  if (attention && attention.awaitingReply > 0) {
-    reasons.push(AwaitingReply.make({ reviewThreads: attention.awaitingReply }))
-  }
+  const reviewThreads =
+    awaitingReply > 0 && handled("review-feedback") ? (held?.reviewThreads ?? 0) : awaitingReply
 
-  if (reasons.length === 0 && attention?.approved && attention.mergeClean) {
+  if (reviewThreads > 0) reasons.push(AwaitingReply.make({ reviewThreads }))
+
+  if (
+    !changesRequested &&
+    !checksFailing &&
+    awaitingReply === 0 &&
+    attention?.approved &&
+    attention.mergeClean
+  )
     reasons.push(ReadyToMerge.make({}))
-  }
 
-  return reasons
+  return {
+    reasons,
+    triedBy: Arr.dedupeWith(triedBy, (a, b) => a.threadId === b.threadId),
+  }
 }
 
-const yourPullRequests = (mirror: Mirror | undefined): ReadonlyArray<WaitingPullRequest> =>
+const yourPullRequests = (
+  mirror: Mirror | undefined,
+  standings: ReadonlyArray<PullRequestStanding>,
+): ReadonlyArray<WaitingPullRequest> =>
   (mirror?.repositories ?? []).flatMap(({ pullRequests }) =>
     pullRequests.flatMap((pr) => {
-      const reasons = reasonsOf(pr)
+      if (!pr.viewerIsAuthor) return []
 
-      return pr.viewerIsAuthor && Arr.isReadonlyArrayNonEmpty(reasons)
-        ? [{ pullRequest: summaryOf(pr), reasons, since: pr.updatedAt }]
+      const { reasons, triedBy } = reasonsOf(pr, standings)
+
+      return Arr.isReadonlyArrayNonEmpty(reasons)
+        ? [{ pullRequest: summaryOf(pr), reasons, triedBy, since: pr.updatedAt }]
         : []
     }),
   )
@@ -195,6 +238,7 @@ export class Inbox extends Context.Service<
       const mirror = yield* PullRequestMirror
       const globalChat = yield* GlobalChat
       const oauth = yield* McpOAuth
+      const updates = yield* PullRequestUpdates
 
       const finishedReviewOf = (pullRequest: PullRequestSummary) =>
         agentReviews.watch(pullRequest.ref).pipe(
@@ -211,6 +255,7 @@ export class Inbox extends Context.Service<
                       lead: splitLead(review.markdown).lead,
                     }),
                   ],
+                  triedBy: [],
                   since: review.writtenAt,
                 }
           }),
@@ -246,7 +291,9 @@ export class Inbox extends Context.Service<
 
       const waitingPullRequests = Stream.zipLatest(
         finishedAgentReviews,
-        mirror.changes.pipe(Stream.map(yourPullRequests)),
+        Stream.zipLatest(mirror.changes, updates.standings).pipe(
+          Stream.map(([mirrored, standings]) => yourPullRequests(mirrored, standings)),
+        ),
       ).pipe(Stream.map(([finished, yours]) => [...finished, ...yours]))
 
       return Inbox.of({

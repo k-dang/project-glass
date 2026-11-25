@@ -18,6 +18,7 @@ import {
   type RequestAnswer,
   SandboxPlace,
   type SentMessage,
+  type TurnEnd,
   type Transcript,
   type TranscriptUpdate,
   repositoryKey,
@@ -62,6 +63,17 @@ export const workingThreadsAtom = backendRuntime
   .atom(
     Stream.unwrap(Backend.useSync((backend) => backend.WatchWorkingThreads())).pipe(
       Stream.map((ids): ReadonlySet<string> => new Set(ids)),
+    ),
+  )
+  .pipe(Atom.keepAlive)
+
+export const unseenTurnsAtom = backendRuntime
+  .atom(
+    Stream.unwrap(Backend.useSync((backend) => backend.WatchUnseenTurns())).pipe(
+      Stream.map(
+        (unseen): ReadonlyMap<string, TurnEnd> =>
+          new Map(unseen.map(({ threadId, ended }) => [threadId, ended])),
+      ),
     ),
   )
   .pipe(Atom.keepAlive)

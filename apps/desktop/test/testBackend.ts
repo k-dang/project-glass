@@ -147,6 +147,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         ReadToDoImage: unused,
         WatchThreads: () => Stream.make([]),
         WatchWorkingThreads: () => Stream.make([]),
+        WatchUnseenTurns: () => Stream.make([]),
         WatchBrowserPageRequests: () => Stream.never,
         AnswerBrowserPageRequest: unused,
         WatchBrowserControl: () => Stream.make([]),

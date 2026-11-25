@@ -330,7 +330,7 @@ export class GlobalChat extends Context.Service<
           transcripts.waiting.pipe(Stream.map((waiting) => waiting.get(sessionId) ?? [])),
         ),
         unseen: followSession((sessionId) =>
-          transcripts.unseen.pipe(Stream.map((unseen) => unseen.get(sessionId) ?? null)),
+          transcripts.unseen.pipe(Stream.map((unseen) => unseen.get(sessionId)?.ended ?? null)),
         ).pipe(Stream.changesWith(Schema.toEquivalence(Schema.NullOr(TurnEnd)))),
         markSeen: (endedAt) => inSession((sessionId) => transcripts.markSeen(sessionId, endedAt)),
         whenIdle: (effect) => inSession((sessionId) => turns.whenIdle(sessionId, effect)),

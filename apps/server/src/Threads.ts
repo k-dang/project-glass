@@ -145,6 +145,7 @@ export interface WaitingThread {
 export interface FinishedThread {
   readonly thread: Thread
   readonly ended: TurnEnd
+  readonly pullRequestUpdate: boolean
 }
 
 export class Threads extends Context.Service<
@@ -1099,13 +1100,13 @@ export class Threads extends Context.Service<
           Stream.zipLatest(placed, transcripts.unseen).pipe(
             Stream.map(([current, unseen]) =>
               current.flatMap(({ thread }) => {
-                const ended = unseen.get(thread.id)
+                const end = unseen.get(thread.id)
 
-                return ended === undefined ||
+                return end === undefined ||
                   thread.forReview ||
-                  Predicate.isTagged(ended.ending, "Stopped")
+                  Predicate.isTagged(end.ended.ending, "Stopped")
                   ? []
-                  : [{ thread, ended }]
+                  : [{ thread, ...end }]
               }),
             ),
           ),
