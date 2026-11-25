@@ -1,0 +1,11 @@
+{
+  "SkipIdleCheck": "NeverCutsIn",
+  "RecordToldAfterStart": "ToldOnce",
+  "SendWhatWaited": "TellsWhatIsStillTrue",
+  "IgnoreLimit": "RunsAtMostTheLimit",
+  "CountRunningInMemory": "RunsAtMostTheLimit",
+  "NeverCount": "StopsAtTheLimit",
+  "RerunResetsCount": "StopsAtTheLimit",
+  "RestartForgetsCount": "StopsAtTheLimit",
+  "IgnoreMessages": "MessageLetsItTryAgain"
+}
