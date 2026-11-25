@@ -124,6 +124,8 @@ const reviewTools = claudeTools.shell
 
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
+  // WARNING: A review Thread resumes the session its Agent review saved, and Claude Code otherwise keeps that run's system prompt, dropping these instructions.
+  extraArgs: { "system-prompt-snapshot": "off" },
   tools: [...reviewTools],
   settingSources: [],
   strictMcpConfig: true,

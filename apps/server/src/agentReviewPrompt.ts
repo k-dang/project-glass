@@ -118,7 +118,7 @@ export const pullRequestMaterial = (input: ReviewInput): PullRequestMaterial => 
   files: input.files.map(fileMaterial),
 })
 
-export const agentReviewMaterial = (input: ReviewInput, revision: Revision) => ({
+const agentReviewMaterial = (input: ReviewInput, revision: Revision) => ({
   ...describedPullRequest(input),
   base: revision.base,
   head: revision.head,

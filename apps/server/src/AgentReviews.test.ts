@@ -23,6 +23,7 @@ import { VIEWER } from "../test/fakePullRequest"
 import { watchDeadlines } from "../test/deadlines"
 import { isolatedHome, startBackend } from "../test/harness"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
+import { followUpInstructions } from "./followUpInstructions"
 import { Deadlines } from "./ServerConfig"
 
 const answer = {
@@ -433,6 +434,26 @@ const withThread = (state: AgentReviewState) =>
 const followUp = (f: Effect.Success<ReturnType<typeof fixture>>, message: string) =>
   f.client.FollowUpAgentReview({ pullRequest: f.ref, revision: f.revision, message })
 
+it.live("follows up with the harness that wrote the review, whatever Settings now say", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    yield* f.state(reviewed)
+
+    const engineSettings = yield* f.client.GetEngineSettings({ feature: "agentReviews" })
+    yield* f.client.SetEngineSettings({
+      feature: "agentReviews",
+      engineSettings: { ...engineSettings, harness: "claude-code" },
+    })
+
+    yield* followUp(f, "show the review")
+    const started = yield* f.state(withThread)
+    const listed = Option.getOrThrow(yield* f.client.WatchThreads().pipe(Stream.runHead))
+    assert.strictEqual(listed[0]?.id, started.review?.threadId)
+    assert.strictEqual(listed[0]?.harness, "pi")
+  }),
+)
+
 it.live(
   "starts the review's Thread in a checkout of its Revision, sending it every Follow-up",
   () =>
@@ -446,14 +467,13 @@ it.live(
       const threadId = started.review!.threadId!
       assert.strictEqual(started.review?.markdown, review?.markdown)
 
+      const [run] = f.runners.runs
+      assert.strictEqual(threadId, run?.task.session)
+
       const [first] = yield* transcript(f.client, threadId, ended(1))
       const [instructions, files] = texts(first)
       assert.strictEqual(first?.message, "show the review")
-      assert.include(instructions, defaultReviewPrompt)
-      assert.include(instructions, f.revision.head)
-      assert.notInclude(instructions, "+hello name")
-      assert.include(instructions, "Why a name?")
-      assert.include(instructions, JSON.stringify(answer.markdown))
+      assert.include(instructions, followUpInstructions)
       assert.strictEqual(files, ".git,greet.ts,main.ts,src")
 
       yield* followUp(f, "And the rename?")
@@ -465,6 +485,7 @@ it.live(
       assert.strictEqual(threads.length, 1)
       assert.strictEqual(threads[0]?.id, threadId)
       assert.strictEqual(threads[0]?.forReview, true)
+      assert.strictEqual(threads[0]?.harness, run?.harness)
       assert.deepStrictEqual(yield* f.restart, started)
     }),
 )
