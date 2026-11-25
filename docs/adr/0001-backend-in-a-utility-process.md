@@ -18,6 +18,13 @@ and an origin check: crash isolation from the windows without a full server life
 
 ## Consequences
 
-The windows outlive a backend crash, but `main` now supervises a second process and restarts it on
-the same port and token, and the renderer holds one RPC socket that can die under it, so every call
-runs through a runtime that retries. The backend's output goes to a log file, not the terminal.
+The windows outlive a backend crash, but `main` now supervises a second process and restarts it with
+a new secret, on the same port while that port is free, and the renderer holds one RPC socket that
+can die under it, so every call runs through a runtime that retries and asks `main` for the current
+secret each time it reconnects. The backend's output goes to a log file, not the terminal.
+
+`main` and the backend talk over the `utilityProcess` message channel, which no other process can
+reach. The backend says it is ready over that channel, so `main` never probes the port and a
+process that takes it while the backend is down never sees a secret. `main` stops the backend by
+asking over the same channel, because a signal on Windows ends the process before its shutdown runs,
+and kills it only when it hasn't exited 10 seconds later.
