@@ -61,6 +61,7 @@ import { BranchNames } from "./BranchNames"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
 import { StartedWorkUpdates } from "./StartedWorkUpdates"
+import { Subscriptions } from "./Subscriptions"
 
 const RendererRoutes = Layer.mergeAll(
   RpcServer.layerHttp({ group: GlassRpcs, path: RPC_PATH, protocol: "websocket" }),
@@ -130,7 +131,7 @@ const services = (
 ) =>
   Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge)
     .pipe(
-      Layer.provide(Inbox.layer),
+      Layer.provide(Layer.merge(Inbox.layer, Subscriptions.layer)),
       Layer.provide(SettledThreads.layer.pipe(Layer.provideMerge(ThreadPullRequests.layer))),
       Layer.provide(StartedWork.layer),
       Layer.provide(PullRequestLists.layer),

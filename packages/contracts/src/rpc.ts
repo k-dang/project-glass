@@ -99,6 +99,7 @@ import {
   SkillPackUpdate,
 } from "./skillPack"
 import { StorageError, StorageItem } from "./storage"
+import { Subscription } from "./subscription"
 import { ToDo, ToDoError, ToDoImageSize, ToDoImageUploads, ToDoTitle } from "./toDo"
 import { TourFailure, TourState } from "./tour"
 
@@ -410,6 +411,16 @@ export class GlassRpcs extends RpcGroup.make(
     success: Schema.Array(ThreadPullRequest),
     error: ThreadError,
     stream: true,
+  }),
+  Rpc.make("WatchSubscriptions", {
+    payload: { threadId: Schema.String },
+    success: Schema.Array(Subscription),
+    error: ThreadError,
+    stream: true,
+  }),
+  Rpc.make("EndSubscription", {
+    payload: { threadId: Schema.String, subscriptionId: Schema.String },
+    error: ThreadError,
   }),
   Rpc.make("WatchInbox", { success: InboxItems, stream: true }),
   Rpc.make("MarkTurnSeen", {

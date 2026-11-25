@@ -159,6 +159,10 @@ const decodeMessages = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ message: Schema.String })),
 )
 
+const decodeContexts = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ context: ContextJson })),
+)
+
 const decodePositions = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({ first: Schema.NullOr(Schema.Int), last: Schema.NullOr(Schema.Int) }),
@@ -277,6 +281,7 @@ export class Transcripts extends Context.Service<
       threadIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<StartedTurn>, ThreadError>
     readonly runningMessage: (threadId: string) => Effect.Effect<string | null, ThreadError>
+    readonly runningContext: (threadId: string) => Effect.Effect<TurnContext | null, ThreadError>
     readonly startOrQueue: (
       threadId: string,
       input: MessageWithContext,
@@ -998,6 +1003,14 @@ export class Transcripts extends Context.Service<
             sql`SELECT message FROM thread_turn WHERE thread_id = ${threadId} AND ended IS NULL`.pipe(
               Effect.flatMap(decodeMessages),
               Effect.map(([turn]) => turn?.message ?? null),
+            ),
+          ),
+        runningContext: (threadId) =>
+          withStorageFailure(
+            "read a running Turn",
+            sql`SELECT context FROM thread_turn WHERE thread_id = ${threadId} AND ended IS NULL`.pipe(
+              Effect.flatMap(decodeContexts),
+              Effect.map(([turn]) => turn?.context ?? null),
             ),
           ),
         settleUndelivered: Effect.fnUntraced(function* (threadId, turnId, reason) {

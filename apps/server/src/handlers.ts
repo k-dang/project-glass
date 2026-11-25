@@ -24,6 +24,7 @@ import { engineSettingsOf, SettingsStore, withEngineSettings } from "./SettingsS
 import { Sandboxes } from "./Sandboxes"
 import { SavedPlaces } from "./SavedPlaces"
 import { SettledThreads } from "./SettledThreads"
+import { Subscriptions } from "./Subscriptions"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { Storage } from "./Storage"
@@ -55,6 +56,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const inbox = yield* Inbox
     const threadPullRequests = yield* ThreadPullRequests
     const settledThreads = yield* SettledThreads
+    const subscriptions = yield* Subscriptions
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const outsideAgents = yield* OutsideAgents
@@ -206,6 +208,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       HandBackBrowser: ({ threadId }) => browserPages.handBack(threadId).pipe(Effect.asVoid),
       WatchThreadPullRequests: () => threadPullRequests.watch(),
       WatchSettledThreads: () => settledThreads.watch(),
+      WatchSubscriptions: ({ threadId }) => subscriptions.watch(threadId),
+      EndSubscription: ({ threadId, subscriptionId }) =>
+        subscriptions.end(threadId, subscriptionId).pipe(Effect.asVoid),
       BringBackThread: ({ threadId }) => threads.bringBack(threadId),
       WatchInbox: () => inbox.watch(),
       MarkTurnSeen: ({ threadId, endedAt }) => threads.markTurnSeen(threadId, endedAt),

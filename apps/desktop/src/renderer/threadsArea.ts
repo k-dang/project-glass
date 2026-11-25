@@ -519,3 +519,15 @@ export const groupThreads = (threads: ReadonlyArray<Thread>) =>
 
     return [{ machine, threads: [...byRepository.values()].flat() }]
   })
+
+export const subscriptionsAtom = Atom.family((threadId: string) =>
+  backendRuntime.atom(
+    Stream.unwrap(Backend.useSync((backend) => backend.WatchSubscriptions({ threadId }))),
+  ),
+)
+
+export const endSubscriptionAtom = Atom.family((threadId: string) =>
+  backendRuntime.fn((subscriptionId: string) =>
+    Backend.use((backend) => backend.EndSubscription({ threadId, subscriptionId })),
+  ),
+)

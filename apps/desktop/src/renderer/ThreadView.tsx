@@ -59,6 +59,7 @@ import { ChangesPane } from "./ThreadChanges"
 import { ThreadDetailsAction, ThreadFrame } from "./ThreadFrame"
 import { ThreadName } from "./ThreadName"
 import { PullRequestPanes, useThreadPullRequest } from "./ThreadPullRequest"
+import { ThreadSubscriptions } from "./ThreadSubscriptions"
 import { PullRequestPane } from "./PullRequestPane"
 import { type PaneChoice, PanePicker } from "./PanePicker"
 import { PreloadPullRequest } from "./preloadPullRequest"
@@ -326,6 +327,7 @@ const OpenThread = memo(function OpenThread(props: { thread: Thread }) {
             branch: thread.branch ?? undefined,
             baseBranch: thread.baseBranch,
             pullRequest,
+            subscriptions: <ThreadSubscriptions threadId={thread.id} pullRequest={pullRequest} />,
             skillPacks: thread.skillPacks,
             localSkills: thread.localSkills,
             actions: paneChoices.map(({ id, label, icon: Icon, open }) => (

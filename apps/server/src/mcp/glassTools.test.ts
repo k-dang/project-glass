@@ -229,6 +229,42 @@ describe("Glass tools over MCP", () => {
       }),
   )
 
+  it.live(
+    "offers the Subscription tools to a Thread's host alone, and refuses a caller posing as one",
+    () =>
+      Effect.gen(function* () {
+        const { baseUrl, mcpCredentials, outsideAgents, mcp } = yield* startGlass
+        const outsideAgent = yield* connectMcp(baseUrl, yield* outsideAgents.issue("Claude Code"))
+
+        const posing = yield* connectMcp(
+          baseUrl,
+          yield* mcpCredentials.issue(
+            GlobalChatCaller.make({ globalChatId: "global-chat", sessionId: "posing-session" }),
+          ),
+          "glass-sandbox-agent-host",
+        )
+
+        const offered = ({ request }: typeof mcp) =>
+          request("tools/list", {}).response.pipe(
+            Effect.map((response) =>
+              listedTools(response).flatMap(({ name }) => (name.includes("subscri") ? [name] : [])),
+            ),
+          )
+
+        const result = yield* posing.call("subscribe_to_pull_request", { note: "Keep it green" })
+
+        assert.deepStrictEqual(yield* offered(mcp), [])
+        assert.deepStrictEqual(yield* offered(outsideAgent), [])
+        assert.deepStrictEqual(yield* offered(posing), [
+          "subscribe_to_pull_request",
+          "list_subscriptions",
+          "end_subscription",
+        ])
+        assert.isTrue(result.isError)
+        assert.include(toolText(result), "Only a Thread's agent has Subscriptions.")
+      }),
+  )
+
   it.live("explains a Thread that doesn't exist as a tool failure", () =>
     Effect.gen(function* () {
       const { call } = yield* startGlass

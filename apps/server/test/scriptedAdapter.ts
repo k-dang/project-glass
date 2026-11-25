@@ -55,7 +55,9 @@ const encodeAccess = Schema.encodeSync(AccessJson)
 
 const decodeAccess = Schema.decodeSync(AccessJson)
 
-const scriptedCall = /^call(-ended)?:(\S+)(?: (.+))?$/m
+const scriptedCall = /^call(?<ended>-ended)?:(?<name>\S+)(?: (?<args>.+))?$/m
+
+const scriptedUpdateCall = /^on-update:(?<name>\S+)(?: (?<args>.+))?$/m
 
 const scriptedHold = /^hold:(\S+)/m
 
@@ -124,12 +126,14 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
             yield* report(TurnEnded.make({ turnId, ended: { at: yield* DateTime.now, ending } }))
           })
 
-        const run = (turnId: string, { message, prompt }: DeliveredTurn) =>
+        const run = (turnId: string, { message, prompt, context }: DeliveredTurn) =>
           Effect.gen(function* () {
-            const called = scriptedCall.exec(message)
+            const called = Predicate.isTagged(context, "StartedWorkUpdate")
+              ? scriptedUpdateCall.exec(prompt)
+              : scriptedCall.exec(message)
 
             if (called !== null && glass !== null) {
-              const [, ended, name, args = "{}"] = called
+              const { ended, name, args = "{}" } = called.groups!
               const access = ended === undefined ? glass : yield* earlierStart
               const { output, done } = yield* callGlass(access, name!, decodeArgs(args))
 
