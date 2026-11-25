@@ -1,4 +1,10 @@
-import { RPC_PATH, THREAD_FILES_PATH, TOKEN_PARAM, VISUALIZATIONS_PATH } from "@glass/contracts"
+import {
+  RPC_PATH,
+  THREAD_FILES_PATH,
+  type PlaceTag,
+  TOKEN_PARAM,
+  VISUALIZATIONS_PATH,
+} from "@glass/contracts"
 import type { BackendEndpoint, BackendFailure } from "@glass/contracts/desktop"
 import { Cause, Deferred, Duration, Effect, Fiber, Option } from "effect"
 import { app, type UtilityProcess, utilityProcess } from "electron"
@@ -9,19 +15,34 @@ import { prependLoginShellPath } from "./loginShellPath"
 
 const STOP_DEADLINE = Duration.seconds(10)
 
-const backendUrl = (endpoint: BackendEndpoint, path: string) => {
-  const url = new URL(path, endpoint.url.replace(/^ws/, "http"))
+const GLASS_ID = /^[\da-f]{8}-[\da-f]{4}-[\da-f]{4}-[\da-f]{4}-[\da-f]{12}$/
+
+const UNSAFE_SEGMENTS: ReadonlySet<string> = new Set(["", ".", ".."])
+
+const backendUrl = (endpoint: BackendEndpoint, route: string, segments: ReadonlyArray<string>) => {
+  if (segments.some((segment) => UNSAFE_SEGMENTS.has(segment))) return null
+
+  const url = new URL(
+    `${route}/${segments.map(encodeURIComponent).join("/")}`,
+    endpoint.url.replace(/^ws/, "http"),
+  )
 
   url.searchParams.set(TOKEN_PARAM, endpoint.token)
 
   return url.href
 }
 
-export const threadFileUrl = (endpoint: BackendEndpoint, threadId: string, pathname: string) =>
-  backendUrl(endpoint, `${THREAD_FILES_PATH}/${encodeURIComponent(threadId)}${pathname}`)
+export const threadFileUrl = (
+  endpoint: BackendEndpoint,
+  place: PlaceTag,
+  file: { readonly threadId: string; readonly path: ReadonlyArray<string> },
+) =>
+  GLASS_ID.test(file.threadId)
+    ? backendUrl(endpoint, THREAD_FILES_PATH, [place, file.threadId, ...file.path])
+    : null
 
 export const visualizationUrl = (endpoint: BackendEndpoint, id: string) =>
-  backendUrl(endpoint, `${VISUALIZATIONS_PATH}/${encodeURIComponent(id)}`)
+  GLASS_ID.test(id) ? backendUrl(endpoint, VISUALIZATIONS_PATH, [id]) : null
 
 // WARNING: UtilityProcess.kill() SIGKILLs 2 s after its SIGTERM (Chromium EnsureProcessTerminated), cutting off the Agent host's shutdown.
 const stopBackend = (backend: UtilityProcess, exitCode: Promise<number>) =>

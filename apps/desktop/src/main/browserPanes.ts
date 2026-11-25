@@ -1,12 +1,14 @@
+import type { PlaceTag } from "@glass/contracts"
 import {
   BROWSER_PARTITION,
   BROWSER_RELAY_CHANNEL,
-  isLoopbackHost,
   SANDBOX_BROWSER_PARTITION,
   THREAD_FILE_SCHEME,
   VISUALIZATION_SCHEME,
 } from "@glass/contracts/desktop"
 import { app, ipcMain, type Session, session, type WebContents, webContents } from "electron"
+import { isIP } from "node:net"
+import { publicAddressCheck, startSandboxProxy } from "./sandboxProxy"
 
 const ALLOWED_PERMISSIONS: ReadonlySet<string> = new Set([
   "clipboard-sanitized-write",
@@ -25,25 +27,23 @@ const opensInPane = (address: string) => {
   return url !== null && (PAGE_PROTOCOLS.has(url.protocol) || url.href === "about:blank")
 }
 
-const isLoopbackAddress = (address: string) => {
-  const url = URL.parse(`http://${address.includes(":") ? `[${address}]` : address}/`)
+const reachesPrivateNetwork = async (resolver: Session, page: string) => {
+  const url = URL.parse(page)
 
-  return url !== null && isLoopbackHost(url.hostname)
-}
+  if (url === null || url.hostname === "") return true
 
-const reachesThisDevice = async (resolver: Session, address: string) => {
-  const url = URL.parse(address)
+  const host = url.hostname.replace(/^\[(.*)\]$/, "$1")
 
-  if (url === null || url.hostname === "") return false
+  const isPublic = publicAddressCheck()
 
-  if (isLoopbackHost(url.hostname)) return true
+  if (isIP(host) !== 0) return !isPublic(host)
 
   try {
-    const { endpoints } = await resolver.resolveHost(url.hostname)
+    const { endpoints } = await resolver.resolveHost(host)
 
-    return endpoints.some((endpoint) => isLoopbackAddress(endpoint.address))
+    return !endpoints.every((endpoint) => isPublic(endpoint.address))
   } catch {
-    return false
+    return true
   }
 }
 
@@ -53,8 +53,27 @@ export const keepVisualizationsOffThisDevice = () => {
   glass.webRequest.onBeforeRequest({ urls: ["https://*/*"] }, (details, callback) => {
     if (details.frame?.url.startsWith(`${VISUALIZATION_SCHEME}:`) !== true) return callback({})
 
-    void reachesThisDevice(glass, details.url).then((cancel) => callback({ cancel }))
+    void reachesPrivateNetwork(glass, details.url).then((cancel) => callback({ cancel }))
   })
+}
+
+export const threadFileOf = (request: Request) => {
+  const url = URL.parse(request.url)
+
+  if (
+    url === null ||
+    ("initiatorOrigin" in request && request.initiatorOrigin !== `${url.protocol}//${url.host}`)
+  )
+    return null
+
+  try {
+    return {
+      threadId: url.hostname,
+      path: url.pathname.slice(1).split("/").map(decodeURIComponent),
+    }
+  } catch {
+    return null
+  }
 }
 
 const keepToPage = (event: { readonly url: string; preventDefault: () => void }) => {
@@ -73,9 +92,12 @@ const keepToPages = (contents: WebContents) => {
 
 export const setUpBrowserPanes = (options: {
   readonly preload: string
-  readonly threadFile: (threadId: string, pathname: string) => Promise<Response>
+  readonly threadFileUrl: (
+    place: PlaceTag,
+    file: NonNullable<ReturnType<typeof threadFileOf>>,
+  ) => Promise<string | null>
 }) => {
-  const setUp = (browser: Session) => {
+  const setUp = (browser: Session, place: PlaceTag) => {
     browser.setPermissionRequestHandler((_contents, permission, callback) =>
       callback(ALLOWED_PERMISSIONS.has(permission)),
     )
@@ -83,10 +105,12 @@ export const setUpBrowserPanes = (options: {
       ALLOWED_PERMISSIONS.has(permission),
     )
     browser.protocol.handle(THREAD_FILE_SCHEME, async (request) => {
-      const { hostname, pathname } = new URL(request.url)
+      const file = threadFileOf(request)
 
       try {
-        return await options.threadFile(hostname, pathname)
+        const url = file === null ? null : await options.threadFileUrl(place, file)
+
+        return url === null ? new Response("No such file.", { status: 404 }) : await fetch(url)
       } catch {
         return new Response("Glass's backend isn't answering", { status: 503 })
       }
@@ -97,7 +121,8 @@ export const setUpBrowserPanes = (options: {
   const sandbox = session.fromPartition(SANDBOX_BROWSER_PARTITION)
   const browsers = [local, sandbox]
 
-  for (const browser of browsers) setUp(browser)
+  setUp(local, "local")
+  setUp(sandbox, "sandbox")
 
   // WARNING: Relays load Effect, which would delay the window if imported before it shows.
   let relays: Promise<ReturnType<typeof import("./pageRelays").pageRelays>> | undefined
@@ -113,13 +138,29 @@ export const setUpBrowserPanes = (options: {
     return (await relays)(pane)
   })
 
+  const proxied = startSandboxProxy(publicAddressCheck).then(({ port }) =>
+    sandbox.setProxy({
+      proxyRules: `socks5://127.0.0.1:${port}`,
+      proxyBypassRules: "<-loopback>",
+    }),
+  )
+
+  proxied.catch((cause: unknown) =>
+    console.error("Sandbox Browser panes can't load pages: their proxy didn't start", cause),
+  )
+
   sandbox.webRequest.onBeforeRequest(
-    (details, callback) =>
-      void reachesThisDevice(sandbox, details.url).then((cancel) => callback({ cancel })),
+    (_details, callback) =>
+      void proxied.then(
+        () => callback({}),
+        () => callback({ cancel: true }),
+      ),
   )
 
   app.on("web-contents-created", (_event, contents) => {
     if (browsers.includes(contents.session)) keepToPages(contents)
+
+    if (contents.session === sandbox) contents.setWebRTCIPHandlingPolicy("disable_non_proxied_udp")
 
     contents.on("will-attach-webview", (event, webPreferences, params) => {
       if (
