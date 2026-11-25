@@ -351,7 +351,7 @@ const CheckIn = Tool.make("check_in", {
 
 const StartAgentReview = Tool.make("start_agent_review", {
   description:
-    "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
+    "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one. A review runs on this device and asks the user nothing, so a Thread can start one only when it is on this device and has no Permission mode.",
   parameters: Schema.Struct({
     pullRequest: PullRequestRef,
     revision: Revision.annotate({
@@ -631,9 +631,17 @@ export const GlassToolHandlers = GlassTools.toLayer(
       read_agent_review: ({ pullRequest }) =>
         first(agentReviews.watch(pullRequest)).pipe(Effect.mapError(explained)),
       start_agent_review: ({ pullRequest, revision }) =>
-        recordedFor(agentReviews.start(pullRequest, revision), (starter, since) =>
-          startedWork.startedAgentReview(starter, pullRequest, since),
-        ).pipe(Effect.andThen(first(agentReviews.watch(pullRequest))), Effect.mapError(explained)),
+        Effect.gen(function* () {
+          const starter = yield* callingThreadId
+
+          if (Option.isSome(starter)) yield* threads.refuseReviewFrom(starter.value)
+
+          yield* recordedFor(agentReviews.start(pullRequest, revision), (recorded, since) =>
+            startedWork.startedAgentReview(recorded, pullRequest, since),
+          )
+
+          return yield* first(agentReviews.watch(pullRequest))
+        }).pipe(Effect.mapError(explained)),
       list_thread_places: () =>
         Effect.gen(function* () {
           return {

@@ -13,8 +13,9 @@ Glass already holds to it, and the backend answers it with the same handlers, as
 
 Glass decides which Thread a call comes from per connection, never from the host's word alone: a
 Sandbox's host can call only as its own Thread, and a Thread in a Sandbox can create and message
-only Threads in a Sandbox. A call is delivered at most once, so one that loses its connection
-midway says it may or may not have happened rather than running twice.
+only Threads in a Sandbox and can't start an Agent review, which runs on this device. A call is
+delivered at most once, so one that loses its connection midway says it may or may not have
+happened rather than running twice.
 
 ## Considered options
 
