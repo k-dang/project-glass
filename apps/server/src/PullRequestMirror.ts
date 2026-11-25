@@ -57,9 +57,7 @@ const MirroredPullRequest = Schema.Struct({
   ),
   checks: Checks,
   attention: Schema.NullOr(Attention),
-  subscribed: Schema.NullOr(SubscribedRead).pipe(
-    Schema.withDecodingDefaultKey(Effect.succeed(null)),
-  ),
+  subscribed: Schema.NullOr(SubscribedRead),
   viewerIsAuthor: Schema.Boolean,
   viewerHasDrafts: Schema.Boolean,
   viewerHasSubmittedReview: Schema.Boolean,
