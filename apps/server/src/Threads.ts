@@ -214,6 +214,9 @@ export class Threads extends Context.Service<
       input: Omit<NewThread, "permissionMode">,
     ) => Effect.Effect<Thread, ThreadNotFound | InvalidLocalCheckout | ThreadError>
     readonly createForReview: (input: NewReviewThread) => Effect.Effect<Thread, ThreadError>
+    readonly refuseReviewFrom: (
+      threadId: string,
+    ) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly send: (
       threadId: string,
       input: SentMessage,
@@ -728,6 +731,21 @@ export class Threads extends Context.Service<
         return yield* createWith(input, permissionMode)
       })
 
+      const refuseReviewFrom = Effect.fn("Threads.refuseReviewFrom")(function* (threadId: string) {
+        const starter = (yield* find(threadId)).thread
+
+        yield* refuseReach(
+          starter,
+          { place: localPlace, permissionMode: null },
+          {
+            leavesSandbox:
+              "An Agent review runs on this device, so a Thread in a Sandbox can't start one. Ask the user to.",
+            asksLess:
+              "An Agent review asks the user less than you do, so you can't start one. Ask the user to.",
+          },
+        )
+      })
+
       const findWritable = (threadId: string) =>
         find(threadId).pipe(Effect.tap(() => sandboxes.refuseIfGone(threadId)))
 
@@ -1035,6 +1053,7 @@ export class Threads extends Context.Service<
         create,
         createFrom,
         createForReview,
+        refuseReviewFrom,
         send,
         sendFrom,
         changes,
