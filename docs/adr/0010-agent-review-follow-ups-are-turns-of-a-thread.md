@@ -13,8 +13,10 @@ id, so the harness resumes the session with the review's reading, reasoning, and
 harness and model that wrote it. Only a review someone follows up on gets a Thread. A review with
 no saved session, such as one written before reviews saved theirs, takes no Follow-ups until it is
 reviewed again, rather than a fresh agent that never saw it. Both harnesses keep a session by its
-folder, which is why the path is fixed, and Claude Code keeps a resumed session's first system
-prompt unless told not to, which the Thread turns off so the Follow-up instructions apply. Every
+folder, which is why the path is fixed. The review and its Follow-ups share one system prompt,
+which covers writing the review and answering about it, so following up reads as one conversation
+rather than an agent handed a new role. Glass saves that prompt with the session: Claude Code keeps a
+resumed session's first system prompt, and pi takes it again on resume. Every
 review's run saves its session whether or not anyone follows up; the sessions are small, so Glass
 leaves them to the harnesses, where Claude Code prunes old ones and pi keeps them.
 
@@ -41,6 +43,8 @@ adds a Suggested draft as a Draft.
   Glass kept a second prompt carrying both.
 - **Running every Agent review as the first Turn of its Thread**: one session from the start, but
   every review, Queue reviews among them, would become a Thread and keep its checkout.
+- **A separate Follow-up system prompt swapped in on resume**: Claude Code has to be told to drop
+  the review's prompt, and the agent switches roles mid-conversation.
 - **Resuming the runner's own session for each Follow-up**: keeps what the agent read, but puts
   session state into a seam Tours and Agent reviews don't need, duplicating the agent host
   without its streaming, Steer, or Stop. The runner only saves the session; the agent host resumes it.

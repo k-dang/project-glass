@@ -23,7 +23,6 @@ import { VIEWER } from "../test/fakePullRequest"
 import { watchDeadlines } from "../test/deadlines"
 import { isolatedHome, startBackend } from "../test/harness"
 import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
-import { followUpInstructions } from "./followUpInstructions"
 import { Deadlines } from "./ServerConfig"
 
 const answer = {
@@ -461,6 +460,7 @@ it.live(
       const f = yield* fixture()
       yield* f.start
       const { review } = yield* f.state(reviewed)
+      yield* f.client.SetReviewPrompt({ prompt: "Review only the tests." })
 
       yield* followUp(f, "show the review")
       const started = yield* f.state(withThread)
@@ -473,7 +473,7 @@ it.live(
       const [first] = yield* transcript(f.client, threadId, ended(1))
       const [instructions, files] = texts(first)
       assert.strictEqual(first?.message, "show the review")
-      assert.include(instructions, followUpInstructions)
+      assert.strictEqual(instructions, run?.task.instructions)
       assert.strictEqual(files, ".git,greet.ts,main.ts,src")
 
       yield* followUp(f, "And the rename?")

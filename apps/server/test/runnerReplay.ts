@@ -235,7 +235,9 @@ const stdinOf = (command: ChildProcess.StandardCommand) => {
 }
 
 const systemPromptOf = (args: ReadonlyArray<string>) => {
-  const index = args.indexOf("--system-prompt")
+  const index = args.findIndex((arg) =>
+    ["--append-system-prompt", "--append-system-prompt-file"].includes(arg),
+  )
 
   return index === -1 ? undefined : readFileSync(args[index + 1]!, "utf8")
 }

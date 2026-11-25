@@ -38,7 +38,6 @@ import {
   MAX_HOTSPOTS,
 } from "./agentReviewPrompt"
 import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
-import { followUpInstructions } from "./followUpInstructions"
 import { GitHubClient } from "./github/GitHubClient"
 import { patchLineNumbers, rangeInFiles } from "./github/patchLines"
 import { type JobState, pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
@@ -81,7 +80,11 @@ const stored = Schema.Array(
   }),
 )
 
-const ReviewSession = Schema.Struct({ id: Schema.String, runner: AgentRunnerIdentity })
+const ReviewSession = Schema.Struct({
+  id: Schema.String,
+  runner: AgentRunnerIdentity,
+  instructions: Schema.String,
+})
 
 type ReviewSession = typeof ReviewSession.Type
 
@@ -274,9 +277,11 @@ export class AgentReviews extends Context.Service<
             .select("agentReviews")
             .pipe(Effect.mapError(fromCheckoutRunFailure))
 
-          const prompt = yield* reviewPrompt
-
-          const session: ReviewSession = { id: randomUUID(), runner: runner.identity }
+          const session: ReviewSession = {
+            id: randomUUID(),
+            runner: runner.identity,
+            instructions: agentReviewInstructions(yield* reviewPrompt),
+          }
 
           const { input, answer } = yield* runner
             .run({
@@ -289,7 +294,7 @@ export class AgentReviews extends Context.Service<
               session: { id: session.id, folder: reviewFolder(session.id) },
               task: (material) =>
                 Effect.succeed({
-                  instructions: agentReviewInstructions(prompt),
+                  instructions: session.instructions,
                   prompt: agentReviewPrompt(material, revision),
                   answer: AgentReviewAnswer,
                   tools: "shell",
@@ -360,7 +365,7 @@ export class AgentReviews extends Context.Service<
                 model: threadModelOf(session.runner),
                 checkout: folder,
                 review: {
-                  instructions: followUpInstructions,
+                  instructions: session.instructions,
                   diffLines: {
                     old: diffLinesOn(input.files, "old"),
                     new: diffLinesOn(input.files, "new"),
