@@ -76,7 +76,7 @@ import { useShift } from "./useShift"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { useActions } from "./actions"
-import { ShellPanelSlot } from "./shellPanelSlot"
+import { ShellPanelSlot } from "./shellSlots"
 import { ThreadViews } from "./ThreadView"
 import { shortcutLabel } from "./shortcutLabel"
 
@@ -164,7 +164,9 @@ export function ThreadsLayout() {
 
   const togglePanel = () => {
     if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
-      document.getElementById(panelToggleId)?.focus()
+      Array.from(document.querySelectorAll<HTMLElement>(`#${panelToggleId}`))
+        .find((toggle) => toggle.checkVisibility())
+        ?.focus()
 
     setPanelOpen((open) => !open)
   }
@@ -245,10 +247,7 @@ function NewThreadLink() {
       <Link
         to="/threads/new"
         aria-label="New Thread"
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "icon-sm" }),
-          "[app-region:no-drag]",
-        )}
+        className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
       >
         <SquarePen aria-hidden />
       </Link>

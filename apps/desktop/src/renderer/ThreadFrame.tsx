@@ -9,9 +9,11 @@ import { cn } from "cn"
 import { Predicate } from "effect"
 import { FolderGit2, GitBranch, GitPullRequest, Package, PanelTop } from "lucide-react"
 import { createContext, type ReactNode, use, useId, useState, useSyncExternalStore } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ThreadPullRequestLink, PullRequestLink, PullRequestStatusIcon } from "./ThreadPullRequest"
+import { ShellTitleSlot } from "./shellSlots"
 import { ThreadsPanelToggle } from "./Threads"
 import { threadDetailsPinnedAtom, placeIcons, placeNames } from "./threadsArea"
 import { LOCAL_SKILLS_LABEL } from "./skillChoice"
@@ -30,6 +32,11 @@ const subscribeToWidth = (onChange: () => void) => {
 }
 
 const isWide = () => wideWindow.matches
+
+const headerStyles = {
+  card: "box-content flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm",
+  strip: "flex min-w-0 flex-auto items-center gap-2 pr-3 pl-2 text-sm",
+}
 
 const ClosePopover = createContext<() => void>(() => {})
 
@@ -58,34 +65,39 @@ export function ThreadFrame(props: {
   const { details } = props
   const pins = wide && props.pinnable === true
   const pinnedLabel = pinned ? "Hide details" : "Show details"
+  const titleSlot = use(ShellTitleSlot)
+
+  const header = (
+    <header className={titleSlot === null ? headerStyles.card : headerStyles.strip}>
+      <ThreadsPanelToggle />
+      <div className="flex min-w-0 flex-1 items-center gap-2">{props.heading}</div>
+      {details?.pullRequest !== undefined && (
+        <ThreadPullRequestLink pullRequest={details.pullRequest} />
+      )}
+      {details !== null &&
+        (pins ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={pinnedLabel}
+            aria-expanded={pinned}
+            aria-controls={detailsId}
+            onClick={() => setPinned((open) => !open)}
+          >
+            <PanelTop aria-hidden />
+          </Button>
+        ) : (
+          <DetailsPopover details={details} />
+        ))}
+    </header>
+  )
 
   return (
     <section
       aria-label={props.label}
       className={cn("flex min-h-0 flex-1 flex-col", props.className)}
     >
-      <header className="box-content flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
-        <ThreadsPanelToggle />
-        <div className="flex min-w-0 flex-1 items-center gap-2">{props.heading}</div>
-        {details?.pullRequest !== undefined && (
-          <ThreadPullRequestLink pullRequest={details.pullRequest} />
-        )}
-        {details !== null &&
-          (pins ? (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={pinnedLabel}
-              aria-expanded={pinned}
-              aria-controls={detailsId}
-              onClick={() => setPinned((open) => !open)}
-            >
-              <PanelTop aria-hidden />
-            </Button>
-          ) : (
-            <DetailsPopover details={details} />
-          ))}
-      </header>
+      {titleSlot === null ? header : createPortal(header, titleSlot)}
       <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">
         {props.children}
         {details !== null && pins && (
