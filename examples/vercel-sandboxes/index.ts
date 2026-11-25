@@ -254,7 +254,9 @@ const vercelSandboxes: Plugin = (glass) => {
       const policy = await networkPolicy(token, address, signal)
 
       record({ ...address, port: request.hostPort })
+      signal.throwIfAborted()
 
+      // WARNING: Glass may have run `remove` before the Sandbox existed, so this isn't given the signal, and a Sandbox that finishes after a cancel deletes itself.
       const sandbox = await Sandbox.create({
         token,
         teamId,
@@ -263,13 +265,19 @@ const vercelSandboxes: Plugin = (glass) => {
         ports: [request.hostPort],
         timeout: SESSION,
         networkPolicy: policy,
-        signal,
       }).catch((error: Error) => {
         if (error instanceof APIError && error.response.status === 429)
           throw glass.noCapacity("Vercel has no room for another Sandbox right now")
 
         throw error
       })
+
+      if (signal.aborted) {
+        await sandbox.delete({ deleteOrphanSnapshots: true }).catch((error: Error) => {
+          if (!(error instanceof APIError && error.response.status === 404)) throw error
+        })
+        signal.throwIfAborted()
+      }
 
       progress("Cloning the repository")
       const { owner, repo } = request.repository
