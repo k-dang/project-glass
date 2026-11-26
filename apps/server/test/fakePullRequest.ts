@@ -307,6 +307,7 @@ export class FakePullRequest {
     )
 
     this.publishHead({ base: change.base ?? this.#base, head: change.head ?? this.#head })
+    this.#updatedAt = this.now()
 
     this.#changedFiles = change.changedFiles ?? this.#changedFiles
 

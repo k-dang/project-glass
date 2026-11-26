@@ -34,6 +34,7 @@ export interface AgentTask<A> {
   readonly answer: Schema.Decoder<A>
   readonly tools: AgentTools
   readonly checkout: string
+  readonly session?: string | undefined
 }
 
 interface AgentRunner {
@@ -102,10 +103,20 @@ const startFailure = (name: string) => (error: { readonly reason: unknown }) => 
   )
 }
 
-const claudeFlags = ["--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"]
+const claudeSessionFlags = (session: string | undefined) =>
+  session === undefined ? ["--no-session-persistence"] : ["--session-id", session]
+
+const claudeFlags = (session: string | undefined) => [
+  "--strict-mcp-config",
+  ...claudeSessionFlags(session),
+  "--disable-slash-commands",
+]
 
 const claudeRequiredFlags = [
-  ...claudeFlags,
+  "--strict-mcp-config",
+  "--no-session-persistence",
+  "--session-id",
+  "--disable-slash-commands",
   "--restricted",
   "--setting-sources",
   "--tools",
@@ -133,9 +144,12 @@ const piToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
   shell: ["--tools", piTools.shell.join(",")],
 }
 
-const piCliFlags = (tools: AgentTools) => [
+const piSessionFlags = (session: string | undefined) =>
+  session === undefined ? ["--no-session"] : ["--session-id", session]
+
+const piCliFlags = (tools: AgentTools, session: string | undefined) => [
   "--offline",
-  "--no-session",
+  ...piSessionFlags(session),
   ...piLoadsNothing,
   ...piToolFlags[tools],
 ]
@@ -201,25 +215,49 @@ const runnerStrategies = Effect.gen(function* () {
 
   const decodeClaude = Schema.decodeUnknownEffect(Schema.fromJsonString(ClaudeEnvelope))
 
-  const runClaudeCode = (model: string, identity: AgentRunnerIdentity): AgentRunner["run"] =>
+  // WARNING: Both harnesses read the instructions from a file path, which keeps them out of argv, where endpoint security tools may kill long commands.
+  const instructionsWriter =
+    (directory: string, identity: AgentRunnerIdentity, name: string) => (source: string) => {
+      const instructions = join(directory, "instructions.md")
+
+      return fs.writeFileString(instructions, source).pipe(
+        Effect.tapError((cause) =>
+          Effect.logWarning(`Couldn't write ${name}'s instructions`, cause),
+        ),
+        Effect.mapError(() =>
+          agentFailure("storage", `Couldn't prepare ${name}'s instructions. Try again.`, identity),
+        ),
+        Effect.as(instructions),
+      )
+    }
+
+  const runClaudeCode = (
+    writeInstructions: (source: string) => Effect.Effect<string, AgentFailure>,
+    model: string,
+    identity: AgentRunnerIdentity,
+  ): AgentRunner["run"] =>
     Effect.fn("runClaudeCode")(function* <A>(task: AgentTask<A>) {
       const unusable = unusableFailure("Claude Code", task.subject, identity)
       const channel = claudeAnswer(commands.claudeCommand, task)
+
+      const instructions = yield* writeInstructions(task.instructions)
 
       const result = yield* execute(
         commands.claudeCommand,
         [
           "-p",
           ...claudeToolFlags[task.tools],
-          ...claudeFlags,
+          ...claudeFlags(task.session),
           "--model",
           model,
           "--output-format",
           "json",
+          "--append-system-prompt-file",
+          instructions,
           ...channel.flags,
         ],
         task.checkout,
-        `${task.instructions}\n\n${channel.prompt}`,
+        channel.prompt,
       ).pipe(
         Effect.mapError(() =>
           agentFailure("failed", "Claude Code could not start. Check your installation.", identity),
@@ -287,7 +325,10 @@ const runnerStrategies = Effect.gen(function* () {
 
     const identity = runnerIdentity({ harness: "claude-code", models })
 
-    return { identity, run: runClaudeCode(model, identity) } satisfies AgentRunner
+    return {
+      identity,
+      run: runClaudeCode(instructionsWriter(cwd, identity, "Claude Code"), model, identity),
+    } satisfies AgentRunner
   })
 
   const decodePiCliEnd = Schema.decodeUnknownOption(
@@ -312,7 +353,7 @@ const runnerStrategies = Effect.gen(function* () {
   )
 
   const runPiCli = (
-    instructionsDirectory: string,
+    writeInstructions: (source: string) => Effect.Effect<string, AgentFailure>,
     selection: PiModel,
     identity: AgentRunnerIdentity,
   ): AgentRunner["run"] =>
@@ -324,14 +365,7 @@ const runnerStrategies = Effect.gen(function* () {
           identity,
         )
 
-      // WARNING: pi reads --system-prompt from a file path, which keeps instructions out of argv, where endpoint security tools may kill long commands.
-      const instructions = join(instructionsDirectory, "instructions.md")
-      yield* fs.writeFileString(instructions, task.instructions).pipe(
-        Effect.tapError((cause) => Effect.logWarning("Couldn't write pi's instructions", cause)),
-        Effect.mapError(() =>
-          agentFailure("storage", "Couldn't prepare pi's instructions. Try again.", identity),
-        ),
-      )
+      const instructions = yield* writeInstructions(task.instructions)
 
       const result = yield* execute(
         commands.piCommand,
@@ -339,12 +373,12 @@ const runnerStrategies = Effect.gen(function* () {
           "-p",
           "--mode",
           "json",
-          ...piCliFlags(task.tools),
+          ...piCliFlags(task.tools, task.session),
           "--provider",
           selection.provider,
           "--model",
           selection.modelId,
-          "--system-prompt",
+          "--append-system-prompt",
           instructions,
         ],
         task.checkout,
@@ -418,7 +452,10 @@ const runnerStrategies = Effect.gen(function* () {
         `pi has no model ${model}. Run pi --list-models to see yours, then change it in Settings.`,
       )
 
-    return { identity, run: runPiCli(cwd, selection, identity) } satisfies AgentRunner
+    return {
+      identity,
+      run: runPiCli(instructionsWriter(cwd, identity, "pi"), selection, identity),
+    } satisfies AgentRunner
   })
 
   const runners: Record<

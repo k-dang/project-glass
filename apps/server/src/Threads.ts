@@ -167,6 +167,8 @@ type Purpose = Data.TaggedEnum<{
 const Purpose = Data.taggedEnum<Purpose>()
 
 interface NewReviewThread {
+  // WARNING: The id must be the session the Agent review's run saved in this checkout, since both harnesses resume a Thread's session by its id and folder.
+  readonly id: string
   readonly name: string
   readonly repository: FollowedRepository
   readonly revision: Revision
@@ -672,7 +674,7 @@ export class Threads extends Context.Service<
         input: NewReviewThread,
       ) {
         const thread = new Thread({
-          id: randomUUID(),
+          id: input.id,
           name: input.name,
           place: localPlace,
           repository: input.repository,

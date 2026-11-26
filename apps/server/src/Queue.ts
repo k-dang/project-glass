@@ -27,7 +27,6 @@ import { SqlClient } from "effect/sql"
 import { AgentReviews } from "./AgentReviews"
 import { GitHubClient } from "./github/GitHubClient"
 import type { LookedUpPullRequest } from "./github/queuedPullRequests"
-import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { queueWorkOf, SettingsStore, withQueueWork } from "./SettingsStore"
 import { Tours } from "./Tours"
 
@@ -102,7 +101,6 @@ export class Queue extends Context.Service<
       const github = yield* GitHubClient
       const tours = yield* Tours
       const agentReviews = yield* AgentReviews
-      const workspaces = yield* PullRequestWorkspaces
       const settings = yield* SettingsStore
       const workToggleLock = yield* Semaphore.make(1)
       const now = DateTime.now.pipe(Effect.map(DateTime.formatIso))
@@ -193,7 +191,7 @@ export class Queue extends Context.Service<
       const cancelWork = (ref: PullRequestRef) =>
         Effect.forEach(EngineFeature.literals, (feature) => work[feature].cancel(ref), {
           discard: true,
-        }).pipe(Effect.andThen(workspaces.forget(ref)))
+        })
 
       const insert = Effect.fnUntraced(function* (
         queuedAt: DateTime.Utc,
@@ -292,8 +290,6 @@ export class Queue extends Context.Service<
           )
           .pipe(logSaveFailure, Effect.mapError(saveFailed))
 
-        yield* workspaces.prefetch(added.map(({ summary }) => summary.ref))
-
         yield* startWork(
           added.map(({ summary, state, revision }) => ({
             pullRequest: summary,
@@ -356,7 +352,6 @@ export class Queue extends Context.Service<
           { openedAt, missing: queued.problem !== null },
         ).pipe(logSaveFailure, Effect.mapError(saveFailed))
 
-        yield* workspaces.prefetch([queued.pullRequest.ref])
         yield* startWork([queued])
       }, announce)
 

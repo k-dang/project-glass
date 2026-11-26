@@ -458,6 +458,8 @@ export class GitHubClient extends Context.Service<
                 .pipe(Effect.catch(unavailable("Check your internet connection, then try again.")))
 
               if (response.status === 401) {
+                yield* auth.forgetToken
+
                 return yield* new TokenRejected({ tokenSource: source })
               }
 

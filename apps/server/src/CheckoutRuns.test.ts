@@ -96,6 +96,7 @@ const fixture = Effect.gen(function* () {
                 () => Deferred.succeed(released, undefined),
               ),
             checkoutInto: () => Effect.die("unused"),
+            checkoutAt: () => Effect.die("unused"),
           }),
         ),
       ),

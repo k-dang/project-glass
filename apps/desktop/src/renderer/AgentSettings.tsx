@@ -55,8 +55,7 @@ const reviewPrompt: TextSetting = {
   copy: {
     title: "Review prompt",
     description: "How you review: what to look for and what to skip.",
-    footnote:
-      "Glass wraps it in its own instructions, which fix the answer format and keep the agent from suggesting a Review decision.",
+    footnote: "Glass wraps it in its own instructions, which fix the answer format.",
     defaultValue: defaultReviewPrompt,
   },
 }
