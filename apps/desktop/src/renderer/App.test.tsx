@@ -123,7 +123,7 @@ afterEach(() => {
   vi.restoreAllMocks()
   window.history.replaceState(null, "", "#/")
   localStorage.removeItem("glass.layout")
-  localStorage.removeItem("glass.titleStripResourceUsage")
+  localStorage.removeItem("glass.railResourceUsage")
 })
 
 it("breaks storage down by table in Settings, and retries a failed measurement", async () => {
@@ -330,7 +330,7 @@ it("keeps Keyboard shortcuts in the Connection menu in the Inset layout", async 
   await waitFor(() => expect(document.activeElement).toBe(avatar))
 })
 
-it("shows CPU and memory in the Inset title strip once turned on in Settings", async () => {
+it("shows CPU and memory in the Inset rail once turned on in Settings", async () => {
   localStorage.setItem("glass.layout", "inset")
   const user = mount({})
   await user.click(await screen.findByRole("link", { name: "Settings" }))

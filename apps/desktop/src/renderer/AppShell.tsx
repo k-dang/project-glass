@@ -44,11 +44,7 @@ import {
   listSearchAtom,
   reviewsLinkAtom,
 } from "./reviewsArea"
-import {
-  ResourceUsage,
-  TitleStripResourceUsage,
-  titleStripResourceUsageAtom,
-} from "./ResourceUsage"
+import { RailResourceUsage, ResourceUsage, railResourceUsageAtom } from "./ResourceUsage"
 import { ShellPanelSlot, ShellTitleSlot, useShellSlot } from "./shellSlots"
 import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog"
 import { useAppearance } from "./theme"
@@ -244,7 +240,7 @@ function ClassicFrame(props: { rail: ReactNode; children: ReactNode }) {
 }
 
 function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
-  const showsResourceUsage = useAtomValue(titleStripResourceUsageAtom)
+  const showsResourceUsage = useAtomValue(railResourceUsageAtom)
 
   const [panelSlot, attachPanelSlot] = useShellSlot()
   const [titleSlot, attachTitleSlot] = useShellSlot()
@@ -261,13 +257,13 @@ function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
           </TooltipHint>
         </div>
         {props.rail}
+        {showsResourceUsage && <RailResourceUsage />}
       </aside>
       <div ref={attachPanelSlot} className="contents" />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="title-strip title-strip-clear-controls flex shrink-0 items-center pl-[max(0px,calc(env(titlebar-area-x,0px)-3.5rem))]">
           <HistoryNav />
           <div ref={attachTitleSlot} className="contents" />
-          {showsResourceUsage && <TitleStripResourceUsage />}
         </div>
         <div className="mr-2 mb-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
           <ShellPanelSlot value={panelSlot}>
