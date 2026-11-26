@@ -7,7 +7,7 @@ import {
   type PullRequestRef,
   referenceKey,
 } from "@glass/contracts"
-import { Context, DateTime, Duration, Effect, Layer, Option, Schema } from "effect"
+import { Context, DateTime, Duration, Effect, Layer, Option, Predicate, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
 export const KEPT_FOR = Duration.days(30)
@@ -15,9 +15,11 @@ export const KEPT_FOR = Duration.days(30)
 const encodeEvent = Schema.encodeEffect(Event)
 
 const endedAt = (event: typeof Event.Encoded) => {
-  if (event._tag === "PullRequestMerged") return { path: "$.mergedAt", at: event.mergedAt }
+  if (Predicate.isTagged(event, "PullRequestMerged"))
+    return { path: "$.mergedAt", at: event.mergedAt }
 
-  if (event._tag === "PullRequestClosed") return { path: "$.closedAt", at: event.closedAt }
+  if (Predicate.isTagged(event, "PullRequestClosed"))
+    return { path: "$.closedAt", at: event.closedAt }
 
   return null
 }

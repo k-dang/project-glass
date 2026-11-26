@@ -561,15 +561,11 @@ it.live(
       const dependency = f.github.seedPullRequest(greeterPullRequest(8, "feature/dependency"))
       const again = subscribe("Go on once it ends again", ["merged-or-closed"], dependency)
 
-      const busy = yield* f.start(
-        subscribe("Go on once it ends", ["merged-or-closed"], dependency),
-      )
+      const busy = yield* f.start(subscribe("Go on once it ends", ["merged-or-closed"], dependency))
 
       yield* f.transcript(busy.id, settled(1))
 
-      const idle = yield* f.start(
-        subscribe("Go on once it ends", ["merged-or-closed"], dependency),
-      )
+      const idle = yield* f.start(subscribe("Go on once it ends", ["merged-or-closed"], dependency))
 
       yield* f.transcript(idle.id, settled(1))
       yield* f.client.ListPullRequests()
