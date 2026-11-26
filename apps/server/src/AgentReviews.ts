@@ -85,7 +85,6 @@ const encodeHotspots = Schema.encodeSync(HotspotsJson)
 const encodeLowAttention = Schema.encodeSync(LowAttentionJson)
 
 interface Run {
-  readonly pr: PullRequestRef
   readonly threadId: string
   readonly revision: Revision
   readonly runner: AgentRunnerIdentity
@@ -426,7 +425,7 @@ export class AgentReviews extends Context.Service<
               ),
             )
 
-            yield* restore(follow({ pr, threadId, revision, runner, files: input.files })).pipe(
+            yield* restore(follow({ threadId, revision, runner, files: input.files })).pipe(
               Effect.flatMap((review) => save(job, pr, review)),
               Effect.onError(() => removeThread(threadId)),
             )

@@ -1006,6 +1006,8 @@ export class Threads extends Context.Service<
             yield* toDos.unlinkThread(threadId)
             yield* sql`DELETE FROM thread WHERE id = ${threadId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
+
+          yield* stopOnHost(hosting, row)
         }).pipe(
           Effect.tapError(() =>
             SubscriptionRef.update(rows, (current) =>

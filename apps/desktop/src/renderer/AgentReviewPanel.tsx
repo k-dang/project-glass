@@ -192,9 +192,6 @@ function ReviewThread(props: {
     [turns],
   )
 
-  const earlierFollowUps =
-    followUps.length < turns.length ? earlierTurns : Math.max(0, earlierTurns - 1)
-
   const loadEarlier = useAtomSet(atoms.loadEarlier)
 
   const suggestedDraftView = useCallback(
@@ -221,7 +218,7 @@ function ReviewThread(props: {
         )}
         <Transcript
           turns={followUps}
-          earlierTurns={earlierFollowUps}
+          earlierTurns={earlierTurns}
           onShowEarlier={loadEarlier}
           status={status}
           lead={
@@ -235,7 +232,7 @@ function ReviewThread(props: {
           <OutdatedNote />
         ) : (
           <ThreadComposer
-            turns={turns}
+            turns={followUps}
             queued={queued}
             label="Follow up"
             idlePlaceholder="Ask about the review, or have it draft comments"

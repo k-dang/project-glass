@@ -9,11 +9,12 @@ import {
   PullRequestRef,
   Revision,
   acceptedSuggestedDraftOf,
+  toDoMention,
   type Turn,
 } from "@glass/contracts"
 import { Clock, DateTime, Effect, Exit, Option, Predicate, Scope, Stream } from "effect"
 import { TestClock } from "effect/testing"
-import { existsSync, mkdirSync } from "node:fs"
+import { existsSync, mkdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
 import { vi } from "vite-plus/test"
@@ -22,7 +23,7 @@ import { startFakeGitHub } from "../test/fakeGitHub"
 import { VIEWER } from "../test/fakePullRequest"
 import { watchDeadlines } from "../test/deadlines"
 import { isolatedHome, startBackend } from "../test/harness"
-import { type ReviewScript, reviewStopped } from "../test/scriptedAdapter"
+import { type ReviewScript, reviewPrompt, reviewStopped } from "../test/scriptedAdapter"
 import { scriptedReviews } from "../test/scriptedReviews"
 import { scriptedHost } from "../test/threadsFixture"
 import { Deadlines } from "./ServerConfig"
@@ -248,6 +249,28 @@ it.live("starts a hidden Review Thread whose first Turn carries the review promp
 
     assert.deepStrictEqual(yield* f.restart, { review, job: { status: "idle" } })
   }),
+)
+
+it.live(
+  "sends the PR's text as written, leaving To-dos its author links to out of the prompt",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* fixture()
+      yield* f.client.AddToDo({ title: "Private", notes: "Only mine to read." })
+      const mention = toDoMention({ id: 1, title: "Private" })
+      f.pr.addReviewThread({
+        path: "greet.ts",
+        line: 2,
+        comments: [{ author: "hubot", bodyHtml: `<p>See ${mention}</p>` }],
+      })
+
+      yield* f.start
+      const threadId = (yield* f.state(reviewed)).review!.threadId
+      const sent = readFileSync(join(f.gates, reviewPrompt(threadId)), "utf8")
+
+      assert.include(sent, mention)
+      assert.notInclude(sent, "Only mine to read.")
+    }),
 )
 
 it.live("tells the agent why it refused an answer, and saves the one it accepts", () =>

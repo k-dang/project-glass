@@ -170,18 +170,19 @@ it("leaves out the Turn that wrote the Agent review, showing only its Follow-ups
   expect(screen.queryByText("Handed in.")).toBeNull()
 })
 
-it("offers no earlier Turns when only the Turn that wrote the Agent review is earlier", async () => {
+it("recalls only Follow-ups with ↑, never the Turn that wrote the Agent review", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: { review: reviewOf(revision), job: { status: "idle" } },
-    reviewThreadTurns: followUps,
-    reviewThreadEarlierTurns: 1,
+    reviewThreadTurns: [reviewTurn],
   })
 
   await readFullReview(f)
+  const composer = await screen.findByRole("textbox", { name: "Follow up" })
+  await f.user.click(composer)
+  await f.user.keyboard("{ArrowUp}")
 
-  expect(await screen.findByText("Draft a comment for the letter change.")).toBeDefined()
-  expect(screen.queryByRole("button", { name: "Show earlier Turns" })).toBeNull()
+  expect(composer).toHaveProperty("textContent", "")
 })
 
 const draftPrComments =

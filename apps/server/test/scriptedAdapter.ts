@@ -73,6 +73,8 @@ export interface ReviewScript {
 
 export const reviewStopped = (thread: string) => `review-stopped-${thread}`
 
+export const reviewPrompt = (thread: string) => `review-prompt-${thread}`
+
 const reviewScript = (gates: string): ReviewScript => {
   const path = join(gates, REVIEW_SCRIPT)
 
@@ -144,8 +146,9 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
             yield* report(TurnEnded.make({ turnId, ended: { at: yield* DateTime.now, ending } }))
           })
 
-        const runReview = (turnId: string) =>
+        const runReview = (turnId: string, prompt: string) =>
           Effect.gen(function* () {
+            writeFileSync(join(gates, reviewPrompt(thread)), prompt)
             const { hold } = reviewScript(gates)
 
             yield* part(turnId, TextPart.make({ text: readdirSync(folder).toSorted().join(",") }))
@@ -311,7 +314,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
             Effect.gen(function* () {
               const fiber = yield* (
                 review !== null && Predicate.isTagged(message.context, "AgentReview")
-                  ? runReview(turnId)
+                  ? runReview(turnId, message.prompt)
                   : run(turnId, message)
               ).pipe(Effect.forkIn(scope))
 

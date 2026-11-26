@@ -582,10 +582,12 @@ export const GlassToolHandlers = GlassTools.toLayer(
       list_threads: () =>
         Effect.all([first(threads.watch()), first(threads.watchWaiting())]).pipe(
           Effect.map(([listed, waiting]) => ({
-            threads: listed.map((thread) => ({
-              thread,
-              waiting: waiting.some((found) => found.thread.id === thread.id),
-            })),
+            threads: listed
+              .filter(({ forReview }) => !forReview)
+              .map((thread) => ({
+                thread,
+                waiting: waiting.some((found) => found.thread.id === thread.id),
+              })),
           })),
           Effect.mapError(explained),
         ),

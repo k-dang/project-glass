@@ -532,15 +532,27 @@ describe("An Agent review started by a Thread", () => {
     }),
   )
 
-  it.live("starts for a Thread on this device with no Permission mode", () =>
-    Effect.gen(function* () {
-      const f = yield* reviewingFromThreads
+  it.live(
+    "starts for a Thread on this device with no Permission mode, keeping its Thread unlisted",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* reviewingFromThreads
 
-      const thread = yield* f.start(f.startReview)
-      const [started] = callsIn(yield* f.transcript(thread.id, callsSettled(1)))
+        const thread = yield* f.start(f.startReview)
+        const [started] = callsIn(yield* f.transcript(thread.id, callsSettled(1)))
 
-      assert.equal(calledBy(started).status, "done")
-      assert.equal((yield* f.review(({ review }) => review !== null)).review?.markdown, markdown)
-    }),
+        assert.equal(calledBy(started).status, "done")
+        assert.equal((yield* f.review(({ review }) => review !== null)).review?.markdown, markdown)
+
+        yield* f.send(thread.id, glassCall("list_threads", {}))
+        const [, listed] = callsIn(yield* f.transcript(thread.id, callsSettled(2)))
+
+        assert.deepStrictEqual(
+          JSON.parse(calledBy(listed).text).threads.map(
+            (entry: { readonly thread: { readonly id: string } }) => entry.thread.id,
+          ),
+          [thread.id],
+        )
+      }),
   )
 })
