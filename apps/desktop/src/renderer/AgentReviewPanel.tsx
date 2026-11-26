@@ -328,7 +328,7 @@ export function AgentReviewPanel(props: {
 
   return (
     <>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-8">
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-8 [scrollbar-gutter:stable]">
         {markdown}
         <FirstFollowUp controls={props.controls} />
       </div>
