@@ -317,6 +317,10 @@ export class Transcripts extends Context.Service<
     readonly runningTurnStarter: (
       threadId: string,
     ) => Effect.Effect<TurnStarter | null, ThreadError>
+    readonly turnStarter: (
+      threadId: string,
+      turnId: string | null,
+    ) => Effect.Effect<TurnStarter | null, ThreadError>
     readonly lastMessageTurn: (threadId: string) => Effect.Effect<string | null, ThreadError>
     readonly runningPullRequestUpdates: Effect.Effect<
       ReadonlyArray<RunningPullRequestUpdate>,
@@ -1063,6 +1067,19 @@ export class Transcripts extends Context.Service<
               Effect.map(([turn]) => turn?.startedBy ?? null),
             ),
           ),
+        turnStarter: (threadId, turnId) =>
+          turnId === null
+            ? Effect.succeed(null)
+            : withStorageFailure(
+                "read who started a Turn",
+                sql`
+                  SELECT started_by AS startedBy
+                  FROM thread_turn WHERE id = ${turnId} AND thread_id = ${threadId}
+                `.pipe(
+                  Effect.flatMap(decodeStarters),
+                  Effect.map(([turn]) => turn?.startedBy ?? null),
+                ),
+              ),
         lastMessageTurn: (threadId) =>
           withStorageFailure(
             "read the last Turn a message of the user's reached",

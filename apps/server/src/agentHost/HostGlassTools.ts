@@ -22,7 +22,12 @@ import {
   type RelayedToolCall,
 } from "./protocol"
 
-export class RelayedThread extends Context.Service<RelayedThread, { readonly threadId: string }>()(
+interface RelayingThread {
+  readonly threadId: string
+  readonly runningTurn: Effect.Effect<string | null>
+}
+
+export class RelayedThread extends Context.Service<RelayedThread, RelayingThread>()(
   "@glass/server/agentHost/RelayedThread",
 ) {
   static readonly current = Effect.serviceOption(RelayedThread).pipe(
@@ -35,8 +40,7 @@ export class RelayedThread extends Context.Service<RelayedThread, { readonly thr
   )
 }
 
-interface RelayCredential {
-  readonly threadId: string
+interface RelayCredential extends RelayingThread {
   readonly ownedSessions: Set<string>
 }
 
@@ -66,10 +70,14 @@ export class HostGlassTools extends Context.Service<
       host: string,
       tools: ReadonlyArray<McpSchema.Tool>,
     ) => Effect.Effect<void, HostReplaced>
-    readonly access: (threadId: string) => Effect.Effect<GlassToolsAccess, never, Scope.Scope>
+    readonly access: (
+      threadId: string,
+      runningTurn: Effect.Effect<string | null>,
+    ) => Effect.Effect<GlassToolsAccess, never, Scope.Scope>
     readonly authenticate: (bearer: Redacted.Redacted) => Option.Option<RelayCredential>
     readonly call: (
       threadId: string,
+      turnId: string | null,
       name: string,
       args: Schema.JsonObject,
     ) => Effect.Effect<McpSchema.CallToolResult>
@@ -103,7 +111,12 @@ export class HostGlassTools extends Context.Service<
           { discard: true },
         )
 
-      const call = (threadId: string, name: string, args: Schema.JsonObject) =>
+      const call = (
+        threadId: string,
+        turnId: string | null,
+        name: string,
+        args: Schema.JsonObject,
+      ) =>
         Effect.suspend(() => {
           const owner = watcher
 
@@ -113,7 +126,7 @@ export class HostGlassTools extends Context.Service<
           const answered = Deferred.makeUnsafe<McpSchema.CallToolResult>()
 
           pending.set(callId, { owner, threadId, answered })
-          Queue.offerUnsafe(owner, { callId, threadId, name, arguments: args })
+          Queue.offerUnsafe(owner, { callId, threadId, turnId, name, arguments: args })
 
           return Deferred.await(answered).pipe(
             Effect.ensuring(Effect.sync(() => pending.delete(callId))),
@@ -122,7 +135,9 @@ export class HostGlassTools extends Context.Service<
 
       const relayed = (name: string) => (args: Schema.JsonObject | undefined) =>
         RelayedThread.current.pipe(
-          Effect.flatMap(({ threadId }) => call(threadId, name, args ?? {})),
+          Effect.flatMap(({ threadId, runningTurn }) =>
+            Effect.flatMap(runningTurn, (turnId) => call(threadId, turnId, name, args ?? {})),
+          ),
         )
 
       const release = (ended: Watcher) =>
@@ -158,12 +173,16 @@ export class HostGlassTools extends Context.Service<
               ),
             )
           }),
-        access: (threadId) =>
+        access: (threadId, runningTurn) =>
           Effect.acquireRelease(
             Effect.sync(() => {
               const bearer = newHostToken()
 
-              credentials.set(digest(bearer), { threadId, ownedSessions: new Set() })
+              credentials.set(digest(bearer), {
+                threadId,
+                runningTurn,
+                ownedSessions: new Set(),
+              })
 
               return bearer
             }),

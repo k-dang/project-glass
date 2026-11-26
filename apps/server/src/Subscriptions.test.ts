@@ -1,6 +1,8 @@
+import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
-import { localPlace, Subscription } from "@glass/contracts"
-import { Effect, Option, Schema, Stream } from "effect"
+import { localPlace, PullRequestRef, Subscription } from "@glass/contracts"
+import { Context, Effect, Layer, Option, Schema, Stream } from "effect"
+import { SqlClient } from "effect/sql"
 import {
   calledBy,
   glassCall,
@@ -10,6 +12,14 @@ import {
   threadsFixture,
 } from "../test/threadsFixture"
 import { greeterPullRequest, threadWithPullRequest } from "../test/threadWithPullRequest"
+import { EventLog } from "./EventLog"
+import { FollowedRepositories } from "./FollowedRepositories"
+import { GitHubClient } from "./github/GitHubClient"
+import { migrationLoader } from "./Migrations"
+import { PullRequestMirror } from "./PullRequestMirror"
+import { Subscriptions } from "./Subscriptions"
+import { ThreadPullRequests } from "./ThreadPullRequests"
+import { Transcripts } from "./Transcripts"
 
 type Fixture = Effect.Success<typeof threadsFixture>
 
@@ -346,4 +356,76 @@ it.live("ends a Subscription the user ends from the Thread", () =>
 
     assert.deepStrictEqual(yield* subscriptionsOf(f, thread.id, (all) => all.length === 0), [])
   }),
+)
+
+it.effect(
+  "refuses a Subscription asked for by a Turn Glass has no record of yet, though the user's Turn still shows as running",
+  () =>
+    Effect.gen(function* () {
+      const context = yield* Layer.build(
+        Subscriptions.layer.pipe(
+          Layer.provideMerge(Transcripts.layer),
+          Layer.provide(Layer.mock(FollowedRepositories)({ list: () => Effect.succeed([]) })),
+          Layer.provide(Layer.mock(GitHubClient)({})),
+          Layer.provide(
+            Layer.mock(ThreadPullRequests)({
+              watch: () => Stream.never,
+              ofThread: () => Effect.succeed(undefined),
+            }),
+          ),
+          Layer.provide(Layer.mock(PullRequestMirror)({ changes: Stream.never })),
+          Layer.provide(Layer.mock(EventLog)({})),
+          Layer.provideMerge(
+            SqliteMigrator.layer({ loader: migrationLoader }).pipe(
+              Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
+            ),
+          ),
+        ),
+      )
+
+      const sql = Context.get(context, SqlClient.SqlClient)
+
+      yield* sql`INSERT INTO thread ${sql.insert({
+        id: "thread",
+        name: "thread",
+        owner: "glass-demo",
+        repo: "greeter",
+        base_branch: "main",
+        harness: "pi",
+        folder: "thread",
+        created_at: "2026-11-20T00:00:00.000Z",
+      })}`
+
+      yield* Context.get(context, Transcripts).startOrQueue(
+        "thread",
+        { message: "Look after the PR", images: [], context: null },
+        "user",
+      )
+
+      const [usersTurn] = yield* sql<{ readonly id: string }>`
+        SELECT id FROM thread_turn WHERE thread_id = 'thread' AND ended IS NULL
+      `
+
+      const subscriptions = Context.get(context, Subscriptions)
+
+      const asked = {
+        pullRequest: new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 7 }),
+        reasons: ["failing-checks" as const],
+        note: "Keep it green",
+      }
+
+      const unheardOf = yield* subscriptions
+        .subscribe("thread", "a-turn-the-journal-has-not-brought", asked)
+        .pipe(Effect.flip)
+
+      const betweenTurns = yield* subscriptions.subscribe("thread", null, asked).pipe(Effect.flip)
+
+      const onTheUsersWord = yield* subscriptions
+        .subscribe("thread", usersTurn!.id, asked)
+        .pipe(Effect.flip)
+
+      assert.include(unheardOf.message, "Glass has no record of the Turn asking")
+      assert.include(betweenTurns.message, "Glass has no record of the Turn asking")
+      assert.include(onTheUsersWord.message, "glass-demo/greeter isn't one")
+    }),
 )

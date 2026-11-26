@@ -74,7 +74,7 @@ const relay = Effect.gen(function* () {
     origin: ToolCallOrigin,
     threadId: string,
     call: Pick<RelayedToolCall, "name" | "arguments"> = { name: "caller", arguments: {} },
-  ) => glassToolRelay.answer(origin, { callId: "call", threadId, ...call })
+  ) => glassToolRelay.answer(origin, { callId: "call", threadId, turnId: null, ...call })
 })
 
 it.effect("refuses a Sandbox's call stamped with another Thread", () =>
@@ -189,7 +189,13 @@ it.effect(
 
       const fromSandbox = yield* glassToolRelay.answer(
         ToolCallOrigin.Sandbox({ threadId: "sandboxed" }),
-        { callId: "call", threadId: "sandboxed", name: "this_device", arguments: {} },
+        {
+          callId: "call",
+          threadId: "sandboxed",
+          turnId: null,
+          name: "this_device",
+          arguments: {},
+        },
       )
 
       assert.isTrue(fromSandbox.isError)

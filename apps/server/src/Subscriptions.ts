@@ -141,7 +141,7 @@ const refusedStarters = {
   glass: "Glass started this Turn",
   harness: "The agent started this Turn by itself",
   agent: "A message from another agent started this Turn",
-  none: "Your Thread has no Turn running",
+  none: "Glass has no record of the Turn asking",
 }
 
 const refuse = (message: string) => Effect.fail(new ThreadError({ message }))
@@ -169,6 +169,7 @@ export class Subscriptions extends Context.Service<
   {
     readonly subscribe: (
       threadId: string,
+      turnId: string | null,
       input: NewSubscription,
     ) => Effect.Effect<Subscription, ThreadError | SettingsError | ConnectionError>
     readonly list: (threadId: string) => Effect.Effect<ReadonlyArray<Subscription>, ThreadError>
@@ -247,9 +248,10 @@ export class Subscriptions extends Context.Service<
 
       const subscribe = Effect.fn("Subscriptions.subscribe")(function* (
         threadId: string,
+        turnId: string | null,
         input: NewSubscription,
       ) {
-        const starter = yield* transcripts.runningTurnStarter(threadId)
+        const starter = yield* transcripts.turnStarter(threadId, turnId)
 
         if (!isOnTheUsersWord(starter))
           return yield* refuse(

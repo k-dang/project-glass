@@ -27,6 +27,7 @@ export class OutsideAgentCaller extends Schema.TaggedClass<OutsideAgentCaller>()
 
 export class ThreadCaller extends Schema.TaggedClass<ThreadCaller>()("Thread", {
   threadId: Schema.String,
+  turnId: Schema.NullOr(Schema.String),
 }) {}
 
 export type McpCallerIdentity = GlobalChatCaller | ThreadCaller | OutsideAgentCaller

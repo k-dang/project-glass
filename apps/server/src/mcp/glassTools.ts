@@ -566,12 +566,17 @@ export const GlassToolHandlers = GlassTools.toLayer(
 
       if (Predicate.isTagged(caller, "OutsideAgent")) return AgentSender.OutsideAgent()
 
-      const session = Predicate.isTagged(caller, "Thread") ? caller.threadId : caller.sessionId
-      const turnForUser = isOnTheUsersWord(yield* transcripts.runningTurnStarter(session))
-
       return Predicate.isTagged(caller, "Thread")
-        ? AgentSender.Thread({ id: caller.threadId, turnForUser })
-        : AgentSender.GlobalChat({ id: caller.globalChatId, turnForUser })
+        ? AgentSender.Thread({
+            id: caller.threadId,
+            turnForUser: isOnTheUsersWord(
+              yield* transcripts.turnStarter(caller.threadId, caller.turnId),
+            ),
+          })
+        : AgentSender.GlobalChat({
+            id: caller.globalChatId,
+            turnForUser: isOnTheUsersWord(yield* transcripts.runningTurnStarter(caller.sessionId)),
+          })
     })
 
     return GlassTools.of({

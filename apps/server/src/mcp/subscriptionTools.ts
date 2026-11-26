@@ -4,11 +4,11 @@ import {
   Subscription,
   SubscriptionReason,
 } from "@glass/contracts"
-import { Context, Effect, Option, Schema } from "effect"
+import { Context, Effect, Predicate, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { Subscriptions } from "../Subscriptions"
 import { acting, explained, GlassToolFailure, readOnly } from "./glassTools"
-import { callingThreadId } from "./McpCredentials"
+import { McpCaller } from "./McpCredentials"
 import { forThreads } from "./toolAudience"
 
 const MAX_NOTE_CHARS = 2_000
@@ -61,13 +61,11 @@ export const SubscriptionTools = Toolkit.make(
   EndSubscription,
 )
 
-const callingThread = callingThreadId.pipe(
-  Effect.flatMap(
-    Option.match({
-      onNone: () =>
-        Effect.fail(new GlassToolFailure({ message: "Only a Thread's agent has Subscriptions." })),
-      onSome: Effect.succeed,
-    }),
+const callingThread = McpCaller.current.pipe(
+  Effect.flatMap((caller) =>
+    Predicate.isTagged(caller, "Thread")
+      ? Effect.succeed(caller)
+      : Effect.fail(new GlassToolFailure({ message: "Only a Thread's agent has Subscriptions." })),
   ),
 )
 
@@ -78,9 +76,9 @@ export const SubscriptionToolHandlers = SubscriptionTools.toLayer(
     return SubscriptionTools.of({
       subscribe_to_pull_request: ({ pullRequest, reasons, note }) =>
         callingThread.pipe(
-          Effect.flatMap((threadId) =>
+          Effect.flatMap(({ threadId, turnId }) =>
             subscriptions
-              .subscribe(threadId, {
+              .subscribe(threadId, turnId, {
                 pullRequest: pullRequest ?? null,
                 reasons: reasons ?? defaultSubscriptionReasons,
                 note,
@@ -91,14 +89,14 @@ export const SubscriptionToolHandlers = SubscriptionTools.toLayer(
         ),
       list_subscriptions: () =>
         callingThread.pipe(
-          Effect.flatMap((threadId) =>
+          Effect.flatMap(({ threadId }) =>
             subscriptions.list(threadId).pipe(Effect.mapError(explained)),
           ),
           Effect.map((listed) => ({ subscriptions: listed })),
         ),
       end_subscription: ({ subscriptionId }) =>
         Effect.gen(function* () {
-          const threadId = yield* callingThread
+          const { threadId } = yield* callingThread
 
           const ended = yield* subscriptions
             .end(threadId, subscriptionId)

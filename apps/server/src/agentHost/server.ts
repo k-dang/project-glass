@@ -47,12 +47,13 @@ const RelayAccess = HttpRouter.middleware(
 
         if (Option.isNone(credential)) return HttpServerResponse.empty({ status: 401 })
 
-        const { threadId, ownedSessions } = credential.value
+        const { threadId, runningTurn, ownedSessions } = credential.value
 
         if (!ownsSession(request, ownedSessions)) return HttpServerResponse.empty({ status: 404 })
 
         const response = yield* Effect.provideService(httpEffect, RelayedThread, {
           threadId,
+          runningTurn,
         })
 
         yield* claimOpenedSession(ownedSessions)

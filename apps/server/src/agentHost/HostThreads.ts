@@ -210,7 +210,13 @@ export class HostThreads extends Context.Service<
               const tools = yield* Match.value(starting.role).pipe(
                 Match.tagsExhaustive({
                   Global: (role) => Effect.succeed(role.tools),
-                  Work: () => glassTools.access(threadId),
+                  Work: () =>
+                    glassTools.access(
+                      threadId,
+                      SubscriptionRef.get(runningTurns).pipe(
+                        Effect.map((turns) => turns.get(threadId) ?? null),
+                      ),
+                    ),
                   Review: () => Effect.succeed(undefined),
                 }),
               )
