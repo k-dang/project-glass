@@ -34,6 +34,7 @@ import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import { BackgroundToolCalls, callStatus, toolCallsOf, TurnParts } from "./TurnParts"
 import { sentFrom, UserMessage } from "./UserMessage"
 import { threadColumn } from "./threadColumn"
+import { plural } from "./plural"
 import { referenceText } from "./queue"
 
 export function Transcript(props: {
@@ -144,13 +145,11 @@ function StartedWorkUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
   )
 }
 
-const counted = (count: number, one: string, many: string) => `${count} ${count === 1 ? one : many}`
-
 const reasonText = (reason: PullRequestUpdateReason) =>
   Match.valueTags(reason, {
-    FailingChecks: ({ checks }) => counted(checks.length, "check failed", "checks failed"),
+    FailingChecks: ({ checks }) => plural(checks.length, "check failed", "checks failed"),
     ReviewFeedback: ({ reviewThreads }) =>
-      counted(
+      plural(
         reviewThreads.length,
         "Review thread waits for a reply",
         "Review threads wait for a reply",
