@@ -98,6 +98,7 @@ export const testLayer = (handlers: Partial<Handlers>) =>
         GetEngineSettings: unused,
         SetEngineSettings: unused,
         GetQueueWork: () => Effect.succeed(false),
+        ReportRendererEvents: () => Effect.void,
         SetQueueWork: unused,
         GetStorageBreakdown: () => Effect.succeed([]),
         ListFollowedRepositories: () => Effect.succeed([]),

@@ -20,6 +20,7 @@ import { McpOAuth } from "./mcp/McpOAuth"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
+import { reportRendererEvents } from "./rendererEvents"
 import { engineSettingsOf, SettingsStore, withEngineSettings } from "./SettingsStore"
 import { Sandboxes } from "./Sandboxes"
 import { SavedPlaces } from "./SavedPlaces"
@@ -247,6 +248,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       RemoveFeedbackNote: ({ threadId, noteId }) => threads.removeFeedbackNote(threadId, noteId),
       GetRemovalWarnings: ({ threadId }) => threads.removalWarnings(threadId),
       RemoveThread: ({ threadId }) => threads.remove(threadId),
+      ReportRendererEvents: ({ events }) => reportRendererEvents(events),
       GetGlobalChatModel: () => globalChat.model,
       ChangeGlobalChatModel: (choice) => globalChat.changeModel(choice),
       WatchGlobalTranscript: () => globalChat.transcript,
