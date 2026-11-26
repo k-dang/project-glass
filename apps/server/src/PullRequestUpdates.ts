@@ -183,37 +183,35 @@ export class PullRequestUpdates extends Context.Service<
 
             const toldWithoutSending = toldAnew.flatMap(({ tells, told }) => (tells ? [] : [told]))
 
-            const updated = yield* Effect.forEach(
-              all,
-              ({ state: { subscription }, pullRequest, decision: { reasons } }) =>
-                Arr.isReadonlyArrayNonEmpty(reasons)
-                  ? recentEvents(pullRequest).pipe(
-                      Effect.map((recent): ReadonlyArray<UpdatedPullRequest> => [
-                        {
-                          subscriptionId: subscription.id,
-                          pullRequest,
-                          own: subscription.pullRequest === null,
-                          reasons,
-                          note: subscription.note,
-                          events: eventsBehind(reasons, recent),
-                        },
-                      ]),
-                    )
-                  : Effect.succeed([]),
-            ).pipe(Effect.map(Arr.flatten))
+            const due = all.flatMap(({ state: { subscription }, pullRequest, decision }) =>
+              Arr.isReadonlyArrayNonEmpty(decision.reasons)
+                ? [{ subscription, pullRequest, reasons: decision.reasons }]
+                : [],
+            )
 
-            if (!Arr.isReadonlyArrayNonEmpty(updated)) {
+            const full =
+              due.length > 0 && (yield* transcripts.runningPullRequestUpdates).length >= RUN_AT_ONCE
+
+            if (!Arr.isReadonlyArrayNonEmpty(due) || full) {
               yield* subscriptions.recordTold(toldWithoutSending, lastMessageTurn)
+
+              if (full) yield* waits
 
               return
             }
 
-            if ((yield* transcripts.runningPullRequestUpdates).length >= RUN_AT_ONCE) {
-              yield* subscriptions.recordTold(toldWithoutSending, lastMessageTurn)
-              yield* waits
-
-              return
-            }
+            const updated = yield* Effect.forEach(due, ({ subscription, pullRequest, reasons }) =>
+              recentEvents(pullRequest).pipe(
+                Effect.map((recent): UpdatedPullRequest => ({
+                  subscriptionId: subscription.id,
+                  pullRequest,
+                  own: subscription.pullRequest === null,
+                  reasons,
+                  note: subscription.note,
+                  events: eventsBehind(reasons, recent),
+                })),
+              ),
+            )
 
             const { pullRequestUpdateNote: note } = yield* settings.read()
             const startedAt = yield* DateTime.now
