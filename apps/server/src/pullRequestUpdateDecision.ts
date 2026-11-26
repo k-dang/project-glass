@@ -16,13 +16,16 @@ import {
 import { Array as Arr, Data, Predicate, Record, Schema } from "effect"
 import type { SubscribedDetails } from "./github/repositoryPullRequests"
 
-export const GIVES_UP_AFTER = 3
+const GIVES_UP_AFTER = 3
 
 const Updates = Schema.Record(Schema.Literals(openReasons), Schema.Int)
 
-const noUpdates = Schema.decodeUnknownSync(Updates)(
-  Object.fromEntries(openReasons.map((reason) => [reason, 0])),
-)
+const noUpdates = {
+  "failing-checks": 0,
+  "review-feedback": 0,
+  "changes-requested": 0,
+  "merge-conflict": 0,
+} satisfies Record<OpenReason, number>
 
 export const Told = Schema.Struct({
   failedRuns: Schema.NullOr(
