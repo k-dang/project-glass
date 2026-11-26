@@ -7,7 +7,6 @@ import {
 } from "@effect/atom-react"
 import {
   type Thread,
-  type InboxThread,
   isGone,
   isOutOfReach,
   type TurnEnd,
@@ -16,7 +15,7 @@ import {
   type SandboxStatus,
 } from "@glass/contracts"
 import { Link, Outlet, useNavigate, useParams } from "@tanstack/react-router"
-import { DateTime, Exit, Match, Option, Predicate } from "effect"
+import { DateTime, Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import {
   ChevronRight,
@@ -98,14 +97,7 @@ const workingMarker: Marker = {
   tone: "text-sky-600 dark:text-sky-400",
 }
 
-const markerOf = ({ reasons }: InboxThread): Marker => {
-  const reason = reasons.find(Predicate.isTagged("WaitingRequests")) ?? reasons[0]
-
-  return Match.valueTags(reason, {
-    WaitingRequests: () => ({ label: "Waiting on you", icon: CircleHelp, tone: warningTone }),
-    TurnFinished: ({ ended }) => turnEndingLooks[ended.ending._tag],
-  })
-}
+const waitingMarker: Marker = { label: "Waiting on you", icon: CircleHelp, tone: warningTone }
 
 const expiryFormat = new Intl.DateTimeFormat(undefined, {
   weekday: "short",
@@ -476,7 +468,10 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
   const pullRequestId = useId()
   const pullRequest = useThreadPullRequest(thread.id)
 
-  const inboxThread = useAtomValue(threadsInInboxAtom).get(thread.id)
+  const waiting =
+    useAtomValue(threadsInInboxAtom)
+      .get(thread.id)
+      ?.reasons.some(Predicate.isTagged("WaitingRequests")) ?? false
 
   const working = Option.getOrElse(
     AsyncResult.value(useAtomValue(workingThreadsAtom)),
@@ -488,16 +483,15 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
     () => noUnseenTurns,
   ).get(thread.id)
 
-  const showsWorking = inboxThread === undefined && unseen === undefined && working
+  const showsWorking = !waiting && unseen === undefined && working
 
-  const marker =
-    inboxThread !== undefined
-      ? markerOf(inboxThread)
-      : unseen !== undefined
-        ? turnEndingLooks[unseen.ending._tag]
-        : showsWorking
-          ? workingMarker
-          : null
+  const marker = waiting
+    ? waitingMarker
+    : unseen !== undefined
+      ? turnEndingLooks[unseen.ending._tag]
+      : showsWorking
+        ? workingMarker
+        : null
 
   const removeNow = () => {
     setConfirming(null)

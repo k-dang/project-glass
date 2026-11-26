@@ -53,7 +53,6 @@ import {
   TurnDone,
   TurnEnded,
   TurnFailed,
-  TurnFinished,
   TurnStarted,
   TurnStopped,
   QueuedMessageStarted,
@@ -349,14 +348,7 @@ it("says in the Threads panel how a Turn that finished unseen ended", async () =
 
   mount(
     {
-      WatchInbox: () =>
-        Stream.make([
-          InboxThread.make({
-            thread,
-            reasons: [TurnFinished.make({ ended })],
-            since: ended.at,
-          }),
-        ]),
+      WatchUnseenTurns: () => Stream.make([{ threadId: thread.id, ended }]),
     },
     "/threads",
   )
