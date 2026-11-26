@@ -2,7 +2,7 @@ import { AgentHarness, ThreadError, type FollowedRepository } from "@glass/contr
 import { Context, Effect, FileSystem, Layer, Option, Stream } from "effect"
 import { join } from "node:path"
 import { placeholderBranch } from "./BranchNames"
-import { Git, type GitFailed } from "./git"
+import { Git, type GitFailed, renameBranch } from "./git"
 import { type CarriedOn, LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
 import { asThreadError, type Placement, type PlacedThread, type SubscribeLost } from "./Placement"
@@ -106,23 +106,11 @@ export class LocalPlacement extends Context.Service<
       })
 
       // WARNING: `git branch -m` and `branch -D` rewrite .git/config, which fails on Windows while any other git process reads it.
-      const useBranch = Effect.fn("LocalPlacement.useBranch")(function* (
-        { thread, folder }: PlacedThread,
-        branch: string,
-      ) {
-        yield* git
-          .run(folder, ["switch", "--no-track", "-c", branch])
-          .pipe(gitFailure(`Couldn't rename the Thread's branch to ${branch}.`))
-
-        if (thread.branch === null) return
-
-        yield* git.run(folder, ["update-ref", "-d", `refs/heads/${thread.branch}`]).pipe(
-          Effect.tapError((cause) =>
-            Effect.logWarning(`Couldn't delete the placeholder branch ${thread.branch}`, cause),
-          ),
-          Effect.ignore,
+      const useBranch = ({ thread, folder }: PlacedThread, branch: string) =>
+        renameBranch(git, folder, thread.branch, branch).pipe(
+          gitFailure(`Couldn't rename the Thread's branch to ${branch}.`),
+          Effect.withSpan("LocalPlacement.useBranch"),
         )
-      })
 
       const baseRef = Effect.fn("LocalPlacement.baseRef")(function* ({ thread }: PlacedThread) {
         const checkout = yield* checkoutOf(thread.repository)

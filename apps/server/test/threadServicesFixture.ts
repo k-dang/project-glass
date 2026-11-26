@@ -163,6 +163,7 @@ export const threadServicesFixture = Effect.gen(function* () {
       }),
     uncommitted: () => Effect.sync(() => uncommitted),
     branch: (folder) => Effect.succeed(folder),
+    useBranch: () => Effect.void,
     files: () => Effect.succeed([]),
   })
 

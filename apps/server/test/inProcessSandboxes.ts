@@ -18,7 +18,7 @@ import { Rpc, RpcGroup, RpcSerialization, RpcServer } from "effect/rpc"
 import { RPC_PATH } from "@glass/contracts"
 import { createServer } from "node:http"
 import type { Socket } from "node:net"
-import type { Changes } from "../src/Changes"
+import { Changes } from "../src/Changes"
 import type { FolderFiles } from "../src/agentHost/FolderFiles"
 import type { HostThreads } from "../src/agentHost/HostThreads"
 import type { HostGlassTools } from "../src/agentHost/HostGlassTools"
@@ -199,7 +199,17 @@ export const inProcessSandboxes = Effect.fnUntraced(function* (
     const services = await runPromise(
       Layer.buildWithScope(
         (kind.kind === "current"
-          ? hostServer({ token: Redacted.make(token), shutDown }).pipe(Layer.provideMerge(host()))
+          ? hostServer({ token: Redacted.make(token), shutDown }).pipe(
+              Layer.updateService(Changes, (changes) =>
+                Changes.of({
+                  ...changes,
+                  branch: () => Effect.sync(() => branches.get(threadId) ?? null),
+                  useBranch: (_folder, branch) =>
+                    Effect.sync(() => void branches.set(threadId, branch)),
+                }),
+              ),
+              Layer.provideMerge(host()),
+            )
           : otherHost(kind, shutDown)
         ).pipe(
           Layer.provideMerge(NodeHttpServer.layer(() => server, { port: 0, host: "127.0.0.1" })),
