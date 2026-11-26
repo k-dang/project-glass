@@ -8,6 +8,7 @@ import { Schema } from "effect"
 import { login, GitHubAuthor } from "./author"
 import { aliasedLookup } from "./aliasedLookups"
 import { checksOfRollup, StatusState } from "./checkContexts"
+import { GitHubPullRequestState } from "./repositoryPullRequests"
 
 const GitHubQueuedPullRequest = Schema.Struct({
   id: Schema.String,
@@ -17,7 +18,7 @@ const GitHubQueuedPullRequest = Schema.Struct({
   author: GitHubAuthor,
   updatedAt: Schema.DateTimeUtcFromString,
   isDraft: Schema.Boolean,
-  state: Schema.Literals(["OPEN", "CLOSED", "MERGED"]),
+  state: GitHubPullRequestState,
   baseRefOid: Schema.String,
   headRefOid: Schema.String,
   repository: Schema.Struct({
