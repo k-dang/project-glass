@@ -106,7 +106,7 @@ export const mirrorOf = (mirror: Mirror, repository: FollowedRepository) =>
     (candidate) => repositoryKey(candidate.repository) === repositoryKey(repository),
   )
 
-// WARNING: GitHub matches owner and repository names ignoring case, and a Followed repository keeps the case the user typed.
+// WARNING: GitHub matches owner and repository names ignoring case, and answers with its own spelling of them.
 export const isRepositoryOf =
   ({ owner, repo }: Pick<PullRequestRef, "owner" | "repo">) =>
   (repository: FollowedRepository) =>

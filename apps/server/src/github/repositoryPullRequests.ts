@@ -384,7 +384,7 @@ export interface SubscribedPullRequest {
   readonly details: SubscribedDetails
 }
 
-// WARNING: GitHub's author association is the only sign of write access a PR's comments carry; owners, members and collaborators have it.
+// WARNING: GitHub's author association is the only sign of write access a PR's comments carry. A member or collaborator can have read access alone, and still counts here.
 const writeAccess = new Set(["OWNER", "MEMBER", "COLLABORATOR"])
 
 const authorOf = ({
