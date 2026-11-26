@@ -1,6 +1,11 @@
 import type { PullRequestRef, ThreadPullRequest } from "@glass/contracts"
-import { Effect, Stream } from "effect"
-import { type Mirror, mirroredPullRequest, PullRequestMirror } from "./PullRequestMirror"
+import { DateTime, Effect, Stream } from "effect"
+import {
+  type Mirror,
+  mirroredPullRequest,
+  mirroredRepositoryOf,
+  PullRequestMirror,
+} from "./PullRequestMirror"
 import { decide, type Decision, PullRequestNow, type Told } from "./pullRequestUpdateDecision"
 import { type SubscriptionState, Subscriptions } from "./Subscriptions"
 import { ThreadPullRequests } from "./ThreadPullRequests"
@@ -15,6 +20,7 @@ const subscribedNow = (
   { subscription, ended }: SubscriptionState,
   mirror: Mirror | undefined,
   own: ThreadPullRequest | undefined,
+  readSince: DateTime.Utc | undefined,
 ): SubscribedNow | undefined => {
   if (ended !== null)
     return { pullRequest: ended.pullRequest, now: PullRequestNow.Ended({ state: ended.state }) }
@@ -22,6 +28,11 @@ const subscribedNow = (
   const pullRequest = subscription.pullRequest ?? own?.ref
 
   if (mirror === undefined || pullRequest === undefined) return undefined
+
+  const readAt = mirroredRepositoryOf(mirror, pullRequest)?.syncedAt
+
+  if (readSince !== undefined && (readAt === undefined || DateTime.isLessThan(readAt, readSince)))
+    return undefined
 
   const mirrored = mirroredPullRequest(mirror, pullRequest)
 
@@ -45,7 +56,7 @@ export interface SubscriptionDecision {
   readonly decision: Decision
 }
 
-export const subscriptionDecisions = Effect.gen(function* () {
+export const subscriptionDecisions = Effect.fnUntraced(function* (readSince?: DateTime.Utc) {
   const subscriptions = yield* Subscriptions
   const transcripts = yield* Transcripts
   const mirror = yield* PullRequestMirror
@@ -58,7 +69,7 @@ export const subscriptionDecisions = Effect.gen(function* () {
     const lastMessageTurn = yield* transcripts.lastMessageTurn(threadId)
 
     const all = states.flatMap((state): ReadonlyArray<SubscriptionDecision> => {
-      const subscribed = subscribedNow(state, mirrored, own)
+      const subscribed = subscribedNow(state, mirrored, own, readSince)
 
       if (subscribed === undefined) return []
 

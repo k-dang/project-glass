@@ -36,7 +36,7 @@ export class PullRequestStandings extends Context.Service<
       const transcripts = yield* Transcripts
       const mirror = yield* PullRequestMirror
       const threadPullRequests = yield* ThreadPullRequests
-      const decided = yield* subscriptionDecisions
+      const decided = yield* subscriptionDecisions()
 
       const standingsOf = Effect.fnUntraced(function* (
         thread: Thread,

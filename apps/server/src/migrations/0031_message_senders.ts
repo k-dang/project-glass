@@ -5,7 +5,7 @@ export default Effect.gen(function* () {
   const sql = yield* SqlClient.SqlClient
 
   yield* sql`ALTER TABLE thread ADD COLUMN created_by TEXT`
-  yield* sql`ALTER TABLE thread_queued_message ADD COLUMN sent_by TEXT NOT NULL DEFAULT 'user'`
+  yield* sql`ALTER TABLE thread_queued_message ADD COLUMN sent_by TEXT NOT NULL DEFAULT 'agent'`
   yield* sql`ALTER TABLE thread_turn ADD COLUMN started_by TEXT NOT NULL DEFAULT 'user'`
   yield* sql`
     UPDATE thread_turn SET started_by = 'glass'

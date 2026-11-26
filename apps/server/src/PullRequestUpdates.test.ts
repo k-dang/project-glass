@@ -695,6 +695,41 @@ it.live("after a restart sends nothing twice, and tells what the PR's state call
   }),
 )
 
+it.live("sends nothing after a restart for a failure that passed while Glass was closed", () =>
+  Effect.gen(function* () {
+    const f = yield* subscribedThread()
+    yield* f.send(f.thread.id, "hold:busy")
+    yield* f.transcript(f.thread.id, holding)
+    fail(f.pullRequest, failed("lint"))
+    yield* f.client.ListPullRequests()
+
+    pass(f.pullRequest)
+    const restarted = yield* f.restartBackend
+    yield* f.release("busy")
+    yield* f.transcript(f.thread.id, settled(3), restarted.client)
+    yield* restarted.client.ListPullRequests()
+
+    yield* restarted.client.SendMessage({
+      threadId: f.thread.id,
+      message: "Carry on",
+      images: [],
+      feedback: [],
+    })
+
+    const turns = yield* f.transcript(f.thread.id, lastSettled("Carry on"), restarted.client)
+
+    assert.deepStrictEqual(
+      turns.map((turn) => [turn.message, reasonsTold(turn)]),
+      [
+        [turns[0]?.message, undefined],
+        [turns[1]?.message, undefined],
+        ["hold:busy", undefined],
+        ["Carry on", undefined],
+      ],
+    )
+  }),
+)
+
 it.live("sends a PR update to a Thread in a Sandbox", () =>
   Effect.gen(function* () {
     const f = yield* threadsFixture

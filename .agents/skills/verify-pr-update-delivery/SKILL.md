@@ -32,7 +32,7 @@ Synced with the code at commit `bdad3325b800762a742f919fc2c5af2a83e5a0ff`. Befor
 
 | Model | Code |
 | --- | --- |
-| `ChecksFail`, `ChecksRunAgain`, `NewPushHasNoChecksYet`, `ChecksPass` | What a read of the PR mirror shows: `subscribedNow` in `apps/server/src/subscriptionDecisions.ts` |
+| `ChecksFail`, `ChecksRunAgain`, `NewPushHasNoChecksYet`, `ChecksPass` | What a read of the PR mirror shows: `subscribedNow` in `apps/server/src/subscriptionDecisions.ts`, which gives the sender nothing for a repository not read since Glass started |
 | `Decide` | One `threads.whenIdle` transaction in `sendUpdate` in `apps/server/src/PullRequestUpdates.ts`, which plans what to send and record in `planned`; `whenIdle` in `apps/server/src/ThreadTurns.ts`; `idle` in `apps/server/src/Transcripts.ts` |
 | `IsNew`, `DecideNothingHolds`, `Count(t) < GivesUpAfter` | `decide` and `failingChecks` in `apps/server/src/pullRequestUpdateDecision.ts` (`cleared` returns the count to zero; `unsettled` keeps it, both while checks run again and while a new push has none yet) |
 | `SlotFree` | `runningPullRequestUpdates` in `Transcripts.ts`, compared with `RUN_AT_ONCE` in `PullRequestUpdates.ts` |

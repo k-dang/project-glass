@@ -82,7 +82,7 @@ export const PullRequestUpdates = Layer.effectDiscard(
     const threadPullRequests = yield* ThreadPullRequests
     const settings = yield* SettingsStore
     const eventLog = yield* EventLog
-    const decided = yield* subscriptionDecisions
+    const decided = yield* subscriptionDecisions(yield* DateTime.now)
 
     const updatedPullRequest = ({ subscription, pullRequest, reasons }: Due) =>
       eventLog.list({ limit: EVENTS_READ, pullRequests: [pullRequest] }).pipe(
