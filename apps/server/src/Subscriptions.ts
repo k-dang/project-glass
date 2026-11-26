@@ -336,19 +336,23 @@ export class Subscriptions extends Context.Service<
       })
 
       const endOwn = Effect.fnUntraced(function* (listed: ReadonlyArray<ThreadPullRequest>) {
-        yield* Effect.forEach(
-          listed,
-          (own) => {
-            const state = endedStateOf(own)
+        const ended = listed.flatMap((own) => {
+          const state = endedStateOf(own)
 
-            return state === null
-              ? Effect.void
-              : stored(sql`owner IS NULL AND ended IS NULL AND thread_id = ${own.threadId}`).pipe(
-                  Effect.flatMap((subscriptions) =>
-                    endTold(subscriptions, { state, pullRequest: own.ref }),
-                  ),
-                )
-          },
+          return state === null ? [] : [{ own, state }]
+        })
+
+        if (ended.length === 0) return
+
+        const subscriptions = yield* stored(sql`owner IS NULL AND ended IS NULL`)
+
+        yield* Effect.forEach(
+          ended,
+          ({ own, state }) =>
+            endTold(
+              subscriptions.filter(({ threadId }) => threadId === own.threadId),
+              { state, pullRequest: own.ref },
+            ),
           { discard: true },
         )
       })
