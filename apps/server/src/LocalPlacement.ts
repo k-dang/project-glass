@@ -70,7 +70,10 @@ export class LocalPlacement extends Context.Service<
 
         const discard = git
           .run(checkout.path, ["worktree", "remove", "--force", folder])
-          .pipe(Effect.andThen(git.run(checkout.path, ["branch", "-D", name])), Effect.ignore)
+          .pipe(
+            Effect.andThen(git.run(checkout.path, ["update-ref", "-d", `refs/heads/${name}`])),
+            Effect.ignore,
+          )
 
         return { branch: name, folder, discard }
       })
@@ -102,10 +105,24 @@ export class LocalPlacement extends Context.Service<
         return `${local}\n${remote}`.split("\n").map((line) => line.replace(/^.*refs\/heads\//, ""))
       })
 
-      const useBranch = ({ folder }: PlacedThread, branch: string) =>
-        git
-          .run(folder, ["branch", "-m", branch])
+      // WARNING: `git branch -m` and `branch -D` rewrite .git/config, which fails on Windows while any other git process reads it.
+      const useBranch = Effect.fn("LocalPlacement.useBranch")(function* (
+        { thread, folder }: PlacedThread,
+        branch: string,
+      ) {
+        yield* git
+          .run(folder, ["switch", "--no-track", "-c", branch])
           .pipe(gitFailure(`Couldn't rename the Thread's branch to ${branch}.`))
+
+        if (thread.branch === null) return
+
+        yield* git.run(folder, ["update-ref", "-d", `refs/heads/${thread.branch}`]).pipe(
+          Effect.tapError((cause) =>
+            Effect.logWarning(`Couldn't delete the placeholder branch ${thread.branch}`, cause),
+          ),
+          Effect.ignore,
+        )
+      })
 
       const baseRef = Effect.fn("LocalPlacement.baseRef")(function* ({ thread }: PlacedThread) {
         const checkout = yield* checkoutOf(thread.repository)
