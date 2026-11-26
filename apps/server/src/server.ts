@@ -131,7 +131,13 @@ const services = (
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer,
 ) =>
-  Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge)
+  Layer.mergeAll(
+    GlassRpcHandlers,
+    mcpTools,
+    StartedWorkUpdates,
+    CompleteToDosOnMerge,
+    PullRequestUpdates.layer,
+  )
     .pipe(
       Layer.provide(
         Inbox.layer.pipe(
