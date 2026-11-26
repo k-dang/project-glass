@@ -29,6 +29,7 @@ import {
   isRepositoryOf,
   type Mirror,
   mirroredPullRequest,
+  mirroredRepositoryOf,
   PullRequestMirror,
 } from "./PullRequestMirror"
 import { countedAfresh, EndedState, nothingTold, Told } from "./pullRequestUpdateDecision"
@@ -153,9 +154,6 @@ const endedStateOf = ({ state }: ThreadPullRequest): EndedState | null => {
 
   return Predicate.isTagged(state, "Merged") ? "merged" : "closed"
 }
-
-const isMirrored = (mirror: Mirror, pullRequest: PullRequestRef) =>
-  mirror.repositories.some(({ repository }) => isRepositoryOf(pullRequest)(repository))
 
 const sameSubscriptions = Schema.toEquivalence(Schema.Array(Subscription))
 
@@ -363,7 +361,7 @@ export class Subscriptions extends Context.Service<
             const { pullRequest } = subscriptionOf(subscription)
 
             return pullRequest !== null &&
-              isMirrored(mirrored, pullRequest) &&
+              mirroredRepositoryOf(mirrored, pullRequest) !== undefined &&
               mirroredPullRequest(mirrored, pullRequest) === undefined
               ? [{ subscription, pullRequest }]
               : []

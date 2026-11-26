@@ -112,10 +112,13 @@ export const isRepositoryOf =
   (repository: FollowedRepository) =>
     repositoryKey(repository).toLowerCase() === `${owner}/${repo}`.toLowerCase()
 
+export const mirroredRepositoryOf = (mirror: Mirror, pullRequest: PullRequestRef) =>
+  mirror.repositories.find(({ repository }) => isRepositoryOf(pullRequest)(repository))
+
 export const mirroredPullRequest = (mirror: Mirror, pullRequest: PullRequestRef) =>
-  mirror.repositories
-    .find(({ repository }) => isRepositoryOf(pullRequest)(repository))
-    ?.pullRequests.find(({ ref }) => ref.number === pullRequest.number)
+  mirroredRepositoryOf(mirror, pullRequest)?.pullRequests.find(
+    ({ ref }) => ref.number === pullRequest.number,
+  )
 
 export const openPullRequestOf = (
   mirror: Mirror,
