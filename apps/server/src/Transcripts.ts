@@ -10,7 +10,6 @@ import {
   Image,
   type MessageDelivery,
   PartAppended,
-  type PullRequestUpdate,
   ThreadBusy,
   QueuedMessagesChanged,
   QueuedMessage,
@@ -129,7 +128,7 @@ const decodeEnds = Schema.decodeUnknownEffect(
     Schema.Struct({
       threadId: Schema.String,
       ended: Schema.fromJsonString(TurnEnd),
-      pullRequestUpdate: Schema.BooleanFromBit,
+      update: Schema.BooleanFromBit,
     }),
   ),
 )
@@ -178,9 +177,9 @@ const decodeRunningContexts = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ threadId: Schema.String, context: ContextJson })),
 )
 
-export interface RunningPullRequestUpdate {
+export interface RunningContext {
   readonly threadId: string
-  readonly update: PullRequestUpdate
+  readonly context: TurnContext | null
 }
 
 const decodePositions = Schema.decodeUnknownEffect(
@@ -206,7 +205,7 @@ export type WaitingByThread = ReadonlyMap<string, Arr.NonEmptyReadonlyArray<Wait
 
 interface UnseenEnd {
   readonly ended: TurnEnd
-  readonly pullRequestUpdate: boolean
+  readonly update: boolean
 }
 
 type UnseenByThread = ReadonlyMap<string, UnseenEnd>
@@ -322,10 +321,7 @@ export class Transcripts extends Context.Service<
       turnId: string | null,
     ) => Effect.Effect<TurnStarter | null, ThreadError>
     readonly lastMessageTurn: (threadId: string) => Effect.Effect<string | null, ThreadError>
-    readonly runningPullRequestUpdates: Effect.Effect<
-      ReadonlyArray<RunningPullRequestUpdate>,
-      ThreadError
-    >
+    readonly runningContexts: Effect.Effect<ReadonlyArray<RunningContext>, ThreadError>
     readonly startOrQueue: (
       threadId: string,
       input: MessageWithContext,
@@ -446,7 +442,7 @@ export class Transcripts extends Context.Service<
       const lastEnds = (conditions: ReadonlyArray<string | Statement.Fragment>) =>
         sql`
           SELECT a.id AS threadId, t.ended AS ended,
-            json_extract(t.context, '$._tag') IS 'PullRequestUpdate' AS pullRequestUpdate
+            json_extract(t.context, '$._tag') IS 'Update' AS "update"
           FROM (
             SELECT id, turn_seen_at FROM thread
             UNION ALL SELECT id, turn_seen_at FROM global_chat_session WHERE ended_at IS NULL
@@ -1098,17 +1094,10 @@ export class Transcripts extends Context.Service<
               Effect.map(([turn]) => turn?.id ?? null),
             ),
           ),
-        runningPullRequestUpdates: withStorageFailure(
-          "read the running PR updates",
+        runningContexts: withStorageFailure(
+          "read what the running Turns were started with",
           sql`SELECT thread_id AS threadId, context FROM thread_turn WHERE ended IS NULL`.pipe(
             Effect.flatMap(decodeRunningContexts),
-            Effect.map((running) =>
-              running.flatMap(({ threadId, context }) =>
-                Predicate.isTagged(context, "PullRequestUpdate")
-                  ? [{ threadId, update: context }]
-                  : [],
-              ),
-            ),
           ),
         ),
         settleUndelivered: Effect.fnUntraced(function* (threadId, turnId, reason) {

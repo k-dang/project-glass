@@ -3,15 +3,12 @@ import {
   type OpenReason,
   openReasons,
   type PullRequestRef,
-  type PullRequestUpdate,
-  subscriptionReasonOf,
   type Thread,
 } from "@glass/contracts"
 import { Array as Arr, Context, Effect, Layer, Option, Stream } from "effect"
-import { PullRequestMirror } from "./PullRequestMirror"
-import { changed, subscriptionDecisions } from "./subscriptionDecisions"
+import { GitHubSource } from "./GitHubSource"
+import { changed, type Telling, telling } from "./Source"
 import { Subscriptions } from "./Subscriptions"
-import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Threads } from "./Threads"
 import { Transcripts } from "./Transcripts"
 
@@ -34,28 +31,24 @@ export class PullRequestStandings extends Context.Service<
       const threads = yield* Threads
       const subscriptions = yield* Subscriptions
       const transcripts = yield* Transcripts
-      const mirror = yield* PullRequestMirror
-      const threadPullRequests = yield* ThreadPullRequests
-      const decided = yield* subscriptionDecisions()
+      const gitHub = yield* GitHubSource
 
       const standingsOf = Effect.fnUntraced(function* (
         thread: Thread,
-        running: PullRequestUpdate | undefined,
+        running: ReadonlyArray<Telling>,
       ) {
-        const { all } = yield* decided(thread.id)
+        const all = yield* gitHub.decisions(thread.id)
 
         return all.flatMap(({ state: { subscription }, pullRequest, decision }) =>
           openReasons.flatMap((reason): ReadonlyArray<PullRequestStanding> => {
             const standing = decision.standing[reason]
 
-            if (standing === null) return []
+            if (standing === undefined) return []
 
-            const beingTold =
-              running?.pullRequests.some(
-                ({ subscriptionId, reasons }) =>
-                  subscriptionId === subscription.id &&
-                  reasons.some(({ _tag }) => subscriptionReasonOf[_tag] === reason),
-              ) === true
+            const beingTold = running.some(
+              ({ subscriptionId, reasons }) =>
+                subscriptionId === subscription.id && reasons.includes(reason),
+            )
 
             return [
               {
@@ -76,14 +69,19 @@ export class PullRequestStandings extends Context.Service<
           (): ReadonlyArray<Thread> => [],
         )
 
-        const running = yield* transcripts.runningPullRequestUpdates
+        const running = yield* transcripts.runningContexts
 
         return yield* Effect.forEach(yield* subscriptions.subscribedThreads, (threadId) => {
           const thread = listed.find(({ id }) => id === threadId)
 
           return thread === undefined || (thread.sandbox !== null && isGone(thread.sandbox.reach))
             ? Effect.succeed([])
-            : standingsOf(thread, running.find((update) => update.threadId === threadId)?.update)
+            : standingsOf(
+                thread,
+                running.flatMap((turn) =>
+                  turn.threadId === threadId ? (telling(turn.context) ?? []) : [],
+                ),
+              )
         }).pipe(Effect.map(Arr.flatten))
       }).pipe(
         Effect.catch((cause) =>
@@ -97,8 +95,7 @@ export class PullRequestStandings extends Context.Service<
         watch: () =>
           changed([
             subscriptions.changes,
-            mirror.changes,
-            threadPullRequests.watch(),
+            ...gitHub.source.changes,
             threads.watch(),
             threads.keptGoing,
             transcripts.running,

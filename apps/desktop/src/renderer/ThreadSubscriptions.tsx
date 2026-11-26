@@ -11,7 +11,10 @@ import { BellRing, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { endSubscriptionAtom, subscriptionsAtom } from "./threadsArea"
 
-const pullRequestLabel = ({ pullRequest }: Subscription, own: OwnPullRequest | undefined) => {
+const subjectLabel = (
+  { subject: { pullRequest } }: Subscription,
+  own: OwnPullRequest | undefined,
+) => {
   if (pullRequest !== null) return referenceText(pullRequest)
 
   return own === undefined
@@ -36,7 +39,7 @@ export function ThreadSubscriptions(props: {
       <div className="-mx-1 my-1 border-t" />
       <ul aria-label="Subscriptions">
         {subscriptions.map((subscription) => {
-          const label = pullRequestLabel(subscription, props.pullRequest)
+          const label = subjectLabel(subscription, props.pullRequest)
 
           return (
             <li key={subscription.id} className="flex items-start gap-2 px-2 py-1 text-xs">

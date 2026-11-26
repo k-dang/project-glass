@@ -226,7 +226,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
           Effect.gen(function* () {
             const update =
               Predicate.isTagged(context, "StartedWorkUpdate") ||
-              Predicate.isTagged(context, "PullRequestUpdate")
+              Predicate.isTagged(context, "Update")
 
             const scripted = update ? scriptedUpdateCall.exec(prompt) : scriptedCall.exec(message)
 
@@ -329,10 +329,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
               )
             }
 
-            if (
-              prompt.includes("<glass_feedback>") ||
-              Predicate.isTagged(context, "PullRequestUpdate")
-            )
+            if (prompt.includes("<glass_feedback>") || Predicate.isTagged(context, "Update"))
               yield* part(turnId, TextPart.make({ text: prompt }))
 
             yield* part(turnId, TextPart.make({ text: `Reply to: ${message}` }))

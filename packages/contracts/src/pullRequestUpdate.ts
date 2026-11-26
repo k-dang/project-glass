@@ -77,12 +77,17 @@ export const UpdatedPullRequest = Schema.Struct({
 
 export type UpdatedPullRequest = typeof UpdatedPullRequest.Type
 
-export const PullRequestUpdate = Schema.TaggedStruct("PullRequestUpdate", {
-  pullRequests: Schema.NonEmptyArray(UpdatedPullRequest),
+export const PullRequestUpdate = Schema.TaggedStruct("Update", {
+  source: Schema.Literal("github"),
+  subjects: Schema.NonEmptyArray(UpdatedPullRequest),
   note: Schema.String,
 })
 
 export type PullRequestUpdate = typeof PullRequestUpdate.Type
+
+export const Update = Schema.Union([PullRequestUpdate])
+
+export type Update = typeof Update.Type
 
 export const PullRequestUpdateNote = Schema.Trimmed.check(Schema.isNonEmpty())
 

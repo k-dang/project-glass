@@ -452,8 +452,8 @@ const recentEvents = (
   )
 
 const eventsBehind = (turn: Turn | undefined) =>
-  Predicate.isTagged(turn?.context, "PullRequestUpdate")
-    ? turn.context.pullRequests.flatMap(({ events }) => events.map(({ event }) => event._tag))
+  Predicate.isTagged(turn?.context, "Update")
+    ? turn.context.subjects.flatMap(({ events }) => events.map(({ event }) => event._tag))
     : undefined
 
 it.live(
@@ -634,7 +634,7 @@ it.live("refuses a Subscription asked for in a PR update", () =>
 
     assert.deepStrictEqual(calledBy(update), {
       status: "failed",
-      text: "Glass started this Turn, so it can't subscribe your Thread to a PR. Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can.",
+      text: "Glass started this Turn, so it can't subscribe your Thread. Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can.",
     })
     assert.deepStrictEqual(subscription?.reasons, ["failing-checks"])
   }),
@@ -652,7 +652,7 @@ it.live("refuses a Subscription asked for in a Turn the Agent harness started by
 
     assert.deepStrictEqual(calledBy(unprompted), {
       status: "failed",
-      text: "The agent started this Turn by itself, so it can't subscribe your Thread to a PR. Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can.",
+      text: "The agent started this Turn by itself, so it can't subscribe your Thread. Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can.",
     })
     assert.deepStrictEqual(yield* subscriptionsLeft(f, thread.id, 0), [])
   }),
@@ -747,11 +747,12 @@ it.live("sends a PR update to a Thread in a Sandbox", () =>
 )
 
 const UpdateUnit = Schema.Struct({
-  event: Schema.Literal("PullRequestUpdate"),
+  event: Schema.Literal("Update"),
   outcome: Schema.String,
   thread_id: Schema.String,
   turn_id: Schema.String,
-  pr: Schema.String,
+  source: Schema.String,
+  subjects: Schema.String,
   reasons: Schema.String,
 })
 
@@ -782,12 +783,13 @@ it.live("logs each PR update as one unit of work, with ids and reasons and no co
       lines.flatMap((line) => Option.toArray(decodeUpdateUnit(line))),
       [
         {
-          event: "PullRequestUpdate",
+          event: "Update",
           outcome: "success",
           thread_id: sent.threadId,
           turn_id: sent.turnId ?? "",
-          pr: "glass-demo/greeter#7",
-          reasons: "FailingChecks,ReviewFeedback",
+          source: "github",
+          subjects: "glass-demo/greeter#7",
+          reasons: "failing-checks,review-feedback",
         },
       ],
     )
@@ -810,7 +812,7 @@ it.live("gives every PR update the PR update note the user set", () =>
     const [, , update] = yield* f.transcript(f.thread.id, settled(3))
 
     assert.strictEqual(
-      Predicate.isTagged(update?.context, "PullRequestUpdate") ? update.context.note : null,
+      Predicate.isTagged(update?.context, "Update") ? update.context.note : null,
       note,
     )
     assert.include(received(update), note)

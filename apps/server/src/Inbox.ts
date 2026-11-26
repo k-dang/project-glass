@@ -50,7 +50,7 @@ import {
   summaryOf,
 } from "./PullRequestMirror"
 import { type PullRequestStanding, PullRequestStandings } from "./PullRequestStandings"
-import { partitionFeedback } from "./pullRequestUpdateDecision"
+import { partitionFeedback } from "./pullRequestNow"
 import { Queue } from "./Queue"
 import type { WaitingRequest } from "./Transcripts"
 
@@ -123,7 +123,7 @@ const inboxOf = (waiting: Waiting): InboxItems =>
     [
       ...waiting.threads.map(waitingItem),
       ...waiting.finished.flatMap((finished) =>
-        finished.pullRequestUpdate && Predicate.isTagged(finished.ended.ending, "Done")
+        finished.update && Predicate.isTagged(finished.ended.ending, "Done")
           ? []
           : [finishedItem(finished)],
       ),

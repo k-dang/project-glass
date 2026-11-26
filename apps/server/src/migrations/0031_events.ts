@@ -9,11 +9,13 @@ export default Effect.gen(function* () {
       id INTEGER PRIMARY KEY,
       source TEXT NOT NULL,
       kind TEXT NOT NULL,
-      pull_request TEXT NOT NULL,
+      subject TEXT NOT NULL,
+      once TEXT,
       payload TEXT NOT NULL,
       occurred_at TEXT NOT NULL
     )
   `
-  yield* sql`CREATE INDEX event_pull_request ON event (pull_request, id)`
+  yield* sql`CREATE INDEX event_subject ON event (source, subject, id)`
+  yield* sql`CREATE UNIQUE INDEX event_once ON event (source, once) WHERE once IS NOT NULL`
   yield* sql`CREATE INDEX event_occurred_at ON event (occurred_at)`
 })

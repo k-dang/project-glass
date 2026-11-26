@@ -32,16 +32,16 @@ Synced with the code at commit `f775437165e09892033e52a62e912c446b589d14`. Befor
 
 | Model | Code |
 | --- | --- |
-| `ChecksFail`, `ChecksRunAgain`, `NewPushHasNoChecksYet`, `ChecksPass` | What a read of the PR mirror shows: `subscribedNow` in `apps/server/src/subscriptionDecisions.ts`, which gives the sender nothing for a repository not read since Glass started |
-| `Decide` | One `threads.whenIdle` transaction in `sendUpdate` in `apps/server/src/PullRequestUpdates.ts`, which plans what to send and record in `planned`; `whenIdle` in `apps/server/src/ThreadTurns.ts`; `idle` in `apps/server/src/Transcripts.ts` |
-| `IsNew`, `DecideNothingHolds`, `Count(t) < GivesUpAfter` | `decide` and `failingChecks` in `apps/server/src/pullRequestUpdateDecision.ts` (`cleared` returns the count to zero; `unsettled` keeps it, both while checks run again and while a new push has none yet) |
-| `SlotFree` | `runningPullRequestUpdates` in `Transcripts.ts`, compared with `RUN_AT_ONCE` in `PullRequestUpdates.ts` |
+| `ChecksFail`, `ChecksRunAgain`, `NewPushHasNoChecksYet`, `ChecksPass` | What a read of the PR mirror shows: `subscribedNow` in `apps/server/src/GitHubSource.ts`, which gives the sender nothing for a repository not read since Glass started |
+| `Decide` | One `threads.whenIdle` transaction in `sendUpdate` in `apps/server/src/Updates.ts`, which asks each Source's `decide` what to send and plans what to record in `toRecord`; `whenIdle` in `apps/server/src/ThreadTurns.ts`; `idle` in `apps/server/src/Transcripts.ts` |
+| `IsNew`, `DecideNothingHolds`, `Count(t) < GivesUpAfter` | `decide` in `apps/server/src/updateDecision.ts` and `failingChecks` in `apps/server/src/pullRequestNow.ts` (`cleared` returns the count to zero; `unsettled` keeps it, both while checks run again and while a new push has none yet) |
+| `SlotFree` | `runningUpdates` in `Updates.ts`, which counts the running Turns `runningContexts` in `Transcripts.ts` reads, compared with `RUN_AT_ONCE` |
 | `StartUpdate` | `startIfIdle` in `Transcripts.ts`, with `recordTold` in `apps/server/src/Subscriptions.ts` in the same transaction |
-| `afterNewMessage`, `MessageReaches` | `lastMessageTurn` in `Transcripts.ts`, which reads the Turns your message started (`started_by = 'user'`) and your Steers, against `afterMessage` in `last_told`; `toldAbout` in `Subscriptions.ts` and `countedAfresh` in `pullRequestUpdateDecision.ts` |
+| `afterNewMessage`, `MessageReaches` | `lastMessageTurn` in `Transcripts.ts`, which reads the Turns your message started (`started_by = 'user'`) and your Steers, against `afterMessage` in `last_told`; `toldAbout` in `Subscriptions.ts` and `countedAfresh` in `updateDecision.ts` |
 | `YouSendMessage`, `YouQueueMessage`, `AgentSendsMessage`, `AgentQueuesMessage`, `QueuedMessageStarts`, `TurnEnds`, `StoppedQueueStarts` | `stepThread` in `apps/server/src/threadState.ts`, which gives the Turn a message starts that message's sender |
 | `AgentMessageReaches` | A Turn another agent's message started (`started_by` is `creator` or `agent`), which `lastMessageTurn` leaves out |
 | `YouSteer` | The Steer part the Agent harness reports, which `lastMessageTurn` reads |
-| `GlassRestarts` | Nothing but the wait order lives in memory (`waiting` in `PullRequestUpdates.ts`). A local Thread's Turn is interrupted in `serve` in `ThreadTurns.ts`; a Sandbox Thread's Turn keeps running |
+| `GlassRestarts` | Nothing but the wait order lives in memory (`waiting` in `Updates.ts`). A local Thread's Turn is interrupted in `serve` in `ThreadTurns.ts`; a Sandbox Thread's Turn keeps running |
 
 Each mutant in `model/mutants.json` is one way to break this code: skipping the idle check, saving `last_told` after the Turn starts, sending what was decided before the wait, ignoring the limit or counting running PR updates in memory, never counting, resetting the count while checks run again or while a new push has no checks yet, counting another agent's message as yours, keeping the count in memory, and ignoring your messages.
 

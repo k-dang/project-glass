@@ -42,6 +42,8 @@ interface UnitFields {
   readonly failed_tool_calls?: number
   readonly ended_lookups?: number
   readonly to_dos_done?: number
+  readonly source?: string
+  readonly subjects?: string
   readonly subscription_ids?: string
   readonly reasons?: string
 }

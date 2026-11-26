@@ -1,4 +1,4 @@
-import { EventPage, PullRequestRef } from "@glass/contracts"
+import { EventPage, PullRequestRef, referenceKey } from "@glass/contracts"
 import { Duration, Effect, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { EventLog, KEPT_FOR } from "../EventLog"
@@ -36,6 +36,11 @@ const ListRecentEvents = Tool.make("list_recent_events", {
 
 export const EventTools = Toolkit.make(ListRecentEvents)
 
+const about = (pullRequests: ReadonlyArray<PullRequestRef>) => ({
+  source: "github" as const,
+  subjects: pullRequests.map(referenceKey),
+})
+
 export const EventToolHandlers = EventTools.toLayer(
   Effect.gen(function* () {
     const eventLog = yield* EventLog
@@ -61,7 +66,9 @@ export const EventToolHandlers = EventTools.toLayer(
 
       return [
         ...(own === undefined ? [] : [own]),
-        ...subscribed.flatMap(({ pullRequest }) => (pullRequest === null ? [] : [pullRequest])),
+        ...subscribed.flatMap(({ subject: { pullRequest } }) =>
+          pullRequest === null ? [] : [pullRequest],
+        ),
       ]
     })
 
@@ -71,7 +78,7 @@ export const EventToolHandlers = EventTools.toLayer(
           if (threadId === undefined)
             return yield* eventLog.list({
               limit,
-              pullRequests: pullRequest === undefined ? undefined : [pullRequest],
+              about: pullRequest === undefined ? undefined : about([pullRequest]),
               since,
             })
 
@@ -84,7 +91,7 @@ export const EventToolHandlers = EventTools.toLayer(
 
           return pullRequests.length === 0
             ? new EventPage({ events: [], hasMore: false })
-            : yield* eventLog.list({ limit, pullRequests, since })
+            : yield* eventLog.list({ limit, about: about(pullRequests), since })
         }).pipe(
           Effect.catchTag("EventLogError", ({ message }) =>
             Effect.fail(new GlassToolFailure({ message })),

@@ -6,6 +6,7 @@ import {
 } from "@glass/contracts"
 import { Context, Effect, Predicate, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
+import { GitHubSource } from "../GitHubSource"
 import { Subscriptions } from "../Subscriptions"
 import { acting, explained, GlassToolFailure, readOnly } from "./glassTools"
 import { McpCaller } from "./McpCredentials"
@@ -38,14 +39,14 @@ const SubscribeToPullRequest = Tool.make("subscribe_to_pull_request", {
 
 const ListSubscriptions = Tool.make("list_subscriptions", {
   description:
-    "Lists your Thread's Subscriptions: each PR it is told about, for which reasons, and the note you left. A null pullRequest is your Thread's own PR.",
+    "Lists your Thread's Subscriptions: what each is about, for which reasons your Thread is told, and the note you left. A PR subject with a null pullRequest is your Thread's own PR.",
   success: Schema.Struct({ subscriptions: Schema.Array(Subscription) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly.pipe(Context.merge(forThreads)))
 
 const EndSubscription = Tool.make("end_subscription", {
   description:
-    "Ends one of your Thread's Subscriptions, so Glass stops telling it about that PR. Use it when the user asks you to stop looking after a PR.",
+    "Ends one of your Thread's Subscriptions, so Glass stops telling it about what that one covers. Use it when the user asks you to stop looking after a PR.",
   parameters: Schema.Struct({
     subscriptionId: Schema.String.annotate({
       description: "The Subscription's id, from list_subscriptions.",
@@ -72,12 +73,13 @@ const callingThread = McpCaller.current.pipe(
 export const SubscriptionToolHandlers = SubscriptionTools.toLayer(
   Effect.gen(function* () {
     const subscriptions = yield* Subscriptions
+    const gitHub = yield* GitHubSource
 
     return SubscriptionTools.of({
       subscribe_to_pull_request: ({ pullRequest, reasons, note }) =>
         callingThread.pipe(
           Effect.flatMap(({ threadId, turnId }) =>
-            subscriptions
+            gitHub
               .subscribe(threadId, turnId, {
                 pullRequest: pullRequest ?? null,
                 reasons: reasons ?? defaultSubscriptionReasons,

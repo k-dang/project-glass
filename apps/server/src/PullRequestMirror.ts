@@ -25,7 +25,7 @@ import { SqlClient } from "effect/sql"
 import { join } from "node:path"
 import { writeDataFile } from "./dataFiles"
 import { EventLog } from "./EventLog"
-import { eventsBetween } from "./gitHubSource"
+import { eventsBetween, recorded } from "./gitHubEvents"
 import { GitHubClient } from "./github/GitHubClient"
 import {
   Attention,
@@ -302,9 +302,12 @@ export class PullRequestMirror extends Context.Service<
 
       const subscribedIn = (mirror: Mirror) =>
         sql`
-          SELECT s.owner, s.repo, s.number, t.owner AS threadOwner, t.repo AS threadRepo, t.branch
+          SELECT json_extract(s.subject, '$.pullRequest.owner') AS owner,
+            json_extract(s.subject, '$.pullRequest.repo') AS repo,
+            json_extract(s.subject, '$.pullRequest.number') AS number,
+            t.owner AS threadOwner, t.repo AS threadRepo, t.branch
           FROM subscription s JOIN thread t ON t.id = s.thread_id
-          WHERE s.ended IS NULL
+          WHERE s.source = 'github' AND s.ended IS NULL
         `.pipe(
           Effect.flatMap(decodeSubscribedTo),
           Effect.map((subscriptions) => [
@@ -479,7 +482,7 @@ export class PullRequestMirror extends Context.Service<
         }
 
         const { mirror, failures } = yield* withLatestStatus(synced, shown(synced))
-        yield* events.record("github", eventsBetween(previous, mirror))
+        yield* events.record("github", recorded(eventsBetween(previous, mirror)))
         yield* commit(mirror)
 
         return {

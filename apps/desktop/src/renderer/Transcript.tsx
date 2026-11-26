@@ -217,8 +217,8 @@ function TurnMessage(props: { turn: Turn }) {
   if (Predicate.isTagged(turn.context, "StartedWorkUpdate"))
     return <StartedWorkUpdateMessage work={turn.context.work} />
 
-  if (Predicate.isTagged(turn.context, "PullRequestUpdate"))
-    return <PullRequestUpdateMessage pullRequests={turn.context.pullRequests} />
+  if (Predicate.isTagged(turn.context, "Update"))
+    return <PullRequestUpdateMessage pullRequests={turn.context.subjects} />
 
   if (Predicate.isTagged(turn.context, "BackgroundWorkEnded")) return null
 

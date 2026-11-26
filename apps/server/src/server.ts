@@ -27,6 +27,7 @@ import { Changes } from "./Changes"
 import { CheckIns } from "./CheckIns"
 import { Git } from "./git"
 import { GitHubAuth } from "./github/GitHubAuth"
+import { GitHubSource } from "./GitHubSource"
 import { GitHubClient } from "./github/GitHubClient"
 import { GlassRpcHandlers } from "./handlers"
 import { GlobalChat } from "./GlobalChat"
@@ -48,7 +49,6 @@ import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
 import { PullRequestStandings } from "./PullRequestStandings"
-import { PullRequestUpdates } from "./PullRequestUpdates"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
 import { AgentCommands, SettingsStore } from "./SettingsStore"
@@ -63,8 +63,10 @@ import { AgentRunners } from "./agentRunners"
 import { BranchNames } from "./BranchNames"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
+import { Sources } from "./Source"
 import { StartedWorkUpdates } from "./StartedWorkUpdates"
 import { Subscriptions } from "./Subscriptions"
+import { Updates } from "./Updates"
 
 const RendererRoutes = Layer.mergeAll(
   RpcServer.layerHttp({ group: GlassRpcs, path: RPC_PATH, protocol: "websocket" }),
@@ -123,6 +125,13 @@ const ThreadsLive = followReattachedHost.pipe(
   Layer.provideMerge(LocalCheckouts.layer),
 )
 
+const SourcesLive = Layer.effect(
+  Sources,
+  Effect.gen(function* () {
+    return [(yield* GitHubSource).source]
+  }),
+)
+
 type McpToolsLayer = Layer.Layer<never, never, Layer.Services<typeof GlassMcpTools>>
 
 type AgentCommandsLayer = Layer.Layer<AgentCommands, never, SettingsStore>
@@ -132,17 +141,13 @@ const services = (
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer,
 ) =>
-  Layer.mergeAll(
-    GlassRpcHandlers,
-    mcpTools,
-    StartedWorkUpdates,
-    CompleteToDosOnMerge,
-    PullRequestUpdates,
-  )
+  Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge, Updates)
     .pipe(
       Layer.provide(
         Inbox.layer.pipe(
           Layer.provide(PullRequestStandings.layer),
+          Layer.provideMerge(SourcesLive),
+          Layer.provideMerge(GitHubSource.layer),
           Layer.provideMerge(Subscriptions.layer),
         ),
       ),

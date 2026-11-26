@@ -11,10 +11,11 @@ import {
   referenceKey,
   ReviewFeedbackWaitingEvent,
 } from "@glass/contracts"
-import { type DateTime, Match } from "effect"
+import { DateTime, Match, Predicate } from "effect"
+import type { NewEvent } from "./EventLog"
 import type { EndedPullRequest } from "./github/branchPullRequests"
 import type { Mirror, MirroredPullRequest } from "./PullRequestMirror"
-import type { EndedState } from "./pullRequestUpdateDecision"
+import type { EndedState } from "./pullRequestNow"
 
 const changesOf = (before: MirroredPullRequest, after: MirroredPullRequest): Array<Event> => {
   const pullRequest = after.ref
@@ -56,6 +57,22 @@ const changesOf = (before: MirroredPullRequest, after: MirroredPullRequest): Arr
 
   return events
 }
+
+const endedAt = (event: Event) => {
+  if (Predicate.isTagged(event, "PullRequestMerged")) return event.mergedAt
+
+  return Predicate.isTagged(event, "PullRequestClosed") ? event.closedAt : undefined
+}
+
+export const recorded = (events: ReadonlyArray<Event>) =>
+  events.map((event): NewEvent => {
+    const subject = referenceKey(event.pullRequest)
+    const at = endedAt(event)
+
+    return at === undefined
+      ? { event, subject }
+      : { event, subject, once: `${event._tag} ${subject} ${DateTime.formatIso(at)}` }
+  })
 
 const pullRequestsOf = (mirror: Mirror) =>
   mirror.repositories.flatMap(({ pullRequests }) => pullRequests)

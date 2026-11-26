@@ -1,43 +1,33 @@
-import {
-  Event,
-  EventLogError,
-  EventPage,
-  type EventSource,
-  LoggedEvent,
-  type PullRequestRef,
-  referenceKey,
-} from "@glass/contracts"
-import { Context, DateTime, Duration, Effect, Layer, Option, Predicate, Schema } from "effect"
+import { Event, EventLogError, EventPage, type EventSource, LoggedEvent } from "@glass/contracts"
+import { Context, DateTime, Duration, Effect, Layer, Option, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
 export const KEPT_FOR = Duration.days(30)
 
 const encodeEvent = Schema.encodeEffect(Event)
 
-const endedAt = (event: typeof Event.Encoded) => {
-  if (Predicate.isTagged(event, "PullRequestMerged"))
-    return { path: "$.mergedAt", at: event.mergedAt }
-
-  if (Predicate.isTagged(event, "PullRequestClosed"))
-    return { path: "$.closedAt", at: event.closedAt }
-
-  return null
-}
-
 const decodeLogged = Schema.decodeUnknownEffect(
   Schema.Struct({ ...LoggedEvent.fields, event: Schema.fromJsonString(Event) }),
 )
 
+export interface NewEvent {
+  readonly event: Event
+  readonly subject: string
+  readonly once?: string
+}
+
 export interface EventFilter {
   readonly limit: number
-  readonly pullRequests?: ReadonlyArray<PullRequestRef> | undefined
+  readonly about?:
+    | { readonly source: EventSource; readonly subjects: ReadonlyArray<string> }
+    | undefined
   readonly since?: DateTime.Utc | undefined
 }
 
 export class EventLog extends Context.Service<
   EventLog,
   {
-    readonly record: (source: EventSource, events: ReadonlyArray<Event>) => Effect.Effect<void>
+    readonly record: (source: EventSource, events: ReadonlyArray<NewEvent>) => Effect.Effect<void>
     readonly list: (filter: EventFilter) => Effect.Effect<EventPage, EventLogError>
   }
 >()("@glass/server/EventLog") {
@@ -47,24 +37,15 @@ export class EventLog extends Context.Service<
       const sql = yield* SqlClient.SqlClient
 
       const write = Effect.fnUntraced(
-        function* (source: EventSource, event: Event, occurredAt: string) {
-          const encoded = yield* encodeEvent(event)
-          const pullRequest = referenceKey(event.pullRequest)
-          const ended = endedAt(encoded)
-
-          yield* sql`
-            INSERT INTO event (source, kind, pull_request, payload, occurred_at)
-            SELECT ${source}, ${event._tag}, ${pullRequest}, ${JSON.stringify(encoded)}, ${occurredAt}
-            WHERE ${
-              ended === null
-                ? sql.and([])
-                : sql`NOT EXISTS (
-                    SELECT 1 FROM event
-                    WHERE kind = ${event._tag} AND pull_request = ${pullRequest}
-                      AND json_extract(payload, ${ended.path}) = ${ended.at}
-                  )`
-            }
-          `
+        function* (source: EventSource, { event, subject, once }: NewEvent, occurredAt: string) {
+          yield* sql`INSERT OR IGNORE INTO event ${sql.insert({
+            source,
+            kind: event._tag,
+            subject,
+            once: once ?? null,
+            payload: JSON.stringify(yield* encodeEvent(event)),
+            occurred_at: occurredAt,
+          })}`
         },
         Effect.catch((cause) => Effect.logWarning("Couldn't record an Event", cause)),
       )
@@ -79,7 +60,7 @@ export class EventLog extends Context.Service<
 
       const record = Effect.fn("EventLog.record")(function* (
         source: EventSource,
-        events: ReadonlyArray<Event>,
+        events: ReadonlyArray<NewEvent>,
       ) {
         if (events.length === 0) return
 
@@ -92,14 +73,14 @@ export class EventLog extends Context.Service<
       })
 
       const list = Effect.fn("EventLog.list")(
-        function* ({ limit, pullRequests, since }: EventFilter) {
+        function* ({ limit, about, since }: EventFilter) {
           const rows = yield* sql`
             SELECT id, source, occurred_at AS occurredAt, payload AS event
             FROM event
             WHERE ${sql.and([
-              ...(pullRequests === undefined
+              ...(about === undefined
                 ? []
-                : [sql.in("pull_request", pullRequests.map(referenceKey))]),
+                : [sql`source = ${about.source}`, sql.in("subject", about.subjects)]),
               ...(since === undefined ? [] : [sql`occurred_at >= ${DateTime.formatIso(since)}`]),
             ])}
             ORDER BY id DESC

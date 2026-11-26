@@ -7,6 +7,7 @@ import {
   MergedReason,
   PullRequestOpen,
   PullRequestRef,
+  PullRequestSubject,
   PullRequestUpdate,
   ReviewFeedbackReason,
   Subscription,
@@ -33,7 +34,7 @@ const own = new Subscription({
   id: "own",
   threadId: thread.id,
   source: "github",
-  pullRequest: null,
+  subject: PullRequestSubject.make({ pullRequest: null }),
   reasons: ["failing-checks", "review-feedback", "changes-requested", "merge-conflict"],
   note: "Keep it green",
 })
@@ -42,7 +43,9 @@ const dependency = new Subscription({
   id: "dependency",
   threadId: thread.id,
   source: "github",
-  pullRequest: new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 7 }),
+  subject: PullRequestSubject.make({
+    pullRequest: new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 7 }),
+  }),
   reasons: ["merged-or-closed"],
   note: "Go on once it merges",
 })
@@ -118,8 +121,9 @@ it("shows a PR update as a Turn Glass started, listing each PR and its reasons",
               message: "",
               images: [],
               context: PullRequestUpdate.make({
+                source: "github",
                 note: "Never merge a PR.",
-                pullRequests: [
+                subjects: [
                   {
                     subscriptionId: own.id,
                     pullRequest: ownPullRequest.ref,
@@ -145,7 +149,7 @@ it("shows a PR update as a Turn Glass started, listing each PR and its reasons",
                   },
                   {
                     subscriptionId: dependency.id,
-                    pullRequest: dependency.pullRequest!,
+                    pullRequest: dependency.subject.pullRequest!,
                     own: false,
                     note: dependency.note,
                     events: [],

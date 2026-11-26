@@ -11,7 +11,7 @@ import {
   SubscriptionRef,
 } from "effect"
 import { EventLog } from "./EventLog"
-import { endedEvents } from "./gitHubSource"
+import { endedEvents, recorded } from "./gitHubEvents"
 import type { Branch, EndedPullRequest } from "./github/branchPullRequests"
 import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
@@ -159,7 +159,7 @@ export class ThreadPullRequests extends Context.Service<
         )
 
         yield* events
-          .record("github", endedEvents(before, answers.filter(Predicate.isNotNull)))
+          .record("github", recorded(endedEvents(before, answers.filter(Predicate.isNotNull))))
           .pipe(Effect.andThen(remembered), Effect.uninterruptible)
       })
 

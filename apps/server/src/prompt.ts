@@ -11,7 +11,7 @@ import {
   type ToDo,
   type TurnContext,
   type StartedWorkUpdate,
-  type PullRequestUpdate,
+  type Update,
   type PullRequestUpdateReason,
   type UpdatedPullRequest,
 } from "@glass/contracts"
@@ -125,10 +125,10 @@ const updatedPullRequestEntry = ({ pullRequest, own, reasons, note }: UpdatedPul
     closing("subscribed_pull_request"),
   ].join("\n")
 
-const pullRequestUpdateBlock = ({ pullRequests, note }: PullRequestUpdate) =>
+const updateBlock = ({ subjects, note }: Update) =>
   block("glass_pull_request_update", [
     'Glass has a PR update: something happened to PRs your Thread has a Subscription to. The user sent no message. Each PR lists what is true of it now, and own="true" marks your Thread\'s own PR.',
-    ...pullRequests.map(updatedPullRequestEntry),
+    ...subjects.map(updatedPullRequestEntry),
     "The user's PR update note, which applies to every PR update:",
     withoutBlockTags(note),
   ])
@@ -139,7 +139,7 @@ const viewingBlock = (context: CapturedContext) =>
 const contextBlock = (context: TurnContext) =>
   Match.valueTags(context, {
     StartedWorkUpdate: startedWorkUpdateBlock,
-    PullRequestUpdate: pullRequestUpdateBlock,
+    Update: updateBlock,
     BackgroundWorkEnded: () => null,
     AgentReview: () => null,
     PullRequest: viewingBlock,

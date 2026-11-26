@@ -237,8 +237,9 @@ it("keeps a Review thread's text and a Subscription's note from closing the PR u
     "",
     [],
     PullRequestUpdate.make({
+      source: "github",
       note: "Never merge a PR.",
-      pullRequests: [
+      subjects: [
         {
           subscriptionId: "own",
           pullRequest: new PullRequestRef({ owner: "octo-org", repo: "glass", number: 7 }),

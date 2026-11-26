@@ -9,7 +9,7 @@ export default Effect.gen(function* () {
   yield* sql`ALTER TABLE thread_turn ADD COLUMN started_by TEXT NOT NULL DEFAULT 'user'`
   yield* sql`
     UPDATE thread_turn SET started_by = 'glass'
-    WHERE json_extract(context, '$._tag') IN ('StartedWorkUpdate', 'PullRequestUpdate', 'AgentReview')
+    WHERE json_extract(context, '$._tag') IN ('StartedWorkUpdate', 'Update', 'AgentReview')
   `
   yield* sql`
     UPDATE thread_turn SET started_by = 'harness'

@@ -1,6 +1,6 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
-import { localPlace, PullRequestRef, Subscription } from "@glass/contracts"
+import { localPlace, PullRequestSubject, Subscription } from "@glass/contracts"
 import { Context, Effect, Layer, Option, Schema, Stream } from "effect"
 import { SqlClient } from "effect/sql"
 import {
@@ -12,13 +12,8 @@ import {
   threadsFixture,
 } from "../test/threadsFixture"
 import { greeterPullRequest, threadWithPullRequest } from "../test/threadWithPullRequest"
-import { EventLog } from "./EventLog"
-import { FollowedRepositories } from "./FollowedRepositories"
-import { GitHubClient } from "./github/GitHubClient"
 import { migrationLoader } from "./Migrations"
-import { PullRequestMirror } from "./PullRequestMirror"
 import { Subscriptions } from "./Subscriptions"
-import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Transcripts } from "./Transcripts"
 
 type Fixture = Effect.Success<typeof threadsFixture>
@@ -36,7 +31,7 @@ const subscribe = (args: Parameters<typeof glassCall>[1]) =>
   glassCall("subscribe_to_pull_request", args)
 
 const covered = (subscriptions: ReadonlyArray<Subscription>) =>
-  subscriptions.map(({ pullRequest, reasons, note }) => ({
+  subscriptions.map(({ subject: { pullRequest }, reasons, note }) => ({
     pullRequest: pullRequest === null ? null : `${pullRequest.repo}#${pullRequest.number}`,
     reasons,
     note,
@@ -201,7 +196,7 @@ it.live("refuses a Subscription asked for in a Turn Glass started", () =>
     assert.equal(update?.context?._tag, "StartedWorkUpdate")
     assert.deepStrictEqual(calledBy(update), {
       status: "failed",
-      text: `Glass started this Turn, so it can't subscribe your Thread to a PR. ${onlyAllowed}`,
+      text: `Glass started this Turn, so it can't subscribe your Thread. ${onlyAllowed}`,
     })
     assert.deepStrictEqual(yield* subscriptionsOf(f, thread.id, () => true), [])
   }),
@@ -211,7 +206,7 @@ const keepGreen = subscribe({ note: "Keep it green" })
 
 const refusedAgentMessage = {
   status: "failed" as const,
-  text: `A message from another agent started this Turn, so it can't subscribe your Thread to a PR. ${onlyAllowed}`,
+  text: `A message from another agent started this Turn, so it can't subscribe your Thread. ${onlyAllowed}`,
 }
 
 it.live("refuses a Subscription a Thread's creator asks for from a Turn Glass started", () =>
@@ -365,16 +360,6 @@ it.effect(
       const context = yield* Layer.build(
         Subscriptions.layer.pipe(
           Layer.provideMerge(Transcripts.layer),
-          Layer.provide(Layer.mock(FollowedRepositories)({ list: () => Effect.succeed([]) })),
-          Layer.provide(Layer.mock(GitHubClient)({})),
-          Layer.provide(
-            Layer.mock(ThreadPullRequests)({
-              watch: () => Stream.never,
-              ofThread: () => Effect.succeed(undefined),
-            }),
-          ),
-          Layer.provide(Layer.mock(PullRequestMirror)({ changes: Stream.never })),
-          Layer.provide(Layer.mock(EventLog)({})),
           Layer.provideMerge(
             SqliteMigrator.layer({ loader: migrationLoader }).pipe(
               Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
@@ -409,7 +394,8 @@ it.effect(
       const subscriptions = Context.get(context, Subscriptions)
 
       const asked = {
-        pullRequest: new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 7 }),
+        source: "github" as const,
+        subject: Effect.succeed(PullRequestSubject.make({ pullRequest: null })),
         reasons: ["failing-checks" as const],
         note: "Keep it green",
       }
@@ -419,13 +405,10 @@ it.effect(
         .pipe(Effect.flip)
 
       const betweenTurns = yield* subscriptions.subscribe("thread", null, asked).pipe(Effect.flip)
-
-      const onTheUsersWord = yield* subscriptions
-        .subscribe("thread", usersTurn!.id, asked)
-        .pipe(Effect.flip)
+      const onTheUsersWord = yield* subscriptions.subscribe("thread", usersTurn!.id, asked)
 
       assert.include(unheardOf.message, "Glass has no record of the Turn asking")
       assert.include(betweenTurns.message, "Glass has no record of the Turn asking")
-      assert.include(onTheUsersWord.message, "glass-demo/greeter isn't one")
+      assert.strictEqual(onTheUsersWord.note, "Keep it green")
     }),
 )

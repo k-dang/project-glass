@@ -102,8 +102,8 @@ export const pass = (pullRequest: FakePullRequest) => {
 }
 
 export const told = (turn: Turn | undefined) =>
-  Predicate.isTagged(turn?.context, "PullRequestUpdate")
-    ? turn.context.pullRequests.map(({ pullRequest, own, note, reasons }) => ({
+  Predicate.isTagged(turn?.context, "Update")
+    ? turn.context.subjects.map(({ pullRequest, own, note, reasons }) => ({
         pullRequest: `${pullRequest.repo}#${pullRequest.number}`,
         own,
         note,

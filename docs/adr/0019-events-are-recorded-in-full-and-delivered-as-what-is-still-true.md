@@ -12,6 +12,11 @@ nobody. What to send is decided from the current state and what the Subscription
 log is a record, not a queue: it says which Events led to an Update, and losing it loses history,
 never pending work.
 
+The rules that don't depend on where Events come from sit outside the Sources: who may make a
+Subscription, telling each state once, giving up after three Updates, and running three at once. A
+Source says what a Subscription may be about, what holds for it now, and what its Update carries.
+GitHub is the only Source.
+
 GitHub's Events come from comparing each read of the PR mirror with the one before. The mirror is
 already polled, and a desktop app has no public address for webhooks.
 

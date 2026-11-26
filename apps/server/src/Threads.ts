@@ -189,7 +189,7 @@ export interface WaitingThread {
 export interface FinishedThread {
   readonly thread: Thread
   readonly ended: TurnEnd
-  readonly pullRequestUpdate: boolean
+  readonly update: boolean
 }
 
 export class Threads extends Context.Service<
