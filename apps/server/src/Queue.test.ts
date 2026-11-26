@@ -261,6 +261,9 @@ it.live(
 const operations = (github: FakeGitHub) =>
   github.graphQLRequests.map(({ operationName }) => operationName)
 
+const pullRequestReads = (github: FakeGitHub) =>
+  operations(github).filter((name) => name === "PullRequest").length
+
 it.live("opens a queued PR from the read Glass started when it was queued", () =>
   Effect.gen(function* () {
     const { github, start } = yield* startSignedIn
@@ -272,11 +275,11 @@ it.live("opens a queued PR from the read Glass started when it was queued", () =
     const workspace = yield* client.LoadPullRequest({ pullRequest: ref(pr) })
 
     assert.strictEqual(workspace.pullRequest.title, "Read ahead")
-    assert.strictEqual(operations(github).filter((name) => name === "PullRequest").length, 1)
+    assert.strictEqual(pullRequestReads(github), 1)
   }),
 )
 
-it.live("opens a queued PR fresh when it changed after Glass read it ahead", () =>
+it.live("reads a queued PR ahead again once the Queue sees it changed", () =>
   Effect.gen(function* () {
     const { github, start } = yield* startSignedIn
     const pr = github.seedPullRequest({ title: "Pushed to", base, head })
@@ -284,9 +287,57 @@ it.live("opens a queued PR fresh when it changed after Glass read it ahead", () 
     yield* client.AddToQueue({ references: [ref(pr)] })
     yield* eventually(Effect.sync(() => assert.include(operations(github), "PullRequestRevision")))
     pr.push({ head: { sha: "h2", files: {} } })
+    yield* client.RefreshQueue()
+    yield* eventually(Effect.sync(() => assert.strictEqual(pullRequestReads(github), 2)))
 
     const workspace = yield* client.LoadPullRequest({ pullRequest: ref(pr) })
 
     assert.strictEqual(workspace.revision.head, "h2")
+    assert.strictEqual(pullRequestReads(github), 2)
+  }),
+)
+
+it.live("reads a queued PR ahead again after GitHub failed the first read", () =>
+  Effect.gen(function* () {
+    let failed = 0
+
+    const github = yield* startFakeGitHub({
+      beforeRequest: ({ graphql }) => {
+        if (failed > 0 || graphql?.operationName !== "PullRequest") return undefined
+        failed++
+
+        return 502
+      },
+    })
+
+    const pr = github.seedPullRequest({ title: "Failed once", base, head })
+    const env = { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url }
+    const { client } = yield* startBackend(env, yield* isolatedHome)
+    yield* client.AddToQueue({ references: [ref(pr)] })
+    yield* eventually(Effect.sync(() => assert.strictEqual(failed, 1)))
+
+    yield* eventually(
+      client
+        .RefreshQueue()
+        .pipe(Effect.andThen(Effect.sync(() => assert.strictEqual(pullRequestReads(github), 1)))),
+    )
+    yield* client.LoadPullRequest({ pullRequest: ref(pr) })
+
+    assert.strictEqual(pullRequestReads(github), 1)
+  }),
+)
+
+it.live("reads a PR from GitHub when it is opened again", () =>
+  Effect.gen(function* () {
+    const { github, start } = yield* startSignedIn
+    const pr = github.seedPullRequest({ title: "Opened twice", base, head })
+    const { client } = yield* start
+    yield* client.AddToQueue({ references: [ref(pr)] })
+    yield* eventually(Effect.sync(() => assert.strictEqual(pullRequestReads(github), 1)))
+    yield* client.LoadPullRequest({ pullRequest: ref(pr) })
+
+    yield* client.LoadPullRequest({ pullRequest: ref(pr) })
+
+    assert.strictEqual(pullRequestReads(github), 2)
   }),
 )

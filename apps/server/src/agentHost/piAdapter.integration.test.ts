@@ -13,7 +13,7 @@ import {
 import { NodeHttpServer, NodeServices } from "@effect/platform-node"
 import { Deferred, Effect, Fiber, Layer, Predicate, Redacted, Schema } from "effect"
 import { createServer } from "node:http"
-import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import {
   writeGreetPack,
@@ -589,7 +589,7 @@ const reviewReplies = [
 ]
 
 it.live(
-  "runs commands in its checkout, hands in its review, and proposes Suggested drafts as an Agent review's Thread",
+  "runs commands in its checkout, hands in its review, and proposes Suggested drafts as an Agent review's Thread, keeping its session where Glass puts it",
   () =>
     Effect.gen(function* () {
       const f = yield* piSession("pi-review", {
@@ -603,6 +603,12 @@ it.live(
       })
 
       yield* writeGreeter(f.folder)
+      const checkoutSessions = join(f.home, "checkout-sessions")
+      mkdirSync(join(f.folder, ".pi"), { recursive: true })
+      writeFileSync(
+        join(f.folder, ".pi", "settings.json"),
+        JSON.stringify({ sessionDir: checkoutSessions }),
+      )
       const session = yield* f.open(threadId, ReviewRole.make({ brief: reviewBrief }))
 
       yield* session.send("Draft comments on greet.ts.")
@@ -624,6 +630,10 @@ it.live(
       assertReviewAnswers(calls.slice(1, 1 + reviewAnswers.length))
       assertSuggestedDrafts(drafts)
       assert.deepStrictEqual(acceptedSuggestedDraftOf(drafts[0]!), reviewDrafts[0]?.draft)
+      assert.isFalse(existsSync(checkoutSessions))
+
+      if (recordingSessions)
+        assert.isNotEmpty(readdirSync(join(f.home, ".pi", "agent", "sessions", "glass-reviews")))
     }).pipe(Effect.scoped),
 )
 

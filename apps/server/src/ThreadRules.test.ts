@@ -189,6 +189,16 @@ it.live("stops a Turn whose harness is still starting, which never gets the mess
   }),
 )
 
+it.live("runs a Local Thread's first message before its branch is named", () =>
+  Effect.gen(function* () {
+    const f = yield* threadServicesFixture
+    yield* f.suggestBranch(Effect.never)
+    const thread = yield* f.create()
+
+    assert.equal((yield* f.started).threadId, thread.id)
+  }),
+)
+
 it.live("keeps a Thread's unsent message across a relaunch until it is cleared", () =>
   Effect.gen(function* () {
     const f = yield* threadServicesFixture

@@ -1,4 +1,5 @@
 import {
+  getAgentDir,
   type ModelRuntime,
   resolveModelScopeWithDiagnostics,
   SettingsManager,
@@ -237,6 +238,12 @@ const roleFlags = (
             ]),
             instructions(brief.instructions),
           ],
+        ).pipe(
+          Effect.map((flags) => [
+            "--session-dir",
+            join(getAgentDir(), "sessions", "glass-reviews"),
+            ...flags,
+          ]),
         ),
       Global: () =>
         lockedDownFlags(

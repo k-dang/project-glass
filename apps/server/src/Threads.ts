@@ -438,11 +438,36 @@ export class Threads extends Context.Service<
 
       const naming = yield* threadBranchNaming(claimBranch)
 
-      // WARNING: A Sandbox makes its branch when its host is prepared, so the host waits for the name.
+      // WARNING: A Sandbox is made on the branch it had when prepared, so its host takes the name before any Turn.
+      const useNamedBranch = Effect.fnUntraced(function* (row: PlacedThread, client: HostClient) {
+        yield* naming.named(row.thread.id)
+
+        const { thread } = yield* find(row.thread.id)
+
+        if (thread.branch === null || thread.branch === row.thread.branch) return
+
+        yield* client
+          .UseBranch({ folder: row.folder, branch: thread.branch })
+          .pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning("Kept a Sandbox's placeholder branch", cause).pipe(
+                Effect.andThen(saveBranch(thread.id, { branch: row.thread.branch })),
+              ),
+            ),
+          )
+      })
+
       const prepareHostOf = (threadId: string) =>
-        naming.named(threadId).pipe(
-          Effect.andThen(find(threadId)),
-          Effect.flatMap((row) => hostingOf(row).prepareHost(row)),
+        find(threadId).pipe(
+          Effect.flatMap((row) =>
+            hostingOf(row)
+              .prepareHost(row)
+              .pipe(
+                Effect.tap((client) =>
+                  inSandbox(row.thread.place) ? useNamedBranch(row, client) : Effect.void,
+                ),
+              ),
+          ),
         )
 
       const withSandbox = (thread: Thread) =>
