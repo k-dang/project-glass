@@ -378,8 +378,8 @@ it.live("removes the Review Threads and checkouts no Agent review keeps when Gla
     mkdirSync(stray)
 
     yield* f.restart
+    yield* eventually(Effect.sync(() => assert.isFalse(existsSync(stray))))
     assert.isTrue(existsSync(f.checkout(threadId)))
-    assert.isFalse(existsSync(stray))
 
     const database = new DatabaseSync(join(f.home, ".project-glass", "glass.db"))
 
@@ -390,8 +390,8 @@ it.live("removes the Review Threads and checkouts no Agent review keeps when Gla
     }
 
     yield* f.restart
+    yield* eventually(Effect.sync(() => assert.isFalse(existsSync(f.checkout(threadId)))))
     assert.isEmpty(yield* f.reviewThreads)
-    assert.isFalse(existsSync(f.checkout(threadId)))
   }),
 )
 

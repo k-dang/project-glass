@@ -270,15 +270,9 @@ export class AgentReviews extends Context.Service<
           ),
         )
 
-      const removeUnkept = Effect.gen(function* () {
+      const unkept = Effect.gen(function* () {
         const kept = yield* keptThreads
         const reviewThreads = yield* threads.reviewThreads
-
-        yield* Effect.forEach(
-          reviewThreads.filter(({ id }) => !kept.has(id)),
-          ({ id }) => removeThread(id),
-          { discard: true },
-        )
 
         const keptFolders = reviewThreads.flatMap(({ id, folder }) =>
           kept.has(id) ? [folder] : [],
@@ -288,21 +282,33 @@ export class AgentReviews extends Context.Service<
           .readDirectory(checkoutsFolder)
           .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []))
 
-        yield* Effect.forEach(
-          entries
+        return {
+          threadIds: reviewThreads.flatMap(({ id }) => (kept.has(id) ? [] : [id])),
+          paths: entries
             .map((entry) => join(checkoutsFolder, entry))
             .filter(
               (path) =>
                 !keptFolders.some((folder) => path === folder || path.startsWith(`${folder}.`)),
             ),
-          (path) => fs.remove(path, { recursive: true, force: true }),
-          { discard: true },
+        }
+      })
+
+      const removeAll = ({ threadIds, paths }: Effect.Success<typeof unkept>) =>
+        Effect.forEach(threadIds, removeThread, { discard: true }).pipe(
+          Effect.andThen(
+            Effect.forEach(
+              paths,
+              (path) =>
+                fs.remove(path, { recursive: true, force: true }).pipe(
+                  Effect.ignore({
+                    log: "Warn",
+                    message: "Couldn't remove an Agent review's checkout",
+                  }),
+                ),
+              { discard: true },
+            ),
+          ),
         )
-      }).pipe(
-        Effect.catch((cause) =>
-          Effect.logWarning("Couldn't remove what no Agent review keeps", cause),
-        ),
-      )
 
       const save = (job: Job, run: Run, review: AgentReview) =>
         Effect.gen(function* () {
@@ -498,7 +504,12 @@ export class AgentReviews extends Context.Service<
           )
         })
 
-      yield* removeUnkept
+      yield* unkept.pipe(
+        Effect.flatMap((found) => removeAll(found).pipe(Effect.forkIn(scope))),
+        Effect.catch((cause) =>
+          Effect.logWarning("Couldn't remove what no Agent review keeps", cause),
+        ),
+      )
 
       return AgentReviews.of({
         start,
