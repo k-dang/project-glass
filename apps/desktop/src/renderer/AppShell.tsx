@@ -1,5 +1,4 @@
 import { RegistryContext, useAtom, useAtomValue } from "@effect/atom-react"
-import type { Layout } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import {
@@ -31,7 +30,6 @@ import { type Action, useActions } from "./actions"
 import { CommandMenu } from "./CommandMenu"
 import { useStartThread } from "./threadsArea"
 import { ConfirmationDialog } from "./ConfirmationDialog"
-import { ConnectionAvatar } from "./ConnectionAvatar"
 import { ConnectionMenu } from "./ConnectionMenu"
 import { globalChatOpenAtom, globalUnseenAtom } from "./globalChat"
 import { HistoryNav } from "./HistoryNav"
@@ -44,29 +42,14 @@ import {
   listSearchAtom,
   reviewsLinkAtom,
 } from "./reviewsArea"
-import { RailResourceUsage, ResourceUsage, railResourceUsageAtom } from "./ResourceUsage"
+import { RailResourceUsage, railResourceUsageAtom } from "./ResourceUsage"
 import { ShellPanelSlot, ShellTitleSlot, useShellSlot } from "./shellSlots"
-import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog"
-import { useAppearance } from "./theme"
+import { ShortcutsDialog } from "./ShortcutsDialog"
 
-const classicRailLink =
-  "relative flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:before:absolute aria-[current=page]:before:-left-2 aria-[current=page]:before:h-3 aria-[current=page]:before:w-0.5 aria-[current=page]:before:rounded-full aria-[current=page]:before:bg-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
-
-const insetRailLink =
+const railLink =
   "relative flex size-9 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-black/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-black/[0.07] aria-[current=page]:text-foreground aria-pressed:bg-black/[0.07] aria-pressed:text-foreground dark:hover:bg-white/5 dark:aria-[current=page]:bg-white/10 dark:aria-pressed:bg-white/10"
 
 type AreaLabel = "Dashboard" | "Inbox" | "Reviews" | "To-dos" | "Threads" | "Activity" | "Settings"
-
-interface RailStyle {
-  readonly link: string
-  readonly bottomFrom: AreaLabel
-  readonly connection: ComponentType
-}
-
-const railStyles = {
-  classic: { link: classicRailLink, bottomFrom: "Settings", connection: ConnectionAvatar },
-  inset: { link: insetRailLink, bottomFrom: "Activity", connection: ConnectionMenu },
-} satisfies Record<Layout, RailStyle>
 
 interface Area {
   readonly label: AreaLabel
@@ -113,7 +96,6 @@ export function AppShell() {
   const startThread = useStartThread()
   const [chatting, setChatting] = useAtom(globalChatOpenAtom)
   const [GlobalChatDialog, setGlobalChatDialog] = useState<ComponentType>()
-  const { layout } = useAppearance()
 
   const current = useMatch({ from: "/reviews/$owner/$repo/$number", shouldThrow: false })?.params
 
@@ -165,31 +147,11 @@ export function AppShell() {
       leavesPullRequest(registry, next) && !(await confirmLeave(registry)),
   })
 
-  const rail = (
-    <AreaRail
-      areas={areas}
-      chatting={chatting}
-      onToggleChatting={toggleChatting}
-      style={railStyles[layout]}
-    />
-  )
-
-  const page = (
-    <>
-      <Reconnecting />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <Outlet />
-      </div>
-    </>
-  )
-
   return (
     <div className="relative flex h-screen flex-col overflow-clip">
-      {layout === "inset" ? (
-        <InsetFrame rail={rail}>{page}</InsetFrame>
-      ) : (
-        <ClassicFrame rail={rail}>{page}</ClassicFrame>
-      )}
+      <Frame
+        rail={<AreaRail areas={areas} chatting={chatting} onToggleChatting={toggleChatting} />}
+      />
       {GlobalChatDialog && <GlobalChatDialog />}
       <CommandMenu
         current={current}
@@ -211,35 +173,7 @@ export function AppShell() {
   )
 }
 
-function ClassicFrame(props: { rail: ReactNode; children: ReactNode }) {
-  return (
-    <>
-      <div className="title-strip flex shrink-0 items-center border-b pr-2 pl-[calc(env(titlebar-area-x,0px)+0.75rem)]">
-        <HistoryNav />
-      </div>
-      <div className="flex min-h-0 flex-1">
-        <aside className="flex w-12 shrink-0 flex-col items-center gap-4 border-r bg-muted/40 py-3">
-          <TooltipHint content="Glass" side="right">
-            <div className="flex h-8 items-center">
-              <GlassMark />
-              <span className="sr-only">Glass</span>
-            </div>
-          </TooltipHint>
-          {props.rail}
-        </aside>
-        <div className="flex min-w-0 flex-1 flex-col">
-          {props.children}
-          <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
-            <ShortcutsButton />
-            <ResourceUsage />
-          </footer>
-        </div>
-      </div>
-    </>
-  )
-}
-
-function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
+function Frame(props: { rail: ReactNode }) {
   const showsResourceUsage = useAtomValue(railResourceUsageAtom)
 
   const [panelSlot, attachPanelSlot] = useShellSlot()
@@ -267,7 +201,12 @@ function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
         </div>
         <div className="mr-2 mb-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
           <ShellPanelSlot value={panelSlot}>
-            <ShellTitleSlot value={titleSlot}>{props.children}</ShellTitleSlot>
+            <ShellTitleSlot value={titleSlot}>
+              <Reconnecting />
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <Outlet />
+              </div>
+            </ShellTitleSlot>
           </ShellPanelSlot>
         </div>
       </div>
@@ -279,7 +218,6 @@ function AreaRail(props: {
   areas: ReadonlyArray<Area>
   chatting: boolean
   onToggleChatting: () => void
-  style: RailStyle
 }) {
   const inboxBadgeId = useId()
   const inboxWaiting = Option.getOrElse(useAtomValue(inboxCountAtom), () => 0)
@@ -305,7 +243,7 @@ function AreaRail(props: {
                     : undefined
               }
               aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
-              className={cn(props.style.link, label === props.style.bottomFrom && "mt-auto")}
+              className={cn(railLink, label === "Activity" && "mt-auto")}
             >
               <Icon className="size-4" aria-hidden />
               {label === "Inbox" && inboxWaiting > 0 && (
@@ -329,7 +267,7 @@ function AreaRail(props: {
           aria-label="Global chat"
           aria-pressed={props.chatting}
           aria-keyshortcuts="Meta+J Control+J"
-          className={props.style.link}
+          className={railLink}
           onClick={props.onToggleChatting}
         >
           <MessagesSquare className="size-4" aria-hidden />
@@ -340,7 +278,7 @@ function AreaRail(props: {
           )}
         </button>
       </TooltipHint>
-      <props.style.connection />
+      <ConnectionMenu />
     </>
   )
 }

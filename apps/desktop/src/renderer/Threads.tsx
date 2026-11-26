@@ -74,7 +74,7 @@ import { useShift } from "./useShift"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { useActions } from "./actions"
-import { ShellPanelSlot } from "./shellSlots"
+import { ShellPanelSlot, useShellSlotHost } from "./shellSlots"
 import { ThreadViews } from "./ThreadView"
 import { shortcutLabel } from "./shortcutLabel"
 
@@ -123,25 +123,6 @@ const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
 const threadLink =
   "flex flex-col gap-0.5 rounded-lg px-2 py-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
 
-const panelStyles: Record<
-  "inline" | "beside",
-  { aside: string; header: string; heading: "h1" | "h2"; title: string }
-> = {
-  inline: {
-    aside: "flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4",
-    header: "flex items-center justify-between pl-2",
-    heading: "h1",
-    title: "text-sm font-semibold",
-  },
-  beside: {
-    aside: "flex w-64 shrink-0 flex-col gap-2 pr-2 pb-2",
-    header:
-      "title-strip flex shrink-0 items-center justify-between pl-[max(0.5rem,calc(env(titlebar-area-x,0px)-3rem))]",
-    heading: "h2",
-    title: "text-base font-semibold",
-  },
-}
-
 const panelId = "threads-panel"
 
 const panelToggleId = "threads-panel-toggle"
@@ -150,8 +131,7 @@ export function ThreadsLayout() {
   const [panelOpen, setPanelOpen] = useAtom(threadsPanelOpenAtom)
   const threadId = useParams({ from: "/threads/$threadId", shouldThrow: false })?.threadId ?? null
 
-  const panelSlot = use(ShellPanelSlot)
-  const styles = panelSlot === null ? panelStyles.inline : panelStyles.beside
+  const panelSlot = useShellSlotHost(ShellPanelSlot)
 
   const togglePanel = () => {
     if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
@@ -174,9 +154,14 @@ export function ThreadsLayout() {
   ])
 
   const panel = (
-    <aside id={panelId} aria-label="Threads panel" hidden={!panelOpen} className={styles.aside}>
-      <div className={styles.header}>
-        <styles.heading className={styles.title}>Threads</styles.heading>
+    <aside
+      id={panelId}
+      aria-label="Threads panel"
+      hidden={!panelOpen}
+      className="flex w-64 shrink-0 flex-col gap-2 pr-2 pb-2"
+    >
+      <div className="title-strip flex shrink-0 items-center justify-between pl-[max(0.5rem,calc(env(titlebar-area-x,0px)-3rem))]">
+        <h2 className="text-base font-semibold">Threads</h2>
         <NewThreadLink />
       </div>
       <div className="no-scrollbar min-h-0 flex-1 scroll-fade-y overflow-y-auto">
@@ -187,7 +172,7 @@ export function ThreadsLayout() {
 
   return (
     <main aria-label="Threads" className="flex min-h-0 flex-1">
-      {panelSlot === null ? panel : createPortal(panel, panelSlot)}
+      {createPortal(panel, panelSlot)}
       <div className="flex min-w-0 flex-1 flex-col">
         <ThreadViews threadId={threadId} />
         <Outlet />

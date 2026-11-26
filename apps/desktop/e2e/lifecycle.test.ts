@@ -4,9 +4,11 @@ import { expect, openPullRequest, test } from "./glass"
 test("opens the built renderer signed in to GitHub", async ({ window }) => {
   await expect(window).toHaveURL(/^glass:\/\/app\/index\.html/)
   await expect(
-    window.getByRole("status", { name: `@${VIEWER.login} · via GH_TOKEN` }),
+    window.getByRole("button", { name: `@${VIEWER.login} · via GH_TOKEN` }),
   ).toBeVisible()
 
+  await window.getByRole("link", { name: "Settings" }).click()
+  await window.getByRole("switch", { name: "Show CPU and memory" }).click()
   await window.getByRole("button", { name: "Show Glass resource usage" }).click()
   const processes = window.getByRole("table", { name: "Resource usage by process" })
   await expect(processes.getByRole("row", { name: /^Backend / })).toBeVisible()
@@ -20,7 +22,7 @@ test("restarts a crashed backend and works again", async ({ app, github, window 
     head: { sha: "h1", files: {} },
   })
 
-  await expect(window.getByRole("status", { name: new RegExp(`^@${VIEWER.login}`) })).toBeVisible()
+  await expect(window.getByRole("button", { name: new RegExp(`^@${VIEWER.login}`) })).toBeVisible()
 
   const backend = await app.evaluate(({ app: electron }) => {
     const metric = electron.getAppMetrics().find(({ name }) => name === "Glass backend")

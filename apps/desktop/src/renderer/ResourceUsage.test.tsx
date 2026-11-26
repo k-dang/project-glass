@@ -11,7 +11,7 @@ import {
   within,
 } from "@testing-library/react"
 import { afterEach, expect, it, vi } from "vite-plus/test"
-import { ResourceUsage as ResourceUsageFooter, useResourceUsage } from "./ResourceUsage"
+import { RailResourceUsage, useResourceUsage } from "./ResourceUsage"
 
 afterEach(() => {
   cleanup()
@@ -57,7 +57,7 @@ it("serializes samples, retries after failure, and stops even with a request in 
   expect(resourceUsage).toHaveBeenCalledTimes(3)
 })
 
-it("shows the latest reading in the footer and per process in the popover", async () => {
+it("shows the latest reading in the rail and per process in the popover", async () => {
   const sample: ResourceUsage = {
     cpuPercent: 2.5,
     memoryBytes: 1.5 * 1024 ** 3,
@@ -65,7 +65,7 @@ it("shows the latest reading in the footer and per process in the popover", asyn
   }
 
   vi.stubGlobal("glass", { resourceUsage: () => Promise.resolve(sample) })
-  render(<ResourceUsageFooter />)
+  render(<RailResourceUsage />)
 
   const button = screen.getByRole("button", { name: "Show Glass resource usage" })
   await waitFor(() => expect(button.getAttribute("aria-description")).toBe("CPU 2.5%, RAM 1.5 GB"))

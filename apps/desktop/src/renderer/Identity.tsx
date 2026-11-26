@@ -2,7 +2,6 @@ import { cn } from "cn"
 import { AsyncResult } from "effect/reactivity"
 import type { ComponentProps } from "react"
 import { Avatar, AvatarBadge, AvatarFallback } from "@/components/ui/avatar"
-import { TooltipHint } from "@/components/ui/tooltip"
 import { useConnection } from "./connection"
 import { describeSource } from "./problems"
 
@@ -40,15 +39,5 @@ export function IdentityAvatar({
       <AvatarFallback className="bg-accent text-xs">{identity.initial}</AvatarFallback>
       <AvatarBadge className={`-right-0.5 -bottom-0.5 ${identity.dot}`} aria-hidden />
     </Avatar>
-  )
-}
-
-export function ConnectionAvatar() {
-  const identity = useIdentity()
-
-  return (
-    <TooltipHint content={identity.label} side="right">
-      <IdentityAvatar identity={identity} render={<output />} aria-label={identity.label} />
-    </TooltipHint>
   )
 }
