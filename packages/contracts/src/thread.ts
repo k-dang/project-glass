@@ -254,10 +254,6 @@ export const TurnContext = Schema.Union([
 
 export type TurnContext = typeof TurnContext.Type
 
-export const isUpdate = (context: TurnContext | null) =>
-  Predicate.isTagged(context, "StartedWorkUpdate") ||
-  Predicate.isTagged(context, "PullRequestUpdate")
-
 export const TurnMessage = Schema.Struct({
   ...SentMessage.fields,
   context: Schema.NullOr(TurnContext),
