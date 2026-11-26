@@ -162,15 +162,13 @@ function FollowUpsMarker() {
   )
 }
 
-function ReviewAgainNote(props: { children: ReactNode }) {
+function OutdatedNote() {
   return (
     <p className="m-0 shrink-0 border-t px-5 py-3 text-sm text-muted-foreground">
-      {props.children}
+      Written for an older Revision. Review again to follow up.
     </p>
   )
 }
-
-const outdatedNote = "Written for an older Revision. Review again to follow up."
 
 function ReviewThread(props: {
   threadId: string
@@ -193,6 +191,9 @@ function ReviewThread(props: {
     () => turns.filter(({ context }) => !Predicate.isTagged(context, "AgentReview")),
     [turns],
   )
+
+  const earlierFollowUps =
+    followUps.length < turns.length ? earlierTurns : Math.max(0, earlierTurns - 1)
 
   const loadEarlier = useAtomSet(atoms.loadEarlier)
 
@@ -220,7 +221,7 @@ function ReviewThread(props: {
         )}
         <Transcript
           turns={followUps}
-          earlierTurns={earlierTurns}
+          earlierTurns={earlierFollowUps}
           onShowEarlier={loadEarlier}
           status={status}
           lead={
@@ -231,7 +232,7 @@ function ReviewThread(props: {
           }
         />
         {outdated ? (
-          <ReviewAgainNote>{outdatedNote}</ReviewAgainNote>
+          <OutdatedNote />
         ) : (
           <ThreadComposer
             turns={turns}
@@ -258,31 +259,15 @@ export function AgentReviewPanel(props: {
   const { outdated } = props.controls
   const markdown = <ReviewBody review={review} links={props.hotspotLinks} outdated={outdated} />
 
-  if (review.threadId !== null)
-    return (
-      <ReviewThread
-        key={review.threadId}
-        threadId={review.threadId}
-        lead={markdown}
-        outdated={outdated}
-        drafts={props.drafts}
-        show={props.show}
-      />
-    )
-
   return (
-    <>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-8">{markdown}</div>
-      <div
-        aria-hidden
-        className="pointer-events-none relative -mt-8 h-8 shrink-0 bg-linear-to-t from-background to-transparent"
-      />
-      <ReviewAgainNote>
-        {outdated
-          ? outdatedNote
-          : "This Agent review takes no Follow-ups. Review again to follow up."}
-      </ReviewAgainNote>
-    </>
+    <ReviewThread
+      key={review.threadId}
+      threadId={review.threadId}
+      lead={markdown}
+      outdated={outdated}
+      drafts={props.drafts}
+      show={props.show}
+    />
   )
 }
 

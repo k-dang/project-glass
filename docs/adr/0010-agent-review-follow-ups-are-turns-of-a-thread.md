@@ -17,9 +17,8 @@ answer it accepted once the Turn ends, and a Turn that ends without one fails th
 then the Thread belongs to the review in progress: stopping the review, its deadline passing, or
 Glass quitting stops the Turn and removes the Thread, and at launch Glass removes every Review
 Thread and checkout that no saved review keeps. Reviewing again replaces the review and removes its
-Thread. A review written before reviews ran as Turns has no Thread and takes no Follow-ups until it
-is reviewed again. The Follow-ups show without the review's own Turn, whose prompt carries the PR
-material rather than the user's words.
+Thread. The Follow-ups show without the review's own Turn, whose prompt carries the PR material
+rather than the user's words.
 
 The Thread's agent works in a checkout of the review's Revision from Glass's cached clone,
 with a shell like the review's own (ADR 0006), not a Local checkout worktree (ADR 0008), since it

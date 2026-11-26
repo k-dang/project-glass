@@ -66,7 +66,7 @@ import {
 import { settleWith } from "./requests"
 import { scopedFolder } from "./scopedFolder"
 import type { WrittenSkills } from "./sentSkills"
-import { piLoadsNothing, piTools } from "../agentTools"
+import { piFilesFolder, piLoadsNothing, piTools } from "../agentTools"
 import { piSubagentStatusExtension } from "./piSubagentStatus"
 import { PI_DIFF_LINES } from "./piReviewTools"
 import { SUBMIT_REVIEW_TOOL } from "./submitReviewTool"
@@ -186,7 +186,7 @@ const writtenFiles = Effect.fnUntraced(function* (
   files: ReadonlyArray<PiFlagFile>,
 ) {
   const fs = yield* FileSystem.FileSystem
-  const directory = yield* scopedFolder(`${folder}.pi`)
+  const directory = yield* scopedFolder(piFilesFolder(folder))
 
   const flags = yield* Effect.forEach(files, ({ flag, name, source, besideIt }) => {
     const file = join(directory, name)
@@ -230,7 +230,7 @@ const roleFlags = (
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,
-          [...piTools.shell, SUBMIT_REVIEW_TOOL, SUGGEST_DRAFT_TOOL],
+          [...piTools.review, SUBMIT_REVIEW_TOOL, SUGGEST_DRAFT_TOOL],
           [
             extension("review-tools.mjs", piReviewToolsSource, [
               { name: PI_DIFF_LINES, source: JSON.stringify(brief.diffLines) },

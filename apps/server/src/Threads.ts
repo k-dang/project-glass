@@ -58,7 +58,6 @@ import {
 import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { changesId } from "./Changes"
-import { checkoutError } from "./CheckoutRuns"
 import { Checkouts } from "./Checkouts"
 import { ActivityLog } from "./ActivityLog"
 import { firstFreeBranch } from "./BranchNames"
@@ -79,9 +78,14 @@ import { LocalPlacement } from "./LocalPlacement"
 import { type RepositoryRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
-import { keyedLock } from "./keyedLock"
 import { ToDos } from "./ToDos"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
+import {
+  reviewThreadHosting,
+  reviewColumns,
+  type ReviewedRevision,
+  stopOnHost,
+} from "./reviewHosting"
 import { annotateUnit } from "./wideEvents"
 
 const changesOf = (files: ReadonlyArray<ChangedFile>) =>
@@ -89,24 +93,6 @@ const changesOf = (files: ReadonlyArray<ChangedFile>) =>
     id: changesId(files),
     files,
   })
-
-const BriefJson = Schema.fromJsonString(ReviewBrief)
-
-const encodeBrief = Schema.encodeSync(BriefJson)
-
-const decodeBrief = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ brief: BriefJson })))
-
-const ReviewedRevision = Schema.Struct({ pullRequest: PullRequestRef, revision: Revision })
-
-type ReviewedRevision = typeof ReviewedRevision.Type
-
-const ReviewedJson = Schema.fromJsonString(ReviewedRevision)
-
-const encodeReviewed = Schema.encodeSync(ReviewedJson)
-
-const decodeReviewed = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ reviewed: Schema.NullOr(ReviewedJson) })),
-)
 
 const decodeKeptGoing = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.String, keptGoingAt: Schema.DateTimeUtcFromString })),
@@ -164,19 +150,6 @@ export interface FinishedThread {
   readonly thread: Thread
   readonly ended: TurnEnd
 }
-
-const stopOnHost = (hosting: ThreadHosting, row: PlacedThread) =>
-  hosting.connectedHost(row).pipe(
-    Effect.flatMap(
-      Option.match({
-        onNone: () => Effect.void,
-        onSome: (host) =>
-          host
-            .StopThread({ threadId: row.thread.id })
-            .pipe(Effect.ignore({ log: "Warn", message: "Couldn't stop a Thread" })),
-      }),
-    ),
-  )
 
 export class Threads extends Context.Service<
   Threads,
@@ -251,7 +224,7 @@ export class Threads extends Context.Service<
     >
     readonly dropReviewCheckout: (
       threadId: string,
-    ) => Effect.Effect<void, ThreadNotFound | ThreadError>
+    ) => Effect.Effect<void, ThreadNotFound | ThreadBusy | ThreadError>
     readonly refuseReviewFrom: (
       threadId: string,
     ) => Effect.Effect<void, ThreadNotFound | ThreadError>
@@ -344,7 +317,6 @@ export class Threads extends Context.Service<
       const fs = yield* FileSystem.FileSystem
       const checkouts = yield* Checkouts
       const lock = yield* Semaphore.make(1)
-      const reviewCheckoutLock = keyedLock()
 
       const stored = yield* sql`
         SELECT id, name, sandbox_provider AS sandboxProvider, owner, repo, base_branch AS baseBranch,
@@ -414,58 +386,10 @@ export class Threads extends Context.Service<
             )
       }
 
-      const removeReviewCheckout = (folder: string) =>
-        fs.remove(folder, { recursive: true, force: true }).pipe(
-          Effect.tapError((cause) =>
-            Effect.logWarning("Couldn't remove an Agent review's checkout", cause),
-          ),
-          Effect.mapError(storageFailure),
-        )
-
-      const reviewedRevision = (threadId: string) =>
-        sql`SELECT review_checkout AS reviewed FROM thread WHERE id = ${threadId}`.pipe(
-          Effect.flatMap(decodeReviewed),
-          Effect.tapError((cause) => Effect.logWarning("Couldn't read a reviewed Revision", cause)),
-          Effect.mapError(storageFailure),
-          Effect.map(([found]) => found?.reviewed ?? null),
-        )
-
-      // WARNING: Both harnesses find a session by its folder, so a Review Thread whose checkout was dropped gets it back at the same path.
-      const checkedOutForReview = ({ thread, folder }: PlacedThread) =>
-        reviewCheckoutLock.withLock(
-          thread.id,
-          Effect.gen(function* () {
-            if (yield* fs.exists(folder).pipe(Effect.orElseSucceed(() => false))) return undefined
-
-            const reviewed = yield* reviewedRevision(thread.id)
-
-            if (reviewed === null)
-              return yield* new ThreadError({
-                message: "This Agent review's checkout is gone. Review again to follow up.",
-              })
-
-            return yield* checkouts
-              .checkoutInto(reviewed.pullRequest, reviewed.revision, folder)
-              .pipe(
-                Effect.mapError(
-                  (error) => new ThreadError({ message: checkoutError(null)(error).message }),
-                ),
-              )
-          }),
-        )
-
-      const reviewHosting: ThreadHosting = {
-        prepareHost: (row) =>
-          checkedOutForReview(row).pipe(Effect.andThen(localPlacement.prepareHost(row))),
-        hostIfPrepared: () => Effect.succeedNone,
-        connectedHost: localPlacement.connectedHost,
-        baseRef: localPlacement.baseRef,
-        remove: ({ thread, folder }) =>
-          reviewCheckoutLock.withLock(thread.id, removeReviewCheckout(folder)),
-      }
+      const review = reviewThreadHosting({ sql, fs, checkouts, localPlacement, storageFailure })
 
       const hostingOf = (row: PlacedThread): ThreadHosting =>
-        row.forReview ? reviewHosting : placementFor(row.thread.place)
+        row.forReview ? review.hosting : placementFor(row.thread.place)
 
       const saveBranch = (
         threadId: string,
@@ -524,18 +448,6 @@ export class Threads extends Context.Service<
       const withSandbox = (thread: Thread) =>
         sandboxes.status(thread.id).pipe(Effect.map((sandbox) => threadWith(thread, { sandbox })))
 
-      const reviewBrief = (row: PlacedThread) =>
-        sql`SELECT review_brief AS brief FROM thread WHERE id = ${row.thread.id}`.pipe(
-          Effect.flatMap(decodeBrief),
-          Effect.tapError((cause) => Effect.logWarning("Couldn't read a review brief", cause)),
-          Effect.mapError(storageFailure),
-          Effect.flatMap(([found]) =>
-            found === undefined
-              ? Effect.fail(new ThreadError({ message: "This Thread was removed." }))
-              : Effect.succeed(found.brief),
-          ),
-        )
-
       // WARNING: pi keeps the first skill of a name, so Local skills go first to win over a pack's.
       const skillsOf = (thread: Thread) =>
         Effect.all(
@@ -574,9 +486,9 @@ export class Threads extends Context.Service<
           id,
           ensureStarted: (client) =>
             (row.forReview
-              ? reviewBrief(row).pipe(
-                  Effect.flatMap((brief) => startAs(client, ReviewRole.make({ brief }))),
-                )
+              ? review
+                  .brief(id)
+                  .pipe(Effect.flatMap((brief) => startAs(client, ReviewRole.make({ brief }))))
               : startAs(client, WorkRole.make({}))
             ).pipe(Effect.asVoid),
           settings: { model, effort, permissionMode },
@@ -638,11 +550,27 @@ export class Threads extends Context.Service<
         return lock
           .withPermits(1)(
             Effect.gen(function* () {
+              const purposed = Purpose.$match(purpose, {
+                Work: ({ packs }) => ({
+                  packs,
+                  columns: { review_brief: null, reviewed_revision: null },
+                  linked: toDos.linkThread(id, mentionedToDoIds(first.message)),
+                  startFirst: transcripts.startOrQueue(id, { ...first, context: null }),
+                }),
+                Review: ({ brief, reviewed }) => ({
+                  packs: [],
+                  columns: reviewColumns(brief, reviewed),
+                  linked: Effect.void,
+                  startFirst: transcripts.startIfIdle(
+                    id,
+                    { ...first, context: AgentReviewTurn.make({}), retriesDelivery: false },
+                    () => Effect.void,
+                  ),
+                }),
+              })
+
               const thread = threadWith(placed.thread, {
-                skillPacks: yield* skillPacks.pinForThread(
-                  id,
-                  Purpose.$match(purpose, { Work: ({ packs }) => packs, Review: () => [] }),
-                ),
+                skillPacks: yield* skillPacks.pinForThread(id, purposed.packs),
               })
 
               yield* annotateThread(thread)
@@ -662,32 +590,14 @@ export class Threads extends Context.Service<
                 folder: placed.folder,
                 created_at: DateTime.formatIso(thread.createdAt),
                 kept_going_at: DateTime.formatIso(thread.createdAt),
-                review_brief: Purpose.$match(purpose, {
-                  Work: () => null,
-                  Review: ({ brief }) => encodeBrief(brief),
-                }),
-                review_checkout: Purpose.$match(purpose, {
-                  Work: () => null,
-                  Review: ({ reviewed }) => encodeReviewed(reviewed),
-                }),
+                ...purposed.columns,
               })}`
 
-              yield* Purpose.$match(purpose, {
-                Work: () => toDos.linkThread(id, mentionedToDoIds(first.message)),
-                Review: () => Effect.void,
-              })
+              yield* purposed.linked
 
               yield* SubscriptionRef.update(rows, (current) => [{ ...placed, thread }, ...current])
               yield* setKeptGoing(id, thread.createdAt)
-              yield* Purpose.$match(purpose, {
-                Work: () => transcripts.startOrQueue(id, { ...first, context: null }),
-                Review: () =>
-                  transcripts.startIfIdle(
-                    id,
-                    { ...first, context: AgentReviewTurn.make({}), retriesDelivery: false },
-                    () => Effect.void,
-                  ),
-              })
+              yield* purposed.startFirst
 
               return thread
             }).pipe(sql.withTransaction),
@@ -742,14 +652,7 @@ export class Threads extends Context.Service<
       ) {
         const row = yield* find(threadId)
 
-        if (!row.forReview) return
-
-        yield* turns
-          .whileIdle(
-            threadId,
-            stopOnHost(reviewHosting, row).pipe(Effect.andThen(reviewHosting.remove(row))),
-          )
-          .pipe(Effect.catchTag("ThreadBusy", () => Effect.void))
+        yield* turns.whileIdle(threadId, review.dropCheckout(row))
       })
 
       const createWith = Effect.fnUntraced(function* (

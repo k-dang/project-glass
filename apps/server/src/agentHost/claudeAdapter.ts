@@ -128,7 +128,7 @@ const drawDiagramInput = claudeToolInput(drawDiagramParameters)
 const toolResult = ({ accepted, text }: ToolReply) =>
   Promise.resolve({ content: [{ type: "text" as const, text }], isError: !accepted })
 
-const reviewTools = claudeTools.shell
+const reviewTools = claudeTools.review
 
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },

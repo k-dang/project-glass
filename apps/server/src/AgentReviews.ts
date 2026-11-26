@@ -20,7 +20,6 @@ import {
   Context,
   DateTime,
   Effect,
-  Exit,
   FileSystem,
   Layer,
   Match,
@@ -34,7 +33,8 @@ import {
 import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
-import { type AgentReviewAnswer, submittedReviewOf } from "./agentHost/submitReviewTool"
+import { type AgentReviewAnswer, acceptedReviewOf } from "./agentHost/submitReviewTool"
+import { piFilesFolder } from "./agentTools"
 import { agentReviewInstructions, agentReviewPrompt, MAX_HOTSPOTS } from "./agentReviewPrompt"
 import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
 import { GitHubClient } from "./github/GitHubClient"
@@ -74,7 +74,7 @@ const stored = Schema.Array(
     markdown: Schema.String,
     hotspots: HotspotsJson,
     low_attention: LowAttentionJson,
-    thread_id: Schema.NullOr(Schema.String),
+    thread_id: Schema.String,
     done: Schema.BooleanFromBit,
     included_in_started_work_update: Schema.BooleanFromBit,
   }),
@@ -230,29 +230,19 @@ export class AgentReviews extends Context.Service<
 
       const jobs = yield* pullRequestJobs({ load, toState, backgroundSlots: BACKGROUND_SLOTS })
 
-      const removeThread = (threadId: string | null) =>
-        threadId === null
-          ? Effect.void
-          : threads.remove(threadId).pipe(
-              Effect.catchTag("ThreadNotFound", () => Effect.void),
-              Effect.catch((cause) =>
-                Effect.logWarning("Couldn't remove an Agent review's Thread", cause),
-              ),
-            )
+      const removeThread = (threadId: string) =>
+        threads.remove(threadId).pipe(
+          Effect.catchTag("ThreadNotFound", () => Effect.void),
+          Effect.catch((cause) =>
+            Effect.logWarning("Couldn't remove an Agent review's Thread", cause),
+          ),
+        )
 
       const checkoutsFolder = join(config.dataDirectory, "agent-review-checkouts")
 
       const keptThreads = sql<{ readonly threadId: string }>`
-        SELECT thread_id AS threadId FROM agent_reviews WHERE thread_id IS NOT NULL
+        SELECT thread_id AS threadId FROM agent_reviews
       `.pipe(Effect.map((rows) => new Set(rows.map(({ threadId }) => threadId))))
-
-      const removeUnlessKept = (threadId: string) =>
-        sql`SELECT 1 FROM agent_reviews WHERE thread_id = ${threadId}`.pipe(
-          Effect.flatMap((rows) => (rows.length > 0 ? Effect.void : removeThread(threadId))),
-          Effect.catch((cause) =>
-            Effect.logWarning("Couldn't check whether an Agent review keeps its Thread", cause),
-          ),
-        )
 
       const unkept = Effect.gen(function* () {
         const { kept, reviewThreads, entries } = yield* Effect.all(
@@ -266,18 +256,17 @@ export class AgentReviews extends Context.Service<
           { concurrency: "unbounded" },
         )
 
-        const keptFolders = reviewThreads.flatMap(({ id, folder }) =>
-          kept.has(id) ? [folder] : [],
+        const keptPaths = new Set(
+          reviewThreads.flatMap(({ id, folder }) =>
+            kept.has(id) ? [folder, piFilesFolder(folder)] : [],
+          ),
         )
 
         return {
           threadIds: reviewThreads.flatMap(({ id }) => (kept.has(id) ? [] : [id])),
           paths: entries
             .map((entry) => join(checkoutsFolder, entry))
-            .filter(
-              (path) =>
-                !keptFolders.some((folder) => path === folder || path.startsWith(`${folder}.`)),
-            ),
+            .filter((path) => !keptPaths.has(path)),
         }
       })
 
@@ -298,15 +287,14 @@ export class AgentReviews extends Context.Service<
           ),
         )
 
-      const save = (job: Job, run: Run, review: AgentReview) =>
+      const save = (job: Job, pr: PullRequestRef, review: AgentReview) =>
         Effect.gen(function* () {
-          const replaced = (yield* SubscriptionRef.get(job.state)).output?.threadId ?? null
-          const { pr } = run
+          const replaced = (yield* SubscriptionRef.get(job.state)).output
 
           yield* jobs.commit(
             job,
             sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, thread_id, done, included_in_started_work_update)
-                VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, ${run.threadId}, 0, 0)
+                VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, ${review.threadId}, 0, 0)
                 ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, thread_id = excluded.thread_id, done = 0, included_in_started_work_update = 0`.pipe(
               logStorageFailure,
               Effect.mapError(storageFailure),
@@ -314,7 +302,7 @@ export class AgentReviews extends Context.Service<
             () => review,
           )
 
-          yield* removeThread(replaced).pipe(Effect.forkIn(scope))
+          if (replaced !== null) yield* removeThread(replaced.threadId).pipe(Effect.forkIn(scope))
         })
 
       const reviewSettings = settings.read().pipe(
@@ -340,7 +328,7 @@ export class AgentReviews extends Context.Service<
           Effect.map(Option.getOrThrow),
         )
 
-      const follow = (job: Job, run: Run) =>
+      const follow = (run: Run) =>
         Effect.gen(function* () {
           const { parts, ending } = yield* firstTurnEnded(run.threadId).pipe(
             Effect.timeoutOrElse({
@@ -356,16 +344,23 @@ export class AgentReviews extends Context.Service<
             }),
             Effect.catchTags({
               ThreadNotFound: () =>
-                Effect.fail(failure("runner", "The Agent review's Thread was removed. Try again.")),
+                Effect.fail(
+                  failure(
+                    "runner",
+                    "The Agent review's Thread was removed. Try again.",
+                    run.runner,
+                  ),
+                ),
               ThreadError: ({ message }) => Effect.fail(failure("runner", message, run.runner)),
             }),
           )
 
-          const answer = parts.reduce<AgentReviewAnswer | null>(
-            (found, part) =>
-              Predicate.isTagged(part, "ToolCall") ? (submittedReviewOf(part) ?? found) : found,
-            null,
-          )
+          const answer =
+            parts
+              .flatMap((part) =>
+                Predicate.isTagged(part, "ToolCall") ? [acceptedReviewOf(part)] : [],
+              )
+              .findLast(Predicate.isNotNull) ?? null
 
           if (answer === null) return yield* unfinished(ending, run.runner)
 
@@ -387,7 +382,7 @@ export class AgentReviews extends Context.Service<
               ),
             )
 
-          return yield* save(job, run, review)
+          return review
         })
 
       const work = (job: Job, pr: PullRequestRef, revision: Revision) =>
@@ -423,22 +418,17 @@ export class AgentReviews extends Context.Service<
                   message: agentReviewPrompt(copied, revision),
                 }),
               ),
-              Effect.mapError((error) =>
-                Predicate.isTagged(error, "ThreadError")
-                  ? failure("runner", error.message, runner)
-                  : error,
+              Effect.catchTag("ThreadError", ({ message }) =>
+                Effect.fail(failure("runner", message, runner)),
               ),
               Effect.onError(() =>
                 fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
               ),
             )
 
-            yield* restore(
-              follow(job, { pr, threadId, revision, runner, files: input.files }),
-            ).pipe(
-              Effect.onExit((exit) =>
-                Exit.isSuccess(exit) ? Effect.void : removeUnlessKept(threadId),
-              ),
+            yield* restore(follow({ pr, threadId, revision, runner, files: input.files })).pipe(
+              Effect.flatMap((review) => save(job, pr, review)),
+              Effect.onError(() => removeThread(threadId)),
             )
           }),
         ).pipe(

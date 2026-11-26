@@ -223,7 +223,7 @@ it.live("starts a hidden Review Thread whose first Turn carries the review promp
     const f = yield* fixture()
     yield* f.start
     const { review } = yield* f.state(reviewed)
-    const threadId = review!.threadId!
+    const threadId = review!.threadId
 
     assert.strictEqual(review?.markdown, answer.markdown)
     assert.deepStrictEqual(review?.revision, f.revision)
@@ -259,7 +259,7 @@ it.live("tells the agent why it refused an answer, and saves the one it accepts"
     yield* f.start
     const { review } = yield* f.state(reviewed)
 
-    const [first] = yield* f.transcript(review!.threadId!, ended(1))
+    const [first] = yield* f.transcript(review!.threadId, ended(1))
     const [refused, accepted] = toolCalls(first)
     assert.strictEqual(refused?.status, "failed")
     assert.include(refused?.output, `["hotspots"][0]["kind"]`)
@@ -371,7 +371,7 @@ it.live("removes the Review Threads and checkouts no Agent review keeps when Gla
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.start
-    const threadId = (yield* f.state(reviewed)).review!.threadId!
+    const threadId = (yield* f.state(reviewed)).review!.threadId
     yield* f.send(threadId, "Why?")
     yield* f.transcript(threadId, ended(2))
     const stray = f.checkout("left-by-a-crash")
@@ -384,7 +384,7 @@ it.live("removes the Review Threads and checkouts no Agent review keeps when Gla
     const database = new DatabaseSync(join(f.home, ".project-glass", "glass.db"))
 
     try {
-      database.exec("UPDATE agent_reviews SET thread_id = NULL")
+      database.exec("DELETE FROM agent_reviews")
     } finally {
       database.close()
     }
@@ -440,7 +440,7 @@ it.live("checks the Revision out again for the first Follow-up, continuing the s
     const prompt = "Look only at how names are handled."
     yield* f.client.SetReviewPrompt({ prompt })
     yield* f.start
-    const threadId = (yield* f.state(reviewed)).review!.threadId!
+    const threadId = (yield* f.state(reviewed)).review!.threadId
     assert.isFalse(existsSync(f.checkout(threadId)))
 
     yield* f.send(threadId, "show the review")
@@ -461,7 +461,7 @@ it.live("keeps the Suggested drafts the agent places on lines of the diff", () =
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.start
-    const threadId = (yield* f.state(reviewed)).review!.threadId!
+    const threadId = (yield* f.state(reviewed)).review!.threadId
 
     yield* f.send(threadId, "suggest new:greet.ts:2 Could this keep the caller's `!`?")
     yield* f.transcript(threadId, ended(2))
@@ -487,7 +487,7 @@ it.live("removes the previous Thread and its checkout when the Agent review is w
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.start
-    const previous = (yield* f.state(reviewed)).review!.threadId!
+    const previous = (yield* f.state(reviewed)).review!.threadId
     yield* f.send(previous, "Why?")
     yield* f.transcript(previous, ended(2))
     assert.isTrue(existsSync(f.checkout(previous)))
@@ -498,7 +498,7 @@ it.live("removes the previous Thread and its checkout when the Agent review is w
       (state) => reviewed(state) && state.review?.threadId !== previous,
     )
 
-    const replacement = rewritten.review!.threadId!
+    const replacement = rewritten.review!.threadId
 
     yield* eventually(Effect.sync(() => assert.isFalse(existsSync(f.checkout(previous)))))
 

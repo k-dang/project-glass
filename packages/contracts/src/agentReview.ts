@@ -1,5 +1,5 @@
-import { Option, Schema } from "effect"
-import type { ToolCallPart } from "./thread"
+import { Schema } from "effect"
+import { acceptedCallInput } from "./thread"
 import { Revision } from "./revision"
 import { CheckoutRunReason } from "./checkoutRun"
 import { DiffSide } from "./comment"
@@ -25,12 +25,7 @@ export type SuggestedDraft = typeof SuggestedDraft.Type
 
 export const SUGGEST_DRAFT_TOOL = "suggest_draft"
 
-const decodeSuggestedDraft = Schema.decodeUnknownOption(Schema.fromJsonString(SuggestedDraft))
-
-export const acceptedSuggestedDraftOf = (call: typeof ToolCallPart.Type): SuggestedDraft | null =>
-  call.name === SUGGEST_DRAFT_TOOL && call.status === "done"
-    ? Option.getOrNull(decodeSuggestedDraft(call.input))
-    : null
+export const acceptedSuggestedDraftOf = acceptedCallInput(SUGGEST_DRAFT_TOOL, SuggestedDraft)
 
 export const RiskKind = Schema.Literals([
   "data-access",
@@ -63,7 +58,7 @@ export const AgentReview = Schema.Struct({
   markdown: Schema.String,
   hotspots: Schema.Array(Hotspot),
   lowAttention: Schema.Array(LowAttentionFile),
-  threadId: Schema.NullOr(Schema.String),
+  threadId: Schema.String,
   done: Schema.Boolean,
   includedInStartedWorkUpdate: Schema.Boolean,
 })

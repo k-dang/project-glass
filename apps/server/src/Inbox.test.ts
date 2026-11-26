@@ -389,7 +389,7 @@ it.live("lists a waiting Thread before a PR that has waited longer", () =>
     const { review } = yield* f.review(pr)
 
     yield* f.client.SendMessage({
-      threadId: review!.threadId!,
+      threadId: review!.threadId,
       message: "Please ask permission",
       images: [],
       feedback: [],

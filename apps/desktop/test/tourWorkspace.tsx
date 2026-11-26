@@ -42,6 +42,7 @@ export const mountTourWorkspace = (
     readonly initial?: TourState
     readonly agentReview?: AgentReviewState
     readonly reviewThreadTurns?: ReadonlyArray<Turn>
+    readonly reviewThreadEarlierTurns?: number
   } = {},
 ) => {
   giveDiffScrollersAViewport()
@@ -91,6 +92,7 @@ export const mountTourWorkspace = (
       Stream.make(
         TranscriptSnapshot.make({
           turns: options.reviewThreadTurns ?? [],
+          earlierTurns: options.reviewThreadEarlierTurns ?? 0,
           queued: [],
           status: null,
         }),

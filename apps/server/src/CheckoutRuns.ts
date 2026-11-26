@@ -12,7 +12,7 @@ import { Context, Data, type Duration, Effect, Layer, Predicate, type Schema } f
 import type { AgentFailure } from "./agentFailure"
 import type { AgentTools } from "./agentTools"
 import { AgentRunners } from "./agentRunners"
-import { type CheckoutFailure, Checkouts } from "./Checkouts"
+import { type CheckoutFailure, Checkouts, checkoutProblem } from "./Checkouts"
 import { engineSettingsOf, SettingsStore } from "./SettingsStore"
 import type { InputReadError } from "./github/GitHubClient"
 import { annotateUnit, recordDuration } from "./wideEvents"
@@ -37,33 +37,6 @@ const agentFailureReasons: Record<AgentFailure["reason"], CheckoutRunReason> = {
   "unusable-output": "unusable-output",
   storage: "storage",
 }
-
-const checkoutMessages: Record<CheckoutFailure["reason"], readonly [CheckoutRunReason, string]> = {
-  "access-refused": [
-    "no-access",
-    "Your GitHub Connection can't read this repository's code. Check its access, then try again.",
-  ],
-  unreachable: [
-    "fetch-failed",
-    "Couldn't reach the repository to fetch the PR's code. Check your connection, then try again.",
-  ],
-  "fetch-failed": [
-    "fetch-failed",
-    "Fetching the PR's code failed. Git's output is in Glass's backend log; try again.",
-  ],
-  timeout: ["fetch-failed", "Fetching the PR's code took too long. Try again."],
-  storage: [
-    "storage",
-    "Couldn't prepare a copy of the PR's code. Check that your disk has free space, then try again.",
-  ],
-}
-
-const staleFailure = (identity: AgentRunnerIdentity | null) =>
-  checkoutRunFailure(
-    "stale-revision",
-    "The PR has new commits since Glass loaded it. Reload, then try again.",
-    identity,
-  )
 
 const fromAgentFailure = ({ reason, message, runner }: AgentFailure) =>
   checkoutRunFailure(agentFailureReasons[reason], message, runner)
@@ -120,7 +93,7 @@ const readMaterial = <I>(
     ),
     Effect.mapError((error) =>
       Predicate.isTagged(error, "StaleRevision")
-        ? staleFailure(identity)
+        ? checkoutRunFailure(...checkoutProblem(error), identity)
         : checkoutRunFailure(
             "github",
             "Couldn't read the PR from GitHub. Check your connection, then try again.",
@@ -129,19 +102,10 @@ const readMaterial = <I>(
     ),
   )
 
-export const checkoutError =
+const checkoutError =
   (identity: AgentRunnerIdentity | null) =>
   (error: CheckoutFailure | StaleRevision | NoCredentials) => {
-    if (Predicate.isTagged(error, "StaleRevision")) return staleFailure(identity)
-
-    if (Predicate.isTagged(error, "NoCredentials"))
-      return checkoutRunFailure(
-        "no-access",
-        "Glass isn't signed in to GitHub, so it can't fetch the PR's code.",
-        identity,
-      )
-
-    const [reason, message] = checkoutMessages[error.reason]
+    const [reason, message] = checkoutProblem(error)
 
     return checkoutRunFailure(reason, message, identity)
   }

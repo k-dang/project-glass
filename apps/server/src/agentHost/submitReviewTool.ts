@@ -1,5 +1,5 @@
-import { Hotspot, LowAttentionFile, type ToolCallPart } from "@glass/contracts"
-import { Option, Schema } from "effect"
+import { acceptedCallInput, Hotspot, LowAttentionFile } from "@glass/contracts"
+import { Schema } from "effect"
 import { replyTo, toolParameters } from "./hostTool"
 
 export const SUBMIT_REVIEW_TOOL = "submit_review"
@@ -28,9 +28,4 @@ const SUBMITTED = "Glass has your Agent review. End your Turn now."
 
 export const submitReview = replyTo(AgentReviewAnswer, () => ({ accepted: true, text: SUBMITTED }))
 
-const decodeSubmitted = Schema.decodeUnknownOption(Schema.fromJsonString(AgentReviewAnswer))
-
-export const submittedReviewOf = (call: typeof ToolCallPart.Type): AgentReviewAnswer | null =>
-  call.name === SUBMIT_REVIEW_TOOL && call.status === "done"
-    ? Option.getOrNull(decodeSubmitted(call.input))
-    : null
+export const acceptedReviewOf = acceptedCallInput(SUBMIT_REVIEW_TOOL, AgentReviewAnswer)

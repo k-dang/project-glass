@@ -22,11 +22,6 @@ const files = [changedFile("greet.ts")]
 
 const sidePanel = () => screen.queryByRole("complementary", { name: "Agent review" })
 
-const followedUp = (reviewRevision: Revision) => ({
-  ...reviewOf(reviewRevision),
-  threadId: "review-agent",
-})
-
 const suggestion = (input: SuggestedDraft, status: "done" | "failed") =>
   ToolCallPart.make({
     toolCallId: `call-${status}`,
@@ -88,7 +83,7 @@ it("reads the whole Agent review in a side panel without leaving Overview, until
 it("opens and closes the Agent review with Mod+D, even from its composer", async () => {
   const f = mountTourWorkspace({
     files,
-    agentReview: { review: followedUp(revision), job: { status: "idle" } },
+    agentReview: { review: reviewOf(revision), job: { status: "idle" } },
     reviewThreadTurns: followUps,
   })
 
@@ -161,24 +156,10 @@ const readFullReview = async (f: ReturnType<typeof mountTourWorkspace>) => {
   await f.user.click(within(card).getByRole("button", { name: "Read the full review" }))
 }
 
-it("takes no Follow-ups on an Agent review with no Thread", async () => {
-  const f = mountTourWorkspace({
-    files,
-    agentReview: { review: reviewOf(revision), job: { status: "idle" } },
-  })
-
-  await readFullReview(f)
-
-  expect(
-    await screen.findByText("This Agent review takes no Follow-ups. Review again to follow up."),
-  ).toBeDefined()
-  expect(screen.queryByRole("textbox", { name: "Follow up" })).toBeNull()
-})
-
 it("leaves out the Turn that wrote the Agent review, showing only its Follow-ups", async () => {
   const f = mountTourWorkspace({
     files,
-    agentReview: { review: followedUp(revision), job: { status: "idle" } },
+    agentReview: { review: reviewOf(revision), job: { status: "idle" } },
     reviewThreadTurns: [reviewTurn, ...followUps],
   })
 
@@ -189,13 +170,27 @@ it("leaves out the Turn that wrote the Agent review, showing only its Follow-ups
   expect(screen.queryByText("Handed in.")).toBeNull()
 })
 
+it("offers no earlier Turns when only the Turn that wrote the Agent review is earlier", async () => {
+  const f = mountTourWorkspace({
+    files,
+    agentReview: { review: reviewOf(revision), job: { status: "idle" } },
+    reviewThreadTurns: followUps,
+    reviewThreadEarlierTurns: 1,
+  })
+
+  await readFullReview(f)
+
+  expect(await screen.findByText("Draft a comment for the letter change.")).toBeDefined()
+  expect(screen.queryByRole("button", { name: "Show earlier Turns" })).toBeNull()
+})
+
 const draftPrComments =
   "Draft PR comments without using jargon and speak coherently. State it more simply and concisely, like one human talking to another."
 
 it("sends Follow-ups and suggestions to the review's Thread", async () => {
   const f = mountTourWorkspace({
     files,
-    agentReview: { review: followedUp(revision), job: { status: "idle" } },
+    agentReview: { review: reviewOf(revision), job: { status: "idle" } },
     reviewThreadTurns: followUps,
   })
 
@@ -223,7 +218,7 @@ it("sends Follow-ups and suggestions to the review's Thread", async () => {
 it("adds a suggested Draft as the user edited it", async () => {
   const f = mountTourWorkspace({
     files,
-    agentReview: { review: followedUp(revision), job: { status: "idle" } },
+    agentReview: { review: reviewOf(revision), job: { status: "idle" } },
     reviewThreadTurns: followUps,
   })
 
@@ -255,7 +250,7 @@ it("only reads the Follow-ups of an outdated Agent review", async () => {
   const f = mountTourWorkspace({
     files,
     agentReview: {
-      review: followedUp(new Revision({ base: "b0", head: "0123456789abcdef" })),
+      review: reviewOf(new Revision({ base: "b0", head: "0123456789abcdef" })),
       job: { status: "idle" },
     },
     reviewThreadTurns: followUps,
