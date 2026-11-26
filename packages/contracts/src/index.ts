@@ -20,6 +20,8 @@ export * from "./desktop"
 
 export * from "./diagram"
 
+export * from "./diagnostics"
+
 export * from "./visualization"
 
 export * from "./visualizationBootstrap"

@@ -1,4 +1,5 @@
 import { NodeRuntime } from "@effect/platform-node"
+import { burstCounter } from "@glass/contracts"
 import {
   Cause,
   Clock,
@@ -176,6 +177,10 @@ type Sink = (line: string) => void
 
 const isLoud = (line: UnitLine | LogLine) => line.level === "WARN" || line.level === "ERROR"
 
+export const STORM_CALLS = 50
+
+export const STORM_WINDOW_MS = 5000
+
 const emitter = (source: Source, stdout: Sink, stderr?: Sink): Emit => {
   const launch = {
     source,
@@ -183,11 +188,43 @@ const emitter = (source: Source, stdout: Sink, stderr?: Sink): Emit => {
     platform: `${process.platform}-${process.arch}`,
   }
 
-  return (at, line, extra) => {
+  const storming = burstCounter(STORM_CALLS, STORM_WINDOW_MS)
+
+  const write: Emit = (at, line, extra) => {
     const text = Formatter.formatJson({ at, ...launch, ...Object.fromEntries(extra), ...line })
     const sink = stderr !== undefined && isLoud(line) ? stderr : stdout
 
     sink(text)
+  }
+
+  return (at, line, extra) => {
+    const fields = Object.fromEntries(extra)
+    write(at, line, Object.entries(fields))
+
+    const method = fields["rpc.method"]
+
+    if ("event" in line && Predicate.isString(method)) {
+      const threadId = Predicate.isString(fields.thread_id) ? fields.thread_id : null
+
+      if (storming(`${method} ${threadId}`, Date.parse(at)))
+        write(
+          at,
+          {
+            level: "WARN",
+            message: "A request is repeating fast",
+            details: undefined,
+            cause: undefined,
+            trace_id: undefined,
+          },
+          [
+            ["event", "RpcStorm"],
+            ["rpc.method", method],
+            ["thread_id", threadId],
+            ["calls", STORM_CALLS],
+            ["window_ms", STORM_WINDOW_MS],
+          ],
+        )
+    }
   }
 }
 

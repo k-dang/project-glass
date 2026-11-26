@@ -1,6 +1,12 @@
 import { assert, it } from "@effect/vitest"
 import { Data, Effect, Layer, Option, Schema, Tracer } from "effect"
-import { annotateUnit, recordDuration, wideEvents } from "./wideEvents"
+import {
+  annotateUnit,
+  recordDuration,
+  STORM_CALLS,
+  STORM_WINDOW_MS,
+  wideEvents,
+} from "./wideEvents"
 
 class ReviewFailed extends Data.TaggedError("ReviewFailed")<{
   readonly message: string
@@ -170,6 +176,48 @@ it.effect("makes units from the tracer it is given, so they export like any othe
     assert.deepStrictEqual(
       lines.map(({ event, trace_id }) => ({ event, trace_id })),
       [{ event: "PullRequestJob.tour", trace_id: tour!.traceId }],
+    )
+  }),
+)
+
+const listFeedbackNotes = (threadId: string) =>
+  Effect.void.pipe(
+    Effect.withSpan("ListFeedbackNotes", {
+      kind: "server",
+      attributes: { "rpc.method": "ListFeedbackNotes", thread_id: threadId },
+    }),
+  )
+
+it.effect("warns once a window when one request repeats fast for the same Thread", () =>
+  Effect.gen(function* () {
+    const raw: Array<string> = []
+
+    yield* Effect.gen(function* () {
+      for (let calls = 0; calls < STORM_CALLS * 2; calls++) yield* listFeedbackNotes("storming")
+
+      for (let calls = 0; calls < STORM_CALLS - 1; calls++) yield* listFeedbackNotes("calm")
+    }).pipe(Effect.provide(wideEvents("backend", (line) => void raw.push(line))))
+
+    const storms = raw.flatMap((line) => {
+      const parsed = JSON.parse(line)
+
+      return parsed.event === "RpcStorm" ? [parsed] : []
+    })
+
+    assert.deepStrictEqual(
+      storms.map(({ at: _at, launch_id: _launch, platform: _platform, ...storm }) => storm),
+      [
+        {
+          source: "backend",
+          level: "WARN",
+          message: "A request is repeating fast",
+          event: "RpcStorm",
+          "rpc.method": "ListFeedbackNotes",
+          thread_id: "storming",
+          calls: STORM_CALLS,
+          window_ms: STORM_WINDOW_MS,
+        },
+      ],
     )
   }),
 )

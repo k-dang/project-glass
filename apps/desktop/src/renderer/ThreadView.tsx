@@ -50,6 +50,7 @@ import {
   useState,
 } from "react"
 import { Button } from "@/components/ui/button"
+import { useMountWatch } from "./rendererEvents"
 import { AgentStatuses } from "./AgentStatuses"
 import { Transcript } from "./Transcript"
 import { BackgroundToolCalls, ToolCallView } from "./TurnParts"
@@ -147,6 +148,8 @@ export function ThreadViews(props: { threadId: string | null }) {
   const listedShown = threadId !== null && listed.some(({ id }) => id === threadId)
   const kept = useKeptThreads(listedShown ? threadId : null, listed)
 
+  useMountWatch("ThreadViews", null)
+
   return (
     <>
       {threadId !== null && !listedShown && (
@@ -194,6 +197,8 @@ const OpenThread = memo(function OpenThread(props: { thread: Thread }) {
   const atoms = useMemo(() => threadAtoms(thread.id), [thread.id])
   const loaded = AsyncResult.value(useAtomValue(atoms.transcript))
   const { turns } = Option.getOrElse(loaded, () => emptyTranscript)
+
+  useMountWatch("OpenThread", thread.id)
 
   const [pane, setPane] = useState<SidePane>(null)
   const openDiagram = useCallback((title: string) => setPane({ kind: "diagram", title }), [setPane])
@@ -550,6 +555,8 @@ function Composer(props: {
   const modeChanged = useAtomValue(changePermissionModeAtom(thread.id))
   const changePermissionMode = useAtomSet(changePermissionModeAtom(thread.id))
   const feedback = useFeedbackNotes(thread.id)
+
+  useMountWatch("Composer", thread.id)
 
   return (
     <ThreadComposer

@@ -7,6 +7,7 @@ import { cn } from "cn"
 import { FolderTree, MessageCircle, Route } from "lucide-react"
 import { type ReactNode, useCallback, useContext } from "react"
 import { Skeleton } from "@/components/ui/skeleton"
+import { useMountWatch } from "./rendererEvents"
 import { BackToPullRequests } from "./BackToPullRequests"
 import { OpenPullRequestButton } from "./CommandMenu"
 import { ProblemAlert, Problems } from "./ProblemAlert"
@@ -26,6 +27,8 @@ const route = getRouteApi("/reviews/$owner/$repo/$number")
 
 export function PullRequestPage() {
   const ref = route.useParams()
+
+  useMountWatch("PullRequestPage", `${ref.owner}/${ref.repo}#${ref.number}`)
   const navigate = route.useNavigate()
   const registry = useContext(RegistryContext)
   const result = useAtomValue(openWorkspaceAtom)

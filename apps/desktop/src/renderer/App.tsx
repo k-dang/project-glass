@@ -3,11 +3,14 @@ import { RouterProvider } from "@tanstack/react-router"
 import { useContext, useState } from "react"
 import { Toaster } from "@/components/ui/toast"
 import { TooltipProvider } from "@/components/ui/tooltip"
+import { useRendererEvents } from "./rendererEvents"
 import { createAppRouter } from "./routes"
 
 export function App() {
   const registry = useContext(RegistryContext)
   const [router] = useState(() => createAppRouter(registry))
+
+  useRendererEvents()
 
   return (
     <Toaster>

@@ -23,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { useMountWatch } from "./rendererEvents"
 import { threadColumn } from "./threadColumn"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
@@ -292,6 +293,8 @@ function ThreadDetail(props: DetailProps<InboxThread>) {
   const { thread } = props.item
   const atoms = useMemo(() => threadAtoms(thread.id), [thread.id])
   const done = props.actions.find(({ key }) => key === "E")
+
+  useMountWatch("InboxThreadDetail", thread.id)
 
   return (
     <ThreadAtomsContext value={atoms}>
