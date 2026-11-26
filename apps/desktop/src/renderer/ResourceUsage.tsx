@@ -219,7 +219,7 @@ export function TitleStripResourceUsage() {
   const { usage, trend } = useResourceUsage()
 
   return (
-    <div className="@container flex min-w-0 flex-1 justify-end">
+    <div className="@container ml-auto flex min-w-0 flex-[0_1_15rem] justify-end">
       <ResourceUsagePopover
         usage={usage}
         side="bottom"
