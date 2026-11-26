@@ -13,7 +13,6 @@ import {
   Revision,
   runnerIdentity,
   threadModelOf,
-  type TourCodeTarget,
   type TurnEnding,
 } from "@glass/contracts"
 import {
@@ -21,6 +20,7 @@ import {
   Context,
   DateTime,
   Effect,
+  Exit,
   FileSystem,
   Layer,
   Match,
@@ -34,12 +34,11 @@ import {
 import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
-import { ReviewBrief } from "./agentHost/protocol"
 import { type AgentReviewAnswer, submittedReviewOf } from "./agentHost/submitReviewTool"
 import { agentReviewInstructions, agentReviewPrompt, MAX_HOTSPOTS } from "./agentReviewPrompt"
 import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
 import { GitHubClient } from "./github/GitHubClient"
-import { patchLineNumbers } from "./github/patchLines"
+import { patchLineNumbers, rangeInFiles } from "./github/patchLines"
 import { type JobState, pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
 import { Deadlines, ServerConfig } from "./ServerConfig"
 import { engineSettingsOf, SettingsStore } from "./SettingsStore"
@@ -85,19 +84,12 @@ const encodeHotspots = Schema.encodeSync(HotspotsJson)
 
 const encodeLowAttention = Schema.encodeSync(LowAttentionJson)
 
-const ReviewDiff = Schema.Struct({
-  paths: Schema.Array(Schema.String),
-  lines: ReviewBrief.fields.diffLines,
-})
-
-type ReviewDiff = typeof ReviewDiff.Type
-
 interface Run {
   readonly pr: PullRequestRef
   readonly threadId: string
   readonly revision: Revision
   readonly runner: AgentRunnerIdentity
-  readonly diff: ReviewDiff
+  readonly files: ReadonlyArray<ChangedFile>
 }
 
 const diffLinesOn = (files: ReadonlyArray<ChangedFile>, side: DiffSide) =>
@@ -107,27 +99,17 @@ const diffLinesOn = (files: ReadonlyArray<ChangedFile>, side: DiffSide) =>
     ),
   )
 
-const diffOf = (files: ReadonlyArray<ChangedFile>): ReviewDiff => ({
-  paths: files.map(({ path }) => path),
-  lines: { old: diffLinesOn(files, "old"), new: diffLinesOn(files, "new") },
-})
-
-const inDiff = ({ lines }: ReviewDiff, { path, side, startLine, endLine }: TourCodeTarget) =>
-  endLine >= startLine &&
-  (lines[side][path] ?? []).filter((line) => line >= startLine && line <= endLine).length ===
-    endLine - startLine + 1
-
-const fitToDiff = (answer: AgentReviewAnswer, diff: ReviewDiff) => {
+const fitToDiff = (answer: AgentReviewAnswer, files: ReadonlyArray<ChangedFile>) => {
   const hotspots = answer.hotspots.slice(0, MAX_HOTSPOTS).map((hotspot) => ({
     ...hotspot,
-    place: hotspot.place !== null && inDiff(diff, hotspot.place) ? hotspot.place : null,
+    place: hotspot.place !== null && rangeInFiles(files, hotspot.place) ? hotspot.place : null,
   }))
 
   const hotspotPaths = new Set(
     hotspots.flatMap(({ place }) => (place === null ? [] : [place.path])),
   )
 
-  const changed = new Set(diff.paths)
+  const changed = new Set(files.map(({ path }) => path))
 
   const lowAttention = answer.lowAttention.filter(
     (file) => changed.has(file.path) && !hotspotPaths.has(file.path),
@@ -159,6 +141,9 @@ const stoppedRunner = (runner: AgentRunnerIdentity | null) =>
     runner,
   )
 
+const lost = (runner: AgentRunnerIdentity) =>
+  failure("runner", "Glass lost the agent before it finished. Try again.", runner)
+
 const unfinished = (ending: TurnEnding, runner: AgentRunnerIdentity) =>
   Match.valueTags(ending, {
     Done: () =>
@@ -170,9 +155,8 @@ const unfinished = (ending: TurnEnding, runner: AgentRunnerIdentity) =>
     Failed: ({ reason }) => failure("runner", reason, runner),
     Stopped: () =>
       failure("runner", "The agent was stopped before it finished. Try again.", runner),
-    CutOff: () => failure("runner", "Glass lost the agent before it finished. Try again.", runner),
-    Interrupted: () =>
-      failure("runner", "Glass lost the agent before it finished. Try again.", runner),
+    CutOff: () => lost(runner),
+    Interrupted: () => lost(runner),
   })
 
 export class AgentReviews extends Context.Service<
@@ -263,24 +247,28 @@ export class AgentReviews extends Context.Service<
       `.pipe(Effect.map((rows) => new Set(rows.map(({ threadId }) => threadId))))
 
       const removeUnlessKept = (threadId: string) =>
-        keptThreads.pipe(
-          Effect.flatMap((kept) => (kept.has(threadId) ? Effect.void : removeThread(threadId))),
+        sql`SELECT 1 FROM agent_reviews WHERE thread_id = ${threadId}`.pipe(
+          Effect.flatMap((rows) => (rows.length > 0 ? Effect.void : removeThread(threadId))),
           Effect.catch((cause) =>
             Effect.logWarning("Couldn't check whether an Agent review keeps its Thread", cause),
           ),
         )
 
       const unkept = Effect.gen(function* () {
-        const kept = yield* keptThreads
-        const reviewThreads = yield* threads.reviewThreads
+        const { kept, reviewThreads, entries } = yield* Effect.all(
+          {
+            kept: keptThreads,
+            reviewThreads: threads.reviewThreads,
+            entries: fs
+              .readDirectory(checkoutsFolder)
+              .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => [])),
+          },
+          { concurrency: "unbounded" },
+        )
 
         const keptFolders = reviewThreads.flatMap(({ id, folder }) =>
           kept.has(id) ? [folder] : [],
         )
-
-        const entries = yield* fs
-          .readDirectory(checkoutsFolder)
-          .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []))
 
         return {
           threadIds: reviewThreads.flatMap(({ id }) => (kept.has(id) ? [] : [id])),
@@ -329,13 +317,11 @@ export class AgentReviews extends Context.Service<
           yield* removeThread(replaced).pipe(Effect.forkIn(scope))
         })
 
-      const reviewInstructions = settings.read().pipe(
-        Effect.map((saved) => agentReviewInstructions(saved.reviewPrompt)),
-        Effect.mapError((error) => failure("not-ready", error.message)),
-      )
-
-      const reviewer = settings.read().pipe(
-        Effect.map((saved) => runnerIdentity(engineSettingsOf(saved, "agentReviews"))),
+      const reviewSettings = settings.read().pipe(
+        Effect.map((saved) => ({
+          runner: runnerIdentity(engineSettingsOf(saved, "agentReviews")),
+          instructions: agentReviewInstructions(saved.reviewPrompt),
+        })),
         Effect.mapError((error) => failure("not-ready", error.message)),
       )
 
@@ -352,16 +338,6 @@ export class AgentReviews extends Context.Service<
           Stream.filter(Predicate.isNotNull),
           Stream.runHead,
           Effect.map(Option.getOrThrow),
-        )
-
-      const settled = (job: Job) =>
-        jobs.settle(
-          job,
-          "AgentReview",
-          (error: Option.Option<AgentReviewFailure>, { runner }): Failed => ({
-            status: "failed",
-            reason: Option.getOrElse(error, () => stoppedRunner(runner)),
-          }),
         )
 
       const follow = (job: Job, run: Run) =>
@@ -397,7 +373,7 @@ export class AgentReviews extends Context.Service<
             revision: run.revision,
             writtenAt: yield* DateTime.now,
             markdown: answer.markdown,
-            ...fitToDiff(answer, run.diff),
+            ...fitToDiff(answer, run.files),
             threadId: run.threadId,
             done: false,
             includedInStartedWorkUpdate: false,
@@ -417,49 +393,64 @@ export class AgentReviews extends Context.Service<
       const work = (job: Job, pr: PullRequestRef, revision: Revision) =>
         Effect.uninterruptibleMask((restore) =>
           Effect.gen(function* () {
-            const runner = yield* restore(reviewer)
+            const { runner, instructions } = yield* restore(reviewSettings)
             yield* jobs.progress(job, (progress) => ({ ...progress, runner }))
 
             const threadId = randomUUID()
             const folder = join(checkoutsFolder, threadId)
 
-            const { input, instructions } = yield* restore(
-              Effect.all({
-                input: checkoutRuns
-                  .copy({ pr, revision, subject: "Agent review", folder, read: github.reviewInput })
-                  .pipe(Effect.mapError(fromCheckoutRunFailure)),
-                instructions: reviewInstructions,
-              }),
+            const input = yield* restore(
+              checkoutRuns
+                .copy({ pr, revision, subject: "Agent review", folder, read: github.reviewInput })
+                .pipe(Effect.mapError(fromCheckoutRunFailure)),
             ).pipe(
+              Effect.tap((copied) =>
+                threads.createForReview({
+                  id: threadId,
+                  name: `Agent review of ${pr.owner}/${pr.repo}#${pr.number}`,
+                  pullRequest: pr,
+                  revision,
+                  harness: runner.harness,
+                  model: threadModelOf(runner),
+                  checkout: folder,
+                  review: {
+                    instructions,
+                    diffLines: {
+                      old: diffLinesOn(copied.files, "old"),
+                      new: diffLinesOn(copied.files, "new"),
+                    },
+                  },
+                  message: agentReviewPrompt(copied, revision),
+                }),
+              ),
+              Effect.mapError((error) =>
+                Predicate.isTagged(error, "ThreadError")
+                  ? failure("runner", error.message, runner)
+                  : error,
+              ),
               Effect.onError(() =>
                 fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
               ),
             )
 
-            const run: Run = { pr, threadId, revision, runner, diff: diffOf(input.files) }
-
-            yield* threads
-              .createForReview({
-                id: threadId,
-                name: `Agent review of ${pr.owner}/${pr.repo}#${pr.number}`,
-                pullRequest: pr,
-                revision,
-                harness: runner.harness,
-                model: threadModelOf(runner),
-                checkout: folder,
-                review: { instructions, diffLines: run.diff.lines },
-                message: agentReviewPrompt(input, revision),
-              })
-              .pipe(
-                Effect.mapError(({ message }) => failure("runner", message, runner)),
-                Effect.onError(() =>
-                  fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
-                ),
-              )
-
-            yield* restore(follow(job, run)).pipe(Effect.ensuring(removeUnlessKept(threadId)))
+            yield* restore(
+              follow(job, { pr, threadId, revision, runner, files: input.files }),
+            ).pipe(
+              Effect.onExit((exit) =>
+                Exit.isSuccess(exit) ? Effect.void : removeUnlessKept(threadId),
+              ),
+            )
           }),
-        ).pipe(settled(job))
+        ).pipe(
+          jobs.settle(
+            job,
+            "AgentReview",
+            (error: Option.Option<AgentReviewFailure>, { runner }): Failed => ({
+              status: "failed",
+              reason: Option.getOrElse(error, () => stoppedRunner(runner)),
+            }),
+          ),
+        )
 
       const start = Effect.fn("AgentReviews.start")(function* (
         pr: PullRequestRef,

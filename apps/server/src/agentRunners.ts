@@ -109,28 +109,18 @@ const claudeRequiredFlags = [
   "--restricted",
   "--setting-sources",
   "--tools",
-  "--allowedTools",
   "--json-schema",
 ]
 
-// WARNING: Each flag set keeps the user's settings files, and their hooks, away from the PR's files; shell can't use --restricted, and -p refuses tools not allowed.
+// WARNING: Each flag set keeps the user's settings files, and their hooks, away from the PR's files.
 const claudeToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
   none: ["--setting-sources", "", "--tools", ""],
   "read-only": ["--restricted", "--tools", claudeTools["read-only"].join(",")],
-  shell: [
-    "--setting-sources",
-    "",
-    "--tools",
-    claudeTools.shell.join(","),
-    "--allowedTools",
-    claudeTools.shell.join(","),
-  ],
 }
 
 const piToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
   none: ["--no-tools"],
   "read-only": ["--tools", piTools["read-only"].join(",")],
-  shell: ["--tools", piTools.shell.join(",")],
 }
 
 const piCliFlags = (tools: AgentTools) => [

@@ -165,6 +165,19 @@ export interface FinishedThread {
   readonly ended: TurnEnd
 }
 
+const stopOnHost = (hosting: ThreadHosting, row: PlacedThread) =>
+  hosting.connectedHost(row).pipe(
+    Effect.flatMap(
+      Option.match({
+        onNone: () => Effect.void,
+        onSome: (host) =>
+          host
+            .StopThread({ threadId: row.thread.id })
+            .pipe(Effect.ignore({ log: "Warn", message: "Couldn't stop a Thread" })),
+      }),
+    ),
+  )
+
 export class Threads extends Context.Service<
   Threads,
   {
@@ -447,7 +460,8 @@ export class Threads extends Context.Service<
         hostIfPrepared: () => Effect.succeedNone,
         connectedHost: localPlacement.connectedHost,
         baseRef: localPlacement.baseRef,
-        remove: ({ folder }) => removeReviewCheckout(folder),
+        remove: ({ thread, folder }) =>
+          reviewCheckoutLock.withLock(thread.id, removeReviewCheckout(folder)),
       }
 
       const hostingOf = (row: PlacedThread): ThreadHosting =>
@@ -733,16 +747,7 @@ export class Threads extends Context.Service<
         yield* turns
           .whileIdle(
             threadId,
-            Effect.gen(function* () {
-              const running = yield* localPlacement.connectedHost(row)
-
-              if (Option.isSome(running))
-                yield* running.value
-                  .StopThread({ threadId })
-                  .pipe(Effect.ignore({ log: "Warn", message: "Couldn't stop a Thread" }))
-
-              yield* reviewCheckoutLock.withLock(threadId, removeReviewCheckout(row.folder))
-            }),
+            stopOnHost(reviewHosting, row).pipe(Effect.andThen(reviewHosting.remove(row))),
           )
           .pipe(Effect.catchTag("ThreadBusy", () => Effect.void))
       })
@@ -1084,13 +1089,8 @@ export class Threads extends Context.Service<
 
         yield* Effect.gen(function* () {
           const hosting = hostingOf(row)
-          const running = yield* hosting.connectedHost(row)
 
-          if (Option.isSome(running))
-            yield* running.value
-              .StopThread({ threadId })
-              .pipe(Effect.ignore({ log: "Warn", message: "Couldn't stop a Thread" }))
-
+          yield* stopOnHost(hosting, row)
           yield* hosting.remove(row)
 
           yield* Effect.gen(function* () {

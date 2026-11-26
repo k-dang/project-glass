@@ -189,7 +189,10 @@ function ReviewThread(props: {
     () => emptyTranscript,
   )
 
-  const followUps = turns.filter(({ context }) => !Predicate.isTagged(context, "AgentReview"))
+  const followUps = useMemo(
+    () => turns.filter(({ context }) => !Predicate.isTagged(context, "AgentReview")),
+    [turns],
+  )
 
   const loadEarlier = useAtomSet(atoms.loadEarlier)
 

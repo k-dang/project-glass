@@ -62,9 +62,6 @@ export const seedCheckout = (checkout: string) => {
   writeFileSync(join(checkout, "src", "greet.ts"), "hello")
 }
 
-const runGreeting =
-  'Run the shell command `cat src/greet.ts`, then reply with only JSON of the form {"summary":"<what it printed>"}.'
-
 const readGreeting =
   'Read the file src/greet.ts, then reply with only JSON of the form {"summary":"<the file\'s contents>"}.'
 
@@ -105,23 +102,11 @@ export const runnerScenarios: ReadonlyArray<RunnerScenario> = [
       CLAUDE_CODE_MAX_RETRIES: "0",
     },
   },
-  {
-    name: "claude-shell",
-    harness: "claude-code",
-    instructions: runGreeting,
-    tools: "shell",
-  },
   { name: "pi-answer", harness: "pi", instructions: replyFine },
   {
     name: "pi-read-only",
     harness: "pi",
     instructions: readGreeting,
-  },
-  {
-    name: "pi-shell",
-    harness: "pi",
-    instructions: runGreeting,
-    tools: "shell",
   },
   {
     name: "pi-unlisted-model",
