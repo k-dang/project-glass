@@ -7,13 +7,14 @@ import {
   MergeConflictClearedEvent,
   PullRequestClosedEvent,
   PullRequestMergedEvent,
+  type PullRequestRef,
   referenceKey,
   ReviewFeedbackWaitingEvent,
 } from "@glass/contracts"
-import { Match } from "effect"
+import { type DateTime, Match } from "effect"
 import type { EndedPullRequest } from "./github/branchPullRequests"
-import type { LookedUpPullRequest } from "./github/queuedPullRequests"
 import type { Mirror, MirroredPullRequest } from "./PullRequestMirror"
+import type { EndedState } from "./pullRequestUpdateDecision"
 
 const changesOf = (before: MirroredPullRequest, after: MirroredPullRequest): Array<Event> => {
   const pullRequest = after.ref
@@ -71,6 +72,15 @@ export const eventsBetween = (before: Mirror | undefined, after: Mirror): Readon
   })
 }
 
+export const endedEvent = (
+  pullRequest: PullRequestRef,
+  state: EndedState,
+  at: DateTime.Utc,
+): Event =>
+  state === "merged"
+    ? PullRequestMergedEvent.make({ pullRequest, mergedAt: at })
+    : PullRequestClosedEvent.make({ pullRequest, closedAt: at })
+
 export const endedEvents = (
   before: Mirror | undefined,
   ended: ReadonlyArray<EndedPullRequest>,
@@ -84,23 +94,9 @@ export const endedEvents = (
 
     return [
       Match.valueTags(state, {
-        Merged: ({ mergedAt }) => PullRequestMergedEvent.make({ pullRequest, mergedAt }),
-        Closed: () => PullRequestClosedEvent.make({ pullRequest, closedAt }),
+        Merged: ({ mergedAt }) => endedEvent(pullRequest, "merged", mergedAt),
+        Closed: () => endedEvent(pullRequest, "closed", closedAt),
       }),
     ]
   })
-}
-
-export const endedEvent = ({
-  summary: { ref: pullRequest },
-  state,
-  mergedAt,
-  closedAt,
-}: LookedUpPullRequest): Event | null => {
-  if (state === "merged" && mergedAt !== null)
-    return PullRequestMergedEvent.make({ pullRequest, mergedAt })
-
-  return state === "closed" && closedAt !== null
-    ? PullRequestClosedEvent.make({ pullRequest, closedAt })
-    : null
 }

@@ -482,29 +482,41 @@ it.live(
 )
 
 it.live(
-  "records a subscribed PR closing as one Event, and tells the Thread that named it and asked",
+  "records a subscribed PR closing as one Event, in a repository GitHub spells with capitals, and tells the Thread that named it and asked",
   () =>
     Effect.gen(function* () {
-      const f = yield* threadWithPullRequest
+      const f = yield* threadsFixture
+      yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+
+      const { pullRequest } = yield* pullRequestFor(f, 7, undefined, {
+        owner: "Glass-Demo",
+        repo: "Greeter",
+      })
 
       const asked = yield* f.start(
-        subscribe("Go on once it ends", ["merged-or-closed"], f.pullRequest),
+        subscribe("Go on once it ends", ["merged-or-closed"], pullRequest),
       )
 
-      const quiet = yield* f.start(subscribe("Keep it green", ["failing-checks"], f.pullRequest))
+      const quiet = yield* f.start(subscribe("Keep it green", ["failing-checks"], pullRequest))
       yield* f.transcript(asked.id, settled(1))
       yield* f.transcript(quiet.id, settled(1))
 
-      f.pullRequest.edit({ state: "CLOSED" })
+      pullRequest.edit({ state: "CLOSED" })
       yield* f.client.ListPullRequests()
       const [, update] = yield* f.transcript(asked.id, settled(2))
       yield* subscriptionsLeft(f, asked.id, 0)
       yield* subscriptionsLeft(f, quiet.id, 0)
+
+      yield* f.client.WatchThreadPullRequests().pipe(
+        Stream.filter((listed) => listed.some(({ state }) => Predicate.isTagged(state, "Closed"))),
+        Stream.runHead,
+      )
+
       yield* f.send(quiet.id, "Carry on")
       const untold = yield* f.transcript(quiet.id, lastSettled("Carry on"))
       const events = yield* recentEvents(f, { pullRequest: 7 })
 
-      assert.deepStrictEqual(reasonsTold(update), [["greeter#7", "Closed"]])
+      assert.deepStrictEqual(reasonsTold(update), [["Greeter#7", "Closed"]])
       assert.deepStrictEqual(untold.map(reasonsTold), [undefined, undefined])
       assert.deepStrictEqual(
         events.map(({ _tag }) => _tag),

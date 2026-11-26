@@ -7,15 +7,20 @@ import {
   type PullRequestRef,
   referenceKey,
 } from "@glass/contracts"
-import { Context, DateTime, Duration, Effect, Layer, Option, Predicate, Schema } from "effect"
+import { Context, DateTime, Duration, Effect, Layer, Option, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
 export const KEPT_FOR = Duration.days(30)
 
-const happensOnce = (event: Event) =>
-  Predicate.isTagged(event, "PullRequestMerged") || Predicate.isTagged(event, "PullRequestClosed")
+const encodeEvent = Schema.encodeEffect(Event)
 
-const encodeEvent = Schema.encodeEffect(Schema.fromJsonString(Event))
+const endedAt = (event: typeof Event.Encoded) => {
+  if (event._tag === "PullRequestMerged") return { path: "$.mergedAt", at: event.mergedAt }
+
+  if (event._tag === "PullRequestClosed") return { path: "$.closedAt", at: event.closedAt }
+
+  return null
+}
 
 const decodeLogged = Schema.decodeUnknownEffect(
   Schema.Struct({ ...LoggedEvent.fields, event: Schema.fromJsonString(Event) }),
@@ -41,19 +46,21 @@ export class EventLog extends Context.Service<
 
       const write = Effect.fnUntraced(
         function* (source: EventSource, event: Event, occurredAt: string) {
-          const payload = yield* encodeEvent(event)
+          const encoded = yield* encodeEvent(event)
           const pullRequest = referenceKey(event.pullRequest)
+          const ended = endedAt(encoded)
 
           yield* sql`
             INSERT INTO event (source, kind, pull_request, payload, occurred_at)
-            SELECT ${source}, ${event._tag}, ${pullRequest}, ${payload}, ${occurredAt}
+            SELECT ${source}, ${event._tag}, ${pullRequest}, ${JSON.stringify(encoded)}, ${occurredAt}
             WHERE ${
-              happensOnce(event)
-                ? sql`NOT EXISTS (
+              ended === null
+                ? sql.and([])
+                : sql`NOT EXISTS (
                     SELECT 1 FROM event
-                    WHERE kind = ${event._tag} AND pull_request = ${pullRequest} AND payload = ${payload}
+                    WHERE kind = ${event._tag} AND pull_request = ${pullRequest}
+                      AND json_extract(payload, ${ended.path}) = ${ended.at}
                   )`
-                : sql.and([])
             }
           `
         },

@@ -388,16 +388,19 @@ export class Subscriptions extends Context.Service<
             if (lookedUp === null || (lookedUp.state !== "merged" && lookedUp.state !== "closed"))
               return Effect.void
 
-            const event = endedEvent(lookedUp)
+            const { state } = lookedUp
+            const at = state === "merged" ? lookedUp.mergedAt : lookedUp.closedAt
 
-            return events.record("github", event === null ? [] : [event]).pipe(
-              Effect.andThen(
-                endTold(
-                  group.map(({ subscription }) => subscription),
-                  { state: lookedUp.state, pullRequest: group[0].pullRequest },
+            return events
+              .record("github", at === null ? [] : [endedEvent(lookedUp.summary.ref, state, at)])
+              .pipe(
+                Effect.andThen(
+                  endTold(
+                    group.map(({ subscription }) => subscription),
+                    { state, pullRequest: group[0].pullRequest },
+                  ),
                 ),
-              ),
-            )
+              )
           },
           { discard: true },
         )
