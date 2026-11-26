@@ -3,7 +3,6 @@ import {
   AllowRequest,
   ChangesRequestedReason,
   defaultPullRequestUpdateNote,
-  EventPage,
   FailingChecksReason,
   MergeConflictAppearedEvent,
   MergeConflictReason,
@@ -14,8 +13,8 @@ import {
 } from "@glass/contracts"
 import { DateTime, Effect, Option, Predicate, Schema, Stream } from "effect"
 import { gitIn } from "../test/gitRepositories"
-import { connectMcp } from "../test/mcpClient"
 import {
+  eventsTool,
   fail,
   failed,
   failedRuns,
@@ -32,7 +31,6 @@ import {
   pullRequestFor,
   threadWithPullRequest,
 } from "../test/threadWithPullRequest"
-import { GlobalChatCaller } from "./mcp/McpCredentials"
 import { wideEvents } from "./wideEvents"
 
 type Fixture = Effect.Success<typeof threadsFixture>
@@ -440,34 +438,18 @@ const subscriptionsLeft = (f: Fixture, threadId: string, count: number) =>
     Effect.map(Option.getOrThrow),
   )
 
-const decodePage = Schema.decodeUnknownSync(EventPage)
-
-const recentEvents = Effect.fnUntraced(function* (
-  f: Pick<Fixture, "baseUrl" | "mcpCredentials">,
-  filter: { readonly pullRequest: number } | { readonly threadId: string },
-) {
-  const mcp = yield* connectMcp(
-    f.baseUrl,
-    yield* f.mcpCredentials.issue(
-      GlobalChatCaller.make({ globalChatId: "global-chat", sessionId: "global-session" }),
-    ),
-  )
-
-  const listed = yield* mcp.call(
-    "list_recent_events",
-    "threadId" in filter
-      ? { limit: 50, threadId: filter.threadId }
-      : {
-          limit: 50,
-          pullRequest: { owner: "glass-demo", repo: "greeter", number: filter.pullRequest },
-        },
-  )
-
-  return decodePage(listed.structuredContent).events.map(({ event }) => event)
-})
-
 const greeter = (number: number) =>
   new PullRequestRef({ owner: "glass-demo", repo: "greeter", number })
+
+const recentEvents = (
+  f: Pick<Fixture, "baseUrl" | "mcpCredentials">,
+  filter: { readonly pullRequest: number } | { readonly threadId: string },
+) =>
+  eventsTool(f).pipe(
+    Effect.flatMap(({ events }) =>
+      events("threadId" in filter ? filter : { pullRequest: greeter(filter.pullRequest) }),
+    ),
+  )
 
 const eventsBehind = (turn: Turn | undefined) =>
   Predicate.isTagged(turn?.context, "PullRequestUpdate")

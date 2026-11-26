@@ -1,10 +1,50 @@
-import { defaultSubscriptionReasons, type SubscriptionReason, type Turn } from "@glass/contracts"
-import { Effect, Predicate } from "effect"
+import {
+  defaultSubscriptionReasons,
+  EventPage,
+  type SubscriptionReason,
+  type Turn,
+} from "@glass/contracts"
+import { Effect, Predicate, Schema } from "effect"
+import { GlobalChatCaller } from "../src/mcp/McpCredentials"
 import type { FakeCheck, FakePullRequest } from "./fakePullRequest"
+import { connectMcp } from "./mcpClient"
 import { glassCall, settled, type threadsFixture } from "./threadsFixture"
 import { threadWithPullRequest } from "./threadWithPullRequest"
 
 type Fixture = Effect.Success<typeof threadsFixture>
+
+const decodePage = Schema.decodeUnknownSync(EventPage)
+
+interface EventFilter {
+  readonly pullRequest?: { readonly owner: string; readonly repo: string; readonly number: number }
+  readonly threadId?: string
+  readonly since?: string
+}
+
+export const eventsTool = Effect.fnUntraced(function* ({
+  baseUrl,
+  mcpCredentials,
+}: Pick<Fixture, "baseUrl" | "mcpCredentials">) {
+  const mcp = yield* connectMcp(
+    baseUrl,
+    yield* mcpCredentials.issue(
+      GlobalChatCaller.make({ globalChatId: "global-chat", sessionId: "global-session" }),
+    ),
+  )
+
+  const call = (filter: EventFilter = {}) =>
+    mcp.call("list_recent_events", { limit: 50, ...filter })
+
+  const page = (filter?: EventFilter) =>
+    call(filter).pipe(Effect.map((result) => decodePage(result.structuredContent)))
+
+  return {
+    call,
+    page,
+    events: (filter?: EventFilter) =>
+      page(filter).pipe(Effect.map(({ events }) => events.map(({ event }) => event))),
+  }
+})
 
 export const subscribe = (
   note: string,

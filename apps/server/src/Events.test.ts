@@ -3,7 +3,6 @@ import {
   ChangesRequestedEvent,
   ChecksFailedEvent,
   ChecksPassedEvent,
-  EventPage,
   MergeConflictAppearedEvent,
   MergeConflictClearedEvent,
   PullRequestClosedEvent,
@@ -11,7 +10,7 @@ import {
   PullRequestRef,
   ReviewFeedbackWaitingEvent,
 } from "@glass/contracts"
-import { DateTime, Effect, Option, Predicate, Schema, Stream } from "effect"
+import { DateTime, Effect, Option, Predicate, Stream } from "effect"
 import { TestClock } from "effect/testing"
 import { join } from "node:path"
 import { DatabaseSync } from "node:sqlite"
@@ -19,11 +18,11 @@ import { eventually } from "../test/eventually"
 import { startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../test/harness"
-import { gitIn } from "../test/gitRepositories"
 import { inboxWhen } from "../test/inboxWhen"
-import { connectMcp, toolText } from "../test/mcpClient"
-import { calledBy, glassCall, holding, settled, threadsFixture } from "../test/threadsFixture"
-import { GlobalChatCaller } from "./mcp/McpCredentials"
+import { toolText } from "../test/mcpClient"
+import { eventsTool } from "../test/pullRequestUpdates"
+import { calledBy, glassCall, settled, threadsFixture } from "../test/threadsFixture"
+import { pullRequestFor } from "../test/threadWithPullRequest"
 
 const mine = {
   owner: "octo-org",
@@ -35,33 +34,6 @@ const mine = {
 
 const ref = (pr: FakePullRequest) =>
   new PullRequestRef({ owner: pr.owner, repo: pr.repo, number: pr.number })
-
-const decodePage = Schema.decodeUnknownSync(EventPage)
-
-interface Filter {
-  readonly pullRequest?: { readonly owner: string; readonly repo: string; readonly number: number }
-  readonly threadId?: string
-  readonly since?: string
-}
-
-type Backend = Pick<Effect.Success<ReturnType<typeof startBackend>>, "baseUrl" | "mcpCredentials">
-
-const eventsTool = Effect.fnUntraced(function* ({ baseUrl, mcpCredentials }: Backend) {
-  const mcp = yield* connectMcp(
-    baseUrl,
-    yield* mcpCredentials.issue(
-      GlobalChatCaller.make({ globalChatId: "global-chat", sessionId: "global-session" }),
-    ),
-  )
-
-  const call = (filter: Filter = {}) => mcp.call("list_recent_events", { limit: 50, ...filter })
-
-  return {
-    call,
-    page: (filter?: Filter) =>
-      call(filter).pipe(Effect.map((result) => decodePage(result.structuredContent))),
-  }
-})
 
 const failWritesOf = (home: string, kind: string) => {
   const database = new DatabaseSync(join(home, ".project-glass", "glass.db"))
@@ -87,7 +59,7 @@ const startGlass = Effect.gen(function* () {
 
   yield* backend.client.FollowRepository({ input: "octo-org/glass" })
 
-  const { page } = yield* eventsTool(backend)
+  const { page, events } = yield* eventsTool(backend)
 
   return {
     ...backend,
@@ -95,8 +67,7 @@ const startGlass = Effect.gen(function* () {
     home,
     read: backend.client.ListPullRequests(),
     page,
-    events: (filter?: Filter) =>
-      page(filter).pipe(Effect.map(({ events }) => events.map(({ event }) => event))),
+    events,
   }
 })
 
@@ -314,26 +285,6 @@ describe("Events for a Thread's PR", () => {
       const f = yield* threadsFixture
       yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
 
-      const onPullRequest = Effect.fnUntraced(function* (gate: string, number: number) {
-        const headBranch = `feature/${gate}`
-        const thread = yield* f.start(`hold:${gate}`)
-        yield* f.transcript(thread.id, holding)
-        gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", headBranch)
-
-        const pr = f.github.seedPullRequest({
-          owner: "glass-demo",
-          repo: "greeter",
-          number,
-          headBranch,
-          base: { sha: "b0", files: {} },
-          head: { sha: `h${number}`, files: {} },
-        })
-
-        yield* f.release(gate)
-
-        return { pr, threadId: thread.id }
-      })
-
       const pullRequestsWhen = (client: typeof f.client, state: "Open" | "ended") =>
         client.WatchThreadPullRequests().pipe(
           Stream.filter(
@@ -345,35 +296,37 @@ describe("Events for a Thread's PR", () => {
           Effect.map(Option.getOrThrow),
         )
 
-      const merged = yield* onPullRequest("merged", 7)
-      const closed = yield* onPullRequest("closed", 8)
+      const merged = yield* pullRequestFor(f, 7)
+      const closed = yield* pullRequestFor(f, 8)
       yield* pullRequestsWhen(f.client, "Open")
 
-      merged.pr.edit({ state: "MERGED" })
-      closed.pr.edit({ state: "CLOSED" })
+      merged.pullRequest.edit({ state: "MERGED" })
+      closed.pullRequest.edit({ state: "CLOSED" })
       yield* f.client.ListPullRequests()
       yield* pullRequestsWhen(f.client, "ended")
 
-      const recorded = Effect.fnUntraced(function* (backend: Backend) {
-        const { page } = yield* eventsTool(backend)
+      const recorded = Effect.fnUntraced(function* (
+        backend: Pick<typeof f, "baseUrl" | "mcpCredentials">,
+      ) {
+        const { events } = yield* eventsTool(backend)
 
-        const of = (threadId: string) =>
-          page({ threadId }).pipe(Effect.map(({ events }) => events.map(({ event }) => event)))
-
-        return { merged: yield* of(merged.threadId), closed: yield* of(closed.threadId) }
+        return {
+          merged: yield* events({ threadId: merged.thread.id }),
+          closed: yield* events({ threadId: closed.thread.id }),
+        }
       })
 
       const expected = {
         merged: [
           PullRequestMergedEvent.make({
-            pullRequest: ref(merged.pr),
-            mergedAt: DateTime.makeUnsafe(merged.pr.mergedAt ?? ""),
+            pullRequest: ref(merged.pullRequest),
+            mergedAt: DateTime.makeUnsafe(merged.pullRequest.mergedAt ?? ""),
           }),
         ],
         closed: [
           PullRequestClosedEvent.make({
-            pullRequest: ref(closed.pr),
-            closedAt: DateTime.makeUnsafe(closed.pr.closedAt ?? ""),
+            pullRequest: ref(closed.pullRequest),
+            closedAt: DateTime.makeUnsafe(closed.pullRequest.closedAt ?? ""),
           }),
         ],
       }
