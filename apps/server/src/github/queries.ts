@@ -10,7 +10,7 @@ import {
   RepositoryPullRequestsData,
   SearchPullRequestsData,
   PullRequestAttentionData,
-  PullRequestChecksData,
+  PullRequestObservationsData,
   ReviewRequestsConnection,
 } from "./repositoryPullRequests"
 
@@ -196,7 +196,7 @@ export const RepositoryPullRequestsResponse = GraphQLResponse(RepositoryPullRequ
 
 export const SearchPullRequestsResponse = GraphQLResponse(SearchPullRequestsData)
 
-export const PullRequestChecksResponse = GraphQLResponse(PullRequestChecksData)
+export const PullRequestObservationsResponse = GraphQLResponse(PullRequestObservationsData)
 
 export const PullRequestAttentionResponse = GraphQLResponse(PullRequestAttentionData)
 

@@ -166,6 +166,26 @@ it.effect(
     ),
 )
 
+it.effect(
+  "warns unchecked without reconnecting when removing a Thread whose Sandbox is unreachable",
+  () =>
+    withSkippableWaits(QUICK_RETRY_SPACING, (skipQuickRetries) =>
+      Effect.gen(function* () {
+        const f = yield* threadsFixture
+        const thread = yield* f.startSandbox("hold:start")
+        yield* f.transcript(thread.id, holding)
+
+        yield* Effect.promise(() => f.sandboxes.dropConnections(thread.id))
+        yield* skipQuickRetries
+        yield* f.sandboxStatus(thread.id, ({ reach }) => reach === "unreachable")
+        f.sandboxes.reconnect(thread.id)
+
+        const warnings = yield* f.client.GetRemovalWarnings({ threadId: thread.id })
+        assert.equal(warnings.uncommittedChanges, "unchecked")
+      }),
+    ),
+)
+
 it.effect("cuts off a Turn whose Sandbox host died while Glass was closed", () =>
   withSkippableWaits(QUICK_RETRY_SPACING, (skipQuickRetries) =>
     Effect.gen(function* () {

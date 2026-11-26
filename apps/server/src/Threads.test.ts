@@ -23,7 +23,7 @@ import {
 } from "../test/threadsFixture"
 import { eventually } from "../test/eventually"
 import { fakeAgentRunners } from "../test/fakeAgentRunners"
-import type { FakePullRequest } from "../test/fakePullRequest"
+import { type FakePullRequest, VIEWER } from "../test/fakePullRequest"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome } from "../test/harness"
 
@@ -488,6 +488,44 @@ it.live("finds a Thread's PR from the branch its agent left checked out, not a f
       .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
     assert.equal(listed?.branch, "feature/greeting")
+  }),
+)
+
+it.live("shows a Thread's PR as merged before GitHub's search catches up on the merge", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+
+    const thread = yield* f.start("hold:first")
+    yield* f.transcript(thread.id, holding)
+    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/greeting")
+
+    const pr = f.github.seedPullRequest({
+      owner: "glass-demo",
+      repo: "greeter",
+      author: VIEWER.login,
+      headBranch: "feature/greeting",
+      base: { sha: "b0", files: {} },
+      head: { sha: "h1", files: {} },
+    })
+
+    yield* f.release("first")
+
+    const stateOf = (tag: "Open" | "Merged") =>
+      f.client.WatchThreadPullRequests().pipe(
+        Stream.filter((listed) =>
+          listed.some(({ threadId, state }) => threadId === thread.id && state._tag === tag),
+        ),
+        Stream.runHead,
+      )
+
+    yield* stateOf("Open")
+
+    f.github.unindexedPullRequests.add(pr.id)
+    pr.edit({ state: "MERGED" })
+    yield* f.client.ListPullRequests()
+
+    yield* stateOf("Merged")
   }),
 )
 

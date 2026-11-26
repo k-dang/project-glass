@@ -983,6 +983,9 @@ export class Threads extends Context.Service<
       const removalWarnings = Effect.fn("Threads.removalWarnings")(function* (threadId: string) {
         const row = yield* find(threadId)
 
+        if ((yield* sandboxes.status(threadId))?.reach === "unreachable")
+          return new RemovalWarnings({ uncommittedChanges: "unchecked" })
+
         return yield* hostingOf(row)
           .hostIfPrepared(row)
           .pipe(

@@ -3,6 +3,7 @@ import { Rpc, RpcGroup } from "effect/rpc"
 import { Activity, ActivityKind, ActivityLogError, ActivityPage, ActivityStamp } from "./activity"
 import { AgentReviewDone, AgentReviewFailure, AgentReviewState, ReviewPrompt } from "./agentReview"
 import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
+import { RendererEvent } from "./diagnostics"
 import {
   Thread,
   ThreadBusy,
@@ -660,6 +661,9 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("LoadEarlierGlobalChatSessionTurns", {
     payload: { id: Schema.String, before: Schema.String },
     error: Schema.Union([GlobalChatSessionNotFound, ThreadError]),
+  }),
+  Rpc.make("ReportRendererEvents", {
+    payload: { events: Schema.Array(RendererEvent) },
   }),
 ) {}
 
