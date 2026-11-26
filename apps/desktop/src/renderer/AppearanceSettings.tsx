@@ -2,7 +2,7 @@ import { useAtom } from "@effect/atom-react"
 import { type ColorScheme, ColorSchemePreference, Layout, Theme } from "@glass/contracts"
 import { Moon, Sun } from "lucide-react"
 import { type ReactNode, useId } from "react"
-import { titleStripResourceUsageAtom } from "./ResourceUsage"
+import { railResourceUsageAtom } from "./ResourceUsage"
 import { SettingsSection } from "./SettingsSection"
 import { SwitchSetting } from "./SwitchSetting"
 import { useAppearance } from "./theme"
@@ -97,13 +97,13 @@ function LayoutPreview(props: { layout: Layout }) {
   )
 }
 
-function TitleStripResourceUsageSetting() {
-  const [shown, setShown] = useAtom(titleStripResourceUsageAtom)
+function RailResourceUsageSetting() {
+  const [shown, setShown] = useAtom(railResourceUsageAtom)
 
   return (
     <SwitchSetting
       label="Show CPU and memory"
-      description="Live readings in the title strip."
+      description="Live readings at the bottom of the rail."
       checked={shown}
       onCheckedChange={setShown}
     />
@@ -178,7 +178,7 @@ export function AppearanceSettings() {
           </Option>
         ))}
       </fieldset>
-      {layout === "inset" && <TitleStripResourceUsageSetting />}
+      {layout === "inset" && <RailResourceUsageSetting />}
     </SettingsSection>
   )
 }
