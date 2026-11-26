@@ -668,8 +668,8 @@ describe("Keeping up with GitHub", () => {
       ])
       assert.deepStrictEqual(operations(github).slice(firstSync), [
         "SearchPullRequests",
-        "PullRequestChecks",
-        "PullRequestChecks",
+        "PullRequestObservations",
+        "PullRequestObservations",
       ])
     }),
   )
@@ -727,7 +727,7 @@ describe("Keeping up with GitHub", () => {
       assert.deepStrictEqual(yield* checks, ["passing"])
       assert.deepStrictEqual(
         github.graphQLRequests.flatMap((request) =>
-          request.operationName === "PullRequestChecks" ? [request.variables.ids] : [],
+          request.operationName === "PullRequestObservations" ? [request.variables.ids] : [],
         ),
         [[pr.id], [pr.id]],
       )
@@ -740,7 +740,7 @@ describe("Keeping up with GitHub", () => {
 
       const github = yield* startFakeGitHub({
         beforeRequest: ({ graphql }) =>
-          failChecks && graphql?.operationName === "PullRequestChecks" ? 503 : undefined,
+          failChecks && graphql?.operationName === "PullRequestObservations" ? 503 : undefined,
       })
 
       const home = yield* isolatedHome
@@ -789,7 +789,7 @@ describe("Keeping up with GitHub", () => {
 
       const github = yield* startFakeGitHub({
         beforeRequest: ({ graphql }) => {
-          if (graphql?.operationName !== "PullRequestChecks") return undefined
+          if (graphql?.operationName !== "PullRequestObservations") return undefined
 
           pushBeforeChecks?.()
 
@@ -1067,7 +1067,7 @@ describe("Watching", () => {
         const seed = { owner: "octo-org", repo: "glass", requestedReviewers: [VIEWER.login] }
         const pr = github.seedPullRequest({ ...seed, base, head })
         yield* client.ListPullRequests()
-        pr.edit({ state: "CLOSED" })
+        pr.requestedReviewers.clear()
         github.unavailableRepositories.add("octo-org/glass")
 
         const restarted = yield* startBackend(env, home)

@@ -258,6 +258,10 @@ export class AgentHostRpcs extends RpcGroup.make(
     success: Schema.NullOr(Schema.String),
     error: HostThreadError,
   }),
+  Rpc.make("UseBranch", {
+    payload: { folder: HostFolder, branch: Schema.String },
+    error: HostThreadError,
+  }),
   Rpc.make("WatchJournal", {
     payload: { host: Schema.String, after: Schema.Int },
     success: JournalEntry,

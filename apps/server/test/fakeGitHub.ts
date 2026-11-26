@@ -476,6 +476,7 @@ export interface FakeGitHub {
   readonly gitTraffic: TrafficMeter
   readonly unavailableRepositories: Set<string>
   readonly timingOutRepositories: Set<string>
+  readonly unindexedPullRequests: Set<string>
   readonly gitRefusedRepositories: Set<string>
   readonly graphQLRequests: ReadonlyArray<FakeGraphQLRequest>
 }
@@ -501,6 +502,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
   const pullRequests: Array<FakePullRequest> = []
   const unavailableRepositories = new Set<string>()
   const timingOutRepositories = new Set<string>()
+  const unindexedPullRequests = new Set<string>()
   const gitRefusedRepositories = new Set<string>()
 
   const repositories = fakeRepositories()
@@ -933,12 +935,16 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
       case "RepositoryPullRequests":
       case "SearchPullRequests":
-      case "PullRequestChecks":
+      case "PullRequestObservations":
       case "PullRequestAttention":
       case "SubscribedPullRequests":
       case "QueuedPullRequests":
       case "EndedBranchPullRequests":
-        return answerListing(request, pullRequests, unavailableRepositories, timingOutRepositories)
+        return answerListing(request, pullRequests, {
+          unavailableRepositories,
+          timingOutRepositories,
+          unindexedPullRequests,
+        })
 
       case "PullRequestStatus": {
         const pr = pullRequestById(request.variables.id)
@@ -1230,6 +1236,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     gitTraffic,
     unavailableRepositories,
     timingOutRepositories,
+    unindexedPullRequests,
     gitRefusedRepositories,
     graphQLRequests,
   }

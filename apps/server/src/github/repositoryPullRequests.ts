@@ -9,6 +9,8 @@ import {
   StatusState,
 } from "./checkContexts"
 
+export const GitHubPullRequestState = Schema.Literals(["OPEN", "CLOSED", "MERGED"])
+
 const CANDIDATE_FIELDS = `id number url title author { login } updatedAt headRefOid headRefName isCrossRepository isDraft state viewerDidAuthor
   repository { owner { login } name }
   pendingReviews: reviews(states: PENDING, first: 1) { nodes { comments { totalCount } } }
@@ -37,9 +39,9 @@ export const SEARCH_PULL_REQUESTS_QUERY = `query SearchPullRequests($query: Stri
   }
 }`
 
-export const PULL_REQUEST_CHECKS_QUERY = `query PullRequestChecks($ids: [ID!]!) {
+export const PULL_REQUEST_OBSERVATIONS_QUERY = `query PullRequestObservations($ids: [ID!]!) {
   nodes(ids: $ids) {
-    ... on PullRequest { id headRefOid commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }
+    ... on PullRequest { id state headRefOid commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } }
   }
 }`
 
@@ -140,7 +142,7 @@ const GitHubCandidate = Schema.Struct({
   headRefName: Schema.String,
   isCrossRepository: Schema.Boolean,
   isDraft: Schema.Boolean,
-  state: Schema.Literals(["OPEN", "CLOSED", "MERGED"]),
+  state: GitHubPullRequestState,
   viewerDidAuthor: Schema.Boolean,
   viewerSubmittedReviews: Schema.Struct({
     nodes: Schema.Array(Schema.Struct({ id: Schema.String })),
@@ -188,11 +190,12 @@ export const RepositoryPullRequestsData = Schema.Struct({
 
 export const SearchPullRequestsData = Schema.Struct({ search: CandidatesConnection })
 
-export const PullRequestChecksData = Schema.Struct({
+export const PullRequestObservationsData = Schema.Struct({
   nodes: Schema.Array(
     Schema.NullOr(
       Schema.Struct({
         id: Schema.String,
+        state: GitHubPullRequestState,
         headRefOid: Schema.String,
         commits: Schema.Struct({
           nodes: Schema.Array(
@@ -208,14 +211,15 @@ export const PullRequestChecksData = Schema.Struct({
   ),
 })
 
-export interface CheckObservation {
+export interface PullRequestObservation {
+  readonly isOpen: boolean
   readonly head: string
   readonly checks: Checks
 }
 
-export const toChecks = (
-  data: typeof PullRequestChecksData.Type,
-): ReadonlyMap<string, CheckObservation> =>
+export const toObservations = (
+  data: typeof PullRequestObservationsData.Type,
+): ReadonlyMap<string, PullRequestObservation> =>
   new Map(
     data.nodes.flatMap((node) =>
       node === null
@@ -224,6 +228,7 @@ export const toChecks = (
             [
               node.id,
               {
+                isOpen: node.state === "OPEN",
                 head: node.headRefOid,
                 checks: checksOfRollup(node.commits.nodes[0]?.commit.statusCheckRollup),
               },

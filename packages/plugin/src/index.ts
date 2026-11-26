@@ -76,7 +76,7 @@ export interface SandboxRequest {
   readonly threadId: string
   readonly harness: AgentHarness
   readonly repository: { readonly owner: string; readonly repo: string }
-  /** The Thread's own branch, made from `baseBranch`. */
+  /** The Thread's own branch, made from `baseBranch`. Glass may rename it once the host starts. */
   readonly branch: string
   /** The clone's `origin` remote must have it, as Review changes diffs against it. */
   readonly baseBranch: string

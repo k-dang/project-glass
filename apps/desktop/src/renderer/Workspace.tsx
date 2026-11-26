@@ -3,7 +3,6 @@ import type {
   DiffSide,
   PullRequest,
   PullRequestRef,
-  PullRequestState,
   PullRequestWorkspace,
   Revision,
   TourCodeTarget,
@@ -14,11 +13,6 @@ import {
   ChevronRight,
   FileDiff,
   FolderTree,
-  GitMerge,
-  GitPullRequest,
-  GitPullRequestClosed,
-  GitPullRequestDraft,
-  type LucideIcon,
   MessageCircle,
   PanelLeft,
   RotateCw,
@@ -71,7 +65,7 @@ import { FinishReview } from "./FinishReview"
 import { useLiveStatus } from "./liveStatus"
 import { MergePullRequest } from "./MergePullRequest"
 import { OpenPullRequestButton } from "./CommandMenu"
-import { closedAs, StatusChips } from "./PullRequestStatus"
+import { closedAs, PullRequestStateIcon, StatusChips } from "./PullRequestStatus"
 import {
   type ChangesOrder,
   readAgentReviewOnOpenAtom,
@@ -742,7 +736,7 @@ function PullRequestHeader(props: {
     <header className="flex flex-col border-b px-4">
       <div className="flex h-11 items-center gap-2">
         <BackToPullRequests onBack={props.onBack} disabled={props.busy} iconOnly />
-        <StateIcon pullRequest={pullRequest} />
+        <PullRequestStateIcon pullRequest={pullRequest} />
         <h1 className="min-w-0 truncate text-base font-semibold tracking-tight">
           {pullRequest.title} <span className="font-normal text-muted-foreground">#{number}</span>
         </h1>
@@ -799,30 +793,6 @@ function PullRequestHeader(props: {
         </div>
       </div>
     </header>
-  )
-}
-
-const states: Record<
-  PullRequestState,
-  { readonly label: string; readonly icon: LucideIcon; readonly className: string }
-> = {
-  open: { label: "Open", icon: GitPullRequest, className: "bg-emerald-600 text-white" },
-  draft: { label: "Draft", icon: GitPullRequestDraft, className: "bg-zinc-500 text-white" },
-  closed: { label: "Closed", icon: GitPullRequestClosed, className: "bg-red-600 text-white" },
-  merged: { label: "Merged", icon: GitMerge, className: "bg-violet-600 text-white" },
-}
-
-function StateIcon(props: { pullRequest: PullRequest }) {
-  const { label, icon: Icon, className } = states[props.pullRequest.state]
-
-  return (
-    <TooltipHint content={label}>
-      <span
-        className={cn("flex size-5 shrink-0 items-center justify-center rounded-full", className)}
-      >
-        <Icon aria-label={label} className="size-3" />
-      </span>
-    </TooltipHint>
   )
 }
 

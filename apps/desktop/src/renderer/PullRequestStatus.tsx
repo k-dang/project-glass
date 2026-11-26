@@ -5,6 +5,7 @@ import type {
   CheckState,
   MergeUnderWay,
   PullRequest,
+  PullRequestState,
   Reviewer,
   ReviewerState,
 } from "@glass/contracts"
@@ -18,6 +19,10 @@ import {
   CircleX,
   FileDiff,
   GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestDraft,
+  type LucideIcon,
   TriangleAlert,
   Users,
 } from "lucide-react"
@@ -85,6 +90,30 @@ const isOpen = (pullRequest: PullRequest) =>
 
 export const closedAs = (pullRequest: PullRequest) =>
   pullRequest.state === "closed" || pullRequest.state === "merged" ? pullRequest.state : null
+
+const states: Record<
+  PullRequestState,
+  { readonly label: string; readonly icon: LucideIcon; readonly className: string }
+> = {
+  open: { label: "Open", icon: GitPullRequest, className: "bg-emerald-600 text-white" },
+  draft: { label: "Draft", icon: GitPullRequestDraft, className: "bg-zinc-500 text-white" },
+  closed: { label: "Closed", icon: GitPullRequestClosed, className: "bg-red-600 text-white" },
+  merged: { label: "Merged", icon: GitMerge, className: "bg-violet-600 text-white" },
+}
+
+export function PullRequestStateIcon(props: { pullRequest: PullRequest }) {
+  const { label, icon: Icon, className } = states[props.pullRequest.state]
+
+  return (
+    <TooltipHint content={label}>
+      <span
+        className={cn("flex size-5 shrink-0 items-center justify-center rounded-full", className)}
+      >
+        <Icon aria-label={label} className="size-3" />
+      </span>
+    </TooltipHint>
+  )
+}
 
 export function StatusChips(props: { pullRequest: PullRequest }) {
   const { pullRequest } = props

@@ -28,7 +28,7 @@ export const ListingRequest = Schema.Union([
     }),
   }),
   Schema.Struct({
-    operationName: Schema.Literal("PullRequestChecks"),
+    operationName: Schema.Literal("PullRequestObservations"),
     variables: Schema.Struct({ ids: Schema.Array(Schema.String) }),
   }),
   Schema.Struct({
@@ -325,11 +325,16 @@ const endedBranchPullRequests = (
   ),
 })
 
+interface ListingFaults {
+  readonly unavailableRepositories: ReadonlySet<string>
+  readonly timingOutRepositories: ReadonlySet<string>
+  readonly unindexedPullRequests: ReadonlySet<string>
+}
+
 export const answerListing = (
   request: typeof ListingRequest.Type,
   pullRequests: ReadonlyArray<FakePullRequest>,
-  unavailableRepositories: ReadonlySet<string>,
-  timingOutRepositories: ReadonlySet<string>,
+  { unavailableRepositories, timingOutRepositories, unindexedPullRequests }: ListingFaults,
 ) => {
   switch (request.operationName) {
     case "RepositoryPullRequests": {
@@ -351,12 +356,15 @@ export const answerListing = (
       }
 
       const filters = query.split(" ").map(searchFilter)
-      const matched = pullRequests.filter((pr) => filters.every((matches) => matches(pr)))
+
+      const matched = pullRequests.filter(
+        (pr) => !unindexedPullRequests.has(pr.id) && filters.every((matches) => matches(pr)),
+      )
 
       return { data: { search: candidatesPage(matched, viewerLogin, after) } }
     }
 
-    case "PullRequestChecks":
+    case "PullRequestObservations":
       return {
         data: {
           nodes: request.variables.ids.map((id) => {
@@ -364,7 +372,7 @@ export const answerListing = (
 
             return pr === undefined
               ? null
-              : { id: pr.id, headRefOid: pr.head.sha, commits: checksNode(pr) }
+              : { id: pr.id, state: pr.state, headRefOid: pr.head.sha, commits: checksNode(pr) }
           }),
         },
       }

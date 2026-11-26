@@ -31,7 +31,7 @@ import {
   Attention,
   type Candidate,
   type CandidatesPage,
-  type CheckObservation,
+  type PullRequestObservation,
   type SubscribedPullRequest,
   SubscribedDetails,
 } from "./github/repositoryPullRequests"
@@ -353,14 +353,16 @@ export class PullRequestMirror extends Context.Service<
         const subscribedIds = new Set(subscribed.map((pr) => pr.id))
         const others = shown.filter((pr) => !subscribedIds.has(pr.id))
 
-        const latestChecks = github
-          .pullRequestChecks([...others, ...subscribed].map((pr) => pr.id))
+        const latestObservations = github
+          .pullRequestObservations([...others, ...subscribed].map((pr) => pr.id))
           .pipe(
-            Effect.tapError((error) => Effect.logWarning("Couldn't read PR checks", error)),
+            Effect.tapError((error) =>
+              Effect.logWarning("Couldn't read PR states and checks", error),
+            ),
             Effect.match({
-              onSuccess: (checks) => ({ checks, problem: null }),
+              onSuccess: (observations) => ({ observations, problem: null }),
               onFailure: (error) => ({
-                checks: new Map<string, CheckObservation>(),
+                observations: new Map<string, PullRequestObservation>(),
                 problem: new GitHubUnavailable({
                   message: `Checks couldn't refresh. ${error.message}`,
                 }),
@@ -369,7 +371,7 @@ export class PullRequestMirror extends Context.Service<
           )
 
         const [result, attention, ofSubscribed] = yield* Effect.all(
-          [latestChecks, latestAttention(others), latestSubscribed(subscribed)],
+          [latestObservations, latestAttention(others), latestSubscribed(subscribed)],
           { concurrency: "unbounded" },
         )
 
@@ -381,24 +383,31 @@ export class PullRequestMirror extends Context.Service<
             ...mirror,
             repositories: mirror.repositories.map((repository) => ({
               ...repository,
-              pullRequests: repository.pullRequests.map((pr) => {
+              pullRequests: repository.pullRequests.flatMap((pr) => {
+                const observed = result.observations.get(pr.id)
+
+                if (observed?.isOpen === false) return []
+
                 const latest = ofSubscribed.get(pr.id)?.attention ?? attention.get(pr.id)
 
-                return {
-                  ...pr,
-                  ...result.checks.get(pr.id),
-                  attention:
-                    latest === undefined
-                      ? pr.attention
-                      : {
-                          ...latest,
-                          mergeConflict:
-                            latest.mergeConflict ?? pr.attention?.mergeConflict ?? null,
-                        },
-                  details: subscribedIds.has(pr.id)
-                    ? (ofSubscribed.get(pr.id)?.details ?? pr.details)
-                    : null,
-                }
+                return [
+                  {
+                    ...pr,
+                    head: observed?.head ?? pr.head,
+                    checks: observed?.checks ?? pr.checks,
+                    attention:
+                      latest === undefined
+                        ? pr.attention
+                        : {
+                            ...latest,
+                            mergeConflict:
+                              latest.mergeConflict ?? pr.attention?.mergeConflict ?? null,
+                          },
+                    details: subscribedIds.has(pr.id)
+                      ? (ofSubscribed.get(pr.id)?.details ?? pr.details)
+                      : null,
+                  },
+                ]
               }),
             })),
           } satisfies Mirror,
