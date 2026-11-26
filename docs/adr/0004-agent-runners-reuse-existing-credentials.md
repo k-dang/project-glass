@@ -1,6 +1,7 @@
 # Agent runners reuse existing credentials through the Claude Code and pi CLIs
 
-The user chooses Claude Code or the pi CLI for each agent task (Tours, Agent reviews, Ask). Both
+The user chooses Claude Code or the pi CLI for each agent task (Tours, Ask, and Agent reviews, which
+run as a Thread's first Turn, ADR 0010). Both
 reuse the user's existing credentials through their installed CLI, so Glass adds no API-key store or
 authentication setup, and tasks can use any model the user's own pi lists, including providers only
 a fork of pi adds, such as a company LiteLLM gateway.

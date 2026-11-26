@@ -27,6 +27,7 @@ import journalTurn from "./migrations/0025_journal_turn"
 import visualizations from "./migrations/0026_visualizations"
 import dropFeedbackNoteStaged from "./migrations/0027_drop_feedback_note_staged"
 import agentReviewSession from "./migrations/0028_agent_review_session"
+import agentReviewTurns from "./migrations/0030_agent_review_turns"
 
 const migrations = {
   "0001_baseline": baseline,
@@ -57,6 +58,7 @@ const migrations = {
   "0026_visualizations": visualizations,
   "0027_drop_feedback_note_staged": dropFeedbackNoteStaged,
   "0028_agent_review_session": agentReviewSession,
+  "0030_agent_review_turns": agentReviewTurns,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

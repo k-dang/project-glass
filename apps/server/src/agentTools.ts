@@ -1,20 +1,22 @@
-export type AgentTools = "none" | "read-only" | "shell"
+export type AgentTools = "none" | "read-only"
 
 const claudeReadTools = ["Read", "Grep", "Glob"]
 
-type ToolList = Record<Exclude<AgentTools, "none">, ReadonlyArray<string>>
+type ToolList = Record<"read-only" | "review", ReadonlyArray<string>>
 
 export const claudeTools: ToolList = {
   "read-only": claudeReadTools,
-  shell: [...claudeReadTools, "Bash"],
+  review: [...claudeReadTools, "Bash"],
 }
 
 const piReadTools = ["read", "grep", "find", "ls"]
 
 export const piTools: ToolList = {
   "read-only": piReadTools,
-  shell: [...piReadTools, "bash"],
+  review: [...piReadTools, "bash"],
 }
+
+export const piFilesFolder = (folder: string) => `${folder}.pi`
 
 export const piLoadsNothing = [
   "--no-extensions",

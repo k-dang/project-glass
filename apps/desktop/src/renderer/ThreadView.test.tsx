@@ -2471,7 +2471,9 @@ it("leaves a Feedback note on the part of a page in the Browser pane the page re
 
   fromPage({ type: "open", id: note!.id, rect: { top: 10, left: 10, bottom: 30, right: 200 } })
   await screen.findByRole("form", { name: "Edit Feedback note" })
-  expect(screen.getByRole("button", { name: "Send" }).hasAttribute("disabled")).toBe(true)
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Send" }).hasAttribute("disabled")).toBe(true),
+  )
 
   await user.click(screen.getByRole("button", { name: "Cancel" }))
   await user.type(screen.getByRole("textbox", { name: "Message" }), "{Enter}")

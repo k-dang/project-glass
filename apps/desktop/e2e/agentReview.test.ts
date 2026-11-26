@@ -1,11 +1,20 @@
+import { SUBMIT_REVIEW_TOOL } from "../../server/src/agentHost/submitReviewTool"
+import type { FakeModelRequest } from "../../server/test/fakeModelProvider"
 import { expect, openPullRequest, test } from "./glass"
 
 const answer = {
   markdown:
     "**The greeting changes its wording.** One line changes.\n\n## Callers expect the old word\n\nBlocking: `main.ts` matches on `world`.",
+  hotspots: [],
+  lowAttention: [],
 }
 
-test.use({ git: true, piModel: { output: JSON.stringify(answer) } })
+const reviewReply = ({ messages }: FakeModelRequest) =>
+  messages.at(-1)?.role === "tool"
+    ? [{ text: "Handed in." }]
+    : [{ toolCall: { id: "review", name: SUBMIT_REVIEW_TOOL, arguments: answer } }]
+
+test.use({ git: true, piModel: { reply: reviewReply } })
 
 test("runs an Agent review, reads it beside the diff, and shows its opening on Overview", async ({
   github,

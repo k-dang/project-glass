@@ -177,6 +177,8 @@ function TurnMessage(props: { turn: Turn }) {
 
   if (Predicate.isTagged(turn.context, "BackgroundWorkEnded")) return null
 
+  if (turn.context?._tag === "AgentReview") return null
+
   return (
     <UserMessage
       message={turn.message}

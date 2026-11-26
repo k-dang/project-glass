@@ -1,12 +1,10 @@
 import { Effect, Layer, Schema } from "effect"
 import { basename } from "node:path"
 import { AgentRunners } from "../src/agentRunners"
-import { AgentReviewAnswer } from "../src/agentReviewPrompt"
 import { AskAgentAnswer } from "../src/askPrompt"
 import { BranchAnswer } from "../src/BranchNames"
 import type { TourAnswer } from "../src/tourPrompt"
 import { RATE_LIMIT_TITLE } from "./demoPullRequests"
-import { demoAgentReview } from "./demoAgentReview"
 import { demoTour } from "./demoTour"
 import { tourOverviewExamples } from "./demoTourOverviews"
 
@@ -19,7 +17,7 @@ const material = Schema.fromJsonString(
   }),
 )
 
-const decodeMaterial = (prompt: string) =>
+export const decodeMaterial = (prompt: string) =>
   Schema.decodeUnknownSync(material)(prompt.slice(prompt.indexOf("{")).split("\n")[0])
 
 const syntheticTour = (prompt: string): TourAnswer => {
@@ -56,22 +54,6 @@ const syntheticTour = (prompt: string): TourAnswer => {
   }
 }
 
-const syntheticReview = (prompt: string): AgentReviewAnswer => {
-  const { title } = decodeMaterial(prompt)
-
-  if (title === RATE_LIMIT_TITLE) return demoAgentReview
-
-  return {
-    markdown: [
-      `**Synthetic Agent review of "${title}", written without a model.**`,
-      "A fake runner wrote this review without reading the code.",
-      "## Synthetic point\n\nA fake runner raised this point.",
-    ].join("\n\n"),
-    hotspots: [],
-    lowAttention: [],
-  }
-}
-
 const syntheticBranch = (prompt: string, branchFor: (request: string) => string | undefined) => {
   const request = prompt.split("\n").slice(1).join("\n")
 
@@ -87,13 +69,11 @@ export const fakeAgentRunners = (branchFor: (request: string) => string | undefi
           identity: { harness, model: "fake/synthetic" },
           run: (task) =>
             Schema.decodeUnknownEffect(task.answer)(
-              Object.is(task.answer, AgentReviewAnswer)
-                ? syntheticReview(task.prompt)
-                : Object.is(task.answer, BranchAnswer)
-                  ? syntheticBranch(task.prompt, branchFor)
-                  : Object.is(task.answer, AskAgentAnswer)
-                    ? { answer: "A synthetic answer: no agent read this code." }
-                    : syntheticTour(task.prompt),
+              Object.is(task.answer, BranchAnswer)
+                ? syntheticBranch(task.prompt, branchFor)
+                : Object.is(task.answer, AskAgentAnswer)
+                  ? { answer: "A synthetic answer: no agent read this code." }
+                  : syntheticTour(task.prompt),
             ).pipe(Effect.orDie, Effect.delay("2 seconds")),
         }),
     }),

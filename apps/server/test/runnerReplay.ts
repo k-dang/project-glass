@@ -31,11 +31,10 @@ export interface RunnerScenario {
   readonly recordEnv?: Readonly<Record<string, string | undefined>>
   readonly piModelId?: string
   readonly answer?: Schema.Decoder<typeof Summary.Type>
-  readonly session?: string
 }
 
 export const scenarioTask = (
-  { instructions, tools = "read-only", answer = Summary, session }: RunnerScenario,
+  { instructions, tools = "read-only", answer = Summary }: RunnerScenario,
   checkout: string,
 ) => ({
   subject: "Agent review",
@@ -44,7 +43,6 @@ export const scenarioTask = (
   answer,
   tools,
   checkout,
-  session,
 })
 
 const signedOut = {
@@ -63,9 +61,6 @@ export const seedCheckout = (checkout: string) => {
   mkdirSync(join(checkout, "src"), { recursive: true })
   writeFileSync(join(checkout, "src", "greet.ts"), "hello")
 }
-
-const runGreeting =
-  'Run the shell command `cat src/greet.ts`, then reply with only JSON of the form {"summary":"<what it printed>"}.'
 
 const readGreeting =
   'Read the file src/greet.ts, then reply with only JSON of the form {"summary":"<the file\'s contents>"}.'
@@ -107,35 +102,11 @@ export const runnerScenarios: ReadonlyArray<RunnerScenario> = [
       CLAUDE_CODE_MAX_RETRIES: "0",
     },
   },
-  {
-    name: "claude-session",
-    harness: "claude-code",
-    instructions: replyFine,
-    session: "3f6d0a52-5d1e-4c39-9a57-0b8f1c2e7d41",
-  },
-  {
-    name: "claude-shell",
-    harness: "claude-code",
-    instructions: runGreeting,
-    tools: "shell",
-  },
   { name: "pi-answer", harness: "pi", instructions: replyFine },
-  {
-    name: "pi-session",
-    harness: "pi",
-    instructions: replyFine,
-    session: "8c2b7e14-0f9a-4d63-b1c5-6e4a9d3f2b70",
-  },
   {
     name: "pi-read-only",
     harness: "pi",
     instructions: readGreeting,
-  },
-  {
-    name: "pi-shell",
-    harness: "pi",
-    instructions: runGreeting,
-    tools: "shell",
   },
   {
     name: "pi-unlisted-model",

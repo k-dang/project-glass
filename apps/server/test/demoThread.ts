@@ -11,12 +11,20 @@ import { Effect, Schema } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { SUBMIT_REVIEW_TOOL } from "../src/agentHost/submitReviewTool"
 import { GLASS_MCP_PREFIX } from "../src/agentHost/toolCalls"
 import { connectRpcClient } from "../src/rpcSocket"
 import { artifactsThread } from "./demoArtifacts"
+import { syntheticReview } from "./demoAgentReview"
 import { longThread } from "./demoLongThread"
 import type { ScriptedThread } from "./demoScript"
-import { DEMO_REPOSITORY, settledBranch, settledPullRequests } from "./demoPullRequests"
+import {
+  DEMO_REPOSITORY,
+  SLOW_QUERY_TITLE,
+  settledBranch,
+  settledPullRequests,
+} from "./demoPullRequests"
+import { decodeMaterial } from "./fakeAgentRunners"
 import { lastUserWords, replyTo, startFakeAnthropic } from "./fakeAnthropic"
 import { globalChatReply, isGlobalChat } from "./fakeGlobalChat"
 import {
@@ -47,6 +55,16 @@ const workingSlowly = ({ messages }: FakeModelRequest) => textOf(messages.at(-1)
 const keepWorkingPrompt = "Keep working until I stop you."
 
 const keepsWorking = (input: FakeModelRequest) => lastUserText(input) === keepWorkingPrompt
+
+const reviewsUntilStopped = (input: FakeModelRequest) => {
+  const asked = lastUserText(input)
+
+  return (
+    asked.startsWith("PR material") &&
+    input.messages.at(-1)?.role === "user" &&
+    decodeMaterial(asked).title === SLOW_QUERY_TITLE
+  )
+}
 
 const answersFollowUp = (input: FakeModelRequest) =>
   !isGlobalChat(input) &&
@@ -89,10 +107,28 @@ const glassToolReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> 
   ]
 }
 
+const reviewReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> | undefined => {
+  const asked = lastUserText(input)
+
+  if (!asked.startsWith("PR material")) return undefined
+
+  if (input.messages.at(-1)?.role === "tool") return [{ text: "Handed in the Agent review." }]
+
+  return [
+    {
+      toolCall: { id: "demo-review", name: SUBMIT_REVIEW_TOOL, arguments: syntheticReview(asked) },
+    },
+  ]
+}
+
 const scriptedThreads = [longThread, artifactsThread]
 
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   if (isGlobalChat(input)) return globalChatReply(input)
+
+  const review = reviewReply(input)
+
+  if (review !== undefined) return review
 
   const glassTool = glassToolReply(input)
 
@@ -158,7 +194,11 @@ export const startDemoPi = Effect.fnUntraced(function* (directory: string) {
   yield* fakeModelProvider(directory, {
     reply: demoReply,
     chunkDelay: (input) =>
-      workingSlowly(input) || answersFollowUp(input) ? 300 : keepsWorking(input) ? 3_600_000 : 0,
+      workingSlowly(input) || answersFollowUp(input)
+        ? 300
+        : keepsWorking(input) || reviewsUntilStopped(input)
+          ? 3_600_000
+          : 0,
   })
   process.env["PI_CODING_AGENT_DIR"] = join(directory, ".pi", "agent")
 })

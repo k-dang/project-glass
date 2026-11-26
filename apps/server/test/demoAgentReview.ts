@@ -1,4 +1,6 @@
-import type { AgentReviewAnswer } from "../src/agentReviewPrompt"
+import type { AgentReviewAnswer } from "../src/agentHost/submitReviewTool"
+import { RATE_LIMIT_TITLE } from "./demoPullRequests"
+import { decodeMaterial } from "./fakeAgentRunners"
 
 const middleware = "src/server/middleware.ts"
 
@@ -43,4 +45,20 @@ export const demoAgentReview: AgentReviewAnswer = {
     { path: "CHANGELOG.md", reason: "Release note" },
     { path: "package.json", reason: "Version bump" },
   ],
+}
+
+export const syntheticReview = (prompt: string): AgentReviewAnswer => {
+  const { title } = decodeMaterial(prompt)
+
+  if (title === RATE_LIMIT_TITLE) return demoAgentReview
+
+  return {
+    markdown: [
+      `**Synthetic Agent review of "${title}", written without a model.**`,
+      "A fake model wrote this review without reading the code.",
+      "## Synthetic point\n\nA fake model raised this point.",
+    ].join("\n\n"),
+    hotspots: [],
+    lowAttention: [],
+  }
 }

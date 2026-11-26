@@ -1,5 +1,5 @@
 import { agentHarnesses } from "@glass/plugin"
-import { Effect, Match, Predicate, Schema } from "effect"
+import { Effect, Match, Option, Predicate, Schema } from "effect"
 import { FeedbackNote } from "./feedbackNote"
 import { FollowedRepository } from "./followedRepository"
 import { BinaryFile, ChangedFile, PullRequestRef } from "./pullRequest"
@@ -243,11 +243,14 @@ export const BackgroundWorkEnded = Schema.TaggedStruct("BackgroundWorkEnded", {
   work: Schema.NonEmptyArray(BackgroundWork),
 })
 
+export const AgentReviewTurn = Schema.TaggedStruct("AgentReview", {})
+
 export const TurnContext = Schema.Union([
   PullRequestContext,
   ThreadContext,
   StartedWorkUpdate,
   BackgroundWorkEnded,
+  AgentReviewTurn,
 ])
 
 export type TurnContext = typeof TurnContext.Type
@@ -289,6 +292,13 @@ export const ToolCallPart = Schema.TaggedStruct("ToolCall", {
   status: ToolCallStatus,
   parentToolCallId: Schema.NullOr(Schema.String),
 })
+
+export const acceptedCallInput = <S extends Schema.Decoder<unknown>>(name: string, schema: S) => {
+  const decode = Schema.decodeUnknownOption(Schema.fromJsonString(schema))
+
+  return (call: typeof ToolCallPart.Type): S["Type"] | null =>
+    call.name === name && call.status === "done" ? Option.getOrNull(decode(call.input)) : null
+}
 
 const Decision = Schema.Literals(["waiting", "allowed", "denied", "expired"])
 

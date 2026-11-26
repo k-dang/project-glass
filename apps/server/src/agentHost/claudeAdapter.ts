@@ -67,6 +67,12 @@ import { settleWith } from "./requests"
 import type { WrittenSkills } from "./sentSkills"
 import { claudeToolInput, type ToolReply } from "./hostTool"
 import { suggestDraft, suggestDraftDescription, suggestDraftParameters } from "./suggestDraftTool"
+import {
+  SUBMIT_REVIEW_TOOL,
+  submitReview,
+  submitReviewDescription,
+  submitReviewParameters,
+} from "./submitReviewTool"
 import { drawDiagram, drawDiagramDescription, drawDiagramParameters } from "./drawDiagramTool"
 import { GLASS_MCP_SERVER, GLASS_TOOLS_MCP_SERVER, permissionRequest, ToolInput } from "./toolCalls"
 import { runTurns } from "./turnLoop"
@@ -115,12 +121,14 @@ const startFailure = (cause: unknown) =>
 
 const suggestDraftInput = claudeToolInput(suggestDraftParameters)
 
+const submitReviewInput = claudeToolInput(submitReviewParameters)
+
 const drawDiagramInput = claudeToolInput(drawDiagramParameters)
 
 const toolResult = ({ accepted, text }: ToolReply) =>
   Promise.resolve({ content: [{ type: "text" as const, text }], isError: !accepted })
 
-const reviewTools = claudeTools.shell
+const reviewTools = claudeTools.review
 
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
@@ -131,6 +139,9 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
     [GLASS_MCP_SERVER]: createSdkMcpServer({
       name: GLASS_MCP_SERVER,
       tools: [
+        tool(SUBMIT_REVIEW_TOOL, submitReviewDescription, submitReviewInput, (input) =>
+          toolResult(submitReview(input)),
+        ),
         tool(SUGGEST_DRAFT_TOOL, suggestDraftDescription, suggestDraftInput, (input) =>
           toolResult(suggestDraft(brief.diffLines)(input)),
         ),
