@@ -7,6 +7,7 @@ const ignorePatterns = [
   ".codex/**",
   ".continue/**",
   ".cursor/**",
+  ".deepsec/**",
   ".gemini/**",
   ".opencode/**",
   ".pi/**",
