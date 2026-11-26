@@ -13,7 +13,7 @@ export default Effect.gen(function* () {
   `
   yield* sql`
     UPDATE thread_turn SET started_by = 'harness'
-    WHERE started_by_harness = 1 OR json_extract(context, '$._tag') = 'BackgroundWorkEnded'
+    WHERE json_extract(context, '$._tag') = 'BackgroundWorkEnded'
   `
-  yield* sql`ALTER TABLE thread_turn DROP COLUMN started_by_harness`
+  yield* sql`CREATE INDEX thread_turn_running ON thread_turn (thread_id) WHERE ended IS NULL`
 })
