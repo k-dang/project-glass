@@ -100,10 +100,7 @@ const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
       InboxPullRequest.make({
         pullRequest: group[0].pullRequest,
         reasons: Arr.flatMap(group, ({ reasons }) => reasons),
-        triedBy: Arr.dedupeWith(
-          group.flatMap(({ triedBy }) => triedBy),
-          (a, b) => a.threadId === b.threadId,
-        ),
+        triedBy: group.flatMap(({ triedBy }) => triedBy),
         since: Arr.min(
           Arr.map(group, ({ since }) => since),
           DateTime.Order,
