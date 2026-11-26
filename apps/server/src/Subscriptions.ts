@@ -2,6 +2,7 @@ import {
   type ConnectionError,
   PullRequestRef,
   referenceKey,
+  referenceText,
   type SettingsError,
   Subscription,
   SubscriptionReason,
@@ -136,8 +137,6 @@ const stateOf = (stored: StoredSubscription): SubscriptionState => ({
 const pullRequestKey = (pullRequest: PullRequestRef | null) =>
   pullRequest === null ? null : referenceKey(pullRequest)
 
-const named = ({ owner, repo, number }: PullRequestRef) => `${owner}/${repo}#${number}`
-
 const refusedStarters = {
   glass: "Glass started this Turn",
   harness: "The agent started this Turn by itself",
@@ -237,11 +236,11 @@ export class Subscriptions extends Context.Service<
 
         if (found == null)
           return yield* refuse(
-            `GitHub has no PR ${named(pullRequest)}, or the user's GitHub login can't see it.`,
+            `GitHub has no PR ${referenceText(pullRequest)}, or the user's GitHub login can't see it.`,
           )
 
         if (found.state === "merged" || found.state === "closed")
-          return yield* refuseEnded(`PR ${named(pullRequest)}`, found.state)
+          return yield* refuseEnded(`PR ${referenceText(pullRequest)}`, found.state)
 
         return found.summary.ref
       })

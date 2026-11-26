@@ -8,10 +8,11 @@ import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { BellRing, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
+import { referenceText } from "./queue"
 import { endSubscriptionAtom, subscriptionsAtom } from "./threadsArea"
 
 const pullRequestLabel = ({ pullRequest }: Subscription, own: OwnPullRequest | undefined) => {
-  if (pullRequest !== null) return `${pullRequest.owner}/${pullRequest.repo}#${pullRequest.number}`
+  if (pullRequest !== null) return referenceText(pullRequest)
 
   return own === undefined
     ? "This Thread's PR, once it has one"

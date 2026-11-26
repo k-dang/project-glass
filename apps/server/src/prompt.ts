@@ -3,6 +3,7 @@ import {
   type FeedbackNote,
   isLineNote,
   isPageNote,
+  referenceText,
   type LineNote,
   type PageNote,
   replaceMentions,
@@ -27,8 +28,8 @@ const attribute = (text: string) => withoutBlockTags(text).replaceAll('"', "&quo
 const viewing = (context: CapturedContext) =>
   Match.value(context).pipe(
     Match.tagsExhaustive({
-      PullRequest: ({ pullRequest: { owner, repo, number }, revision: { base, head } }) =>
-        `PR ${owner}/${repo}#${number} at Revision base ${base}, head ${head}`,
+      PullRequest: ({ pullRequest, revision: { base, head } }) =>
+        `PR ${referenceText(pullRequest)} at Revision base ${base}, head ${head}`,
       Thread: ({ threadId, name }) => `the Thread "${withoutBlockTags(name)}" (id ${threadId})`,
     }),
   )
@@ -38,8 +39,8 @@ const workOutcomeEntry = (work: WorkOutcome) => {
     Match.tagsExhaustive({
       Thread: ({ threadId, name }) =>
         `kind="Thread" thread_id="${threadId}" name="${attribute(name)}"`,
-      AgentReview: ({ pullRequest: { owner, repo, number } }) =>
-        `kind="AgentReview" pull_request="${owner}/${repo}#${number}"`,
+      AgentReview: ({ pullRequest }) =>
+        `kind="AgentReview" pull_request="${referenceText(pullRequest)}"`,
     }),
   )
 
@@ -91,14 +92,9 @@ const reasonLines = (reason: PullRequestUpdateReason): ReadonlyArray<string> =>
     Closed: () => ["The PR closed without merging."],
   })
 
-const updatedPullRequestEntry = ({
-  pullRequest: { owner, repo, number },
-  own,
-  reasons,
-  note,
-}: UpdatedPullRequest) =>
+const updatedPullRequestEntry = ({ pullRequest, own, reasons, note }: UpdatedPullRequest) =>
   [
-    `<subscribed_pull_request pull_request="${owner}/${repo}#${number}" own="${own}">`,
+    `<subscribed_pull_request pull_request="${referenceText(pullRequest)}" own="${own}">`,
     ...reasons.flatMap(reasonLines),
     "The note you left with this Subscription:",
     withoutBlockTags(note),
