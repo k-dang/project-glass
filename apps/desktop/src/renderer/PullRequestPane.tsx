@@ -18,7 +18,7 @@ import { settledProblem } from "./problems"
 import { LineCounts } from "./LineCounts"
 import { useLiveStatus } from "./liveStatus"
 import { plural } from "./plural"
-import { InlineStatusChips } from "./PullRequestStatus"
+import { InlineStatusChips, PullRequestStateIcon } from "./PullRequestStatus"
 import { preloadAtom, reloadPreloaded } from "./reviewsArea"
 import { SidePanel } from "./SidePanel"
 import { Timeline } from "./Timeline"
@@ -127,7 +127,10 @@ function LoadedPullRequest(props: {
   return (
     <>
       <div className="flex flex-col gap-2 border-b px-5 py-3 text-sm">
-        <h3 className="truncate text-base font-semibold">{pullRequest.title}</h3>
+        <div className="flex min-w-0 items-center gap-2">
+          <PullRequestStateIcon pullRequest={pullRequest} />
+          <h3 className="truncate text-base font-semibold">{pullRequest.title}</h3>
+        </div>
         <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="min-w-0 truncate font-mono">

@@ -9,11 +9,9 @@ import {
   MergingRepositoryFields,
   toMerging,
 } from "./merging"
-import { ReviewRequest, ReviewState } from "./repositoryPullRequests"
+import { GitHubPullRequestState, ReviewRequest, ReviewState } from "./repositoryPullRequests"
 
 const MAX_STATUS_ITEMS = 100
-
-export const GitHubPullRequestState = Schema.Literals(["OPEN", "CLOSED", "MERGED"])
 
 export const PULL_REQUEST_STATUS_FIELDS = `repository { ${MERGING_REPOSITORY_FIELDS} }
       state
