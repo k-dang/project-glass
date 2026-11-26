@@ -54,13 +54,19 @@ import { PullRequestMaterial, pullRequestMaterial } from "../agentReviewPrompt"
 import type { FileMaterial } from "../tourPrompt"
 import { AgentSender, Threads } from "../Threads"
 import { Transcripts } from "../Transcripts"
+import { isOnTheUsersWord } from "../threadState"
 import { GitHubClient } from "../github/GitHubClient"
 import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
 import { LocalCheckouts } from "../LocalCheckouts"
 import { AskProgress } from "./AskProgress"
 import { CHECK_IN_MAX_TIMEOUT_SECONDS, CHECK_IN_TIMEOUT_SECONDS, CheckIns } from "../CheckIns"
-import { McpCaller, type McpCallerIdentity, type OutsideAgentCaller } from "./McpCredentials"
+import {
+  callingThreadId,
+  McpCaller,
+  type McpCallerIdentity,
+  type OutsideAgentCaller,
+} from "./McpCredentials"
 import { Inbox } from "../Inbox"
 import { ASK_PROGRESS_SECONDS, ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../OutsideQuestions"
 import { Sandboxes } from "../Sandboxes"
@@ -555,20 +561,13 @@ export const GlassToolHandlers = GlassTools.toLayer(
         })
     })
 
-    const callingThreadId = McpCaller.current.pipe(
-      Effect.map((caller) =>
-        Predicate.isTagged(caller, "Thread") ? Option.some(caller.threadId) : Option.none(),
-      ),
-    )
-
     const sender = Effect.gen(function* () {
       const caller = yield* McpCaller.current
 
       if (Predicate.isTagged(caller, "OutsideAgent")) return AgentSender.OutsideAgent()
 
       const session = Predicate.isTagged(caller, "Thread") ? caller.threadId : caller.sessionId
-      const starter = yield* transcripts.runningTurnStarter(session)
-      const turnForUser = starter === "user" || starter === "creator"
+      const turnForUser = isOnTheUsersWord(yield* transcripts.runningTurnStarter(session))
 
       return Predicate.isTagged(caller, "Thread")
         ? AgentSender.Thread({ id: caller.threadId, turnForUser })

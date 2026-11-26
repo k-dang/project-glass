@@ -1,4 +1,15 @@
-import { Context, Deferred, Effect, Exit, Layer, Option, Redacted, Schema, Scope } from "effect"
+import {
+  Context,
+  Deferred,
+  Effect,
+  Exit,
+  Layer,
+  Option,
+  Predicate,
+  Redacted,
+  Schema,
+  Scope,
+} from "effect"
 import { randomBytes, timingSafeEqual } from "node:crypto"
 import type { GlassToolsAccess, StartOutcome } from "../agentHost/protocol"
 import { digest } from "./mcpHttp"
@@ -32,6 +43,12 @@ export class McpCaller extends Context.Service<McpCaller, McpCallerIdentity>()(
     ),
   )
 }
+
+export const callingThreadId = McpCaller.current.pipe(
+  Effect.map((caller) =>
+    Predicate.isTagged(caller, "Thread") ? Option.some(caller.threadId) : Option.none(),
+  ),
+)
 
 export const mintBearer = () => randomBytes(32).toString("base64url")
 

@@ -33,6 +33,7 @@ import {
 } from "./PullRequestMirror"
 import { countedAfresh, EndedState, nothingTold, Told } from "./pullRequestUpdateDecision"
 import { ThreadPullRequests } from "./ThreadPullRequests"
+import { isOnTheUsersWord } from "./threadState"
 import { Transcripts } from "./Transcripts"
 
 export interface NewSubscription {
@@ -250,11 +251,11 @@ export class Subscriptions extends Context.Service<
         threadId: string,
         input: NewSubscription,
       ) {
-        const starter = (yield* transcripts.runningTurnStarter(threadId)) ?? "none"
+        const starter = yield* transcripts.runningTurnStarter(threadId)
 
-        if (starter !== "user" && starter !== "creator")
+        if (!isOnTheUsersWord(starter))
           return yield* refuse(
-            `${refusedStarters[starter]}, so it can't subscribe your Thread to a PR. Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can.`,
+            `${refusedStarters[starter ?? "none"]}, so it can't subscribe your Thread to a PR. Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can.`,
           )
 
         if (input.pullRequest === null) yield* refuseOwnEnded(threadId)

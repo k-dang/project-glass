@@ -4,11 +4,11 @@ import {
   Subscription,
   SubscriptionReason,
 } from "@glass/contracts"
-import { Context, Effect, Predicate, Schema } from "effect"
+import { Context, Effect, Option, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { Subscriptions } from "../Subscriptions"
 import { acting, explained, GlassToolFailure, readOnly } from "./glassTools"
-import { McpCaller } from "./McpCredentials"
+import { callingThreadId } from "./McpCredentials"
 import { forThreads } from "./toolAudience"
 
 const MAX_NOTE_CHARS = 2_000
@@ -61,11 +61,13 @@ export const SubscriptionTools = Toolkit.make(
   EndSubscription,
 )
 
-const callingThread = McpCaller.current.pipe(
-  Effect.flatMap((caller) =>
-    Predicate.isTagged(caller, "Thread")
-      ? Effect.succeed(caller.threadId)
-      : Effect.fail(new GlassToolFailure({ message: "Only a Thread's agent has Subscriptions." })),
+const callingThread = callingThreadId.pipe(
+  Effect.flatMap(
+    Option.match({
+      onNone: () =>
+        Effect.fail(new GlassToolFailure({ message: "Only a Thread's agent has Subscriptions." })),
+      onSome: Effect.succeed,
+    }),
   ),
 )
 

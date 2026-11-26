@@ -54,13 +54,13 @@ import {
 import { SqlClient, type SqlError, type Statement } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import {
-  type MessageSender,
+  MessageSender,
   type SentQueuedMessage,
   type ThreadEvent,
   type ThreadState,
   type ThreadWrite,
   type StartingTurn,
-  type TurnStarter,
+  TurnStarter,
   stepThread,
 } from "./threadState"
 import type { HostEvent } from "./agentHost/protocol"
@@ -143,7 +143,7 @@ const decodeQueued = Schema.decodeUnknownEffect(
       ...StoredMessage.fields,
       context: Schema.NullOr(Schema.fromJsonString(CapturedContext)),
       feedback: FeedbackJson,
-      sentBy: Schema.Literals(["user", "creator", "agent"]),
+      sentBy: MessageSender,
     }),
   ),
 )
@@ -171,9 +171,7 @@ const decodeMessages = Schema.decodeUnknownEffect(
 )
 
 const decodeStarters = Schema.decodeUnknownEffect(
-  Schema.Array(
-    Schema.Struct({ startedBy: Schema.Literals(["user", "creator", "agent", "glass", "harness"]) }),
-  ),
+  Schema.Array(Schema.Struct({ startedBy: TurnStarter })),
 )
 
 const decodeRunningContexts = Schema.decodeUnknownEffect(

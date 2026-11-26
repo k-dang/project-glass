@@ -1,9 +1,16 @@
 import type { FeedbackNote, QueuedMessage, TurnEnding, TurnMessage } from "@glass/contracts"
-import { Match, Predicate } from "effect"
+import { Match, Predicate, Schema } from "effect"
 
-export type MessageSender = "user" | "creator" | "agent"
+export const MessageSender = Schema.Literals(["user", "creator", "agent"])
 
-export type TurnStarter = MessageSender | "glass" | "harness"
+export type MessageSender = typeof MessageSender.Type
+
+export const TurnStarter = Schema.Literals([...MessageSender.literals, "glass", "harness"])
+
+export type TurnStarter = typeof TurnStarter.Type
+
+export const isOnTheUsersWord = (starter: TurnStarter | null): starter is "user" | "creator" =>
+  starter === "user" || starter === "creator"
 
 export type SentQueuedMessage = QueuedMessage & { readonly sentBy: MessageSender }
 
