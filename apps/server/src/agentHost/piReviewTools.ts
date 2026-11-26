@@ -2,13 +2,30 @@ import { SUGGEST_DRAFT_TOOL } from "@glass/contracts"
 import { readFileSync } from "node:fs"
 import { type PiExtensionApi, registerHostTool } from "./piHostTool"
 import type { ReviewBrief } from "./protocol"
+import {
+  SUBMIT_REVIEW_TOOL,
+  submitReview,
+  submitReviewDescription,
+  submitReviewParameters,
+} from "./submitReviewTool"
 import { suggestDraft, suggestDraftDescription, suggestDraftParameters } from "./suggestDraftTool"
 
 export const PI_DIFF_LINES = "diff-lines.json"
 
-export default function piSuggestDraft(pi: PiExtensionApi) {
+export default function piReviewTools(pi: PiExtensionApi) {
   const diffLines: ReviewBrief["diffLines"] = JSON.parse(
     readFileSync(new URL(PI_DIFF_LINES, import.meta.url), "utf8"),
+  )
+
+  registerHostTool(
+    pi,
+    {
+      name: SUBMIT_REVIEW_TOOL,
+      label: "Submit review",
+      description: submitReviewDescription,
+      parameters: submitReviewParameters,
+    },
+    submitReview,
   )
 
   registerHostTool(

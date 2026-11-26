@@ -108,8 +108,8 @@ bump.
 _Avoid_: Plumbing, noise, skippable file
 
 **Follow-up**:
-A message the user sends about an Agent review and the answer of the agent that wrote it, a Turn
-of the Agent review's own Thread.
+A message the user sends about an Agent review and the answer of the agent that wrote it, a later
+Turn of the Thread whose first Turn wrote the review.
 _Avoid_: Chat
 
 **Suggested draft**:

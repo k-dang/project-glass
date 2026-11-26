@@ -15,7 +15,7 @@ import {
   type PullRequestUpdateReason,
   type UpdatedPullRequest,
 } from "@glass/contracts"
-import { Match, Predicate } from "effect"
+import { Match } from "effect"
 
 const blockTags = [
   "glass_to_dos",
@@ -133,15 +133,18 @@ const pullRequestUpdateBlock = ({ pullRequests, note }: PullRequestUpdate) =>
     withoutBlockTags(note),
   ])
 
-const contextBlock = (context: TurnContext) => {
-  if (Predicate.isTagged(context, "StartedWorkUpdate")) return startedWorkUpdateBlock(context)
+const viewingBlock = (context: CapturedContext) =>
+  block("glass_context", [`The user sent this while viewing ${viewing(context)}.`])
 
-  if (Predicate.isTagged(context, "PullRequestUpdate")) return pullRequestUpdateBlock(context)
-
-  if (Predicate.isTagged(context, "BackgroundWorkEnded")) return null
-
-  return block("glass_context", [`The user sent this while viewing ${viewing(context)}.`])
-}
+const contextBlock = (context: TurnContext) =>
+  Match.valueTags(context, {
+    StartedWorkUpdate: startedWorkUpdateBlock,
+    PullRequestUpdate: pullRequestUpdateBlock,
+    BackgroundWorkEnded: () => null,
+    AgentReview: () => null,
+    PullRequest: viewingBlock,
+    Thread: viewingBlock,
+  })
 
 const entry = ({ id, title, notes, done, images }: ToDo) =>
   [

@@ -148,6 +148,9 @@ export class ThreadTurns extends Context.Service<
         sent: SentMessage & { readonly context: Context | null },
         feedback: ReadonlyArray<FeedbackNote> = [],
       ) {
+        if (Predicate.isTagged(sent.context, "AgentReview"))
+          return { ...withContextOf(sent), mentionedImages: [], prompt: sent.message }
+
         const ids = mentionedToDoIds(sent.message)
 
         const listed =

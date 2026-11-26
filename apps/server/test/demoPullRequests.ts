@@ -8,6 +8,8 @@ export const DEMO_GATEWAY_REPOSITORY = { owner: "octo-org", repo: "api-gateway" 
 
 export const RATE_LIMIT_TITLE = "Rate-limit the public API"
 
+export const SLOW_QUERY_TITLE = "Log slow database queries"
+
 type Line = readonly [" " | "-" | "+", string]
 
 const lines = (prefix: Line[0], ...texts: Array<string>) =>
@@ -448,7 +450,7 @@ export const seedDemoPullRequests = (github: FakeGitHub) => {
   const slowQueries = seed(
     github,
     {
-      title: "Log slow database queries",
+      title: SLOW_QUERY_TITLE,
       author: VIEWER.login,
       body: "Logs any query slower than 500 ms.",
       reviewDecision: "APPROVED",

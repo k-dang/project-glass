@@ -1,4 +1,5 @@
 import {
+  AgentReviewTurn,
   Thread,
   ThreadBusy,
   type AgentHarness,
@@ -29,7 +30,8 @@ import {
   NoPermissionModes,
   type RequestNotWaiting,
   type RequestWaiting,
-  type Revision,
+  PullRequestRef,
+  Revision,
   localPlace,
   mentionedToDoIds,
   repositoryKey,
@@ -57,6 +59,7 @@ import {
 import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { changesId } from "./Changes"
+import { Checkouts } from "./Checkouts"
 import { ActivityLog } from "./ActivityLog"
 import { firstFreeBranch } from "./BranchNames"
 import { threadBranchNaming } from "./threadBranchNaming"
@@ -79,6 +82,12 @@ import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { ToDos } from "./ToDos"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
+import {
+  reviewThreadHosting,
+  reviewColumns,
+  type ReviewedRevision,
+  stopOnHost,
+} from "./reviewHosting"
 import { annotateUnit } from "./wideEvents"
 
 const changesOf = (files: ReadonlyArray<ChangedFile>) =>
@@ -86,12 +95,6 @@ const changesOf = (files: ReadonlyArray<ChangedFile>) =>
     id: changesId(files),
     files,
   })
-
-const BriefJson = Schema.fromJsonString(ReviewBrief)
-
-const encodeBrief = Schema.encodeSync(BriefJson)
-
-const decodeBrief = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ brief: BriefJson })))
 
 const decodeCreators = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ createdBy: Schema.NullOr(Schema.String) })),
@@ -160,17 +163,16 @@ const fromCreator = (creator: AgentSender): FirstMessageFrom => ({
 })
 
 type Purpose = Data.TaggedEnum<{
-  Work: { readonly packs: ReadonlyArray<string> }
-  Review: { readonly brief: ReviewBrief }
+  Work: { readonly packs: ReadonlyArray<string>; readonly from: FirstMessageFrom }
+  Review: { readonly brief: ReviewBrief; readonly reviewed: ReviewedRevision }
 }>
 
 const Purpose = Data.taggedEnum<Purpose>()
 
 interface NewReviewThread {
-  // WARNING: The id must be the session the Agent review's run saved in this checkout, since both harnesses resume a Thread's session by its id and folder.
   readonly id: string
   readonly name: string
-  readonly repository: FollowedRepository
+  readonly pullRequest: PullRequestRef
   readonly revision: Revision
   readonly harness: AgentHarness
   readonly model: string | null
@@ -259,6 +261,12 @@ export class Threads extends Context.Service<
       input: Omit<NewThread, "permissionMode">,
     ) => Effect.Effect<Thread, ThreadNotFound | InvalidLocalCheckout | ThreadError>
     readonly createForReview: (input: NewReviewThread) => Effect.Effect<Thread, ThreadError>
+    readonly reviewThreads: Effect.Effect<
+      ReadonlyArray<{ readonly id: string; readonly folder: string }>
+    >
+    readonly dropReviewCheckout: (
+      threadId: string,
+    ) => Effect.Effect<void, ThreadNotFound | ThreadBusy | ThreadError>
     readonly refuseReviewFrom: (
       threadId: string,
     ) => Effect.Effect<void, ThreadNotFound | ThreadError>
@@ -349,6 +357,7 @@ export class Threads extends Context.Service<
       const toDos = yield* ToDos
       const localSkills = yield* LocalSkills
       const fs = yield* FileSystem.FileSystem
+      const checkouts = yield* Checkouts
       const lock = yield* Semaphore.make(1)
 
       const stored = yield* sql`
@@ -419,22 +428,10 @@ export class Threads extends Context.Service<
             )
       }
 
-      const reviewHosting: ThreadHosting = {
-        prepareHost: localPlacement.prepareHost,
-        hostIfPrepared: () => Effect.succeedNone,
-        connectedHost: localPlacement.connectedHost,
-        baseRef: localPlacement.baseRef,
-        remove: ({ folder }) =>
-          fs.remove(folder, { recursive: true, force: true }).pipe(
-            Effect.tapError((cause) =>
-              Effect.logWarning("Couldn't remove an Agent review's checkout", cause),
-            ),
-            Effect.mapError(storageFailure),
-          ),
-      }
+      const review = reviewThreadHosting({ sql, fs, checkouts, localPlacement, storageFailure })
 
       const hostingOf = (row: PlacedThread): ThreadHosting =>
-        row.forReview ? reviewHosting : placementFor(row.thread.place)
+        row.forReview ? review.hosting : placementFor(row.thread.place)
 
       const saveBranch = (
         threadId: string,
@@ -518,18 +515,6 @@ export class Threads extends Context.Service<
       const withSandbox = (thread: Thread) =>
         sandboxes.status(thread.id).pipe(Effect.map((sandbox) => threadWith(thread, { sandbox })))
 
-      const reviewBrief = (row: PlacedThread) =>
-        sql`SELECT review_brief AS brief FROM thread WHERE id = ${row.thread.id}`.pipe(
-          Effect.flatMap(decodeBrief),
-          Effect.tapError((cause) => Effect.logWarning("Couldn't read a review brief", cause)),
-          Effect.mapError(storageFailure),
-          Effect.flatMap(([found]) =>
-            found === undefined
-              ? Effect.fail(new ThreadError({ message: "This Thread was removed." }))
-              : Effect.succeed(found.brief),
-          ),
-        )
-
       // WARNING: pi keeps the first skill of a name, so Local skills go first to win over a pack's.
       const skillsOf = (thread: Thread) =>
         Effect.all(
@@ -568,9 +553,9 @@ export class Threads extends Context.Service<
           id,
           ensureStarted: (client) =>
             (row.forReview
-              ? reviewBrief(row).pipe(
-                  Effect.flatMap((brief) => startAs(client, ReviewRole.make({ brief }))),
-                )
+              ? review
+                  .brief(id)
+                  .pipe(Effect.flatMap((brief) => startAs(client, ReviewRole.make({ brief }))))
               : startAs(client, WorkRole.make({}))
             ).pipe(Effect.asVoid),
           settings: { model, effort, permissionMode },
@@ -622,12 +607,7 @@ export class Threads extends Context.Service<
         return true
       })
 
-      const insert = (
-        placed: PlacedThread,
-        first: MessageInput,
-        purpose: Purpose,
-        from: FirstMessageFrom,
-      ) => {
+      const insert = (placed: PlacedThread, first: MessageInput, purpose: Purpose) => {
         const { id, place, repository } = placed.thread
 
         const forget = SubscriptionRef.update(rows, (current) =>
@@ -637,11 +617,35 @@ export class Threads extends Context.Service<
         return lock
           .withPermits(1)(
             Effect.gen(function* () {
+              const purposed = Purpose.$match(purpose, {
+                Work: ({ packs, from }) => ({
+                  packs,
+                  columns: {
+                    created_by: from.createdBy,
+                    review_brief: null,
+                    reviewed_revision: null,
+                  },
+                  linked: toDos.linkThread(id, mentionedToDoIds(first.message)),
+                  startFirst: transcripts.startOrQueue(
+                    id,
+                    { ...first, context: null },
+                    from.sentBy,
+                  ),
+                }),
+                Review: ({ brief, reviewed }) => ({
+                  packs: [],
+                  columns: { created_by: null, ...reviewColumns(brief, reviewed) },
+                  linked: Effect.void,
+                  startFirst: transcripts.startIfIdle(
+                    id,
+                    { ...first, context: AgentReviewTurn.make({}), retriesDelivery: false },
+                    () => Effect.void,
+                  ),
+                }),
+              })
+
               const thread = threadWith(placed.thread, {
-                skillPacks: yield* skillPacks.pinForThread(
-                  id,
-                  Purpose.$match(purpose, { Work: ({ packs }) => packs, Review: () => [] }),
-                ),
+                skillPacks: yield* skillPacks.pinForThread(id, purposed.packs),
               })
 
               yield* annotateThread(thread)
@@ -661,21 +665,14 @@ export class Threads extends Context.Service<
                 folder: placed.folder,
                 created_at: DateTime.formatIso(thread.createdAt),
                 kept_going_at: DateTime.formatIso(thread.createdAt),
-                created_by: from.createdBy,
-                review_brief: Purpose.$match(purpose, {
-                  Work: () => null,
-                  Review: ({ brief }) => encodeBrief(brief),
-                }),
+                ...purposed.columns,
               })}`
 
-              yield* Purpose.$match(purpose, {
-                Work: () => toDos.linkThread(id, mentionedToDoIds(first.message)),
-                Review: () => Effect.void,
-              })
+              yield* purposed.linked
 
               yield* SubscriptionRef.update(rows, (current) => [{ ...placed, thread }, ...current])
               yield* setKeptGoing(id, thread.createdAt)
-              yield* transcripts.startOrQueue(id, { ...first, context: null }, from.sentBy)
+              yield* purposed.startFirst
 
               return thread
             }).pipe(sql.withTransaction),
@@ -698,12 +695,14 @@ export class Threads extends Context.Service<
       const createForReview = Effect.fn("Threads.createForReview")(function* (
         input: NewReviewThread,
       ) {
+        const { pullRequest, revision } = input
+
         const thread = new Thread({
           id: input.id,
           name: input.name,
           place: localPlace,
-          repository: input.repository,
-          baseBranch: input.revision.base,
+          repository: new FollowedRepository({ owner: pullRequest.owner, repo: pullRequest.repo }),
+          baseBranch: revision.base,
           branch: null,
           harness: input.harness,
           model: input.model,
@@ -719,9 +718,16 @@ export class Threads extends Context.Service<
         return yield* insert(
           { thread, folder: input.checkout, forReview: true },
           { message: input.message, images: [] },
-          Purpose.Review({ brief: input.review }),
-          { createdBy: null, sentBy: "agent" },
+          Purpose.Review({ brief: input.review, reviewed: { pullRequest, revision } }),
         )
+      })
+
+      const dropReviewCheckout = Effect.fn("Threads.dropReviewCheckout")(function* (
+        threadId: string,
+      ) {
+        const row = yield* find(threadId)
+
+        yield* turns.whileIdle(threadId, review.dropCheckout(row))
       })
 
       const createWith = Effect.fnUntraced(function* (
@@ -757,8 +763,7 @@ export class Threads extends Context.Service<
         const created = yield* insert(
           { thread, folder, forReview: false },
           { message, images },
-          Purpose.Work({ packs: input.skillPacks }),
-          from,
+          Purpose.Work({ packs: input.skillPacks, from }),
         ).pipe(Effect.onError(() => discard.pipe(Effect.andThen(naming.release(thread.id)))))
 
         yield* naming.name(thread.id, message)
@@ -1096,13 +1101,8 @@ export class Threads extends Context.Service<
 
         yield* Effect.gen(function* () {
           const hosting = hostingOf(row)
-          const running = yield* hosting.connectedHost(row)
 
-          if (Option.isSome(running))
-            yield* running.value
-              .StopThread({ threadId })
-              .pipe(Effect.ignore({ log: "Warn", message: "Couldn't stop a Thread" }))
-
+          yield* stopOnHost(hosting, row)
           yield* hosting.remove(row)
 
           yield* Effect.gen(function* () {
@@ -1116,6 +1116,9 @@ export class Threads extends Context.Service<
             yield* toDos.unlinkThread(threadId)
             yield* sql`DELETE FROM thread WHERE id = ${threadId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
+
+          // WARNING: The host can start a Turn delivered before the first stop, so stop it again once its Turns are gone.
+          yield* stopOnHost(hosting, row)
         }).pipe(
           Effect.tapError(() =>
             SubscriptionRef.update(rows, (current) =>
@@ -1185,6 +1188,14 @@ export class Threads extends Context.Service<
         create,
         createFrom,
         createForReview,
+        reviewThreads: SubscriptionRef.get(rows).pipe(
+          Effect.map((current) =>
+            current.flatMap(({ thread, folder, forReview }) =>
+              forReview ? [{ id: thread.id, folder }] : [],
+            ),
+          ),
+        ),
+        dropReviewCheckout,
         refuseReviewFrom,
         send,
         sendFrom,

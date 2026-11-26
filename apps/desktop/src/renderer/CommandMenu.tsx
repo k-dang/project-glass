@@ -323,14 +323,16 @@ function useJumps({ onOpen, onOpenThread }: Destinations) {
       keywords: [referenceText(ref)],
       run: () => onOpen(ref),
     })),
-    threads: threads.map(({ id, name, repository }): Row => ({
-      id: `thread:${id}`,
-      title: name,
-      detail: repositoryKey(repository),
-      icon: Sparkles,
-      keywords: [repositoryKey(repository)],
-      run: () => onOpenThread(id),
-    })),
+    threads: threads
+      .filter(({ forReview }) => !forReview)
+      .map(({ id, name, repository }): Row => ({
+        id: `thread:${id}`,
+        title: name,
+        detail: repositoryKey(repository),
+        icon: Sparkles,
+        keywords: [repositoryKey(repository)],
+        run: () => onOpenThread(id),
+      })),
   }
 }
 

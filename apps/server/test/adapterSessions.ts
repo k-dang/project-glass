@@ -218,6 +218,32 @@ export const reviewDrafts: ReadonlyArray<{
   },
 ]
 
+export const reviewAnswers: ReadonlyArray<{
+  readonly answer: Schema.JsonObject
+  readonly status: "done" | "failed"
+  readonly says: string
+}> = [
+  {
+    answer: { markdown: " ", hotspots: [], lowAttention: [] },
+    status: "failed",
+    says: "length of at least 1",
+  },
+  {
+    answer: { markdown: "**Nothing stands out.**", hotspots: [], lowAttention: [] },
+    status: "done",
+    says: "Glass has your Agent review",
+  },
+]
+
+export const assertReviewAnswers = (calls: ReadonlyArray<typeof ToolCallPart.Type>) => {
+  assert.lengthOf(calls, reviewAnswers.length)
+
+  reviewAnswers.forEach(({ status, says }, index) => {
+    assert.equal(calls[index]?.status, status)
+    assert.include(calls[index]?.output, says)
+  })
+}
+
 export const assertSuggestedDrafts = (calls: ReadonlyArray<typeof ToolCallPart.Type>) => {
   assert.lengthOf(calls, reviewDrafts.length)
 

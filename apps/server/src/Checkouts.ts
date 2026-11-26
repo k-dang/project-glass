@@ -1,4 +1,5 @@
 import {
+  type CheckoutRunReason,
   type NoCredentials,
   type PullRequestRef,
   type Revision,
@@ -11,6 +12,7 @@ import {
   FileSystem,
   Layer,
   type PlatformError,
+  Predicate,
   Redacted,
   type Scope,
 } from "effect"
@@ -26,6 +28,41 @@ import { annotateUnit } from "./wideEvents"
 export class CheckoutFailure extends Data.TaggedError("CheckoutFailure")<{
   readonly reason: "unreachable" | "access-refused" | "fetch-failed" | "timeout" | "storage"
 }> {}
+
+const failureMessages: Record<CheckoutFailure["reason"], readonly [CheckoutRunReason, string]> = {
+  "access-refused": [
+    "no-access",
+    "Your GitHub Connection can't read this repository's code. Check its access, then try again.",
+  ],
+  unreachable: [
+    "fetch-failed",
+    "Couldn't reach the repository to fetch the PR's code. Check your connection, then try again.",
+  ],
+  "fetch-failed": [
+    "fetch-failed",
+    "Fetching the PR's code failed. Git's output is in Glass's backend log; try again.",
+  ],
+  timeout: ["fetch-failed", "Fetching the PR's code took too long. Try again."],
+  storage: [
+    "storage",
+    "Couldn't prepare a copy of the PR's code. Check that your disk has free space, then try again.",
+  ],
+}
+
+export const checkoutProblem = (
+  error: CheckoutFailure | StaleRevision | NoCredentials,
+): readonly [CheckoutRunReason, string] => {
+  if (Predicate.isTagged(error, "StaleRevision"))
+    return [
+      "stale-revision",
+      "The PR has new commits since Glass loaded it. Reload, then try again.",
+    ]
+
+  if (Predicate.isTagged(error, "NoCredentials"))
+    return ["no-access", "Glass isn't signed in to GitHub, so it can't fetch the PR's code."]
+
+  return failureMessages[error.reason]
+}
 
 const failureReason = (output: string): CheckoutFailure["reason"] => {
   if (/could not read Username|Authentication failed|returned error: 40[13]/i.test(output))
@@ -67,11 +104,6 @@ export class Checkouts extends Context.Service<
       revision: Revision,
       folder: string,
     ) => Effect.Effect<void, CheckoutFailure | StaleRevision | NoCredentials>
-    readonly checkoutAt: (
-      pr: PullRequestRef,
-      revision: Revision,
-      folder: string,
-    ) => Effect.Effect<string, CheckoutFailure | StaleRevision | NoCredentials, Scope.Scope>
   }
 >()("@glass/server/Checkouts") {
   static readonly layer = Layer.effect(
@@ -234,12 +266,7 @@ export class Checkouts extends Context.Service<
         )
       }, storageFailure)
 
-      const checkoutAt = (pr: PullRequestRef, revision: Revision, folder: string) =>
-        Effect.addFinalizer(() =>
-          fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
-        ).pipe(Effect.andThen(checkoutInto(pr, revision, folder)), Effect.as(folder))
-
-      return Checkouts.of({ checkout, checkoutInto, checkoutAt })
+      return Checkouts.of({ checkout, checkoutInto })
     }),
   )
 }

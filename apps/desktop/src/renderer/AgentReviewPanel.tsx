@@ -2,17 +2,15 @@ import { useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   type AgentReview,
   emptyTranscript,
-  nothingUnsent,
-  type SentMessage,
   type SuggestedDraft,
   splitLead,
   acceptedSuggestedDraftOf,
   type ToolCallPart,
 } from "@glass/contracts"
 import { cn } from "cn"
-import { Option } from "effect"
+import { Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { Check, LoaderCircle, Pencil } from "lucide-react"
+import { Check, Pencil } from "lucide-react"
 import { type ReactNode, useCallback, useMemo, useState } from "react"
 import { Streamdown } from "streamdown"
 import { Button } from "@/components/ui/button"
@@ -22,13 +20,11 @@ import { threadAtoms, ThreadAtomsContext } from "./thread"
 import { ThreadComposer } from "./ThreadView"
 import { Transcript } from "./Transcript"
 import { ToolCallView } from "./TurnParts"
-import { UserMessage } from "./UserMessage"
 import type { ShowNote } from "./changesView"
 import { LineLocation, pathLineName } from "./ReviewThreads"
-import { Elapsed } from "./Elapsed"
 import { type HotspotLinks, HotspotPoints } from "./Hotspots"
 import { rankHotspots } from "./rankedHotspots"
-import { type ComposerSuggestion, MessageBox } from "./MessageBox"
+import type { ComposerSuggestion } from "./MessageBox"
 import { ProblemAlert } from "./ProblemAlert"
 import { SidePanel } from "./SidePanel"
 import { fileName } from "./fileName"
@@ -166,65 +162,6 @@ function FollowUpsMarker() {
   )
 }
 
-function FirstFollowUp(props: { controls: AgentReviewControls }) {
-  const { job } = props.controls
-
-  if (job?.status !== "starting-thread" && job?.status !== "thread-start-failed") return null
-
-  return (
-    <>
-      <FollowUpsMarker />
-      <div className="flex flex-col gap-3 enter-motion">
-        <UserMessage message={job.message} images={[]} />
-        {job.status === "starting-thread" ? (
-          <output className="flex items-center gap-2 text-sm text-muted-foreground">
-            <LoaderCircle
-              aria-hidden
-              className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none"
-            />
-            <span className="flex-1">Copying the PR's code for the agent…</span>
-            <Elapsed startedAt={job.startedAt} />
-          </output>
-        ) : (
-          <ProblemAlert
-            problem={{ title: "Follow-up failed", detail: job.reason.message }}
-            action={
-              props.controls.followUpPending
-                ? undefined
-                : { label: "Retry", run: () => props.controls.followUp(job.message) }
-            }
-          />
-        )}
-      </div>
-    </>
-  )
-}
-
-function FirstFollowUpComposer(props: { controls: AgentReviewControls; reviewing: boolean }) {
-  const [composed, setComposed] = useState<SentMessage>(nothingUnsent)
-  const { job } = props.controls
-
-  return (
-    <MessageBox
-      composed={composed}
-      setComposed={setComposed}
-      label="Follow up"
-      placeholder="Ask about the review, or have it draft comments"
-      textOnly
-      holdUntilAccepted
-      blocked={
-        props.controls.followUpPending || props.reviewing || job?.status === "starting-thread"
-      }
-      problem={props.controls.followUpProblem}
-      send={({ message }) => props.controls.followUp(message)}
-      steer={null}
-      recall={null}
-      onStop={job?.status === "starting-thread" ? props.controls.cancel : null}
-      suggestions={followUpSuggestions}
-    />
-  )
-}
-
 function OutdatedNote() {
   return (
     <p className="m-0 shrink-0 border-t px-5 py-3 text-sm text-muted-foreground">
@@ -248,6 +185,11 @@ function ReviewThread(props: {
   const { turns, earlierTurns, queued, status } = Option.getOrElse(
     AsyncResult.value(transcript),
     () => emptyTranscript,
+  )
+
+  const followUps = useMemo(
+    () => turns.filter(({ context }) => !Predicate.isTagged(context, "AgentReview")),
+    [turns],
   )
 
   const loadEarlier = useAtomSet(atoms.loadEarlier)
@@ -275,7 +217,7 @@ function ReviewThread(props: {
           </div>
         )}
         <Transcript
-          turns={turns}
+          turns={followUps}
           earlierTurns={earlierTurns}
           onShowEarlier={loadEarlier}
           status={status}
@@ -290,7 +232,7 @@ function ReviewThread(props: {
           <OutdatedNote />
         ) : (
           <ThreadComposer
-            turns={turns}
+            turns={followUps}
             queued={queued}
             label="Follow up"
             idlePlaceholder="Ask about the review, or have it draft comments"
@@ -311,37 +253,18 @@ export function AgentReviewPanel(props: {
   hotspotLinks: HotspotLinks
 }) {
   const { review } = props
-  const { job, outdated } = props.controls
+  const { outdated } = props.controls
   const markdown = <ReviewBody review={review} links={props.hotspotLinks} outdated={outdated} />
 
-  if (review.threadId !== null)
-    return (
-      <ReviewThread
-        key={review.threadId}
-        threadId={review.threadId}
-        lead={markdown}
-        outdated={outdated}
-        drafts={props.drafts}
-        show={props.show}
-      />
-    )
-
   return (
-    <>
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 pt-4 pb-8 [scrollbar-gutter:stable]">
-        {markdown}
-        <FirstFollowUp controls={props.controls} />
-      </div>
-      <div
-        aria-hidden
-        className="pointer-events-none relative -mt-8 h-8 shrink-0 bg-linear-to-t from-background to-transparent"
-      />
-      {outdated ? (
-        <OutdatedNote />
-      ) : (
-        <FirstFollowUpComposer controls={props.controls} reviewing={job?.status === "reviewing"} />
-      )}
-    </>
+    <ReviewThread
+      key={review.threadId}
+      threadId={review.threadId}
+      lead={markdown}
+      outdated={outdated}
+      drafts={props.drafts}
+      show={props.show}
+    />
   )
 }
 

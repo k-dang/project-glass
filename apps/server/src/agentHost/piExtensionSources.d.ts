@@ -3,7 +3,7 @@ declare module "virtual:pi-draw-diagram" {
   export default source
 }
 
-declare module "virtual:pi-suggest-draft" {
+declare module "virtual:pi-review-tools" {
   const source: string
   export default source
 }

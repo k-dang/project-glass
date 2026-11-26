@@ -1,13 +1,7 @@
 import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { Activity, ActivityKind, ActivityLogError, ActivityPage, ActivityStamp } from "./activity"
-import {
-  AgentReviewDone,
-  AgentReviewFailure,
-  AgentReviewState,
-  FollowUpMessage,
-  ReviewPrompt,
-} from "./agentReview"
+import { AgentReviewDone, AgentReviewFailure, AgentReviewState, ReviewPrompt } from "./agentReview"
 import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
 import { RendererEvent } from "./diagnostics"
 import {
@@ -154,10 +148,6 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("StartAgentReview", {
     payload: { pullRequest: PullRequestRef, revision: Revision },
-    error: AgentReviewFailure,
-  }),
-  Rpc.make("FollowUpAgentReview", {
-    payload: { pullRequest: PullRequestRef, revision: Revision, message: FollowUpMessage },
     error: AgentReviewFailure,
   }),
   Rpc.make("CancelAgentReview", {

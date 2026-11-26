@@ -23,6 +23,7 @@ import { VIEWER } from "./fakePullRequest"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 import { seedClone } from "./gitRepositories"
 import { isolatedHome, startBackend } from "./harness"
+import { scriptedReviews } from "./scriptedReviews"
 import { vi } from "vite-plus/test"
 
 export const repository = new FollowedRepository({ owner: "glass-demo", repo: "greeter" })
@@ -201,6 +202,7 @@ export const threadsFixtureWith = ({
       home,
       clone,
       release: (name: string) => Effect.sync(() => writeFileSync(join(gates, name), "")),
+      reviews: scriptedReviews(gates),
       watch,
       transcript,
       sandboxStatus,

@@ -11,12 +11,9 @@ export const controls = (overrides: Partial<AgentReviewControls>): AgentReviewCo
   outdated: false,
   closedAs: null,
   commandProblem: null,
-  followUpProblem: null,
-  followUpPending: false,
   subscriptionProblem: null,
   reconnect: vi.fn<() => void>(),
   start: vi.fn<() => void>(),
-  followUp: vi.fn<(message: string) => Promise<boolean>>(),
   cancel: vi.fn<() => void>(),
   ...overrides,
 })
@@ -28,7 +25,7 @@ export const reviewOf = (revision: Revision): AgentReview => ({
     "**The greeting changes a letter callers match on.** One line changes.\n\n## Callers expect the old letter\n\n`main.ts` matches on `b`.",
   hotspots: [],
   lowAttention: [],
-  threadId: null,
+  threadId: "review-agent",
   done: false,
   includedInStartedWorkUpdate: false,
 })

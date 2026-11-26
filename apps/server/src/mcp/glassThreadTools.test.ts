@@ -12,6 +12,9 @@ import {
   type Turn,
 } from "@glass/contracts"
 import { Effect, Option, Predicate, Schema, Stream } from "effect"
+import { mkdirSync } from "node:fs"
+import { join } from "node:path"
+import { vi } from "vite-plus/test"
 import {
   calledBy,
   glassCall,
@@ -19,13 +22,14 @@ import {
   threadsFixtureWith,
   holding,
   repository,
+  scriptedHost,
   settled,
 } from "../../test/threadsFixture"
 import { type FakeGitHub, startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
 import { connectMcp, toolText } from "../../test/mcpClient"
-import { scriptedAgentRunners } from "../../test/scriptedAgentRunners"
+import { scriptedReviews } from "../../test/scriptedReviews"
 import { StartedItem } from "../StartedWork"
 
 const caller = GlobalChatCaller.make({
@@ -275,14 +279,24 @@ const seedGreeting = (github: FakeGitHub, client: Client) => {
   return { pr, pullRequest, revision: { base: pr.base.sha, head: pr.head.sha }, review }
 }
 
+const answer = { markdown, hotspots: [], lowAttention: [] }
+
 const startReviewing = Effect.gen(function* () {
-  const runners = yield* scriptedAgentRunners({ reply: { answer: { markdown } } })
   const github = yield* startFakeGitHub({ git: true })
+  const home = yield* isolatedHome
+  const gates = join(home, "gates")
+  mkdirSync(gates)
+  vi.stubEnv("GLASS_SCRIPTED_GATES", gates)
+  yield* scriptedReviews(gates).script({ submit: [answer] })
 
   const backend = yield* startBackend(
-    { GH_TOKEN: VIEWER.token, GLASS_GITHUB_API_URL: github.url, GLASS_GIT_REMOTE: github.gitUrl },
-    yield* isolatedHome,
-    runners.layer,
+    {
+      GH_TOKEN: VIEWER.token,
+      GLASS_GITHUB_API_URL: github.url,
+      GLASS_GIT_REMOTE: github.gitUrl,
+      GLASS_AGENT_HOST_BUNDLE: scriptedHost,
+    },
+    home,
   )
 
   const { call } = yield* connectMcp(backend.baseUrl, yield* backend.mcpCredentials.issue(caller))
@@ -354,8 +368,8 @@ describe("Glass's Agent review tools over MCP", () => {
 })
 
 const reviewingFromThreads = Effect.gen(function* () {
-  const runners = yield* scriptedAgentRunners({ reply: { answer: { markdown } } })
-  const f = yield* threadsFixtureWith({ agentRunners: runners.layer, git: true })
+  const f = yield* threadsFixtureWith({ git: true })
+  yield* f.reviews.script({ submit: [answer] })
   const { pullRequest, revision, review } = seedGreeting(f.github, f.client)
   const startReview = glassCall("start_agent_review", { pullRequest, revision })
 
@@ -519,15 +533,27 @@ describe("An Agent review started by a Thread", () => {
     }),
   )
 
-  it.live("starts for a Thread on this device with no Permission mode", () =>
-    Effect.gen(function* () {
-      const f = yield* reviewingFromThreads
+  it.live(
+    "starts for a Thread on this device with no Permission mode, keeping its Thread unlisted",
+    () =>
+      Effect.gen(function* () {
+        const f = yield* reviewingFromThreads
 
-      const thread = yield* f.start(f.startReview)
-      const [started] = callsIn(yield* f.transcript(thread.id, callsSettled(1)))
+        const thread = yield* f.start(f.startReview)
+        const [started] = callsIn(yield* f.transcript(thread.id, callsSettled(1)))
 
-      assert.equal(calledBy(started).status, "done")
-      assert.equal((yield* f.review(({ review }) => review !== null)).review?.markdown, markdown)
-    }),
+        assert.equal(calledBy(started).status, "done")
+        assert.equal((yield* f.review(({ review }) => review !== null)).review?.markdown, markdown)
+
+        yield* f.send(thread.id, glassCall("list_threads", {}))
+        const [, listed] = callsIn(yield* f.transcript(thread.id, callsSettled(2)))
+
+        assert.deepStrictEqual(
+          JSON.parse(calledBy(listed).text).threads.map(
+            (entry: { readonly thread: { readonly id: string } }) => entry.thread.id,
+          ),
+          [thread.id],
+        )
+      }),
   )
 })

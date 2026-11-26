@@ -12,7 +12,7 @@ import { Context, Data, type Duration, Effect, Layer, Predicate, type Schema } f
 import type { AgentFailure } from "./agentFailure"
 import type { AgentTools } from "./agentTools"
 import { AgentRunners } from "./agentRunners"
-import { type CheckoutFailure, Checkouts } from "./Checkouts"
+import { type CheckoutFailure, Checkouts, checkoutProblem } from "./Checkouts"
 import { engineSettingsOf, SettingsStore } from "./SettingsStore"
 import type { InputReadError } from "./github/GitHubClient"
 import { annotateUnit, recordDuration } from "./wideEvents"
@@ -38,33 +38,6 @@ const agentFailureReasons: Record<AgentFailure["reason"], CheckoutRunReason> = {
   storage: "storage",
 }
 
-const checkoutMessages: Record<CheckoutFailure["reason"], readonly [CheckoutRunReason, string]> = {
-  "access-refused": [
-    "no-access",
-    "Your GitHub Connection can't read this repository's code. Check its access, then try again.",
-  ],
-  unreachable: [
-    "fetch-failed",
-    "Couldn't reach the repository to fetch the PR's code. Check your connection, then try again.",
-  ],
-  "fetch-failed": [
-    "fetch-failed",
-    "Fetching the PR's code failed. Git's output is in Glass's backend log; try again.",
-  ],
-  timeout: ["fetch-failed", "Fetching the PR's code took too long. Try again."],
-  storage: [
-    "storage",
-    "Couldn't prepare a copy of the PR's code. Check that your disk has free space, then try again.",
-  ],
-}
-
-const staleFailure = (identity: AgentRunnerIdentity | null) =>
-  checkoutRunFailure(
-    "stale-revision",
-    "The PR has new commits since Glass loaded it. Reload, then try again.",
-    identity,
-  )
-
 const fromAgentFailure = ({ reason, message, runner }: AgentFailure) =>
   checkoutRunFailure(agentFailureReasons[reason], message, runner)
 
@@ -83,7 +56,6 @@ interface CheckoutRun<I, A> {
   readonly read: (pr: PullRequestRef, revision: Revision) => Effect.Effect<I, InputReadError>
   readonly task: (input: I) => Effect.Effect<CheckoutTask<A>, CheckoutRunFailure>
   readonly ready?: Effect.Effect<void>
-  readonly session?: { readonly id: string; readonly folder: string }
 }
 
 interface CheckoutAnswer<I, A> {
@@ -121,7 +93,7 @@ const readMaterial = <I>(
     ),
     Effect.mapError((error) =>
       Predicate.isTagged(error, "StaleRevision")
-        ? staleFailure(identity)
+        ? checkoutRunFailure(...checkoutProblem(error), identity)
         : checkoutRunFailure(
             "github",
             "Couldn't read the PR from GitHub. Check your connection, then try again.",
@@ -133,16 +105,7 @@ const readMaterial = <I>(
 const checkoutError =
   (identity: AgentRunnerIdentity | null) =>
   (error: CheckoutFailure | StaleRevision | NoCredentials) => {
-    if (Predicate.isTagged(error, "StaleRevision")) return staleFailure(identity)
-
-    if (Predicate.isTagged(error, "NoCredentials"))
-      return checkoutRunFailure(
-        "no-access",
-        "Glass isn't signed in to GitHub, so it can't fetch the PR's code.",
-        identity,
-      )
-
-    const [reason, message] = checkoutMessages[error.reason]
+    const [reason, message] = checkoutProblem(error)
 
     return checkoutRunFailure(reason, message, identity)
   }
@@ -193,7 +156,6 @@ export class CheckoutRuns extends Context.Service<
           read,
           task,
           ready = Effect.void,
-          session,
         }: CheckoutRun<I, A>) {
           const readiness = runners
             .select(engineSettings)
@@ -205,11 +167,9 @@ export class CheckoutRuns extends Context.Service<
             ),
           )
 
-          const checkOut = (
-            session === undefined
-              ? checkouts.checkout(pr, revision)
-              : checkouts.checkoutAt(pr, revision, session.folder)
-          ).pipe(Effect.mapError(checkoutError(identity)), recordDuration("checkout_ms"))
+          const checkOut = checkouts
+            .checkout(pr, revision)
+            .pipe(Effect.mapError(checkoutError(identity)), recordDuration("checkout_ms"))
 
           yield* annotateUnit({
             harness: identity.harness,
@@ -222,7 +182,7 @@ export class CheckoutRuns extends Context.Service<
             { concurrency: "unbounded" },
           )
 
-          return yield* selected.run({ ...prepared, subject, checkout, session: session?.id }).pipe(
+          return yield* selected.run({ ...prepared, subject, checkout }).pipe(
             recordDuration("agent_ms"),
             Effect.map((answer) => ({ input, answer })),
             Effect.mapError(fromAgentFailure),
