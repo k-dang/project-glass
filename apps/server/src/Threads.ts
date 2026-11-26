@@ -441,10 +441,14 @@ export class Threads extends Context.Service<
 
       const naming = yield* threadBranchNaming(claimBranch)
 
-      // WARNING: A Sandbox makes its branch when its host is prepared, so the host waits for the name.
+      // WARNING: Only a Sandbox's host waits for the name; it makes its branch when prepared.
       const prepareHostOf = (threadId: string) =>
-        naming.named(threadId).pipe(
-          Effect.andThen(find(threadId)),
+        find(threadId).pipe(
+          Effect.flatMap((row) =>
+            inSandbox(row.thread.place)
+              ? naming.named(threadId).pipe(Effect.andThen(find(threadId)))
+              : Effect.succeed(row),
+          ),
           Effect.flatMap((row) => hostingOf(row).prepareHost(row)),
         )
 

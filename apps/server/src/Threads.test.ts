@@ -21,6 +21,7 @@ import {
   scriptedHost,
   settled,
 } from "../test/threadsFixture"
+import { eventually } from "../test/eventually"
 import { fakeAgentRunners } from "../test/fakeAgentRunners"
 import type { FakePullRequest } from "../test/fakePullRequest"
 import { gitIn } from "../test/gitRepositories"
@@ -571,7 +572,11 @@ it.live("names a Local Thread past a branch pushed since its checkout last fetch
     const thread = yield* f.start("hold:first")
     yield* f.transcript(thread.id, holding)
 
-    assert.equal(gitIn(f.worktree(thread.name), "branch", "--show-current"), "fix/greeting-2")
+    yield* eventually(
+      Effect.sync(() =>
+        assert.equal(gitIn(f.worktree(thread.name), "branch", "--show-current"), "fix/greeting-2"),
+      ),
+    )
     yield* f.release("first")
   }),
 )
