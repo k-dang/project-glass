@@ -101,3 +101,17 @@ it.effect("lists a file in a merge conflict once", () =>
     assert.deepStrictEqual(yield* changes.files(folder), ["new.md", "notes.md"])
   }).pipe(Effect.provide(ChangesLive)),
 )
+
+it.effect("moves a folder's work onto a new branch once, and drops the old branch", () =>
+  Effect.gen(function* () {
+    const folder = yield* branchWithWork
+    const changes = yield* Changes
+
+    yield* changes.useBranch(folder, "fix/notes")
+    yield* changes.useBranch(folder, "fix/notes")
+
+    assert.equal(yield* changes.branch(folder), "fix/notes")
+    assert.equal(gitIn(folder, "branch", "--list", "work"), "")
+    assert.equal(gitIn(folder, "status", "--porcelain"), "MM notes.md\n?? new.md")
+  }).pipe(Effect.provide(ChangesLive)),
+)

@@ -35,6 +35,10 @@ export const AgentHostHandlers = AgentHostRpcs.toLayer(
           .pipe(failure("Couldn't check the Thread's folder for changes.")),
       CurrentBranch: ({ folder }) =>
         changes.branch(folder).pipe(failure("Couldn't read the Thread's branch.")),
+      UseBranch: ({ folder, branch }) =>
+        changes
+          .useBranch(folder, branch)
+          .pipe(failure(`Couldn't rename the Thread's branch to ${branch}.`)),
       ListFiles: ({ folder }) =>
         changes.files(folder).pipe(failure("Couldn't list the files in the Thread's folder.")),
       ExistingFiles: ({ folder, paths }) => folderFiles.existing(folder, paths),

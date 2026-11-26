@@ -86,6 +86,25 @@ export class Git extends Context.Service<
 export const topLevelOf = (git: Git["Service"], path: string) =>
   git.run(path, ["rev-parse", "--show-toplevel"]).pipe(Effect.map((printed) => resolve(printed)))
 
+export const renameBranch = (
+  git: Git["Service"],
+  folder: string,
+  from: string | null,
+  to: string,
+) =>
+  git.run(folder, ["switch", "--no-track", "-c", to]).pipe(
+    Effect.andThen(
+      from === null
+        ? Effect.void
+        : git.run(folder, ["update-ref", "-d", `refs/heads/${from}`]).pipe(
+            Effect.tapError((cause) =>
+              Effect.logWarning(`Couldn't delete the placeholder branch ${from}`, cause),
+            ),
+            Effect.ignore,
+          ),
+    ),
+  )
+
 export const defaultBranchOf = (git: Git["Service"], path: string, remote: string) =>
   git.run(path, ["symbolic-ref", "--short", `refs/remotes/${remote}/HEAD`]).pipe(
     Effect.map((ref) => ref.slice(remote.length + 1)),

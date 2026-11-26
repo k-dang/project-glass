@@ -123,7 +123,7 @@ it.live("shows each step of making a Sandbox, then runs the first message in it"
   }),
 )
 
-it.live("makes each Sandbox on its own branch named for the first message", () =>
+it.live("makes each Sandbox before its branch is named, then names it for the first message", () =>
   Effect.gen(function* () {
     const f = yield* threadServicesFixture
     const named = yield* Deferred.make<void>()
@@ -133,6 +133,9 @@ it.live("makes each Sandbox on its own branch named for the first message", () =
     const first = yield* createSandboxed(f)
     const second = yield* createSandboxed(f)
     assert.match(first.name, /^agent\/[0-9a-f]{8}$/)
+    yield* eventually(
+      Effect.sync(() => assert.equal(f.sandboxes.branches.get(second.id), second.name)),
+    )
     yield* Deferred.succeed(named, undefined)
 
     const started = [yield* f.started, yield* f.started].map(({ threadId }) => threadId)
