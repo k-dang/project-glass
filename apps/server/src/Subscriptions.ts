@@ -265,9 +265,12 @@ export class Subscriptions extends Context.Service<
         const now = yield* DateTime.now
 
         const subscription = yield* Effect.gen(function* () {
-          const existing = (yield* list(threadId)).find(
-            (candidate) => pullRequestKey(candidate.pullRequest) === pullRequestKey(pullRequest),
-          )
+          const existing = (yield* storedOf(threadId))
+            .filter(({ ended }) => ended === null)
+            .map(subscriptionOf)
+            .find(
+              (candidate) => pullRequestKey(candidate.pullRequest) === pullRequestKey(pullRequest),
+            )
 
           const saved = new Subscription({
             id: existing?.id ?? randomUUID(),

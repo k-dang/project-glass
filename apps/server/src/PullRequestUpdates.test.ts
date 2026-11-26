@@ -540,6 +540,55 @@ it.live("records a subscribed PR merging when it is no Thread's own PR", () =>
   }),
 )
 
+it.live(
+  "keeps the Subscription a busy Thread makes again to a PR that closed and was reopened",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadsFixture
+      yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+      const dependency = f.github.seedPullRequest(greeterPullRequest(8, "feature/dependency"))
+      const again = subscribe("Go on once it ends again", ["merged-or-closed"], dependency)
+
+      const busy = yield* f.start(
+        subscribe("Go on once it ends", ["merged-or-closed"], dependency),
+      )
+
+      yield* f.transcript(busy.id, settled(1))
+
+      const idle = yield* f.start(
+        subscribe("Go on once it ends", ["merged-or-closed"], dependency),
+      )
+
+      yield* f.transcript(idle.id, settled(1))
+      yield* f.client.ListPullRequests()
+      yield* f.send(busy.id, "hold:busy")
+      yield* f.transcript(busy.id, holding)
+
+      dependency.edit({ state: "CLOSED" })
+      yield* f.client.ListPullRequests()
+      yield* f.transcript(idle.id, settled(2))
+      dependency.edit({ state: "OPEN" })
+      yield* f.send(busy.id, again)
+      yield* f.release("busy")
+      const turns = yield* f.transcript(busy.id, settled(4))
+
+      const left = yield* f.client
+        .WatchSubscriptions({ threadId: busy.id })
+        .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+
+      assert.deepStrictEqual(turns.map(reasonsTold), [
+        undefined,
+        undefined,
+        undefined,
+        [["greeter#8", "Closed"]],
+      ])
+      assert.deepStrictEqual(
+        left.map(({ note }) => note),
+        ["Go on once it ends again"],
+      )
+    }),
+)
+
 it.live("lists, for one Thread, the Events of every PR it has a Subscription to", () =>
   Effect.gen(function* () {
     const f = yield* subscribedThread()
