@@ -1,7 +1,7 @@
 import { Menu } from "@base-ui/react/menu"
 import { Keyboard } from "lucide-react"
 import { Kbd } from "@/components/ui/kbd"
-import { IdentityAvatar, useIdentity } from "./ConnectionAvatar"
+import { IdentityAvatar, useIdentity } from "./Identity"
 import { shortcutsDialog } from "./ShortcutsDialog"
 
 export function ConnectionMenu() {

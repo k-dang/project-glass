@@ -3,14 +3,19 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event"
 import { afterEach, expect, it, vi } from "vite-plus/test"
 import { Button } from "@/components/ui/button"
+import { DialogTrigger } from "@/components/ui/dialog"
 import { TooltipProvider } from "@/components/ui/tooltip"
 import { BackToPullRequests } from "./BackToPullRequests"
-import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog"
+import { shortcutsDialog, ShortcutsDialog } from "./ShortcutsDialog"
 
 afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
 })
+
+function ShortcutsOpener() {
+  return <DialogTrigger handle={shortcutsDialog}>Keyboard shortcuts</DialogTrigger>
+}
 
 it("opens with Shift+? and Escape returns focus without leaving the PR workspace", async () => {
   const user = userEvent.setup()
@@ -65,11 +70,11 @@ it("searches shortcuts, recovers from no results, and starts fresh when reopened
   const user = userEvent.setup()
   render(
     <>
-      <ShortcutsButton />
+      <ShortcutsOpener />
       <ShortcutsDialog />
     </>,
   )
-  const trigger = screen.getByRole("button", { name: "Keyboard shortcuts ?" })
+  const trigger = screen.getByRole("button", { name: "Keyboard shortcuts" })
   await user.click(trigger)
   const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
   const search = within(dialog).getByRole("textbox", { name: "Search keyboard shortcuts" })
@@ -119,11 +124,11 @@ it.each(["MacIntel", "Win32"])("shows platform keys on %s", async (platform) => 
   const user = userEvent.setup()
   render(
     <>
-      <ShortcutsButton />
+      <ShortcutsOpener />
       <ShortcutsDialog />
     </>,
   )
-  await user.click(screen.getByRole("button", { name: "Keyboard shortcuts ?" }))
+  await user.click(screen.getByRole("button", { name: "Keyboard shortcuts" }))
   const dialog = await screen.findByRole("dialog", { name: "Keyboard shortcuts" })
   expect(within(dialog).getAllByText(platform === "MacIntel" ? "⌘" : "Ctrl")).not.toHaveLength(0)
   expect(within(dialog).queryAllByText(platform === "MacIntel" ? "Ctrl" : "⌘")).toHaveLength(0)

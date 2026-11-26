@@ -5,7 +5,6 @@ import {
   Copy,
   FileDiff,
   Inbox,
-  Keyboard,
   type LucideIcon,
   Route,
   Search,
@@ -19,7 +18,6 @@ import {
   DialogClose,
   DialogContent,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
@@ -121,27 +119,6 @@ const groups: ReadonlyArray<ShortcutGroup> = [
 ]
 
 export const shortcutsDialog = createDialogHandle()
-
-export function ShortcutsButton() {
-  return (
-    <DialogTrigger
-      handle={shortcutsDialog}
-      render={
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-6 gap-1.5 px-1.5 text-[11px] font-normal text-muted-foreground"
-          aria-keyshortcuts="?"
-          title="Keyboard shortcuts (?)"
-        />
-      }
-    >
-      <Keyboard aria-hidden />
-      Keyboard shortcuts
-      <Kbd>?</Kbd>
-    </DialogTrigger>
-  )
-}
 
 export function ShortcutsDialog() {
   const [query, setQuery] = useState("")

@@ -543,16 +543,13 @@
 
 .title-strip {
   height: max(2.25rem, calc(env(titlebar-area-height, 0px) + 1px));
+  background: var(--chrome);
   app-region: drag;
   user-select: none;
 }
 
 .title-strip :is(a, button, input, select, textarea, [role="button"], [tabindex]) {
   app-region: no-drag;
-}
-
-[data-layout="inset"] .title-strip {
-  background: var(--chrome);
 }
 
 .title-strip-clear-controls {

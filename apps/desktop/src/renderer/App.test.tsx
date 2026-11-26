@@ -120,7 +120,6 @@ afterEach(() => {
   cleanup()
   vi.restoreAllMocks()
   window.history.replaceState(null, "", "#/")
-  localStorage.removeItem("glass.layout")
   localStorage.removeItem("glass.railResourceUsage")
 })
 
@@ -315,8 +314,7 @@ it("opens the keyboard shortcuts from any area, not only a PR workspace", async 
   expect(within(dialog).getByRole("heading", { name: "Threads" })).toBeTruthy()
 })
 
-it("keeps Keyboard shortcuts in the Connection menu in the Inset layout", async () => {
-  localStorage.setItem("glass.layout", "inset")
+it("opens Keyboard shortcuts from the Connection menu", async () => {
   const user = mount({})
   const avatar = await screen.findByRole("button", { name: /^@kevin/ })
 
@@ -328,8 +326,7 @@ it("keeps Keyboard shortcuts in the Connection menu in the Inset layout", async 
   await waitFor(() => expect(document.activeElement).toBe(avatar))
 })
 
-it("shows CPU and memory in the Inset rail once turned on in Settings", async () => {
-  localStorage.setItem("glass.layout", "inset")
+it("shows CPU and memory in the rail once turned on in Settings", async () => {
   const user = mount({})
   await user.click(await screen.findByRole("link", { name: "Settings" }))
   expect(screen.queryByRole("button", { name: "Show Glass resource usage" })).toBeNull()

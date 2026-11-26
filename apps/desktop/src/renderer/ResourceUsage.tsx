@@ -144,18 +144,6 @@ function Sparkline(props: { values: ReadonlyArray<number>; minSpan: number }) {
   )
 }
 
-function Reading(props: { kind: Kind; usage: Usage | null; className: string }) {
-  const { icon: Icon, label, color, of, format } = readings[props.kind]
-
-  return (
-    <span className={cn("flex items-center gap-1.5", props.className)}>
-      <Icon className={cn("size-3.5 shrink-0", color)} strokeWidth={1.65} aria-hidden />
-      <span>{label}</span>
-      <span className="ml-auto text-foreground">{format(props.usage && of(props.usage))}</span>
-    </span>
-  )
-}
-
 function RailReading(props: { kind: Kind; usage: Usage | null; trend: ReadonlyArray<TrendPoint> }) {
   const { kind, usage, trend } = props
   const { icon: Icon, color, of, format, minSpan } = readings[kind]
@@ -199,22 +187,6 @@ function ResourceUsagePopover(props: {
         <ResourceUsagePanel usage={props.usage} />
       </PopoverContent>
     </Popover>
-  )
-}
-
-export function ResourceUsage() {
-  const { usage } = useResourceUsage()
-
-  return (
-    <ResourceUsagePopover
-      usage={usage}
-      side="top"
-      sideOffset={10}
-      className="h-6 gap-3 rounded px-1.5 hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
-    >
-      <Reading kind="cpu" usage={usage} className="w-[84px]" />
-      <Reading kind="ram" usage={usage} className="w-[104px]" />
-    </ResourceUsagePopover>
   )
 }
 
