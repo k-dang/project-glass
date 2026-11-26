@@ -36,7 +36,7 @@ import {
   type Transcript,
   type TranscriptUpdate,
   type TurnEnd,
-  type UnseenTurn,
+  UnseenTurn,
   type SentMessage,
 } from "@glass/contracts"
 import {
@@ -100,6 +100,8 @@ const decodeCreators = Schema.decodeUnknownEffect(
 const decodeKeptGoing = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.String, keptGoingAt: Schema.DateTimeUtcFromString })),
 )
+
+const sameUnseenTurns = Schema.toEquivalence(Schema.Array(UnseenTurn))
 
 const annotateThread = ({ id, harness, model, place }: Thread) =>
   annotateUnit({ thread_id: id, harness, model, sandbox_provider: sandboxProviderOf(place) })
@@ -1195,6 +1197,7 @@ export class Threads extends Context.Service<
             Stream.map((finished) =>
               finished.map(({ thread, ended }) => ({ threadId: thread.id, ended })),
             ),
+            Stream.changesWith(sameUnseenTurns),
           ),
         watchWorking: () =>
           Stream.zipLatest(placed, transcripts.running).pipe(
