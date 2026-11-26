@@ -13,41 +13,33 @@ import {
   type SubscriptionReason,
   type WaitingReviewThread,
 } from "@glass/contracts"
-import { Array as Arr, Data, Predicate, Record, Schema } from "effect"
+import { Array as Arr, Data, Predicate, Record, Result, Schema } from "effect"
 import type { SubscribedDetails } from "./github/repositoryPullRequests"
 
 const GIVES_UP_AFTER = 3
 
-const Updates = Schema.Record(Schema.Literals(openReasons), Schema.Int)
-
-const noUpdates = {
-  "failing-checks": 0,
-  "review-feedback": 0,
-  "changes-requested": 0,
-  "merge-conflict": 0,
-} satisfies Record<OpenReason, number>
-
-export const Told = Schema.Struct({
-  failedRuns: Schema.NullOr(
-    Schema.Struct({ head: Schema.String, runs: Schema.Array(Schema.String) }),
-  ),
-  reviewComments: Schema.Array(Schema.String),
-  changesRequested: Schema.Array(Schema.String),
-  conflictBase: Schema.NullOr(Schema.String),
-  updates: Updates,
+const ReasonTold = Schema.Struct({
+  seen: Schema.Array(Schema.String),
+  updates: Schema.Int,
 })
+
+type ReasonTold = typeof ReasonTold.Type
+
+export const Told = Schema.Record(Schema.Literals(openReasons), ReasonTold)
 
 export type Told = typeof Told.Type
 
+const untold: ReasonTold = { seen: [], updates: 0 }
+
 export const nothingTold: Told = {
-  failedRuns: null,
-  reviewComments: [],
-  changesRequested: [],
-  conflictBase: null,
-  updates: noUpdates,
+  "failing-checks": untold,
+  "review-feedback": untold,
+  "changes-requested": untold,
+  "merge-conflict": untold,
 }
 
-export const countedAfresh = (told: Told): Told => ({ ...told, updates: noUpdates })
+export const countedAfresh = (told: Told): Told =>
+  Record.map(told, ({ seen }) => ({ seen, updates: 0 }))
 
 export const sameTold = Schema.toEquivalence(Told)
 
@@ -75,128 +67,116 @@ export interface Decision {
   readonly standing: Readonly<Record<OpenReason, Standing | null>>
 }
 
-const nothingStanding: Decision["standing"] = Record.map(noUpdates, () => null)
-
-type ToldKey = Exclude<keyof Told, "updates">
-
-interface ReasonNow<Key extends ToldKey> {
-  readonly told: Told[Key]
-  readonly reason: PullRequestUpdateReason | null
-  readonly state: "holds" | "cleared" | "unsettled"
-}
-
-interface ReasonDecision<Key extends ToldKey> {
-  readonly told: Told[Key]
-  readonly reason: PullRequestUpdateReason | null
-  readonly updates: number
-  readonly standing: Standing | null
-}
-
 type Open = Extract<PullRequestNow, { _tag: "Open" }>
 
-const runOf = ({ name, url }: Pick<Check, "name" | "url">) => `${name}\n${url ?? ""}`
+type ReasonNow =
+  | { readonly state: "cleared" }
+  | { readonly state: "unsettled"; readonly seen: ReadonlyArray<string> }
+  | {
+      readonly state: "holds"
+      readonly seen: ReadonlyArray<string>
+      readonly reason: PullRequestUpdateReason
+    }
 
-const failingChecks = (
-  { checks: rollup, failingChecks: failing, details }: Open,
-  told: Told,
-): ReasonNow<"failedRuns"> => {
+const failingChecks = ({ checks: rollup, failingChecks: failing, details }: Open): ReasonNow => {
   const checks = failing.map(({ name, url }) => ({ name, url }))
 
   if (!Arr.isReadonlyArrayNonEmpty(checks))
-    return {
-      told: null,
-      reason: null,
-      state: rollup === "running" || rollup === "unavailable" ? "unsettled" : "cleared",
-    }
-
-  const runs = checks.map(runOf)
-  const before = told.failedRuns
-
-  const another =
-    before === null ||
-    before.head !== details.head ||
-    runs.some((run) => !before.runs.includes(run))
+    return rollup === "running" || rollup === "unavailable"
+      ? { state: "unsettled", seen: [] }
+      : { state: "cleared" }
 
   return {
-    told: { head: details.head, runs },
-    reason: another ? FailingChecksReason.make({ head: details.head, checks }) : null,
     state: "holds",
+    seen: checks.map(
+      ({ name, url }) => `${details.head}
+${name}
+${url ?? ""}`,
+    ),
+    reason: FailingChecksReason.make({ head: details.head, checks }),
   }
 }
 
-const allowedThreads = ({ details }: Open) =>
-  details.reviewThreads.flatMap(({ id, path, line, comments }) => {
-    const waiting = comments.at(-1)
+export const partitionFeedback = ({ reviewThreads, changesRequested }: SubscribedDetails) => {
+  const [allowedThreads, heldBackThreads] = Arr.partition(reviewThreads, (reviewThread) => {
+    const waiting = reviewThread.comments.at(-1)
 
-    const allowed = comments.flatMap(({ hasWriteAccess, ...comment }) =>
+    return waiting?.hasWriteAccess === true
+      ? Result.succeed({ reviewThread, waiting: waiting.id })
+      : Result.fail(reviewThread)
+  })
+
+  const [allowedReviews, heldBackReviews] = Arr.partition(changesRequested, (review) =>
+    review.hasWriteAccess ? Result.succeed(review) : Result.fail(review),
+  )
+
+  return {
+    allowed: { reviewThreads: allowedThreads, changesRequested: allowedReviews },
+    heldBack: { reviewThreads: heldBackThreads, changesRequested: heldBackReviews },
+  }
+}
+
+const reviewFeedback = ({ details }: Open): ReasonNow => {
+  const allowed = partitionFeedback(details).allowed.reviewThreads
+
+  const reviewThreads = allowed.flatMap(({ reviewThread: { id, path, line, comments } }) => {
+    const written = comments.flatMap(({ hasWriteAccess, ...comment }) =>
       hasWriteAccess ? [comment] : [],
     )
 
-    return waiting?.hasWriteAccess === true && Arr.isReadonlyArrayNonEmpty(allowed)
-      ? [
-          {
-            waiting: waiting.id,
-            reviewThread: { id, path, line, comments: allowed } satisfies WaitingReviewThread,
-          },
-        ]
+    return Arr.isReadonlyArrayNonEmpty(written)
+      ? [{ id, path, line, comments: written } satisfies WaitingReviewThread]
       : []
   })
 
-export const feedbackHeldBack = ({
-  reviewThreads,
-  changesRequested: reviews,
-}: SubscribedDetails) => ({
-  reviewThreads: reviewThreads.filter(({ comments }) => comments.at(-1)?.hasWriteAccess !== true)
-    .length,
-  changesRequested: reviews.some(({ hasWriteAccess }) => !hasWriteAccess),
-})
-
-const reviewFeedback = (now: Open, told: Told): ReasonNow<"reviewComments"> => {
-  const allowed = allowedThreads(now)
-  const waiting = allowed.map((thread) => thread.waiting)
-  const reviewThreads = allowed.map((thread) => thread.reviewThread)
-
-  return {
-    told: waiting,
-    reason:
-      Arr.isReadonlyArrayNonEmpty(reviewThreads) &&
-      waiting.some((comment) => !told.reviewComments.includes(comment))
-        ? ReviewFeedbackReason.make({ reviewThreads })
-        : null,
-    state: reviewThreads.length === 0 ? "cleared" : "holds",
-  }
+  return Arr.isReadonlyArrayNonEmpty(reviewThreads)
+    ? {
+        state: "holds",
+        seen: allowed.map(({ waiting }) => waiting),
+        reason: ReviewFeedbackReason.make({ reviewThreads }),
+      }
+    : { state: "cleared" }
 }
 
-const changesRequested = ({ details }: Open, told: Told): ReasonNow<"changesRequested"> => {
-  const allowed = details.changesRequested.filter(({ hasWriteAccess }) => hasWriteAccess)
-  const reviews = allowed.map(({ reviewId }) => reviewId)
+const changesRequested = ({ details }: Open): ReasonNow => {
+  const allowed = partitionFeedback(details).allowed.changesRequested
   const reviewers = Arr.dedupe(allowed.map(({ author }) => author))
 
-  return {
-    told: reviews,
-    reason:
-      Arr.isReadonlyArrayNonEmpty(reviewers) &&
-      reviews.some((review) => !told.changesRequested.includes(review))
-        ? ChangesRequestedReason.make({ reviewers })
-        : null,
-    state: reviewers.length === 0 ? "cleared" : "holds",
-  }
+  return Arr.isReadonlyArrayNonEmpty(reviewers)
+    ? {
+        state: "holds",
+        seen: allowed.map(({ reviewId }) => reviewId),
+        reason: ChangesRequestedReason.make({ reviewers }),
+      }
+    : { state: "cleared" }
 }
 
 const mergeConflict = (
   { mergeConflict: conflict, details }: Open,
-  told: Told,
-): ReasonNow<"conflictBase"> => {
-  if (conflict === null) return { told: told.conflictBase, reason: null, state: "unsettled" }
+  seen: ReadonlyArray<string>,
+): ReasonNow => {
+  if (conflict === null) return { state: "unsettled", seen }
 
-  if (!conflict) return { told: null, reason: null, state: "cleared" }
+  return conflict
+    ? {
+        state: "holds",
+        seen: [details.base],
+        reason: MergeConflictReason.make({ base: details.base }),
+      }
+    : { state: "cleared" }
+}
 
-  return {
-    told: details.base,
-    reason:
-      told.conflictBase === details.base ? null : MergeConflictReason.make({ base: details.base }),
-    state: "holds",
-  }
+const standsNow: Record<OpenReason, (now: Open, seen: ReadonlyArray<string>) => ReasonNow> = {
+  "failing-checks": failingChecks,
+  "review-feedback": reviewFeedback,
+  "changes-requested": changesRequested,
+  "merge-conflict": mergeConflict,
+}
+
+interface ReasonDecision {
+  readonly told: ReasonTold
+  readonly reason: PullRequestUpdateReason | null
+  readonly standing: Standing | null
 }
 
 export const decide = (
@@ -207,56 +187,40 @@ export const decide = (
   if (Predicate.isTagged(now, "Ended"))
     return {
       told,
-      standing: nothingStanding,
+      standing: Record.map(told, () => null),
       reasons: covered.includes("merged-or-closed")
         ? [now.state === "merged" ? MergedReason.make({}) : ClosedReason.make({})]
         : [],
     }
 
-  const decideReason = <Key extends ToldKey>(
-    reason: OpenReason,
-    key: Key,
-    standsNow: (now: Open, told: Told) => ReasonNow<Key>,
-  ): ReasonDecision<Key> => {
-    const updates = told.updates[reason]
+  const decided = Record.map(standsNow, (stands, reason): ReasonDecision => {
+    const before = told[reason]
 
-    if (!covered.includes(reason)) return { told: told[key], reason: null, updates, standing: null }
+    if (!covered.includes(reason)) return { told: before, reason: null, standing: null }
 
-    const found = standsNow(now, told)
+    const found = stands(now, before.seen)
 
-    if (found.reason === null)
-      return {
-        told: found.told,
-        reason: null,
-        updates: found.state === "cleared" ? 0 : updates,
-        standing: found.state === "holds" ? "told" : null,
-      }
+    if (found.state === "cleared") return { told: untold, reason: null, standing: null }
 
-    return updates >= GIVES_UP_AFTER
-      ? { told: told[key], reason: null, updates, standing: "gave-up" }
-      : { told: found.told, reason: found.reason, updates: updates + 1, standing: "due" }
-  }
+    const seen = { ...before, seen: found.seen }
 
-  const decided = {
-    "failing-checks": decideReason("failing-checks", "failedRuns", failingChecks),
-    "review-feedback": decideReason("review-feedback", "reviewComments", reviewFeedback),
-    "changes-requested": decideReason("changes-requested", "changesRequested", changesRequested),
-    "merge-conflict": decideReason("merge-conflict", "conflictBase", mergeConflict),
-  } satisfies Record<OpenReason, unknown>
+    if (found.state === "unsettled") return { told: seen, reason: null, standing: null }
+
+    if (found.seen.every((one) => before.seen.includes(one)))
+      return { told: seen, reason: null, standing: "told" }
+
+    return before.updates >= GIVES_UP_AFTER
+      ? { told: before, reason: null, standing: "gave-up" }
+      : {
+          told: { seen: found.seen, updates: before.updates + 1 },
+          reason: found.reason,
+          standing: "due",
+        }
+  })
 
   return {
-    told: {
-      failedRuns: decided["failing-checks"].told,
-      reviewComments: decided["review-feedback"].told,
-      changesRequested: decided["changes-requested"].told,
-      conflictBase: decided["merge-conflict"].told,
-      updates: Record.map(decided, ({ updates }) => updates),
-    },
-    reasons: openReasons.flatMap((open) => {
-      const { reason } = decided[open]
-
-      return reason === null ? [] : [reason]
-    }),
+    told: Record.map(decided, (reason) => reason.told),
+    reasons: openReasons.flatMap((open) => decided[open].reason ?? []),
     standing: Record.map(decided, ({ standing }) => standing),
   }
 }

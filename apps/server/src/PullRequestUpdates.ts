@@ -1,36 +1,20 @@
 import {
   type Event,
-  isGone,
   type LoggedEvent,
-  type OpenReason,
-  openReasons,
   type PullRequestRef,
   PullRequestUpdate,
   type PullRequestUpdateReason,
   referenceKey,
-  subscriptionReasonOf,
-  type Thread,
-  type ThreadPullRequest,
+  type Subscription,
   type UpdatedPullRequest,
 } from "@glass/contracts"
-import {
-  Array as Arr,
-  Context,
-  DateTime,
-  Effect,
-  Exit,
-  Layer,
-  Match,
-  Option,
-  Predicate,
-  Ref,
-  Stream,
-} from "effect"
+import { Array as Arr, DateTime, Effect, Exit, Layer, Match, Predicate, Ref, Stream } from "effect"
 import { EventLog } from "./EventLog"
-import { type Mirror, mirroredPullRequest, PullRequestMirror } from "./PullRequestMirror"
-import { decide, PullRequestNow, sameTold } from "./pullRequestUpdateDecision"
+import { PullRequestMirror } from "./PullRequestMirror"
+import { sameTold } from "./pullRequestUpdateDecision"
 import { SettingsStore } from "./SettingsStore"
-import { type SubscriptionState, Subscriptions } from "./Subscriptions"
+import { changed, type SubscriptionDecision, subscriptionDecisions } from "./subscriptionDecisions"
+import { Subscriptions, type ToldSubscription } from "./Subscriptions"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Threads } from "./Threads"
 import { Transcripts } from "./Transcripts"
@@ -39,38 +23,6 @@ import { recordUnit } from "./wideEvents"
 const EVENTS_READ = 50
 
 const RUN_AT_ONCE = 3
-
-interface SubscribedNow {
-  readonly pullRequest: PullRequestRef
-  readonly now: PullRequestNow
-}
-
-const subscribedNow = (
-  { subscription, ended }: SubscriptionState,
-  mirror: Mirror | undefined,
-  own: ThreadPullRequest | undefined,
-): SubscribedNow | undefined => {
-  if (ended !== null)
-    return { pullRequest: ended.pullRequest, now: PullRequestNow.Ended({ state: ended.state }) }
-
-  const pullRequest = subscription.pullRequest ?? own?.ref
-
-  if (mirror === undefined || pullRequest === undefined) return undefined
-
-  const mirrored = mirroredPullRequest(mirror, pullRequest)
-
-  return mirrored?.attention == null || mirrored.details === null
-    ? undefined
-    : {
-        pullRequest: mirrored.ref,
-        now: PullRequestNow.Open({
-          checks: mirrored.checks,
-          failingChecks: mirrored.attention.failingChecks,
-          mergeConflict: mirrored.attention.mergeConflict,
-          details: mirrored.details,
-        }),
-      }
-}
 
 const isBehind = (reason: PullRequestUpdateReason, event: Event) =>
   Match.valueTags(reason, {
@@ -87,137 +39,124 @@ const eventsBehind = (
   recent: ReadonlyArray<LoggedEvent>,
 ) => reasons.flatMap((reason) => recent.find(({ event }) => isBehind(reason, event)) ?? [])
 
-const changed = (changes: ReadonlyArray<Stream.Stream<unknown, unknown>>) =>
-  Stream.mergeAll(
-    changes.map((change) =>
-      change.pipe(
-        Stream.as(undefined),
-        Stream.catch(() => Stream.empty),
-      ),
-    ),
-    { concurrency: "unbounded" },
-  ).pipe(Stream.buffer({ capacity: 1, strategy: "sliding" }))
-
-export interface PullRequestStanding {
+interface Due {
+  readonly subscription: Subscription
   readonly pullRequest: PullRequestRef
-  readonly reason: OpenReason
-  readonly thread: Thread
-  readonly state: "handling" | "tried"
+  readonly reasons: Arr.NonEmptyReadonlyArray<PullRequestUpdateReason>
 }
 
-export class PullRequestUpdates extends Context.Service<
-  PullRequestUpdates,
-  {
-    readonly standings: Stream.Stream<ReadonlyArray<PullRequestStanding>>
-  }
->()("@glass/server/PullRequestUpdates") {
-  static readonly layer = Layer.effect(
-    PullRequestUpdates,
-    Effect.gen(function* () {
-      const threads = yield* Threads
-      const subscriptions = yield* Subscriptions
-      const transcripts = yield* Transcripts
-      const mirror = yield* PullRequestMirror
-      const threadPullRequests = yield* ThreadPullRequests
-      const settings = yield* SettingsStore
-      const eventLog = yield* EventLog
+const tells = ({ decision }: SubscriptionDecision) => decision.reasons.length > 0
 
-      const recentEvents = (pullRequest: PullRequestRef) =>
-        eventLog.list({ limit: EVENTS_READ, pullRequests: [pullRequest] }).pipe(
-          Effect.map(({ events }) => events),
-          Effect.orElseSucceed((): ReadonlyArray<LoggedEvent> => []),
+const planned = (all: ReadonlyArray<SubscriptionDecision>, full: boolean) => {
+  const sends = !full && all.some(tells)
+
+  return {
+    due: sends
+      ? all.flatMap(({ state: { subscription }, pullRequest, decision }): ReadonlyArray<Due> =>
+          Arr.isReadonlyArrayNonEmpty(decision.reasons)
+            ? [{ subscription, pullRequest, reasons: decision.reasons }]
+            : [],
         )
+      : [],
+    record: all.flatMap((decided): ReadonlyArray<ToldSubscription> => {
+      const { state, pullRequest, before, decision } = decided
+      const telling = tells(decided)
 
-      const decided = Effect.fnUntraced(function* (threadId: string) {
-        const states = yield* subscriptions.states(threadId)
-        const mirrored = yield* mirror.saved
-        const own = yield* threadPullRequests.ofThread(threadId)
-        const lastMessageTurn = yield* transcripts.lastMessageTurn(threadId)
+      if (telling && !sends) return []
 
-        const all = states.flatMap((state) => {
-          const subscribed = subscribedNow(state, mirrored, own)
+      const ends = state.ended !== null && telling
 
-          if (subscribed === undefined) return []
+      return ends || !sameTold(decision.told, before)
+        ? [{ subscriptionId: state.subscription.id, pullRequest, told: decision.told, ends }]
+        : []
+    }),
+  }
+}
 
-          const { pullRequest, now } = subscribed
-          const before = state.toldAbout(pullRequest, lastMessageTurn)
+export const PullRequestUpdates = Layer.effectDiscard(
+  Effect.gen(function* () {
+    const threads = yield* Threads
+    const subscriptions = yield* Subscriptions
+    const transcripts = yield* Transcripts
+    const mirror = yield* PullRequestMirror
+    const threadPullRequests = yield* ThreadPullRequests
+    const settings = yield* SettingsStore
+    const eventLog = yield* EventLog
+    const decided = yield* subscriptionDecisions
 
-          return [
-            {
-              state,
-              pullRequest,
-              before,
-              decision: decide(state.subscription.reasons, now, before),
-            },
-          ]
-        })
+    const updatedPullRequest = ({ subscription, pullRequest, reasons }: Due) =>
+      eventLog.list({ limit: EVENTS_READ, pullRequests: [pullRequest] }).pipe(
+        Effect.map(({ events }) => events),
+        Effect.orElseSucceed((): ReadonlyArray<LoggedEvent> => []),
+        Effect.map((recent): UpdatedPullRequest => ({
+          subscriptionId: subscription.id,
+          pullRequest,
+          own: subscription.pullRequest === null,
+          reasons,
+          note: subscription.note,
+          events: eventsBehind(reasons, recent),
+        })),
+      )
 
-        return { all, lastMessageTurn }
+    const asUnitOfWork = <E, R>(
+      threadId: string,
+      updated: ReadonlyArray<UpdatedPullRequest>,
+      send: (started: (turnId: string) => Effect.Effect<void>) => Effect.Effect<unknown, E, R>,
+    ) =>
+      Effect.gen(function* () {
+        const startedAt = yield* DateTime.now
+        const turn = yield* Ref.make<string | undefined>(undefined)
+
+        yield* send((turnId) => Ref.set(turn, turnId)).pipe(
+          Effect.onExit(
+            Effect.fnUntraced(function* (exit) {
+              const turnId = yield* Ref.get(turn)
+
+              if (turnId === undefined && Exit.isSuccess(exit)) return
+
+              yield* recordUnit("PullRequestUpdate", {
+                startedAt,
+                endedAt: yield* DateTime.now,
+                exit,
+                fields: {
+                  thread_id: threadId,
+                  turn_id: turnId,
+                  pr: updated.map(({ pullRequest }) => referenceKey(pullRequest)).join(),
+                  subscription_ids: updated.map(({ subscriptionId }) => subscriptionId).join(),
+                  reasons: Arr.dedupe(
+                    updated.flatMap(({ reasons }) => reasons.map(({ _tag }) => _tag)),
+                  ).join(),
+                },
+              })
+              yield* subscriptions.announceChange
+            }),
+          ),
+        )
       })
 
-      const sendUpdate = (threadId: string, waits: Effect.Effect<void>) =>
-        threads.whenIdle(threadId, (start) =>
-          Effect.gen(function* () {
-            const { all, lastMessageTurn } = yield* decided(threadId)
+    const sendUpdate = (threadId: string, waits: Effect.Effect<void>) =>
+      threads.whenIdle(threadId, (start) =>
+        Effect.gen(function* () {
+          const { all, lastMessageTurn } = yield* decided(threadId)
 
-            const toldAnew = all.flatMap(({ state, pullRequest, before, decision }) => {
-              const tells = decision.reasons.length > 0
-              const ends = state.ended !== null && tells
+          const full =
+            all.some(tells) && (yield* transcripts.runningPullRequestUpdates).length >= RUN_AT_ONCE
 
-              return ends || !sameTold(decision.told, before)
-                ? [
-                    {
-                      tells,
-                      told: {
-                        subscriptionId: state.subscription.id,
-                        pullRequest,
-                        told: decision.told,
-                        ends,
-                      },
-                    },
-                  ]
-                : []
-            })
+          const { due, record } = planned(all, full)
 
-            const toldBySending = toldAnew.map(({ told }) => told)
+          if (!Arr.isReadonlyArrayNonEmpty(due)) {
+            yield* subscriptions.recordTold(record, lastMessageTurn)
 
-            const toldWithoutSending = toldAnew.flatMap(({ tells, told }) => (tells ? [] : [told]))
+            if (full) yield* waits
 
-            const due = all.flatMap(({ state: { subscription }, pullRequest, decision }) =>
-              Arr.isReadonlyArrayNonEmpty(decision.reasons)
-                ? [{ subscription, pullRequest, reasons: decision.reasons }]
-                : [],
-            )
+            return
+          }
 
-            const full =
-              due.length > 0 && (yield* transcripts.runningPullRequestUpdates).length >= RUN_AT_ONCE
+          const updated = yield* Effect.forEach(due, updatedPullRequest)
+          const { pullRequestUpdateNote: note } = yield* settings.read()
 
-            if (!Arr.isReadonlyArrayNonEmpty(due) || full) {
-              yield* subscriptions.recordTold(toldWithoutSending, lastMessageTurn)
-
-              if (full) yield* waits
-
-              return
-            }
-
-            const updated = yield* Effect.forEach(due, ({ subscription, pullRequest, reasons }) =>
-              recentEvents(pullRequest).pipe(
-                Effect.map((recent): UpdatedPullRequest => ({
-                  subscriptionId: subscription.id,
-                  pullRequest,
-                  own: subscription.pullRequest === null,
-                  reasons,
-                  note: subscription.note,
-                  events: eventsBehind(reasons, recent),
-                })),
-              ),
-            )
-
-            const { pullRequestUpdateNote: note } = yield* settings.read()
-            const startedAt = yield* DateTime.now
-            const started = yield* Ref.make<string | undefined>(undefined)
-
-            yield* start(
+          yield* asUnitOfWork(threadId, updated, (started) =>
+            start(
               {
                 message: "",
                 images: [],
@@ -226,128 +165,40 @@ export class PullRequestUpdates extends Context.Service<
               },
               (turnId) =>
                 subscriptions
-                  .recordTold(toldBySending, lastMessageTurn)
-                  .pipe(Effect.andThen(Ref.set(started, turnId))),
-            ).pipe(
-              Effect.onExit(
-                Effect.fnUntraced(function* (exit) {
-                  const turnId = yield* Ref.get(started)
-
-                  if (turnId === undefined && Exit.isSuccess(exit)) return
-
-                  yield* recordUnit("PullRequestUpdate", {
-                    startedAt,
-                    endedAt: yield* DateTime.now,
-                    exit,
-                    fields: {
-                      thread_id: threadId,
-                      turn_id: turnId,
-                      pr: updated.map(({ pullRequest }) => referenceKey(pullRequest)).join(),
-                      subscription_ids: updated.map(({ subscriptionId }) => subscriptionId).join(),
-                      reasons: Arr.dedupe(
-                        updated.flatMap(({ reasons }) => reasons.map(({ _tag }) => _tag)),
-                      ).join(),
-                    },
-                  })
-                  yield* subscriptions.announceChange
-                }),
-              ),
-            )
-          }),
-        )
-
-      const waiting = yield* Ref.make<ReadonlyArray<string>>([])
-
-      const sendUpdates = Effect.gen(function* () {
-        const subscribed = yield* subscriptions.subscribedThreads
-        const inLine = (yield* Ref.get(waiting)).filter((threadId) => subscribed.includes(threadId))
-        const next = yield* Ref.make<ReadonlyArray<string>>([])
-
-        yield* Effect.forEach(
-          [...inLine, ...subscribed.filter((threadId) => !inLine.includes(threadId))],
-          (threadId) =>
-            sendUpdate(threadId, Ref.update(next, Arr.append(threadId))).pipe(
-              Effect.catch((cause) => Effect.logWarning("Couldn't send a PR update", cause)),
+                  .recordTold(record, lastMessageTurn)
+                  .pipe(Effect.andThen(started(turnId))),
             ),
-          { discard: true },
-        )
-
-        yield* Ref.set(waiting, yield* Ref.get(next))
-      }).pipe(Effect.catch((cause) => Effect.logWarning("Couldn't read the Subscriptions", cause)))
-
-      yield* changed([
-        subscriptions.changes,
-        mirror.changes,
-        threadPullRequests.watch(),
-        yield* transcripts.subscribeMaybeIdle,
-      ]).pipe(
-        Stream.runForEach(() => sendUpdates),
-        Effect.forkScoped,
+          )
+        }),
       )
 
-      const standingsOf = Effect.fnUntraced(function* (
-        thread: Thread,
-        running: PullRequestUpdate | undefined,
-      ) {
-        const { all } = yield* decided(thread.id)
+    const waiting = yield* Ref.make<ReadonlyArray<string>>([])
 
-        return all.flatMap(({ state: { subscription }, pullRequest, decision }) =>
-          openReasons.flatMap((reason): ReadonlyArray<PullRequestStanding> => {
-            const standing = decision.standing[reason]
+    const sendUpdates = Effect.gen(function* () {
+      const subscribed = yield* subscriptions.subscribedThreads
+      const inLine = (yield* Ref.get(waiting)).filter((threadId) => subscribed.includes(threadId))
+      const next = yield* Ref.make<ReadonlyArray<string>>([])
 
-            if (standing === null) return []
-
-            const beingTold =
-              running?.pullRequests.some(
-                ({ subscriptionId, reasons }) =>
-                  subscriptionId === subscription.id &&
-                  reasons.some(({ _tag }) => subscriptionReasonOf[_tag] === reason),
-              ) === true
-
-            return [
-              {
-                pullRequest,
-                reason,
-                thread,
-                state:
-                  standing === "due" || (standing === "told" && beingTold) ? "handling" : "tried",
-              },
-            ]
-          }),
-        )
-      })
-
-      const standings = Effect.gen(function* () {
-        const listed = Option.getOrThrow(yield* threads.watch().pipe(Stream.runHead))
-        const running = yield* transcripts.runningPullRequestUpdates
-
-        return yield* Effect.forEach(yield* subscriptions.subscribedThreads, (threadId) => {
-          const thread = listed.find(({ id }) => id === threadId)
-
-          return thread === undefined || (thread.sandbox !== null && isGone(thread.sandbox.reach))
-            ? Effect.succeed([])
-            : standingsOf(thread, running.find((update) => update.threadId === threadId)?.update)
-        }).pipe(Effect.map(Arr.flatten))
-      }).pipe(
-        Effect.catch((cause) =>
-          Effect.logWarning("Couldn't read what subscribed Threads are doing", cause).pipe(
-            Effect.as<ReadonlyArray<PullRequestStanding>>([]),
+      yield* Effect.forEach(
+        [...inLine, ...subscribed.filter((threadId) => !inLine.includes(threadId))],
+        (threadId) =>
+          sendUpdate(threadId, Ref.update(next, Arr.append(threadId))).pipe(
+            Effect.catch((cause) => Effect.logWarning("Couldn't send a PR update", cause)),
           ),
-        ),
+        { discard: true },
       )
 
-      return PullRequestUpdates.of({
-        standings: Stream.suspend(() =>
-          changed([
-            subscriptions.changes,
-            mirror.changes,
-            threadPullRequests.watch(),
-            threads.watch(),
-            threads.keptGoing,
-            transcripts.running,
-          ]).pipe(Stream.mapEffect(() => standings)),
-        ),
-      })
-    }),
-  )
-}
+      yield* Ref.set(waiting, yield* Ref.get(next))
+    }).pipe(Effect.catch((cause) => Effect.logWarning("Couldn't read the Subscriptions", cause)))
+
+    yield* changed([
+      subscriptions.changes,
+      mirror.changes,
+      threadPullRequests.watch(),
+      yield* transcripts.subscribeMaybeIdle,
+    ]).pipe(
+      Stream.runForEach(() => sendUpdates),
+      Effect.forkScoped,
+    )
+  }),
+)

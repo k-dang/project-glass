@@ -47,6 +47,7 @@ import { OutsideQuestions } from "./OutsideQuestions"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
+import { PullRequestStandings } from "./PullRequestStandings"
 import { PullRequestUpdates } from "./PullRequestUpdates"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
@@ -136,12 +137,12 @@ const services = (
     mcpTools,
     StartedWorkUpdates,
     CompleteToDosOnMerge,
-    PullRequestUpdates.layer,
+    PullRequestUpdates,
   )
     .pipe(
       Layer.provide(
         Inbox.layer.pipe(
-          Layer.provide(PullRequestUpdates.layer),
+          Layer.provide(PullRequestStandings.layer),
           Layer.provideMerge(Subscriptions.layer),
         ),
       ),

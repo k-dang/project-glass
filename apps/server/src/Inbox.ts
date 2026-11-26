@@ -49,8 +49,8 @@ import {
   PullRequestMirror,
   summaryOf,
 } from "./PullRequestMirror"
-import { type PullRequestStanding, PullRequestUpdates } from "./PullRequestUpdates"
-import { feedbackHeldBack } from "./pullRequestUpdateDecision"
+import { type PullRequestStanding, PullRequestStandings } from "./PullRequestStandings"
+import { partitionFeedback } from "./pullRequestUpdateDecision"
 import { Queue } from "./Queue"
 import type { WaitingRequest } from "./Transcripts"
 
@@ -141,7 +141,7 @@ const reasonsOf = (
   standings: ReadonlyArray<PullRequestStanding>,
 ) => {
   const reasons: Array<PullRequestReason> = []
-  const held = details === null ? null : feedbackHeldBack(details)
+  const held = details === null ? null : partitionFeedback(details).heldBack
 
   const standingOn = (reason: OpenReason, holds: boolean) => {
     const standing = holds
@@ -169,13 +169,13 @@ const reasonsOf = (
   const failing = standingOn("failing-checks", checksFailing)
   const feedback = standingOn("review-feedback", awaitingReply > 0)
 
-  if (changesRequested && (!changes.handled || held?.changesRequested === true))
+  if (changesRequested && (!changes.handled || (held?.changesRequested.length ?? 0) > 0))
     reasons.push(ChangesRequested.make({}))
 
   if (checksFailing && !failing.handled)
     reasons.push(ChecksFailing.make({ failing: attention?.failingChecks ?? [] }))
 
-  const reviewThreads = feedback.handled ? (held?.reviewThreads ?? 0) : awaitingReply
+  const reviewThreads = feedback.handled ? (held?.reviewThreads.length ?? 0) : awaitingReply
 
   if (reviewThreads > 0) reasons.push(AwaitingReply.make({ reviewThreads }))
 
@@ -248,7 +248,7 @@ export class Inbox extends Context.Service<
       const mirror = yield* PullRequestMirror
       const globalChat = yield* GlobalChat
       const oauth = yield* McpOAuth
-      const updates = yield* PullRequestUpdates
+      const standings = yield* PullRequestStandings
 
       const finishedReviewOf = (pullRequest: PullRequestSummary) =>
         agentReviews.watch(pullRequest.ref).pipe(
@@ -301,8 +301,8 @@ export class Inbox extends Context.Service<
 
       const waitingPullRequests = Stream.zipLatest(
         finishedAgentReviews,
-        Stream.zipLatest(mirror.changes, updates.standings).pipe(
-          Stream.map(([mirrored, standings]) => yourPullRequests(mirrored, standings)),
+        Stream.zipLatest(mirror.changes, standings.watch()).pipe(
+          Stream.map(([mirrored, standing]) => yourPullRequests(mirrored, standing)),
         ),
       ).pipe(Stream.map(([finished, yours]) => [...finished, ...yours]))
 

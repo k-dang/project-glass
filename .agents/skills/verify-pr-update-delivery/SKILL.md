@@ -1,6 +1,6 @@
 ---
 name: verify-pr-update-delivery
-description: Model-check how a subscribed Thread is sent PR updates - only when idle, once per state of the PR, giving up after three, three at a time, across a Glass restart (subscription.last_told, RUN_AT_ONCE, GIVES_UP_AFTER). Use when a change touches PullRequestUpdates, pullRequestUpdateDecision, recordTold or toldAbout in Subscriptions, lastMessageTurn, runningPullRequestUpdates or startIfIdle in Transcripts, or the sender stepThread gives a Turn in threadState.
+description: Model-check how a subscribed Thread is sent PR updates - only when idle, once per state of the PR, giving up after three, three at a time, across a Glass restart (subscription.last_told, RUN_AT_ONCE, GIVES_UP_AFTER). Use when a change touches PullRequestUpdates, subscriptionDecisions, pullRequestUpdateDecision, recordTold or toldAbout in Subscriptions, lastMessageTurn, runningPullRequestUpdates or startIfIdle in Transcripts, or the sender stepThread gives a Turn in threadState.
 ---
 
 # Verify PR update delivery
@@ -32,9 +32,9 @@ Synced with the code at commit `b5165cf935f179157671f82cfbefd514d77d4cee`. Befor
 
 | Model | Code |
 | --- | --- |
-| `ChecksFail`, `ChecksRunAgain`, `NewPushHasNoChecksYet`, `ChecksPass` | What a read of the PR mirror shows: `subscribedNow` in `apps/server/src/PullRequestUpdates.ts` |
-| `Decide` | One `threads.whenIdle` transaction in `sendUpdate` in `PullRequestUpdates.ts`; `whenIdle` in `apps/server/src/ThreadTurns.ts`; `idle` in `apps/server/src/Transcripts.ts` |
-| `IsNew`, `DecideNothingHolds`, `Count(t) < GivesUpAfter` | `decide`, its `decideReason`, and `failingChecks` in `apps/server/src/pullRequestUpdateDecision.ts` (`cleared` returns the count to zero; `unsettled` keeps it, both while checks run again and while a new push has none yet) |
+| `ChecksFail`, `ChecksRunAgain`, `NewPushHasNoChecksYet`, `ChecksPass` | What a read of the PR mirror shows: `subscribedNow` in `apps/server/src/subscriptionDecisions.ts` |
+| `Decide` | One `threads.whenIdle` transaction in `sendUpdate` in `apps/server/src/PullRequestUpdates.ts`, which plans what to send and record in `planned`; `whenIdle` in `apps/server/src/ThreadTurns.ts`; `idle` in `apps/server/src/Transcripts.ts` |
+| `IsNew`, `DecideNothingHolds`, `Count(t) < GivesUpAfter` | `decide` and `failingChecks` in `apps/server/src/pullRequestUpdateDecision.ts` (`cleared` returns the count to zero; `unsettled` keeps it, both while checks run again and while a new push has none yet) |
 | `SlotFree` | `runningPullRequestUpdates` in `Transcripts.ts`, compared with `RUN_AT_ONCE` in `PullRequestUpdates.ts` |
 | `StartUpdate` | `startIfIdle` in `Transcripts.ts`, with `recordTold` in `apps/server/src/Subscriptions.ts` in the same transaction |
 | `afterNewMessage`, `MessageReaches` | `lastMessageTurn` in `Transcripts.ts`, which reads the Turns your message started (`started_by = 'user'`) and your Steers, against `afterMessage` in `last_told`; `toldAbout` in `Subscriptions.ts` and `countedAfresh` in `pullRequestUpdateDecision.ts` |
@@ -54,7 +54,7 @@ Each mutant in `model/mutants.json` is one way to break this code: skipping the 
 
 ## Scope
 
-Bounds: 2 Threads, 1 PR update at once (the code runs 3), giving up after 2 (the code gives up after 3), 3 failing states per PR, 2 messages (yours or another agent's), 1 restart. Each Thread has one Subscription covering failing checks; review feedback, requested changes and a merge conflict go through the same `decideReason` in `decide`.
+Bounds: 2 Threads, 1 PR update at once (the code runs 3), giving up after 2 (the code gives up after 3), 3 failing states per PR, 2 messages (yours or another agent's), 1 restart. Each Thread has one Subscription covering failing checks; review feedback, requested changes and a merge conflict go through the same steps in `decide`.
 
 Left out: the order in which waiting Threads start (tested in `apps/server/src/PullRequestUpdateLimits.test.ts`), what the Inbox shows, the PR update about a PR merging or closing, several Subscriptions in one PR update, a canceled Queued message, and a failure GitHub reports again unchanged after reporting none.
 
