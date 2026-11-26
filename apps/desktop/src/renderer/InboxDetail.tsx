@@ -12,6 +12,7 @@ import {
   OutsideText,
   type InboxPullRequest,
   referenceKey,
+  referenceText,
 } from "@glass/contracts"
 import { Link } from "@tanstack/react-router"
 import { cn } from "cn"
@@ -43,7 +44,6 @@ import {
 import { settledProblem } from "./problems"
 import { ago } from "./PullRequestRow"
 import { CheckList } from "./PullRequestStatus"
-import { referenceText } from "./queue"
 import { RequestCard } from "./RequestCard"
 
 interface DetailProps<Item> {

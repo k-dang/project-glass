@@ -1,4 +1,10 @@
-import { type CapturedContext, type FeedbackNote, type Image, shortSha } from "@glass/contracts"
+import {
+  type CapturedContext,
+  type FeedbackNote,
+  type Image,
+  shortSha,
+  referenceText,
+} from "@glass/contracts"
 import { Match } from "effect"
 import { useState } from "react"
 import { Bubble, BubbleContent } from "@/components/ui/bubble"
@@ -7,7 +13,6 @@ import { MessageText } from "./Mentions"
 import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { Attachment } from "./MessageBox"
 import { SentFeedback } from "./FeedbackNotes"
-import { referenceText } from "./queue"
 
 function AttachedImages(props: { images: ReadonlyArray<Image> }) {
   const [viewer] = useState(createImageViewer)

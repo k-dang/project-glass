@@ -6,6 +6,7 @@ import {
   type TurnEnd,
   type TurnPart,
   type UpdatedPullRequest,
+  referenceText,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Equivalence, Match, Predicate } from "effect"
@@ -35,7 +36,6 @@ import { BackgroundToolCalls, callStatus, toolCallsOf, TurnParts } from "./TurnP
 import { sentFrom, UserMessage } from "./UserMessage"
 import { threadColumn } from "./threadColumn"
 import { plural } from "./plural"
-import { referenceText } from "./queue"
 
 export function Transcript(props: {
   turns: ReadonlyArray<Turn>

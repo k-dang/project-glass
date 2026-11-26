@@ -3,6 +3,7 @@ import {
   type QueueAddition,
   type QueuedPullRequest,
   referenceKey,
+  referenceText,
 } from "@glass/contracts"
 import { Effect, Exit, Option } from "effect"
 import { AsyncResult, Atom, type AtomRegistry } from "effect/reactivity"
@@ -60,9 +61,6 @@ export const addToQueueAtom = backendRuntime.fn((references: ReadonlyArray<PullR
     Effect.tap(reread(get.registry)),
   ),
 )
-
-export const referenceText = ({ owner, repo, number }: PullRequestRef) =>
-  `${owner}/${repo}#${number}`
 
 const conjunction = new Intl.ListFormat("en", { type: "conjunction" })
 

@@ -3,12 +3,12 @@ import {
   type Subscription,
   subscriptionReasonWords,
   type ThreadPullRequest as OwnPullRequest,
+  referenceText,
 } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { BellRing, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { referenceText } from "./queue"
 import { endSubscriptionAtom, subscriptionsAtom } from "./threadsArea"
 
 const pullRequestLabel = ({ pullRequest }: Subscription, own: OwnPullRequest | undefined) => {

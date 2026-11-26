@@ -5,6 +5,7 @@ import {
   type PullRequestRef,
   referenceKey,
   repositoryKey,
+  referenceText,
 } from "@glass/contracts"
 import {
   Command,
@@ -34,7 +35,7 @@ import { Kbd } from "@/components/ui/kbd"
 import { type Action, actionGroups, mountedActions, shortcutKeys } from "./actions"
 import { threadsAtom } from "./threadsArea"
 import { knownPullRequestsAtom } from "./pullRequestLists"
-import { addToQueue, referenceText } from "./queue"
+import { addToQueue } from "./queue"
 import { refusedEscape } from "./refusedEscape"
 import { sameRef } from "./reviewsArea"
 import { shortcutLabel } from "./shortcutLabel"

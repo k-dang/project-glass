@@ -11,6 +11,7 @@ import {
   type RequestPart,
   TurnFinished,
   type TurnSeen,
+  referenceText,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Match, Predicate, Schema } from "effect"
@@ -26,7 +27,6 @@ import { Badge } from "@/components/ui/badge"
 import { fileName } from "./fileName"
 import { ago } from "./PullRequestRow"
 import { turnEndingLooks, warningTone } from "./status"
-import { referenceText } from "./queue"
 
 type Tone = "warning" | "danger" | "review" | "success" | "neutral"
 
