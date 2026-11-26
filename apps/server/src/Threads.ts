@@ -1007,6 +1007,7 @@ export class Threads extends Context.Service<
             yield* sql`DELETE FROM thread WHERE id = ${threadId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
 
+          // WARNING: The host can start a Turn delivered before the first stop, so stop it again once its Turns are gone.
           yield* stopOnHost(hosting, row)
         }).pipe(
           Effect.tapError(() =>

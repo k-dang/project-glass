@@ -65,11 +65,15 @@ const decodeArgs = Schema.decodeSync(Schema.fromJsonString(Schema.JsonObject))
 
 export const REVIEW_SCRIPT = "review.json"
 
-export interface ReviewScript {
-  readonly hold?: string
-  readonly submit?: ReadonlyArray<unknown>
-  readonly fail?: string
-}
+const ReviewScript = Schema.Struct({
+  hold: Schema.optional(Schema.String),
+  submit: Schema.optional(Schema.Array(Schema.Unknown)),
+  fail: Schema.optional(Schema.String),
+})
+
+export type ReviewScript = typeof ReviewScript.Type
+
+const decodeReviewScript = Schema.decodeSync(Schema.fromJsonString(ReviewScript))
 
 export const reviewStopped = (thread: string) => `review-stopped-${thread}`
 
@@ -78,9 +82,7 @@ export const reviewPrompt = (thread: string) => `review-prompt-${thread}`
 const reviewScript = (gates: string): ReviewScript => {
   const path = join(gates, REVIEW_SCRIPT)
 
-  // SAFETY: Tests write this file as a ReviewScript.
-  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- See SAFETY above.
-  return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as ReviewScript) : {}
+  return existsSync(path) ? decodeReviewScript(readFileSync(path, "utf8")) : {}
 }
 
 const skillCommands = (written: ReadonlyArray<WrittenSkills>) =>
