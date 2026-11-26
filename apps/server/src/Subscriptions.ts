@@ -9,6 +9,7 @@ import {
   type ThreadPullRequest,
 } from "@glass/contracts"
 import {
+  Array as Arr,
   Context,
   DateTime,
   Effect,
@@ -360,49 +361,41 @@ export class Subscriptions extends Context.Service<
       const endNamed = Effect.fnUntraced(function* (mirrored: Mirror | undefined) {
         if (mirrored === undefined) return
 
-        const subscribed = (yield* stored(sql`owner IS NOT NULL AND ended IS NULL`)).flatMap(
-          (subscription) => {
-            const { pullRequest } = subscriptionOf(subscription)
+        const gone = Object.values(
+          Arr.groupBy(
+            (yield* stored(sql`owner IS NOT NULL AND ended IS NULL`)).flatMap((subscription) => {
+              const { pullRequest } = subscriptionOf(subscription)
 
-            return pullRequest !== null &&
-              mirroredRepositoryOf(mirrored, pullRequest) !== undefined &&
-              mirroredPullRequest(mirrored, pullRequest) === undefined
-              ? [{ subscription, pullRequest }]
-              : []
-          },
+              return pullRequest !== null &&
+                mirroredRepositoryOf(mirrored, pullRequest) !== undefined &&
+                mirroredPullRequest(mirrored, pullRequest) === undefined
+                ? [{ subscription, pullRequest }]
+                : []
+            }),
+            ({ pullRequest }) => referenceKey(pullRequest),
+          ),
         )
-
-        const gone = [
-          ...new Map(
-            subscribed.map(({ pullRequest }) => [referenceKey(pullRequest), pullRequest]),
-          ).values(),
-        ]
 
         if (gone.length === 0) return
 
-        const found = yield* lookUp(gone)
+        const found = yield* lookUp(gone.map(([{ pullRequest }]) => pullRequest))
 
         yield* Effect.forEach(
-          gone,
-          (pullRequest, index) => {
-            const lookedUp = found[index]
-            const state = lookedUp?.state
-            const event = lookedUp == null ? null : endedEvent(lookedUp)
+          Arr.zip(gone, found),
+          ([group, lookedUp]) => {
+            if (lookedUp === null || (lookedUp.state !== "merged" && lookedUp.state !== "closed"))
+              return Effect.void
 
-            return state === "merged" || state === "closed"
-              ? events.record("github", event === null ? [] : [event]).pipe(
-                  Effect.andThen(
-                    endTold(
-                      subscribed.flatMap((candidate) =>
-                        referenceKey(candidate.pullRequest) === referenceKey(pullRequest)
-                          ? [candidate.subscription]
-                          : [],
-                      ),
-                      { state, pullRequest },
-                    ),
-                  ),
-                )
-              : Effect.void
+            const event = endedEvent(lookedUp)
+
+            return events.record("github", event === null ? [] : [event]).pipe(
+              Effect.andThen(
+                endTold(
+                  group.map(({ subscription }) => subscription),
+                  { state: lookedUp.state, pullRequest: group[0].pullRequest },
+                ),
+              ),
+            )
           },
           { discard: true },
         )
