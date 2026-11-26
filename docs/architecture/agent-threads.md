@@ -56,5 +56,13 @@ Thread.
 
 `StartThread` names the harness, folder, role and skills. The host writes Local skills and Skill
 packs into a folder beside the Thread's folder. Claude Code loads them as plugins, and pi loads them with
-`--skill`. Tools that need nothing from the backend, `draw_diagram`, `suggest_draft` and
-`ask_user`, are defined in the host and answered there.
+`--skill`. Tools that need nothing from the backend, `draw_diagram`, `submit_review`, `suggest_draft`
+and `ask_user`, are defined in the host and answered there.
+
+## Review Threads
+
+An Agent review runs as the first Turn of its Review Thread (ADR 0010). The agent hands the review
+in with `submit_review`, which the host checks against the review's schema; the backend reads the
+call it accepted from the saved Turn once the Turn ends. The Thread's checkout of the Revision is
+dropped when that Turn ends, and the Thread's review hosting checks the Revision out again at the
+same path before its next Turn starts, since both harnesses find a session by its folder.

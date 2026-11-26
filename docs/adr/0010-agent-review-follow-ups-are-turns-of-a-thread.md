@@ -1,28 +1,33 @@
-# Agent review Follow-ups are Turns of one Thread that resumes the review's session
+# An Agent review is the first Turn of a Thread, and its Follow-ups are the next ones
 
 A first Agent review is rarely the last word: the user wants to question its points and turn the
 ones that hold into comments for the PR's author. Following up is a back-and-forth, so each Agent
-review gets one Thread (ADR 0007), started on the first Follow-up, and each Follow-up is a
-Turn of it. The agent keeps what it read in earlier Turns instead of rereading the checkout from a
-replayed transcript, and Follow-ups gain streamed answers, Steer, and Stop.
+review gets one Thread (ADR 0007), and each Follow-up is a Turn of it. The agent keeps what it read
+in earlier Turns instead of rereading the checkout from a replayed transcript, and Follow-ups gain
+streamed answers, Steer, and Stop.
 
-The Thread continues the agent that wrote the review rather than starting a new one. The review's
-run saves its harness session under an id Glass picks, working in a checkout at a path named by that
-id; the first Follow-up checks the Revision out at that path again and starts the Thread with that
-id, so the harness resumes the session with the review's reading, reasoning, and answer, on the
-harness and model that wrote it. Only a review someone follows up on gets a Thread. A review with
-no saved session, such as one written before reviews saved theirs, takes no Follow-ups until it is
-reviewed again, rather than a fresh agent that never saw it. Both harnesses keep a session by its
-folder, which is why the path is fixed. The review and its Follow-ups share one system prompt,
-which covers writing the review and answering about it, so following up reads as one conversation
-rather than an agent handed a new role. Every review's run saves its session whether or not anyone
-follows up; the sessions are small, so Glass leaves them to the harnesses, where Claude Code prunes
-old ones and pi keeps them.
+Every Agent review, Queue reviews among them, runs as the first Turn of its own Thread on the agent
+host rather than through the one-shot runner Tours and Ask use (ADR 0004). Follow-ups continue that
+session, with the review's reading, reasoning, and answer, on the harness and model that wrote it.
+One system prompt covers writing the review and answering about it, so following up reads as one
+conversation rather than an agent handed a new role. The agent hands in the review by calling a Glass
+tool whose parameters are the review's answer; the host checks the call and tells the agent what
+doesn't fit, so it fixes the answer within its Turn rather than failing the review. Glass saves the
+answer it accepted once the Turn ends, and a Turn that ends without one fails the review. A review
+in progress is that Turn running, read from the saved Turn, so it shows as reviewing after a
+relaunch and keeps running while Glass is closed, like any local Turn. Stopping the review, or its
+deadline passing, stops the Turn. Reviewing again replaces the review and removes its Thread. A
+review written before reviews ran as Turns has no Thread and takes no Follow-ups until it is
+reviewed again. The Follow-ups show without the review's own Turn, whose prompt carries the PR
+material rather than the user's words.
 
 The Thread's agent works in a checkout of the review's Revision from Glass's cached clone,
 with a shell like the review's own (ADR 0006), not a Local checkout worktree (ADR 0008), since it
-never commits. The PR material it read stays data, never instructions, because it comes from the
-PR's author.
+never commits. Most reviews get no Follow-up, so the checkout is dropped when the review's Turn
+ends, and the Revision is checked out again at the same path before the Thread's next Turn: both
+harnesses find a session by its folder. Each review then keeps only a hidden Thread and its
+transcript. The PR material it read stays data, never instructions, because it comes from the PR's
+author.
 
 The agent proposes a Suggested draft by calling a Glass tool with a path, side, line, and body.
 Glass checks the line against the diff and rejects a call that misses it, so the agent can place it
@@ -34,19 +39,23 @@ adds a Suggested draft as a Draft.
 
 ## Considered options
 
-- **One read-only run per Follow-up, as Agent reviews run (ADR 0004)**: no new Thread kinds, but
-  each run replays the review and every earlier Follow-up as text, forgets what it read, and returns
-  one JSON answer at the end with no streaming, Steer, or Stop. Glass built this first.
-- **Seeding a new Thread with the PR material and the review as data**: Glass built this first.
+- **One read-only run per Follow-up, as Tours run (ADR 0004)**: no new Thread kinds, but each run
+  replays the review and every earlier Follow-up as text, forgets what it read, and returns one
+  JSON answer at the end with no streaming, Steer, or Stop. Glass built this first.
+- **Seeding a new Thread with the PR material and the review as data**: Glass built this next.
   The agent answered about a review it never wrote, without what the review's run had read, and
   Glass kept a second prompt carrying both.
-- **Running every Agent review as the first Turn of its Thread**: one session from the start, but
-  every review, Queue reviews among them, would become a Thread and keep its checkout.
+- **Writing the review with the one-shot runner, then resuming its session in a Thread on the first
+  Follow-up**: only a review someone follows up on gets a Thread, but the runner and the agent
+  host's harness adapters must agree on the session's folder, format, and system prompt, and the
+  runner seam gains session state that Tours and Ask don't need. Glass built this before running
+  reviews as Turns.
+- **Reading the review from the Turn's last message**: needs no tool, but by the time Glass reads
+  it the Turn has ended, so a malformed answer can only fail the review.
+- **Keeping the checkout until the review is replaced**: no second checkout on the first Follow-up,
+  but every Queue review would keep a checkout of a Revision nobody may follow up on.
 - **A separate Follow-up system prompt swapped in on resume**: Claude Code has to be told to drop
   the review's prompt, and the agent switches roles mid-conversation.
-- **Resuming the runner's own session for each Follow-up**: keeps what the agent read, but puts
-  session state into a seam Tours and Agent reviews don't need, duplicating the agent host
-  without its streaming, Steer, or Stop. The runner only saves the session; the agent host resumes it.
 - **One drafting pass with no back-and-forth**: smaller, but it can't question the review's points,
   which is half of following up.
 - **A Draft button on each point of the review**: needs every point placed on a line, while ADR 0009
