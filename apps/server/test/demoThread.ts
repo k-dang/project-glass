@@ -11,9 +11,11 @@ import { Effect, Schema } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { SUBMIT_REVIEW_TOOL } from "../src/agentHost/submitReviewTool"
 import { GLASS_MCP_PREFIX } from "../src/agentHost/toolCalls"
 import { connectRpcClient } from "../src/rpcSocket"
 import { artifactsThread } from "./demoArtifacts"
+import { syntheticReview } from "./demoAgentReview"
 import { longThread } from "./demoLongThread"
 import type { ScriptedThread } from "./demoScript"
 import { DEMO_REPOSITORY, settledBranch, settledPullRequests } from "./demoPullRequests"
@@ -89,10 +91,28 @@ const glassToolReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> 
   ]
 }
 
+const reviewReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> | undefined => {
+  const asked = lastUserText(input)
+
+  if (!asked.startsWith("PR material")) return undefined
+
+  if (input.messages.at(-1)?.role === "tool") return [{ text: "Handed in the Agent review." }]
+
+  return [
+    {
+      toolCall: { id: "demo-review", name: SUBMIT_REVIEW_TOOL, arguments: syntheticReview(asked) },
+    },
+  ]
+}
+
 const scriptedThreads = [longThread, artifactsThread]
 
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   if (isGlobalChat(input)) return globalChatReply(input)
+
+  const review = reviewReply(input)
+
+  if (review !== undefined) return review
 
   const glassTool = glassToolReply(input)
 

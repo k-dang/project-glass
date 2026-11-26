@@ -83,7 +83,6 @@ interface CheckoutRun<I, A> {
   readonly read: (pr: PullRequestRef, revision: Revision) => Effect.Effect<I, InputReadError>
   readonly task: (input: I) => Effect.Effect<CheckoutTask<A>, CheckoutRunFailure>
   readonly ready?: Effect.Effect<void>
-  readonly session?: { readonly id: string; readonly folder: string }
 }
 
 interface CheckoutAnswer<I, A> {
@@ -130,7 +129,7 @@ const readMaterial = <I>(
     ),
   )
 
-const checkoutError =
+export const checkoutError =
   (identity: AgentRunnerIdentity | null) =>
   (error: CheckoutFailure | StaleRevision | NoCredentials) => {
     if (Predicate.isTagged(error, "StaleRevision")) return staleFailure(identity)
@@ -193,7 +192,6 @@ export class CheckoutRuns extends Context.Service<
           read,
           task,
           ready = Effect.void,
-          session,
         }: CheckoutRun<I, A>) {
           const readiness = runners
             .select(engineSettings)
@@ -205,11 +203,9 @@ export class CheckoutRuns extends Context.Service<
             ),
           )
 
-          const checkOut = (
-            session === undefined
-              ? checkouts.checkout(pr, revision)
-              : checkouts.checkoutAt(pr, revision, session.folder)
-          ).pipe(Effect.mapError(checkoutError(identity)), recordDuration("checkout_ms"))
+          const checkOut = checkouts
+            .checkout(pr, revision)
+            .pipe(Effect.mapError(checkoutError(identity)), recordDuration("checkout_ms"))
 
           yield* annotateUnit({
             harness: identity.harness,
@@ -222,7 +218,7 @@ export class CheckoutRuns extends Context.Service<
             { concurrency: "unbounded" },
           )
 
-          return yield* selected.run({ ...prepared, subject, checkout, session: session?.id }).pipe(
+          return yield* selected.run({ ...prepared, subject, checkout }).pipe(
             recordDuration("agent_ms"),
             Effect.map((answer) => ({ input, answer })),
             Effect.mapError(fromAgentFailure),

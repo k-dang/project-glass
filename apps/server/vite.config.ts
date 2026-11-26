@@ -15,7 +15,7 @@ const node = {
 
 const piExtensions = new Map([
   ["virtual:pi-draw-diagram", "src/agentHost/piDrawDiagram.ts"],
-  ["virtual:pi-suggest-draft", "src/agentHost/piSuggestDraft.ts"],
+  ["virtual:pi-review-tools", "src/agentHost/piReviewTools.ts"],
 ])
 
 const piExtensionSources = {

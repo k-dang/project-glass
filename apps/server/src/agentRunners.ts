@@ -34,7 +34,6 @@ export interface AgentTask<A> {
   readonly answer: Schema.Decoder<A>
   readonly tools: AgentTools
   readonly checkout: string
-  readonly session?: string | undefined
 }
 
 interface AgentRunner {
@@ -103,20 +102,10 @@ const startFailure = (name: string) => (error: { readonly reason: unknown }) => 
   )
 }
 
-const claudeSessionFlags = (session: string | undefined) =>
-  session === undefined ? ["--no-session-persistence"] : ["--session-id", session]
-
-const claudeFlags = (session: string | undefined) => [
-  "--strict-mcp-config",
-  ...claudeSessionFlags(session),
-  "--disable-slash-commands",
-]
+const claudeFlags = ["--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"]
 
 const claudeRequiredFlags = [
-  "--strict-mcp-config",
-  "--no-session-persistence",
-  "--session-id",
-  "--disable-slash-commands",
+  ...claudeFlags,
   "--restricted",
   "--setting-sources",
   "--tools",
@@ -144,12 +133,9 @@ const piToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
   shell: ["--tools", piTools.shell.join(",")],
 }
 
-const piSessionFlags = (session: string | undefined) =>
-  session === undefined ? ["--no-session"] : ["--session-id", session]
-
-const piCliFlags = (tools: AgentTools, session: string | undefined) => [
+const piCliFlags = (tools: AgentTools) => [
   "--offline",
-  ...piSessionFlags(session),
+  "--no-session",
   ...piLoadsNothing,
   ...piToolFlags[tools],
 ]
@@ -247,7 +233,7 @@ const runnerStrategies = Effect.gen(function* () {
         [
           "-p",
           ...claudeToolFlags[task.tools],
-          ...claudeFlags(task.session),
+          ...claudeFlags,
           "--model",
           model,
           "--output-format",
@@ -373,7 +359,7 @@ const runnerStrategies = Effect.gen(function* () {
           "-p",
           "--mode",
           "json",
-          ...piCliFlags(task.tools, task.session),
+          ...piCliFlags(task.tools),
           "--provider",
           selection.provider,
           "--model",

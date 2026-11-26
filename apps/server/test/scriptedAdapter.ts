@@ -13,6 +13,7 @@ import {
   TurnDone,
   TurnEnded,
   type TurnEnding,
+  TurnFailed,
   withContextOf,
 } from "@glass/contracts"
 import { DateTime, Deferred, Effect, Fiber, Predicate, Schema, Scope } from "effect"
@@ -28,6 +29,7 @@ import { filesIn } from "./filesIn"
 import { connectMcp, initialize, mcpPost } from "./mcpClient"
 import { settleWith } from "../src/agentHost/requests"
 import { placeSuggestedDraft } from "../src/agentHost/suggestDraftTool"
+import { SUBMIT_REVIEW_TOOL, submitReview } from "../src/agentHost/submitReviewTool"
 import { whenExists } from "./whenExists"
 
 interface Waiting {
@@ -60,6 +62,24 @@ const scriptedCall = /^call(-ended)?:(\S+)(?: (.+))?$/m
 const scriptedHold = /^hold:(\S+)/m
 
 const decodeArgs = Schema.decodeSync(Schema.fromJsonString(Schema.JsonObject))
+
+export const REVIEW_SCRIPT = "review.json"
+
+export interface ReviewScript {
+  readonly hold?: string
+  readonly submit?: ReadonlyArray<unknown>
+  readonly fail?: string
+}
+
+export const reviewStopped = (thread: string) => `review-stopped-${thread}`
+
+const reviewScript = (gates: string): ReviewScript => {
+  const path = join(gates, REVIEW_SCRIPT)
+
+  // SAFETY: Tests write this file as a ReviewScript.
+  // oxlint-disable-next-line typescript/no-unsafe-type-assertion -- See SAFETY above.
+  return existsSync(path) ? (JSON.parse(readFileSync(path, "utf8")) as ReviewScript) : {}
+}
 
 const skillCommands = (written: ReadonlyArray<WrittenSkills>) =>
   written.flatMap(({ plugin, skills }) =>
@@ -123,6 +143,48 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
             turn = null
             yield* report(TurnEnded.make({ turnId, ended: { at: yield* DateTime.now, ending } }))
           })
+
+        const runReview = (turnId: string) =>
+          Effect.gen(function* () {
+            const { hold } = reviewScript(gates)
+
+            yield* part(turnId, TextPart.make({ text: readdirSync(folder).toSorted().join(",") }))
+
+            if (hold !== undefined) {
+              yield* part(turnId, TextPart.make({ text: "Holding." }))
+              yield* Effect.promise((signal) => whenExists(join(gates, hold), signal))
+            }
+
+            const script = reviewScript(gates)
+
+            for (const answer of script.submit ?? []) {
+              const { accepted, text } = submitReview(answer)
+
+              yield* part(
+                turnId,
+                ToolCallPart.make({
+                  toolCallId: randomUUID(),
+                  name: SUBMIT_REVIEW_TOOL,
+                  inputSummary: "",
+                  input: JSON.stringify(answer),
+                  output: text,
+                  status: accepted ? "done" : "failed",
+                  parentToolCallId: null,
+                }),
+              )
+            }
+
+            yield* end(
+              turnId,
+              script.fail === undefined
+                ? TurnDone.make({})
+                : TurnFailed.make({ reason: script.fail }),
+            )
+          }).pipe(
+            Effect.onInterrupt(() =>
+              Effect.sync(() => writeFileSync(join(gates, reviewStopped(thread)), "")),
+            ),
+          )
 
         const run = (turnId: string, { message, prompt }: DeliveredTurn) =>
           Effect.gen(function* () {
@@ -247,7 +309,12 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
           configure: () => Effect.void,
           startTurn: (turnId, message) =>
             Effect.gen(function* () {
-              const fiber = yield* run(turnId, message).pipe(Effect.forkIn(scope))
+              const fiber = yield* (
+                review !== null && Predicate.isTagged(message.context, "AgentReview")
+                  ? runReview(turnId)
+                  : run(turnId, message)
+              ).pipe(Effect.forkIn(scope))
+
               turn = { id: turnId, fiber, steers: [], index: 0, waiting: null }
             }),
           steer: (message) =>

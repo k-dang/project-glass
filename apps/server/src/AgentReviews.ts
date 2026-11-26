@@ -2,24 +2,29 @@ import {
   AgentReview,
   AgentReviewFailure,
   type AgentReviewState,
+  AgentRunnerIdentity,
+  applyTranscriptUpdate,
   type ChangedFile,
   type DiffSide,
-  FollowedRepository,
+  emptyTranscript,
   Hotspot,
   LowAttentionFile,
-  type PullRequestRef,
+  PullRequestRef,
   Revision,
-  AgentRunnerIdentity,
+  runnerIdentity,
   threadModelOf,
+  type TourCodeTarget,
+  type TurnEnding,
 } from "@glass/contracts"
 import {
   Clock,
   Context,
   DateTime,
   Effect,
-  Equal,
+  Exit,
   FileSystem,
   Layer,
+  Match,
   Option,
   Predicate,
   Schema,
@@ -27,30 +32,27 @@ import {
   Stream,
   SubscriptionRef,
 } from "effect"
-import { SqlClient } from "effect/sql"
+import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
-import { Threads } from "./Threads"
-import {
-  AgentReviewAnswer,
-  agentReviewInstructions,
-  agentReviewPrompt,
-  MAX_HOTSPOTS,
-} from "./agentReviewPrompt"
+import { ReviewBrief } from "./agentHost/protocol"
+import { type AgentReviewAnswer, submittedReviewOf } from "./agentHost/submitReviewTool"
+import { agentReviewInstructions, agentReviewPrompt, MAX_HOTSPOTS } from "./agentReviewPrompt"
 import { type CheckoutRunFailure, CheckoutRuns } from "./CheckoutRuns"
 import { GitHubClient } from "./github/GitHubClient"
-import { patchLineNumbers, rangeInFiles } from "./github/patchLines"
+import { patchLineNumbers } from "./github/patchLines"
 import { type JobState, pullRequestJobs, type PullRequestJob } from "./pullRequestJobs"
 import { Deadlines, ServerConfig } from "./ServerConfig"
-import { SettingsStore } from "./SettingsStore"
+import { engineSettingsOf, SettingsStore } from "./SettingsStore"
+import { Threads } from "./Threads"
 
 const BACKGROUND_SLOTS = 2
 
 type Status = AgentReviewState["job"]
 
-type Progress = Extract<Status, { status: "reviewing" | "starting-thread" }>
+type Progress = Extract<Status, { status: "reviewing" }>
 
-type Failed = Extract<Status, { status: "failed" | "thread-start-failed" }>
+type Failed = Extract<Status, { status: "failed" }>
 
 type Job = PullRequestJob<AgentReview, Progress, Failed>
 
@@ -80,40 +82,46 @@ const stored = Schema.Array(
   }),
 )
 
-const ReviewSession = Schema.Struct({
-  id: Schema.String,
-  runner: AgentRunnerIdentity,
-})
-
-type ReviewSession = typeof ReviewSession.Type
-
-const SessionJson = Schema.fromJsonString(ReviewSession)
-
-const StoredSession = Schema.Array(Schema.Struct({ session: Schema.NullOr(SessionJson) }))
-
-const encodeSession = Schema.encodeSync(SessionJson)
-
 const encodeHotspots = Schema.encodeSync(HotspotsJson)
 
 const encodeLowAttention = Schema.encodeSync(LowAttentionJson)
 
-const fitToDiff = (answer: AgentReviewAnswer, files: ReadonlyArray<ChangedFile>) => {
-  const hotspots = answer.hotspots.slice(0, MAX_HOTSPOTS).map((hotspot) => ({
-    ...hotspot,
-    place: hotspot.place !== null && rangeInFiles(files, hotspot.place) ? hotspot.place : null,
-  }))
+const ReviewDiff = Schema.Struct({
+  paths: Schema.Array(Schema.String),
+  lines: ReviewBrief.fields.diffLines,
+})
 
-  const hotspotPaths = new Set(
-    hotspots.flatMap(({ place }) => (place === null ? [] : [place.path])),
-  )
+type ReviewDiff = typeof ReviewDiff.Type
 
-  const changed = new Set(files.map(({ path }) => path))
+const RunnerJson = Schema.fromJsonString(AgentRunnerIdentity)
 
-  const lowAttention = answer.lowAttention.filter(
-    (file) => changed.has(file.path) && !hotspotPaths.has(file.path),
-  )
+const DiffJson = Schema.fromJsonString(ReviewDiff)
 
-  return { hotspots, lowAttention }
+const encodeRunner = Schema.encodeSync(RunnerJson)
+
+const encodeDiff = Schema.encodeSync(DiffJson)
+
+const StoredRuns = Schema.Array(
+  Schema.Struct({
+    ...PullRequestRef.fields,
+    thread_id: Schema.String,
+    base: Schema.String,
+    head: Schema.String,
+    started_at: Schema.Number,
+    runner: RunnerJson,
+    background: Schema.BooleanFromBit,
+    diff: DiffJson,
+  }),
+)
+
+interface Run {
+  readonly pr: PullRequestRef
+  readonly threadId: string
+  readonly revision: Revision
+  readonly startedAt: number
+  readonly runner: AgentRunnerIdentity
+  readonly background: boolean
+  readonly diff: ReviewDiff
 }
 
 const diffLinesOn = (files: ReadonlyArray<ChangedFile>, side: DiffSide) =>
@@ -122,6 +130,35 @@ const diffLinesOn = (files: ReadonlyArray<ChangedFile>, side: DiffSide) =>
       Predicate.isTagged(patch, "TextPatch") ? [[path, patchLineNumbers(patch.hunks, side)]] : [],
     ),
   )
+
+const diffOf = (files: ReadonlyArray<ChangedFile>): ReviewDiff => ({
+  paths: files.map(({ path }) => path),
+  lines: { old: diffLinesOn(files, "old"), new: diffLinesOn(files, "new") },
+})
+
+const inDiff = ({ lines }: ReviewDiff, { path, side, startLine, endLine }: TourCodeTarget) =>
+  endLine >= startLine &&
+  (lines[side][path] ?? []).filter((line) => line >= startLine && line <= endLine).length ===
+    endLine - startLine + 1
+
+const fitToDiff = (answer: AgentReviewAnswer, diff: ReviewDiff) => {
+  const hotspots = answer.hotspots.slice(0, MAX_HOTSPOTS).map((hotspot) => ({
+    ...hotspot,
+    place: hotspot.place !== null && inDiff(diff, hotspot.place) ? hotspot.place : null,
+  }))
+
+  const hotspotPaths = new Set(
+    hotspots.flatMap(({ place }) => (place === null ? [] : [place.path])),
+  )
+
+  const changed = new Set(diff.paths)
+
+  const lowAttention = answer.lowAttention.filter(
+    (file) => changed.has(file.path) && !hotspotPaths.has(file.path),
+  )
+
+  return { hotspots, lowAttention }
+}
 
 const failure = (
   reason: AgentReviewFailure["reason"],
@@ -146,6 +183,22 @@ const stoppedRunner = (runner: AgentRunnerIdentity | null) =>
     runner,
   )
 
+const unfinished = (ending: TurnEnding, runner: AgentRunnerIdentity) =>
+  Match.valueTags(ending, {
+    Done: () =>
+      failure(
+        "unusable-output",
+        "The agent finished without handing in its Agent review. Try again.",
+        runner,
+      ),
+    Failed: ({ reason }) => failure("runner", reason, runner),
+    Stopped: () =>
+      failure("runner", "The agent was stopped before it finished. Try again.", runner),
+    CutOff: () => failure("runner", "Glass lost the agent before it finished. Try again.", runner),
+    Interrupted: () =>
+      failure("runner", "Glass lost the agent before it finished. Try again.", runner),
+  })
+
 export class AgentReviews extends Context.Service<
   AgentReviews,
   {
@@ -156,11 +209,6 @@ export class AgentReviews extends Context.Service<
     readonly startInBackground: (
       pr: PullRequestRef,
       revision: Revision,
-    ) => Effect.Effect<void, AgentReviewFailure>
-    readonly followUp: (
-      pr: PullRequestRef,
-      revision: Revision,
-      message: string,
     ) => Effect.Effect<void, AgentReviewFailure>
     readonly cancel: (pr: PullRequestRef) => Effect.Effect<void>
     readonly markDone: (
@@ -232,29 +280,55 @@ export class AgentReviews extends Context.Service<
               ),
             )
 
-      const reviewFolder = (session: string) =>
-        join(config.dataDirectory, "agent-review-checkouts", session)
+      const reviewFolder = (threadId: string) =>
+        join(config.dataDirectory, "agent-review-checkouts", threadId)
 
-      const sessionOf = (pr: PullRequestRef) =>
-        sql`SELECT session FROM agent_reviews WHERE ${where(pr)}`.pipe(
-          Effect.flatMap(Schema.decodeUnknownEffect(StoredSession)),
-          Effect.map(([row]) => row?.session ?? null),
+      const runsOf = (query: Effect.Effect<ReadonlyArray<unknown>, SqlError.SqlError>) =>
+        query.pipe(
+          Effect.flatMap(Schema.decodeUnknownEffect(StoredRuns)),
+          Effect.map((rows) =>
+            rows.map((row): Run => ({
+              pr: new PullRequestRef({ owner: row.owner, repo: row.repo, number: row.number }),
+              threadId: row.thread_id,
+              revision: new Revision({ base: row.base, head: row.head }),
+              startedAt: row.started_at,
+              runner: row.runner,
+              background: row.background,
+              diff: row.diff,
+            })),
+          ),
           logStorageFailure,
           Effect.mapError(storageFailure),
         )
 
-      const save = (job: Job, pr: PullRequestRef, review: AgentReview, session: ReviewSession) =>
+      const discard = (run: Run) =>
+        removeThread(run.threadId).pipe(
+          Effect.andThen(sql`DELETE FROM agent_review_run WHERE thread_id = ${run.threadId}`),
+          Effect.catch((cause) => Effect.logWarning("Couldn't discard an Agent review", cause)),
+        )
+
+      const discardRuns = (query: Effect.Effect<ReadonlyArray<unknown>, SqlError.SqlError>) =>
+        runsOf(query).pipe(
+          Effect.flatMap((runs) => Effect.forEach(runs, discard, { discard: true })),
+          Effect.ignore,
+        )
+
+      const discardRunOf = (pr: PullRequestRef) =>
+        discardRuns(sql`SELECT * FROM agent_review_run WHERE ${where(pr)}`)
+
+      const save = (job: Job, run: Run, review: AgentReview) =>
         Effect.gen(function* () {
           const replaced = (yield* SubscriptionRef.get(job.state)).output?.threadId ?? null
+          const { pr } = run
 
           yield* jobs.commit(
             job,
-            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, thread_id, done, included_in_started_work_update, session)
-              VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, NULL, 0, 0, ${encodeSession(session)})
-              ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, thread_id = NULL, done = 0, included_in_started_work_update = 0, session = excluded.session`.pipe(
-              logStorageFailure,
-              Effect.mapError(storageFailure),
-            ),
+            Effect.all([
+              sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, thread_id, done, included_in_started_work_update)
+                VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, ${run.threadId}, 0, 0)
+                ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, thread_id = excluded.thread_id, done = 0, included_in_started_work_update = 0`,
+              sql`DELETE FROM agent_review_run WHERE thread_id = ${run.threadId}`,
+            ]).pipe(sql.withTransaction, logStorageFailure, Effect.mapError(storageFailure)),
             () => review,
           )
 
@@ -266,137 +340,182 @@ export class AgentReviews extends Context.Service<
         Effect.mapError((error) => failure("not-ready", error.message)),
       )
 
+      const reviewer = settings.read().pipe(
+        Effect.map((saved) => runnerIdentity(engineSettingsOf(saved, "agentReviews"))),
+        Effect.mapError((error) => failure("not-ready", error.message)),
+      )
+
       const started = Clock.currentTimeMillis.pipe(
         Effect.map((startedAt): Progress => ({ status: "reviewing", startedAt, runner: null })),
       )
 
-      const work = (job: Job, pr: PullRequestRef, revision: Revision) =>
+      const firstTurnEnded = (threadId: string) =>
+        threads.transcript(threadId).pipe(
+          Stream.scan(() => emptyTranscript, applyTranscriptUpdate),
+          Stream.map(({ turns: [first] }) =>
+            first?.ended == null ? null : { parts: first.parts, ending: first.ended.ending },
+          ),
+          Stream.filter(Predicate.isNotNull),
+          Stream.runHead,
+          Effect.map(Option.getOrThrow),
+        )
+
+      const settled = (job: Job) =>
+        jobs.settle(
+          job,
+          "AgentReview",
+          (error: Option.Option<AgentReviewFailure>, { runner }): Failed => ({
+            status: "failed",
+            reason: Option.getOrElse(error, () => stoppedRunner(runner)),
+          }),
+        )
+
+      const follow = (job: Job, run: Run) =>
         Effect.gen(function* () {
-          const runner = yield* checkoutRuns
-            .select("agentReviews")
-            .pipe(Effect.mapError(fromCheckoutRunFailure))
+          const remaining =
+            run.startedAt + deadlines.agentReviewMs - (yield* Clock.currentTimeMillis)
 
-          const session: ReviewSession = { id: randomUUID(), runner: runner.identity }
-          const instructions = yield* reviewInstructions
+          const { parts, ending } = yield* firstTurnEnded(run.threadId).pipe(
+            Effect.timeoutOrElse({
+              duration: Math.max(0, remaining),
+              orElse: () =>
+                threads
+                  .stop(run.threadId)
+                  .pipe(
+                    Effect.ignore,
+                    Effect.andThen(
+                      Effect.fail(
+                        failure(
+                          "timeout",
+                          "The agent took too long writing the Agent review. Try again.",
+                          run.runner,
+                        ),
+                      ),
+                    ),
+                  ),
+            }),
+            Effect.catchTags({
+              ThreadNotFound: () =>
+                Effect.fail(failure("runner", "The Agent review's Thread was removed. Try again.")),
+              ThreadError: ({ message }) => Effect.fail(failure("runner", message, run.runner)),
+            }),
+            Effect.tapError(() => discard(run)),
+          )
 
-          const { input, answer } = yield* runner
-            .run({
-              pr,
-              revision,
-              subject: "Agent review",
-              timeout: deadlines.agentReviewMs,
-              read: github.reviewInput,
-              ready: jobs.progress(job, (progress) => ({ ...progress, runner: runner.identity })),
-              session: { id: session.id, folder: reviewFolder(session.id) },
-              task: (material) =>
-                Effect.succeed({
-                  instructions,
-                  prompt: agentReviewPrompt(material, revision),
-                  answer: AgentReviewAnswer,
-                  tools: "shell",
-                }),
-            })
-            .pipe(Effect.mapError(fromCheckoutRunFailure))
+          const answer = parts.reduce<AgentReviewAnswer | null>(
+            (found, part) =>
+              Predicate.isTagged(part, "ToolCall") ? (submittedReviewOf(part) ?? found) : found,
+            null,
+          )
+
+          if (answer === null) {
+            yield* discard(run)
+
+            return yield* unfinished(ending, run.runner)
+          }
 
           const review = AgentReview.make({
-            revision,
+            revision: run.revision,
             writtenAt: yield* DateTime.now,
             markdown: answer.markdown,
-            ...fitToDiff(answer, input.files),
-            threadId: null,
+            ...fitToDiff(answer, run.diff),
+            threadId: run.threadId,
             done: false,
             includedInStartedWorkUpdate: false,
           })
 
-          return { review, session }
-        }).pipe(
-          Effect.flatMap(({ review, session }) => save(job, pr, review, session)),
-          jobs.settle(
-            job,
-            "AgentReview",
-            (error: Option.Option<AgentReviewFailure>, { runner }): Failed => ({
-              status: "failed",
-              reason: Option.getOrElse(error, () => stoppedRunner(runner)),
-            }),
-          ),
-        )
+          yield* threads
+            .dropReviewCheckout(run.threadId)
+            .pipe(
+              Effect.catch((cause) =>
+                Effect.logWarning("Couldn't drop an Agent review's checkout", cause),
+              ),
+            )
 
-      const startThread = (
-        job: Job,
-        pr: PullRequestRef,
-        review: AgentReview,
-        session: ReviewSession,
-        message: string,
-      ) =>
-        Effect.uninterruptibleMask((restore) =>
-          Effect.gen(function* () {
-            const instructions = yield* reviewInstructions
-            const folder = reviewFolder(session.id)
+          return yield* save(job, run, review)
+        })
 
-            const removeFolder = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-              effect.pipe(
-                Effect.onError(() =>
-                  fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
+      const begin = (run: Run, folder: string, instructions: string, prompt: string) =>
+        Effect.gen(function* () {
+          const { pr, revision, runner } = run
+
+          yield* sql`INSERT INTO agent_review_run ${sql.insert({
+            owner: pr.owner,
+            repo: pr.repo,
+            number: pr.number,
+            thread_id: run.threadId,
+            base: revision.base,
+            head: revision.head,
+            started_at: run.startedAt,
+            runner: encodeRunner(runner),
+            background: run.background ? 1 : 0,
+            diff: encodeDiff(run.diff),
+          })}`.pipe(logStorageFailure, Effect.mapError(storageFailure))
+
+          yield* threads
+            .createForReview({
+              id: run.threadId,
+              name: `Agent review of ${pr.owner}/${pr.repo}#${pr.number}`,
+              pullRequest: pr,
+              revision,
+              harness: runner.harness,
+              model: threadModelOf(runner),
+              checkout: folder,
+              review: { instructions, diffLines: run.diff.lines },
+              message: prompt,
+            })
+            .pipe(
+              Effect.mapError(({ message }) => failure("runner", message, runner)),
+              Effect.tapError(() =>
+                sql`DELETE FROM agent_review_run WHERE thread_id = ${run.threadId}`.pipe(
+                  Effect.ignore,
                 ),
-              )
+              ),
+            )
+        }).pipe(Effect.uninterruptible)
 
-            const input = yield* restore(
-              checkoutRuns
-                .copy({
-                  pr,
-                  revision: review.revision,
-                  subject: "Follow-up",
-                  folder,
-                  read: github.tourInput,
-                })
-                .pipe(Effect.mapError(fromCheckoutRunFailure)),
-            ).pipe(removeFolder)
+      const work = (job: Job, pr: PullRequestRef, revision: Revision, background: boolean) =>
+        Effect.gen(function* () {
+          yield* discardRunOf(pr)
 
-            const thread = yield* threads
-              .createForReview({
-                id: session.id,
-                name: `Follow-ups on ${pr.owner}/${pr.repo}#${pr.number}`,
-                repository: new FollowedRepository({ owner: pr.owner, repo: pr.repo }),
-                revision: review.revision,
-                harness: session.runner.harness,
-                model: threadModelOf(session.runner),
-                checkout: folder,
-                review: {
-                  instructions,
-                  diffLines: {
-                    old: diffLinesOn(input.files, "old"),
-                    new: diffLinesOn(input.files, "new"),
-                  },
-                },
-                message,
-              })
-              .pipe(
-                Effect.mapError(({ message: reason }) => failure("runner", reason, session.runner)),
-                removeFolder,
-              )
+          const runner = yield* reviewer
+          const startedAt = yield* Clock.currentTimeMillis
+          yield* jobs.progress(job, () => ({ status: "reviewing", startedAt, runner }))
 
-            yield* jobs
-              .commit(
-                job,
-                sql`UPDATE agent_reviews SET thread_id = ${thread.id} WHERE ${where(pr)}`.pipe(
-                  logStorageFailure,
-                  Effect.mapError(storageFailure),
-                ),
-                (current) => ({ ...(current ?? review), threadId: thread.id }),
-              )
-              .pipe(Effect.onError(() => removeThread(thread.id)))
-          }),
-        ).pipe(
-          jobs.settle(
-            job,
-            "AgentReview.startThread",
-            (error: Option.Option<AgentReviewFailure>, { runner }): Failed => ({
-              status: "thread-start-failed",
-              message,
-              reason: Option.getOrElse(error, () => stoppedRunner(runner)),
-            }),
-          ),
-        )
+          const threadId = randomUUID()
+          const folder = reviewFolder(threadId)
+
+          const removeFolder = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
+            effect.pipe(
+              Effect.onExit((exit) =>
+                Exit.isSuccess(exit)
+                  ? Effect.void
+                  : fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
+              ),
+            )
+
+          const input = yield* checkoutRuns
+            .copy({ pr, revision, subject: "Agent review", folder, read: github.reviewInput })
+            .pipe(Effect.mapError(fromCheckoutRunFailure), removeFolder)
+
+          const instructions = yield* reviewInstructions.pipe(removeFolder)
+
+          const run: Run = {
+            pr,
+            threadId,
+            revision,
+            startedAt,
+            runner,
+            background,
+            diff: diffOf(input.files),
+          }
+
+          yield* begin(run, folder, instructions, agentReviewPrompt(input, revision)).pipe(
+            removeFolder,
+          )
+
+          yield* follow(job, run)
+        }).pipe(settled(job))
 
       const start = Effect.fn("AgentReviews.start")(function* (
         pr: PullRequestRef,
@@ -405,7 +524,7 @@ export class AgentReviews extends Context.Service<
         const job = yield* jobs.jobFor(pr)
 
         yield* jobs.begin(job, (replace) =>
-          Effect.flatMap(started, (progress) => replace(progress, work(job, pr, revision))),
+          Effect.flatMap(started, (progress) => replace(progress, work(job, pr, revision, false))),
         )
       })
 
@@ -413,74 +532,17 @@ export class AgentReviews extends Context.Service<
         pr: PullRequestRef,
         revision: Revision,
       ) {
-        yield* jobs.startInBackground(pr, started, (job) => work(job, pr, revision))
+        yield* jobs.startInBackground(pr, started, (job) => work(job, pr, revision, true))
       })
 
-      const followUp = Effect.fn("AgentReviews.followUp")(function* (
-        pr: PullRequestRef,
-        revision: Revision,
-        message: string,
-      ) {
-        const job = yield* jobs.jobFor(pr)
+      const cancel = (pr: PullRequestRef) => jobs.stop(pr).pipe(Effect.andThen(discardRunOf(pr)))
 
-        const threadId = yield* jobs.begin(job, (replace) =>
-          Effect.gen(function* () {
-            const { output: review, run } = yield* SubscriptionRef.get(job.state)
-
-            if (run.status === "running" && run.progress.status === "starting-thread")
-              return yield* failure("not-ready", "Wait for the agent to start.")
-
-            if (run.status === "waiting" || run.status === "running")
-              return yield* failure("not-ready", "Wait for the Agent review to finish.")
-
-            if (review === null || !Equal.equals(review.revision, revision))
-              return yield* failure(
-                "stale-revision",
-                "This Agent review was written for another Revision. Review again to follow up.",
-              )
-
-            if (review.threadId !== null) return review.threadId
-
-            const session = yield* sessionOf(pr)
-
-            if (session === null)
-              return yield* failure(
-                "not-ready",
-                "This Agent review can't take Follow-ups. Review again to follow up.",
-              )
-
-            const startedAt = yield* Clock.currentTimeMillis
-            yield* replace(
-              {
-                status: "starting-thread",
-                message,
-                startedAt,
-                runner: session.runner,
-              },
-              startThread(job, pr, review, session, message),
-            )
-
-            return null
-          }),
-        )
-
-        if (threadId === null) return
-
-        yield* threads
-          .send(threadId, { message, images: [] })
+      const cancelBackground = () =>
+        jobs
+          .stopBackground()
           .pipe(
-            Effect.mapError((error) =>
-              Predicate.isTagged(error, "RequestWaiting")
-                ? failure("not-ready", "Answer the agent's request first.")
-                : failure(
-                    "runner",
-                    Predicate.isTagged(error, "ThreadNotFound")
-                      ? "This Agent review's Thread is gone. Review again to follow up."
-                      : error.message,
-                  ),
-            ),
+            Effect.andThen(discardRuns(sql`SELECT * FROM agent_review_run WHERE background = 1`)),
           )
-      })
 
       const mark = (flag: "done" | "includedInStartedWorkUpdate", name: string) =>
         Effect.fn(name)(function* (pr: PullRequestRef, writtenAt: DateTime.Utc) {
@@ -507,17 +569,34 @@ export class AgentReviews extends Context.Service<
           )
         })
 
+      const running = yield* runsOf(sql`SELECT * FROM agent_review_run`).pipe(
+        Effect.orElseSucceed(() => []),
+      )
+
+      yield* Effect.forEach(
+        running,
+        (run) =>
+          jobs
+            .resume(
+              run.pr,
+              run.background,
+              { status: "reviewing", startedAt: run.startedAt, runner: run.runner },
+              (job) => follow(job, run).pipe(settled(job)),
+            )
+            .pipe(Effect.ignore),
+        { discard: true },
+      )
+
       return AgentReviews.of({
         start,
         startInBackground,
-        followUp,
-        cancel: jobs.stop,
+        cancel,
         markDone: mark("done", "AgentReviews.markDone"),
         markIncludedInStartedWorkUpdate: mark(
           "includedInStartedWorkUpdate",
           "AgentReviews.markIncludedInStartedWorkUpdate",
         ),
-        cancelBackground: jobs.stopBackground,
+        cancelBackground,
         watch: jobs.watch,
       })
     }),

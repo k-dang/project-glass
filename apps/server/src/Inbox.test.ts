@@ -20,13 +20,17 @@ import { startFakeGitHub } from "../test/fakeGitHub"
 import { type FakePullRequest, type FakePullRequestSeed, VIEWER } from "../test/fakePullRequest"
 import { isolatedHome, startBackend, startSignedInBackend } from "../test/harness"
 import { inboxWhen } from "../test/inboxWhen"
-import { type ScriptedSettings, scriptedAgentRunners } from "../test/scriptedAgentRunners"
+import { scriptedReviews } from "../test/scriptedReviews"
 
 type Client = Effect.Success<ReturnType<typeof startBackend>>["client"]
 
 const scriptedHost = fileURLToPath(new URL("../dist-test/scriptedAgentHost.mjs", import.meta.url))
 
-const answer = { markdown: "**Nothing stands out.** The greeting now takes a name." }
+const answer = {
+  markdown: "**Nothing stands out.** The greeting now takes a name.",
+  hotspots: [],
+  lowAttention: [],
+}
 
 const current = (client: Client) => inboxWhen(client, () => true)
 
@@ -83,15 +87,14 @@ const status = (wanted: AgentReviewState["job"]["status"]) => (state: AgentRevie
 
 const reviewed = (state: AgentReviewState) => state.review !== null && state.job.status === "idle"
 
-const reviewsFixture = Effect.fnUntraced(function* (
-  settings: ScriptedSettings = { reply: { answer } },
-) {
-  const runners = yield* scriptedAgentRunners(settings)
+const reviewsFixture = Effect.fnUntraced(function* (held = false) {
   const github = yield* startFakeGitHub({ git: true })
   const home = yield* isolatedHome
   const gates = join(home, "gates")
   mkdirSync(gates)
   vi.stubEnv("GLASS_SCRIPTED_GATES", gates)
+  const reviews = scriptedReviews(gates)
+  yield* held ? reviews.hold : reviews.script({ submit: [answer] })
 
   const { client } = yield* startBackend(
     {
@@ -101,7 +104,6 @@ const reviewsFixture = Effect.fnUntraced(function* (
       GLASS_AGENT_HOST_BUNDLE: scriptedHost,
     },
     home,
-    runners.layer,
   )
 
   const seed = (title: string, extra: Partial<FakePullRequestSeed> = {}) =>
@@ -131,7 +133,7 @@ const reviewsFixture = Effect.fnUntraced(function* (
       .StartAgentReview({ pullRequest: ref(pr), revision: revisionOf(pr) })
       .pipe(Effect.andThen(reviewState(pr, reviewed)))
 
-  return { runners, client, seed, reviewState, review }
+  return { reviews, client, seed, reviewState, review }
 })
 
 it.live(
@@ -282,7 +284,7 @@ it.live(
   "lists a queued PR once its Agent review is finished, not while one waits, runs, or failed",
   () =>
     Effect.gen(function* () {
-      const f = yield* reviewsFixture({ reply: "hold" })
+      const f = yield* reviewsFixture(true)
       const [first, second, third] = [f.seed("Greet"), f.seed("Wave"), f.seed("Fibers")]
       yield* f.client.SetQueueWork({ feature: "agentReviews", enabled: true })
       yield* f.client.AddToQueue({ references: [ref(first), ref(second), ref(third)] })
@@ -292,7 +294,7 @@ it.live(
 
       assert.deepStrictEqual(yield* current(f.client), [])
 
-      yield* f.runners.release({ answer })
+      yield* f.reviews.release({ submit: [answer] })
       const { review } = yield* f.reviewState(first, reviewed)
 
       const listed = yield* inboxWhen(f.client, (items) => titles(items).includes("Greet"))
@@ -304,12 +306,12 @@ it.live(
 
       yield* f.reviewState(second, reviewed)
       yield* f.reviewState(third, reviewed)
-      yield* f.runners.configure({ reply: "hold" })
+      yield* f.reviews.hold
       yield* f.client.StartAgentReview({ pullRequest: ref(first), revision: revisionOf(first) })
       yield* f.reviewState(first, (state) => status("reviewing")(state) && state.review !== null)
       assert.deepStrictEqual(titles(yield* current(f.client)), ["Wave", "Fibers"])
 
-      yield* f.runners.release({ fail: "failed" })
+      yield* f.reviews.release({ fail: "failed" })
       yield* f.reviewState(first, (state) => status("failed")(state) && state.review !== null)
       assert.deepStrictEqual(titles(yield* current(f.client)), ["Wave", "Fibers"])
     }),
@@ -384,12 +386,13 @@ it.live("lists a waiting Thread before a PR that has waited longer", () =>
     const f = yield* reviewsFixture()
     const pr = f.seed("Greet")
     yield* f.client.AddToQueue({ references: [ref(pr)] })
-    yield* f.review(pr)
+    const { review } = yield* f.review(pr)
 
-    yield* f.client.FollowUpAgentReview({
-      pullRequest: ref(pr),
-      revision: revisionOf(pr),
+    yield* f.client.SendMessage({
+      threadId: review!.threadId!,
       message: "Please ask permission",
+      images: [],
+      feedback: [],
     })
 
     const listed = yield* inboxWhen(f.client, (items) => items.length === 2)
@@ -602,7 +605,7 @@ it.live(
   "drops a queued PR once a Started work update includes the Agent review the Global chat started, leaving it not done",
   () =>
     Effect.gen(function* () {
-      const f = yield* reviewsFixture({ reply: "hold" })
+      const f = yield* reviewsFixture(true)
       const pr = f.seed("Greet")
       yield* f.client.AddToQueue({ references: [ref(pr)] })
 
@@ -613,7 +616,7 @@ it.live(
         context: null,
       })
       yield* f.reviewState(pr, status("reviewing"))
-      yield* f.runners.release({ answer })
+      yield* f.reviews.release({ submit: [answer] })
 
       const { review } = yield* f.reviewState(
         pr,

@@ -18,6 +18,8 @@ import { join } from "node:path"
 import {
   claudeSession,
   writeGreetPack,
+  assertReviewAnswers,
+  reviewAnswers,
   reviewBrief,
   reviewDrafts,
   assertSuggestedDrafts,
@@ -351,7 +353,7 @@ it.live("runs the next Turn in a newly chosen Permission mode", () =>
 )
 
 it.live(
-  "runs commands in its checkout and proposes Suggested drafts as an Agent review's Thread",
+  "runs commands in its checkout, hands in its review, and proposes Suggested drafts as an Agent review's Thread",
   () =>
     Effect.gen(function* () {
       const f = yield* claudeSession("claude-review")
@@ -359,7 +361,9 @@ it.live(
       const session = yield* f.open(threadId, ReviewRole.make({ brief: reviewBrief }))
 
       yield* session.send(
-        "Run `cat greet.ts` with the Bash tool. Then call the suggest_draft tool once for each of these drafts, one call after the other: " +
+        "Run `cat greet.ts` with the Bash tool. Then call the submit_review tool once for each of these answers, one call after the other, even when Glass refuses one: " +
+          reviewAnswers.map(({ answer }) => JSON.stringify(answer)).join("; then ") +
+          ". Then call the suggest_draft tool once for each of these drafts, one call after the other: " +
           reviewDrafts
             .map(
               ({ draft: { path, side, line, body } }) =>
@@ -374,11 +378,13 @@ it.live(
 
       const calls = turn!.parts.filter((part) => Predicate.isTagged(part, "ToolCall"))
       assert.includeMembers(
-        ["Read", "Grep", "Glob", "Bash", "suggest_draft"],
+        ["Read", "Grep", "Glob", "Bash", "submit_review", "suggest_draft"],
         [...new Set(calls.map(({ name }) => name))],
       )
 
       assert.include(calls.find(({ name }) => name === "Bash")?.output, "hello name")
+
+      assertReviewAnswers(calls.filter(({ name }) => name === "submit_review"))
 
       const suggestions = calls.filter(({ name }) => name === "suggest_draft")
       assertSuggestedDrafts(suggestions)

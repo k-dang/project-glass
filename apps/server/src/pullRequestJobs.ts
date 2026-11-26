@@ -184,6 +184,29 @@ export const pullRequestJobs = Effect.fnUntraced(function* <O, P, F, S, E>(optio
         ),
       )
 
+  const launchInBackground = (
+    job: PullRequestJob<O, P, F>,
+    start: Effect.Effect<P>,
+    run: (job: PullRequestJob<O, P, F>) => Effect.Effect<void>,
+  ) =>
+    launch(
+      job,
+      backgroundSlots.withPermits(1)(
+        Effect.gen(function* () {
+          const initial = yield* start
+
+          yield* updateRun(job, isWaiting, (waiting) => ({
+            ...waiting,
+            status: "running",
+            background: true,
+            progress: initial,
+          }))
+          yield* run(job)
+        }),
+      ),
+      (fiber) => ({ status: "waiting", fiber }),
+    )
+
   const startInBackground = Effect.fnUntraced(function* (
     pr: PullRequestRef,
     start: Effect.Effect<P>,
@@ -198,24 +221,24 @@ export const pullRequestJobs = Effect.fnUntraced(function* <O, P, F, S, E>(optio
 
         if (output !== null || current.status !== "idle") return
 
-        yield* launch(
-          job,
-          backgroundSlots.withPermits(1)(
-            Effect.gen(function* () {
-              const initial = yield* start
-
-              yield* updateRun(job, isWaiting, (waiting) => ({
-                ...waiting,
-                status: "running",
-                background: true,
-                progress: initial,
-              }))
-              yield* run(job)
-            }),
-          ),
-          (fiber) => ({ status: "waiting", fiber }),
-        )
+        yield* launchInBackground(job, start, run)
       }),
+    )
+  })
+
+  const resume = Effect.fnUntraced(function* (
+    pr: PullRequestRef,
+    background: boolean,
+    initial: P,
+    run: (job: PullRequestJob<O, P, F>) => Effect.Effect<void>,
+  ) {
+    const job = yield* jobFor(pr)
+
+    yield* locked(
+      job,
+      background
+        ? launchInBackground(job, Effect.succeed(initial), run)
+        : replace(job, initial, run(job)),
     )
   })
 
@@ -245,6 +268,7 @@ export const pullRequestJobs = Effect.fnUntraced(function* <O, P, F, S, E>(optio
         Effect.suspend(() => next((initial, work) => replace(job, initial, work))),
       ),
     startInBackground,
+    resume,
     stop,
     stopBackground: () =>
       Effect.forEach([...jobs.values()], (job) => stopJob(job, true), {

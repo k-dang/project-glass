@@ -243,11 +243,14 @@ export const BackgroundWorkEnded = Schema.TaggedStruct("BackgroundWorkEnded", {
   work: Schema.NonEmptyArray(BackgroundWork),
 })
 
+export const AgentReviewTurn = Schema.TaggedStruct("AgentReview", {})
+
 export const TurnContext = Schema.Union([
   PullRequestContext,
   ThreadContext,
   StartedWorkUpdate,
   BackgroundWorkEnded,
+  AgentReviewTurn,
 ])
 
 export type TurnContext = typeof TurnContext.Type

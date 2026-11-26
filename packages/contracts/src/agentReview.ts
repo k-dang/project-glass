@@ -14,8 +14,6 @@ export const AgentReviewDone = Schema.Struct({
 
 export type AgentReviewDone = typeof AgentReviewDone.Type
 
-export const FollowUpMessage = Schema.Trimmed.check(Schema.isNonEmpty())
-
 export const SuggestedDraft = Schema.Struct({
   path: Schema.String,
   side: DiffSide,
@@ -96,17 +94,6 @@ export const AgentReviewState = Schema.Struct({
       runner: Schema.NullOr(AgentRunnerIdentity),
     }),
     Schema.Struct({ status: Schema.Literal("failed"), reason: AgentReviewFailure }),
-    Schema.Struct({
-      status: Schema.Literal("starting-thread"),
-      message: FollowUpMessage,
-      startedAt: Schema.Number,
-      runner: AgentRunnerIdentity,
-    }),
-    Schema.Struct({
-      status: Schema.Literal("thread-start-failed"),
-      message: FollowUpMessage,
-      reason: AgentReviewFailure,
-    }),
   ]),
 })
 
@@ -114,8 +101,6 @@ export type AgentReviewState = typeof AgentReviewState.Type
 
 const finishedWhile: Record<AgentReviewState["job"]["status"], boolean> = {
   idle: true,
-  "starting-thread": true,
-  "thread-start-failed": true,
   waiting: false,
   reviewing: false,
   failed: false,

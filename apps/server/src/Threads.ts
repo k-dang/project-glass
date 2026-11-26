@@ -1,4 +1,5 @@
 import {
+  AgentReviewTurn,
   Thread,
   ThreadBusy,
   type AgentHarness,
@@ -29,7 +30,8 @@ import {
   NoPermissionModes,
   type RequestNotWaiting,
   type RequestWaiting,
-  type Revision,
+  PullRequestRef,
+  Revision,
   localPlace,
   mentionedToDoIds,
   repositoryKey,
@@ -56,6 +58,8 @@ import {
 import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { changesId } from "./Changes"
+import { checkoutError } from "./CheckoutRuns"
+import { Checkouts } from "./Checkouts"
 import { ActivityLog } from "./ActivityLog"
 import { firstFreeBranch } from "./BranchNames"
 import { threadBranchNaming } from "./threadBranchNaming"
@@ -75,6 +79,7 @@ import { LocalPlacement } from "./LocalPlacement"
 import { type RepositoryRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
+import { keyedLock } from "./keyedLock"
 import { ToDos } from "./ToDos"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
@@ -90,6 +95,18 @@ const BriefJson = Schema.fromJsonString(ReviewBrief)
 const encodeBrief = Schema.encodeSync(BriefJson)
 
 const decodeBrief = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ brief: BriefJson })))
+
+const ReviewedRevision = Schema.Struct({ pullRequest: PullRequestRef, revision: Revision })
+
+type ReviewedRevision = typeof ReviewedRevision.Type
+
+const ReviewedJson = Schema.fromJsonString(ReviewedRevision)
+
+const encodeReviewed = Schema.encodeSync(ReviewedJson)
+
+const decodeReviewed = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ reviewed: Schema.NullOr(ReviewedJson) })),
+)
 
 const decodeKeptGoing = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.String, keptGoingAt: Schema.DateTimeUtcFromString })),
@@ -121,16 +138,15 @@ const couldNotSave = (cause: SqlError.SqlError) =>
 
 type Purpose = Data.TaggedEnum<{
   Work: { readonly packs: ReadonlyArray<string> }
-  Review: { readonly brief: ReviewBrief }
+  Review: { readonly brief: ReviewBrief; readonly reviewed: ReviewedRevision }
 }>
 
 const Purpose = Data.taggedEnum<Purpose>()
 
 interface NewReviewThread {
-  // WARNING: The id must be the session the Agent review's run saved in this checkout, since both harnesses resume a Thread's session by its id and folder.
   readonly id: string
   readonly name: string
-  readonly repository: FollowedRepository
+  readonly pullRequest: PullRequestRef
   readonly revision: Revision
   readonly harness: AgentHarness
   readonly model: string | null
@@ -217,6 +233,9 @@ export class Threads extends Context.Service<
       input: Omit<NewThread, "permissionMode">,
     ) => Effect.Effect<Thread, ThreadNotFound | InvalidLocalCheckout | ThreadError>
     readonly createForReview: (input: NewReviewThread) => Effect.Effect<Thread, ThreadError>
+    readonly dropReviewCheckout: (
+      threadId: string,
+    ) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly refuseReviewFrom: (
       threadId: string,
     ) => Effect.Effect<void, ThreadNotFound | ThreadError>
@@ -307,7 +326,9 @@ export class Threads extends Context.Service<
       const toDos = yield* ToDos
       const localSkills = yield* LocalSkills
       const fs = yield* FileSystem.FileSystem
+      const checkouts = yield* Checkouts
       const lock = yield* Semaphore.make(1)
+      const reviewCheckoutLock = keyedLock()
 
       const stored = yield* sql`
         SELECT id, name, sandbox_provider AS sandboxProvider, owner, repo, base_branch AS baseBranch,
@@ -377,18 +398,53 @@ export class Threads extends Context.Service<
             )
       }
 
+      const removeReviewCheckout = (folder: string) =>
+        fs.remove(folder, { recursive: true, force: true }).pipe(
+          Effect.tapError((cause) =>
+            Effect.logWarning("Couldn't remove an Agent review's checkout", cause),
+          ),
+          Effect.mapError(storageFailure),
+        )
+
+      const reviewedRevision = (threadId: string) =>
+        sql`SELECT review_checkout AS reviewed FROM thread WHERE id = ${threadId}`.pipe(
+          Effect.flatMap(decodeReviewed),
+          Effect.tapError((cause) => Effect.logWarning("Couldn't read a reviewed Revision", cause)),
+          Effect.mapError(storageFailure),
+          Effect.map(([found]) => found?.reviewed ?? null),
+        )
+
+      // WARNING: Both harnesses find a session by its folder, so a Review Thread whose checkout was dropped gets it back at the same path.
+      const checkedOutForReview = ({ thread, folder }: PlacedThread) =>
+        reviewCheckoutLock.withLock(
+          thread.id,
+          Effect.gen(function* () {
+            if (yield* fs.exists(folder).pipe(Effect.orElseSucceed(() => false))) return undefined
+
+            const reviewed = yield* reviewedRevision(thread.id)
+
+            if (reviewed === null)
+              return yield* new ThreadError({
+                message: "This Agent review's checkout is gone. Review again to follow up.",
+              })
+
+            return yield* checkouts
+              .checkoutInto(reviewed.pullRequest, reviewed.revision, folder)
+              .pipe(
+                Effect.mapError(
+                  (error) => new ThreadError({ message: checkoutError(null)(error).message }),
+                ),
+              )
+          }),
+        )
+
       const reviewHosting: ThreadHosting = {
-        prepareHost: localPlacement.prepareHost,
+        prepareHost: (row) =>
+          checkedOutForReview(row).pipe(Effect.andThen(localPlacement.prepareHost(row))),
         hostIfPrepared: () => Effect.succeedNone,
         connectedHost: localPlacement.connectedHost,
         baseRef: localPlacement.baseRef,
-        remove: ({ folder }) =>
-          fs.remove(folder, { recursive: true, force: true }).pipe(
-            Effect.tapError((cause) =>
-              Effect.logWarning("Couldn't remove an Agent review's checkout", cause),
-            ),
-            Effect.mapError(storageFailure),
-          ),
+        remove: ({ folder }) => removeReviewCheckout(folder),
       }
 
       const hostingOf = (row: PlacedThread): ThreadHosting =>
@@ -593,6 +649,10 @@ export class Threads extends Context.Service<
                   Work: () => null,
                   Review: ({ brief }) => encodeBrief(brief),
                 }),
+                review_checkout: Purpose.$match(purpose, {
+                  Work: () => null,
+                  Review: ({ reviewed }) => encodeReviewed(reviewed),
+                }),
               })}`
 
               yield* Purpose.$match(purpose, {
@@ -602,7 +662,15 @@ export class Threads extends Context.Service<
 
               yield* SubscriptionRef.update(rows, (current) => [{ ...placed, thread }, ...current])
               yield* setKeptGoing(id, thread.createdAt)
-              yield* transcripts.startOrQueue(id, { ...first, context: null })
+              yield* Purpose.$match(purpose, {
+                Work: () => transcripts.startOrQueue(id, { ...first, context: null }),
+                Review: () =>
+                  transcripts.startIfIdle(
+                    id,
+                    { ...first, context: AgentReviewTurn.make({}), retriesDelivery: false },
+                    () => Effect.void,
+                  ),
+              })
 
               return thread
             }).pipe(sql.withTransaction),
@@ -625,12 +693,14 @@ export class Threads extends Context.Service<
       const createForReview = Effect.fn("Threads.createForReview")(function* (
         input: NewReviewThread,
       ) {
+        const { pullRequest, revision } = input
+
         const thread = new Thread({
           id: input.id,
           name: input.name,
           place: localPlace,
-          repository: input.repository,
-          baseBranch: input.revision.base,
+          repository: new FollowedRepository({ owner: pullRequest.owner, repo: pullRequest.repo }),
+          baseBranch: revision.base,
           branch: null,
           harness: input.harness,
           model: input.model,
@@ -646,8 +716,32 @@ export class Threads extends Context.Service<
         return yield* insert(
           { thread, folder: input.checkout, forReview: true },
           { message: input.message, images: [] },
-          Purpose.Review({ brief: input.review }),
+          Purpose.Review({ brief: input.review, reviewed: { pullRequest, revision } }),
         )
+      })
+
+      const dropReviewCheckout = Effect.fn("Threads.dropReviewCheckout")(function* (
+        threadId: string,
+      ) {
+        const row = yield* find(threadId)
+
+        if (!row.forReview) return
+
+        yield* turns
+          .whileIdle(
+            threadId,
+            Effect.gen(function* () {
+              const running = yield* localPlacement.connectedHost(row)
+
+              if (Option.isSome(running))
+                yield* running.value
+                  .StopThread({ threadId })
+                  .pipe(Effect.ignore({ log: "Warn", message: "Couldn't stop a Thread" }))
+
+              yield* reviewCheckoutLock.withLock(threadId, removeReviewCheckout(row.folder))
+            }),
+          )
+          .pipe(Effect.catchTag("ThreadBusy", () => Effect.void))
       })
 
       const createWith = Effect.fnUntraced(function* (
@@ -1060,6 +1154,7 @@ export class Threads extends Context.Service<
         create,
         createFrom,
         createForReview,
+        dropReviewCheckout,
         refuseReviewFrom,
         send,
         sendFrom,

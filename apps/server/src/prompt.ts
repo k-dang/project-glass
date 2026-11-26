@@ -11,7 +11,7 @@ import {
   type TurnContext,
   type StartedWorkUpdate,
 } from "@glass/contracts"
-import { Match, Predicate } from "effect"
+import { Match } from "effect"
 
 const withoutBlockTags = (text: string) =>
   text.replaceAll(
@@ -56,13 +56,17 @@ const startedWorkUpdateBlock = ({ work }: StartedWorkUpdate) =>
     ...work.map(workOutcomeEntry),
   ])
 
-const contextBlock = (context: TurnContext) => {
-  if (Predicate.isTagged(context, "StartedWorkUpdate")) return startedWorkUpdateBlock(context)
+const viewingBlock = (context: CapturedContext) =>
+  block("glass_context", [`The user sent this while viewing ${viewing(context)}.`])
 
-  if (Predicate.isTagged(context, "BackgroundWorkEnded")) return null
-
-  return block("glass_context", [`The user sent this while viewing ${viewing(context)}.`])
-}
+const contextBlock = (context: TurnContext) =>
+  Match.valueTags(context, {
+    StartedWorkUpdate: startedWorkUpdateBlock,
+    BackgroundWorkEnded: () => null,
+    AgentReview: () => null,
+    PullRequest: viewingBlock,
+    Thread: viewingBlock,
+  })
 
 const entry = ({ id, title, notes, done, images }: ToDo) =>
   [

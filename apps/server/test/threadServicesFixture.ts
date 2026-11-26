@@ -53,6 +53,7 @@ import { Sandboxes } from "../src/Sandboxes"
 import { GlassToolRelay } from "../src/mcp/GlassToolRelay"
 import { LocalSkills } from "../src/LocalSkills"
 import { SkillPacks } from "../src/SkillPacks"
+import { Checkouts } from "../src/Checkouts"
 import { ServerConfig } from "../src/ServerConfig"
 import { GitHubClient } from "../src/github/GitHubClient"
 import { LocalPlacement } from "../src/LocalPlacement"
@@ -282,6 +283,7 @@ export const threadServicesFixture = Effect.gen(function* () {
             ),
           ),
           Layer.provide(Layer.mock(ActivityLog)({ record: () => Effect.void })),
+          Layer.provide(Layer.mock(Checkouts)({})),
           Layer.provide(Layer.succeed(BranchNames, BranchNames.of({ suggest: () => suggestion }))),
           Layer.provide(NodeFileSystem.layer),
         ),

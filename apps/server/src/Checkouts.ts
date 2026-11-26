@@ -67,11 +67,6 @@ export class Checkouts extends Context.Service<
       revision: Revision,
       folder: string,
     ) => Effect.Effect<void, CheckoutFailure | StaleRevision | NoCredentials>
-    readonly checkoutAt: (
-      pr: PullRequestRef,
-      revision: Revision,
-      folder: string,
-    ) => Effect.Effect<string, CheckoutFailure | StaleRevision | NoCredentials, Scope.Scope>
   }
 >()("@glass/server/Checkouts") {
   static readonly layer = Layer.effect(
@@ -234,12 +229,7 @@ export class Checkouts extends Context.Service<
         )
       }, storageFailure)
 
-      const checkoutAt = (pr: PullRequestRef, revision: Revision, folder: string) =>
-        Effect.addFinalizer(() =>
-          fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
-        ).pipe(Effect.andThen(checkoutInto(pr, revision, folder)), Effect.as(folder))
-
-      return Checkouts.of({ checkout, checkoutInto, checkoutAt })
+      return Checkouts.of({ checkout, checkoutInto })
     }),
   )
 }
