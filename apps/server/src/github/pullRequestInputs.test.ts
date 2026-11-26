@@ -1,9 +1,9 @@
 import { assert, describe, it } from "@effect/vitest"
 import { GitHubUnavailable, PullRequestRef, Revision, StaleRevision } from "@glass/contracts"
-import { Deferred, Effect, Fiber, Redacted, Schema } from "effect"
+import { Deferred, Effect, Fiber, Schema } from "effect"
 import { startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
-import { clientWith } from "../../test/gitHubClient"
+import { clientWith, fakeAuth } from "../../test/gitHubClient"
 
 const FILES = "GET /repos/acme/api/pulls/42/files"
 
@@ -44,44 +44,41 @@ const startRelay = Effect.gen(function* () {
     return made
   }
 
-  const client = yield* clientWith(
-    async (input, init) => {
-      const request = new Request(input, init)
-      const kind = await kindOf(request)
-      requests.push(kind)
-      Deferred.doneUnsafe(arrival(kind), Effect.void)
+  const client = yield* clientWith(async (input, init) => {
+    const request = new Request(input, init)
+    const kind = await kindOf(request)
+    requests.push(kind)
+    Deferred.doneUnsafe(arrival(kind), Effect.void)
 
-      const hold = holds.get(kind)
+    const hold = holds.get(kind)
 
-      if (hold !== undefined) {
-        const aborted = new Promise<never>((_resolve, reject) =>
-          request.signal.addEventListener("abort", () => reject(new Error("Aborted")), {
-            once: true,
-          }),
-        )
+    if (hold !== undefined) {
+      const aborted = new Promise<never>((_resolve, reject) =>
+        request.signal.addEventListener("abort", () => reject(new Error("Aborted")), {
+          once: true,
+        }),
+      )
 
-        await Promise.race([Effect.runPromise(Deferred.await(hold)), aborted])
-      }
+      await Promise.race([Effect.runPromise(Deferred.await(hold)), aborted])
+    }
 
-      const status = failing.get(kind)
+    const status = failing.get(kind)
 
-      if (status !== undefined) {
-        failing.delete(kind)
+    if (status !== undefined) {
+      failing.delete(kind)
 
-        return new Response(null, { status })
-      }
+      return new Response(null, { status })
+    }
 
-      const { pathname, search } = new URL(request.url)
+    const { pathname, search } = new URL(request.url)
 
-      return fetch(`${github.url}${pathname}${search}`, {
-        method: request.method,
-        headers: request.headers,
-        body: request.method === "GET" ? null : await request.text(),
-        signal: request.signal,
-      })
-    },
-    { resolveToken: Effect.succeed({ token: Redacted.make(VIEWER.token), source: "gh" as const }) },
-  )
+    return fetch(`${github.url}${pathname}${search}`, {
+      method: request.method,
+      headers: request.headers,
+      body: request.method === "GET" ? null : await request.text(),
+      signal: request.signal,
+    })
+  }, fakeAuth(VIEWER.token))
 
   return {
     client,

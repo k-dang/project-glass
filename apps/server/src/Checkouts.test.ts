@@ -49,7 +49,9 @@ const fixture = Effect.fnUntraced(function* ({
 
   const services = yield* Layer.build(
     Checkouts.layer.pipe(
-      Layer.provide(Layer.succeed(GitHubAuth, GitHubAuth.of({ resolveToken }))),
+      Layer.provide(
+        Layer.succeed(GitHubAuth, GitHubAuth.of({ resolveToken, forgetToken: Effect.void })),
+      ),
       Layer.provide(Git.layer),
       Layer.provide(ServerConfig.layer),
       Layer.provide(NodeServices.layer),
