@@ -21,7 +21,6 @@ import {
   Context,
   DateTime,
   Effect,
-  Exit,
   FileSystem,
   Layer,
   Match,
@@ -32,7 +31,7 @@ import {
   Stream,
   SubscriptionRef,
 } from "effect"
-import { SqlClient, type SqlError } from "effect/sql"
+import { SqlClient } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { join } from "node:path"
 import { ReviewBrief } from "./agentHost/protocol"
@@ -93,34 +92,11 @@ const ReviewDiff = Schema.Struct({
 
 type ReviewDiff = typeof ReviewDiff.Type
 
-const RunnerJson = Schema.fromJsonString(AgentRunnerIdentity)
-
-const DiffJson = Schema.fromJsonString(ReviewDiff)
-
-const encodeRunner = Schema.encodeSync(RunnerJson)
-
-const encodeDiff = Schema.encodeSync(DiffJson)
-
-const StoredRuns = Schema.Array(
-  Schema.Struct({
-    ...PullRequestRef.fields,
-    thread_id: Schema.String,
-    base: Schema.String,
-    head: Schema.String,
-    started_at: Schema.Number,
-    runner: RunnerJson,
-    background: Schema.BooleanFromBit,
-    diff: DiffJson,
-  }),
-)
-
 interface Run {
   readonly pr: PullRequestRef
   readonly threadId: string
   readonly revision: Revision
-  readonly startedAt: number
   readonly runner: AgentRunnerIdentity
-  readonly background: boolean
   readonly diff: ReviewDiff
 }
 
@@ -280,41 +256,53 @@ export class AgentReviews extends Context.Service<
               ),
             )
 
-      const reviewFolder = (threadId: string) =>
-        join(config.dataDirectory, "agent-review-checkouts", threadId)
+      const checkoutsFolder = join(config.dataDirectory, "agent-review-checkouts")
 
-      const runsOf = (query: Effect.Effect<ReadonlyArray<unknown>, SqlError.SqlError>) =>
-        query.pipe(
-          Effect.flatMap(Schema.decodeUnknownEffect(StoredRuns)),
-          Effect.map((rows) =>
-            rows.map((row): Run => ({
-              pr: new PullRequestRef({ owner: row.owner, repo: row.repo, number: row.number }),
-              threadId: row.thread_id,
-              revision: new Revision({ base: row.base, head: row.head }),
-              startedAt: row.started_at,
-              runner: row.runner,
-              background: row.background,
-              diff: row.diff,
-            })),
+      const keptThreads = sql<{ readonly threadId: string }>`
+        SELECT thread_id AS threadId FROM agent_reviews WHERE thread_id IS NOT NULL
+      `.pipe(Effect.map((rows) => new Set(rows.map(({ threadId }) => threadId))))
+
+      const removeUnlessKept = (threadId: string) =>
+        keptThreads.pipe(
+          Effect.flatMap((kept) => (kept.has(threadId) ? Effect.void : removeThread(threadId))),
+          Effect.catch((cause) =>
+            Effect.logWarning("Couldn't check whether an Agent review keeps its Thread", cause),
           ),
-          logStorageFailure,
-          Effect.mapError(storageFailure),
         )
 
-      const discard = (run: Run) =>
-        removeThread(run.threadId).pipe(
-          Effect.andThen(sql`DELETE FROM agent_review_run WHERE thread_id = ${run.threadId}`),
-          Effect.catch((cause) => Effect.logWarning("Couldn't discard an Agent review", cause)),
+      const removeUnkept = Effect.gen(function* () {
+        const kept = yield* keptThreads
+        const reviewThreads = yield* threads.reviewThreads
+
+        yield* Effect.forEach(
+          reviewThreads.filter(({ id }) => !kept.has(id)),
+          ({ id }) => removeThread(id),
+          { discard: true },
         )
 
-      const discardRuns = (query: Effect.Effect<ReadonlyArray<unknown>, SqlError.SqlError>) =>
-        runsOf(query).pipe(
-          Effect.flatMap((runs) => Effect.forEach(runs, discard, { discard: true })),
-          Effect.ignore,
+        const keptFolders = reviewThreads.flatMap(({ id, folder }) =>
+          kept.has(id) ? [folder] : [],
         )
 
-      const discardRunOf = (pr: PullRequestRef) =>
-        discardRuns(sql`SELECT * FROM agent_review_run WHERE ${where(pr)}`)
+        const entries = yield* fs
+          .readDirectory(checkoutsFolder)
+          .pipe(Effect.orElseSucceed((): ReadonlyArray<string> => []))
+
+        yield* Effect.forEach(
+          entries
+            .map((entry) => join(checkoutsFolder, entry))
+            .filter(
+              (path) =>
+                !keptFolders.some((folder) => path === folder || path.startsWith(`${folder}.`)),
+            ),
+          (path) => fs.remove(path, { recursive: true, force: true }),
+          { discard: true },
+        )
+      }).pipe(
+        Effect.catch((cause) =>
+          Effect.logWarning("Couldn't remove what no Agent review keeps", cause),
+        ),
+      )
 
       const save = (job: Job, run: Run, review: AgentReview) =>
         Effect.gen(function* () {
@@ -323,12 +311,12 @@ export class AgentReviews extends Context.Service<
 
           yield* jobs.commit(
             job,
-            Effect.all([
-              sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, thread_id, done, included_in_started_work_update)
+            sql`INSERT INTO agent_reviews (owner, repo, number, base, head, written_at, markdown, hotspots, low_attention, thread_id, done, included_in_started_work_update)
                 VALUES (${pr.owner}, ${pr.repo}, ${pr.number}, ${review.revision.base}, ${review.revision.head}, ${DateTime.formatIso(review.writtenAt)}, ${review.markdown}, ${encodeHotspots(review.hotspots)}, ${encodeLowAttention(review.lowAttention)}, ${run.threadId}, 0, 0)
-                ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, thread_id = excluded.thread_id, done = 0, included_in_started_work_update = 0`,
-              sql`DELETE FROM agent_review_run WHERE thread_id = ${run.threadId}`,
-            ]).pipe(sql.withTransaction, logStorageFailure, Effect.mapError(storageFailure)),
+                ON CONFLICT (owner, repo, number) DO UPDATE SET base = excluded.base, head = excluded.head, written_at = excluded.written_at, markdown = excluded.markdown, hotspots = excluded.hotspots, low_attention = excluded.low_attention, thread_id = excluded.thread_id, done = 0, included_in_started_work_update = 0`.pipe(
+              logStorageFailure,
+              Effect.mapError(storageFailure),
+            ),
             () => review,
           )
 
@@ -372,34 +360,23 @@ export class AgentReviews extends Context.Service<
 
       const follow = (job: Job, run: Run) =>
         Effect.gen(function* () {
-          const remaining =
-            run.startedAt + deadlines.agentReviewMs - (yield* Clock.currentTimeMillis)
-
           const { parts, ending } = yield* firstTurnEnded(run.threadId).pipe(
             Effect.timeoutOrElse({
-              duration: Math.max(0, remaining),
+              duration: deadlines.agentReviewMs,
               orElse: () =>
-                threads
-                  .stop(run.threadId)
-                  .pipe(
-                    Effect.ignore,
-                    Effect.andThen(
-                      Effect.fail(
-                        failure(
-                          "timeout",
-                          "The agent took too long writing the Agent review. Try again.",
-                          run.runner,
-                        ),
-                      ),
-                    ),
+                Effect.fail(
+                  failure(
+                    "timeout",
+                    "The agent took too long writing the Agent review. Try again.",
+                    run.runner,
                   ),
+                ),
             }),
             Effect.catchTags({
               ThreadNotFound: () =>
                 Effect.fail(failure("runner", "The Agent review's Thread was removed. Try again.")),
               ThreadError: ({ message }) => Effect.fail(failure("runner", message, run.runner)),
             }),
-            Effect.tapError(() => discard(run)),
           )
 
           const answer = parts.reduce<AgentReviewAnswer | null>(
@@ -408,11 +385,7 @@ export class AgentReviews extends Context.Service<
             null,
           )
 
-          if (answer === null) {
-            yield* discard(run)
-
-            return yield* unfinished(ending, run.runner)
-          }
+          if (answer === null) return yield* unfinished(ending, run.runner)
 
           const review = AgentReview.make({
             revision: run.revision,
@@ -435,87 +408,52 @@ export class AgentReviews extends Context.Service<
           return yield* save(job, run, review)
         })
 
-      const begin = (run: Run, folder: string, instructions: string, prompt: string) =>
-        Effect.gen(function* () {
-          const { pr, revision, runner } = run
+      const work = (job: Job, pr: PullRequestRef, revision: Revision) =>
+        Effect.uninterruptibleMask((restore) =>
+          Effect.gen(function* () {
+            const runner = yield* restore(reviewer)
+            yield* jobs.progress(job, (progress) => ({ ...progress, runner }))
 
-          yield* sql`INSERT INTO agent_review_run ${sql.insert({
-            owner: pr.owner,
-            repo: pr.repo,
-            number: pr.number,
-            thread_id: run.threadId,
-            base: revision.base,
-            head: revision.head,
-            started_at: run.startedAt,
-            runner: encodeRunner(runner),
-            background: run.background ? 1 : 0,
-            diff: encodeDiff(run.diff),
-          })}`.pipe(logStorageFailure, Effect.mapError(storageFailure))
+            const threadId = randomUUID()
+            const folder = join(checkoutsFolder, threadId)
 
-          yield* threads
-            .createForReview({
-              id: run.threadId,
-              name: `Agent review of ${pr.owner}/${pr.repo}#${pr.number}`,
-              pullRequest: pr,
-              revision,
-              harness: runner.harness,
-              model: threadModelOf(runner),
-              checkout: folder,
-              review: { instructions, diffLines: run.diff.lines },
-              message: prompt,
-            })
-            .pipe(
-              Effect.mapError(({ message }) => failure("runner", message, runner)),
-              Effect.tapError(() =>
-                sql`DELETE FROM agent_review_run WHERE thread_id = ${run.threadId}`.pipe(
-                  Effect.ignore,
+            const { input, instructions } = yield* restore(
+              Effect.all({
+                input: checkoutRuns
+                  .copy({ pr, revision, subject: "Agent review", folder, read: github.reviewInput })
+                  .pipe(Effect.mapError(fromCheckoutRunFailure)),
+                instructions: reviewInstructions,
+              }),
+            ).pipe(
+              Effect.onError(() =>
+                fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
+              ),
+            )
+
+            const run: Run = { pr, threadId, revision, runner, diff: diffOf(input.files) }
+
+            yield* threads
+              .createForReview({
+                id: threadId,
+                name: `Agent review of ${pr.owner}/${pr.repo}#${pr.number}`,
+                pullRequest: pr,
+                revision,
+                harness: runner.harness,
+                model: threadModelOf(runner),
+                checkout: folder,
+                review: { instructions, diffLines: run.diff.lines },
+                message: agentReviewPrompt(input, revision),
+              })
+              .pipe(
+                Effect.mapError(({ message }) => failure("runner", message, runner)),
+                Effect.onError(() =>
+                  fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
                 ),
-              ),
-            )
-        }).pipe(Effect.uninterruptible)
+              )
 
-      const work = (job: Job, pr: PullRequestRef, revision: Revision, background: boolean) =>
-        Effect.gen(function* () {
-          yield* discardRunOf(pr)
-
-          const runner = yield* reviewer
-          const startedAt = yield* Clock.currentTimeMillis
-          yield* jobs.progress(job, () => ({ status: "reviewing", startedAt, runner }))
-
-          const threadId = randomUUID()
-          const folder = reviewFolder(threadId)
-
-          const removeFolder = <A, E, R>(effect: Effect.Effect<A, E, R>) =>
-            effect.pipe(
-              Effect.onExit((exit) =>
-                Exit.isSuccess(exit)
-                  ? Effect.void
-                  : fs.remove(folder, { recursive: true, force: true }).pipe(Effect.ignore),
-              ),
-            )
-
-          const input = yield* checkoutRuns
-            .copy({ pr, revision, subject: "Agent review", folder, read: github.reviewInput })
-            .pipe(Effect.mapError(fromCheckoutRunFailure), removeFolder)
-
-          const instructions = yield* reviewInstructions.pipe(removeFolder)
-
-          const run: Run = {
-            pr,
-            threadId,
-            revision,
-            startedAt,
-            runner,
-            background,
-            diff: diffOf(input.files),
-          }
-
-          yield* begin(run, folder, instructions, agentReviewPrompt(input, revision)).pipe(
-            removeFolder,
-          )
-
-          yield* follow(job, run)
-        }).pipe(settled(job))
+            yield* restore(follow(job, run)).pipe(Effect.ensuring(removeUnlessKept(threadId)))
+          }),
+        ).pipe(settled(job))
 
       const start = Effect.fn("AgentReviews.start")(function* (
         pr: PullRequestRef,
@@ -524,7 +462,7 @@ export class AgentReviews extends Context.Service<
         const job = yield* jobs.jobFor(pr)
 
         yield* jobs.begin(job, (replace) =>
-          Effect.flatMap(started, (progress) => replace(progress, work(job, pr, revision, false))),
+          Effect.flatMap(started, (progress) => replace(progress, work(job, pr, revision))),
         )
       })
 
@@ -532,17 +470,8 @@ export class AgentReviews extends Context.Service<
         pr: PullRequestRef,
         revision: Revision,
       ) {
-        yield* jobs.startInBackground(pr, started, (job) => work(job, pr, revision, true))
+        yield* jobs.startInBackground(pr, started, (job) => work(job, pr, revision))
       })
-
-      const cancel = (pr: PullRequestRef) => jobs.stop(pr).pipe(Effect.andThen(discardRunOf(pr)))
-
-      const cancelBackground = () =>
-        jobs
-          .stopBackground()
-          .pipe(
-            Effect.andThen(discardRuns(sql`SELECT * FROM agent_review_run WHERE background = 1`)),
-          )
 
       const mark = (flag: "done" | "includedInStartedWorkUpdate", name: string) =>
         Effect.fn(name)(function* (pr: PullRequestRef, writtenAt: DateTime.Utc) {
@@ -569,34 +498,18 @@ export class AgentReviews extends Context.Service<
           )
         })
 
-      const running = yield* runsOf(sql`SELECT * FROM agent_review_run`).pipe(
-        Effect.orElseSucceed(() => []),
-      )
-
-      yield* Effect.forEach(
-        running,
-        (run) =>
-          jobs
-            .resume(
-              run.pr,
-              run.background,
-              { status: "reviewing", startedAt: run.startedAt, runner: run.runner },
-              (job) => follow(job, run).pipe(settled(job)),
-            )
-            .pipe(Effect.ignore),
-        { discard: true },
-      )
+      yield* removeUnkept
 
       return AgentReviews.of({
         start,
         startInBackground,
-        cancel,
+        cancel: jobs.stop,
         markDone: mark("done", "AgentReviews.markDone"),
         markIncludedInStartedWorkUpdate: mark(
           "includedInStartedWorkUpdate",
           "AgentReviews.markIncludedInStartedWorkUpdate",
         ),
-        cancelBackground,
+        cancelBackground: jobs.stopBackground,
         watch: jobs.watch,
       })
     }),

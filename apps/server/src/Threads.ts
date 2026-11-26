@@ -233,6 +233,9 @@ export class Threads extends Context.Service<
       input: Omit<NewThread, "permissionMode">,
     ) => Effect.Effect<Thread, ThreadNotFound | InvalidLocalCheckout | ThreadError>
     readonly createForReview: (input: NewReviewThread) => Effect.Effect<Thread, ThreadError>
+    readonly reviewThreads: Effect.Effect<
+      ReadonlyArray<{ readonly id: string; readonly folder: string }>
+    >
     readonly dropReviewCheckout: (
       threadId: string,
     ) => Effect.Effect<void, ThreadNotFound | ThreadError>
@@ -1154,6 +1157,13 @@ export class Threads extends Context.Service<
         create,
         createFrom,
         createForReview,
+        reviewThreads: SubscriptionRef.get(rows).pipe(
+          Effect.map((current) =>
+            current.flatMap(({ thread, folder, forReview }) =>
+              forReview ? [{ id: thread.id, folder }] : [],
+            ),
+          ),
+        ),
         dropReviewCheckout,
         refuseReviewFrom,
         send,

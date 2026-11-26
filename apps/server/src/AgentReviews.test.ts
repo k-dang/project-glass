@@ -15,6 +15,7 @@ import { Clock, DateTime, Effect, Exit, Option, Predicate, Scope, Stream } from 
 import { TestClock } from "effect/testing"
 import { existsSync, mkdirSync } from "node:fs"
 import { join } from "node:path"
+import { DatabaseSync } from "node:sqlite"
 import { vi } from "vite-plus/test"
 import { eventually } from "../test/eventually"
 import { startFakeGitHub } from "../test/fakeGitHub"
@@ -349,21 +350,48 @@ it.live("fails a review whose Turn ends without an accepted answer, removing its
   }),
 )
 
-it.live("shows a review whose Turn is running as reviewing after a restart, then saves it", () =>
+it.live("stops a running review and removes its Thread when Glass quits", () =>
   Effect.gen(function* () {
     const f = yield* fixture()
     yield* f.reviews.hold
     yield* f.start
     const threadId = yield* f.runningThread
     yield* f.transcript(threadId, holding)
-    const before = yield* f.state(({ job }) => job.status === "reviewing")
 
-    const after = yield* f.restart
-    assert.deepStrictEqual(after, before)
+    assert.deepStrictEqual(yield* f.restart, { review: null, job: { status: "idle" } })
+    yield* eventually(
+      Effect.sync(() => assert.isTrue(existsSync(join(f.gates, reviewStopped(threadId))))),
+    )
+    assert.isFalse(existsSync(f.checkout(threadId)))
+    assert.isEmpty(yield* f.reviewThreads)
+  }),
+)
 
-    yield* f.reviews.release({ submit: [answer] })
-    const { review } = yield* f.state(reviewed)
-    assert.strictEqual(review?.threadId, threadId)
+it.live("removes the Review Threads and checkouts no Agent review keeps when Glass starts", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture()
+    yield* f.start
+    const threadId = (yield* f.state(reviewed)).review!.threadId!
+    yield* f.send(threadId, "Why?")
+    yield* f.transcript(threadId, ended(2))
+    const stray = f.checkout("left-by-a-crash")
+    mkdirSync(stray)
+
+    yield* f.restart
+    assert.isTrue(existsSync(f.checkout(threadId)))
+    assert.isFalse(existsSync(stray))
+
+    const database = new DatabaseSync(join(f.home, ".project-glass", "glass.db"))
+
+    try {
+      database.exec("UPDATE agent_reviews SET thread_id = NULL")
+    } finally {
+      database.close()
+    }
+
+    yield* f.restart
+    assert.isEmpty(yield* f.reviewThreads)
+    assert.isFalse(existsSync(f.checkout(threadId)))
   }),
 )
 

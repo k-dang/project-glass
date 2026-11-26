@@ -13,12 +13,12 @@ One system prompt covers writing the review and answering about it, so following
 conversation rather than an agent handed a new role. The agent hands in the review by calling a Glass
 tool whose parameters are the review's answer; the host checks the call and tells the agent what
 doesn't fit, so it fixes the answer within its Turn rather than failing the review. Glass saves the
-answer it accepted once the Turn ends, and a Turn that ends without one fails the review. A review
-in progress is that Turn running, read from the saved Turn, so it shows as reviewing after a
-relaunch and keeps running while Glass is closed, like any local Turn. Stopping the review, or its
-deadline passing, stops the Turn. Reviewing again replaces the review and removes its Thread. A
-review written before reviews ran as Turns has no Thread and takes no Follow-ups until it is
-reviewed again. The Follow-ups show without the review's own Turn, whose prompt carries the PR
+answer it accepted once the Turn ends, and a Turn that ends without one fails the review. Until
+then the Thread belongs to the review in progress: stopping the review, its deadline passing, or
+Glass quitting stops the Turn and removes the Thread, and at launch Glass removes every Review
+Thread and checkout that no saved review keeps. Reviewing again replaces the review and removes its
+Thread. A review written before reviews ran as Turns has no Thread and takes no Follow-ups until it
+is reviewed again. The Follow-ups show without the review's own Turn, whose prompt carries the PR
 material rather than the user's words.
 
 The Thread's agent works in a checkout of the review's Revision from Glass's cached clone,
@@ -52,6 +52,10 @@ adds a Suggested draft as a Draft.
   reviews as Turns.
 - **Reading the review from the Turn's last message**: needs no tool, but by the time Glass reads
   it the Turn has ended, so a malformed answer can only fail the review.
+- **Keeping a review in progress across a relaunch**: the Turn runs on while Glass is closed and
+  shows as reviewing again after a relaunch, but Glass has to save each review in progress, resume
+  it at launch, and count its deadline from a saved start. Glass built this first; a review is
+  quick to start again.
 - **Keeping the checkout until the review is replaced**: no second checkout on the first Follow-up,
   but every Queue review would keep a checkout of a Revision nobody may follow up on.
 - **A separate Follow-up system prompt swapped in on resume**: Claude Code has to be told to drop
