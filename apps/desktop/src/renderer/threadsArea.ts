@@ -225,21 +225,22 @@ export const noFiles: ReadonlyArray<string> = []
 const listedOr = <A>(
   listing: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<A>, unknown>>,
   none: ReadonlyArray<A>,
-) => Atom.map(listing, (listed) => Option.getOrElse(AsyncResult.value(listed), () => none))
+) =>
+  Atom.map(listing, (listed) => Option.getOrElse(AsyncResult.value(listed), () => none)).pipe(
+    Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL),
+  )
 
 const newThreadCommandsFamily = Atom.family((newThread: NewThreadOf) =>
   listedOr(
-    backendRuntime
-      .atom(
-        Backend.use((backend) =>
-          backend.ListNewThreadCommands({
-            harness: newThread.harness,
-            place: placeOfKey(newThread.place),
-            repository: newThread.repository,
-          }),
-        ),
-      )
-      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+    backendRuntime.atom(
+      Backend.use((backend) =>
+        backend.ListNewThreadCommands({
+          harness: newThread.harness,
+          place: placeOfKey(newThread.place),
+          repository: newThread.repository,
+        }),
+      ),
+    ),
     noCommands,
   ),
 )
@@ -266,13 +267,11 @@ const relistedOnReachAtom = <A>(
   none: ReadonlyArray<A>,
 ) =>
   listedOr(
-    backendRuntime
-      .atom((get) => {
-        get(sandboxReachableAtom(threadId))
+    backendRuntime.atom((get) => {
+      get(sandboxReachableAtom(threadId))
 
-        return list
-      })
-      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+      return list
+    }),
     none,
   )
 
@@ -292,17 +291,15 @@ class NewThreadBranch extends Data.Class<{
 
 const newThreadFilesFamily = Atom.family((branch: NewThreadBranch) =>
   listedOr(
-    backendRuntime
-      .atom(
-        Backend.use((backend) =>
-          backend.ListNewThreadFiles({
-            place: placeOfKey(branch.place),
-            repository: branch.repository,
-            baseBranch: branch.baseBranch,
-          }),
-        ),
-      )
-      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+    backendRuntime.atom(
+      Backend.use((backend) =>
+        backend.ListNewThreadFiles({
+          place: placeOfKey(branch.place),
+          repository: branch.repository,
+          baseBranch: branch.baseBranch,
+        }),
+      ),
+    ),
     noFiles,
   ),
 )
