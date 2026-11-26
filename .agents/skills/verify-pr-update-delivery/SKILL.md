@@ -28,7 +28,7 @@ Expect `Result: ok`: every rule holds and every mutant is caught. A run takes ab
 
 ## Coverage
 
-Synced with the code at commit `bdad3325b800762a742f919fc2c5af2a83e5a0ff`. Before you trust a result, run `git diff bdad3325 -- <files below>`. If a covered function changed, compare it with its actions first.
+Synced with the code at commit `f775437165e09892033e52a62e912c446b589d14`. Before you trust a result, run `git diff f7754371 -- <files below>`. If a covered function changed, compare it with its actions first.
 
 | Model | Code |
 | --- | --- |
