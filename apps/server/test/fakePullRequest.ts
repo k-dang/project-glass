@@ -12,7 +12,7 @@ export interface FakeCommit {
   readonly files: Readonly<Record<string, string>>
 }
 
-export interface FakeLine {
+interface FakeLine {
   readonly path: string
   readonly line: number
   readonly side: "LEFT" | "RIGHT"
@@ -154,7 +154,7 @@ export interface FakePush {
   readonly outdatedReviewThreads?: ReadonlyArray<string>
 }
 
-export interface PullRequestCommits {
+interface PullRequestCommits {
   readonly owner: string
   readonly repo: string
   readonly number: number
@@ -295,6 +295,7 @@ export class FakePullRequest {
     )
 
     this.publishHead({ base: change.base ?? this.#base, head: change.head ?? this.#head })
+    this.#updatedAt = this.now()
 
     this.#changedFiles = change.changedFiles ?? this.#changedFiles
 

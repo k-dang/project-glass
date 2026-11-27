@@ -1,4 +1,4 @@
-/** What a Plugin adds to Glass: a kind of Sandbox to start Threads in (ADR 0010). */
+/** What a Plugin adds to Glass: a kind of Sandbox to start Threads in. */
 export interface SandboxProvider {
   /** What the user sees for this kind of Sandbox, a plural such as "Acme Sandboxes". */
   readonly name: string
@@ -8,12 +8,19 @@ export interface SandboxProvider {
    */
   readonly harnesses: readonly [AgentHarness, ...Array<AgentHarness>]
   /**
-   * Makes the Sandbox, sets up the user's logins, clones the repository onto the Thread's branch,
-   * and starts the agent host in it. Calls `record` as soon as the Sandbox exists, so Glass can
-   * delete a half-built one, and `progress` for each step the user should see. Glass waits for
-   * the host's health check once this resolves.
+   * Makes the Sandbox, sets up the user's logins, and clones the repository onto the Thread's
+   * branch. Calls `record` as soon as the Sandbox exists, so Glass can delete a half-built one, and
+   * `progress` for each step the user should see. Glass calls `startHost` once this resolves.
    */
   readonly create: (request: SandboxRequest, context: SandboxCreation) => Promise<void>
+  /**
+   * Copies the agent host's bundle into the Sandbox and starts it there. Glass calls it for a new
+   * Sandbox, and again when the host that answers is from another version of Glass. Glass has asked
+   * that host to end first; one it couldn't reach may still run, so this ends it before starting
+   * the new one. Glass waits for the host's health check once this resolves. Throws
+   * `glass.sandboxGone()` once the Sandbox no longer exists.
+   */
+  readonly startHost: (state: SandboxState, host: SandboxHost, signal: AbortSignal) => Promise<void>
   /**
    * Where the agent host in the Sandbox answers, asked afresh for each connection. Throws
    * `glass.sandboxGone()` once the Sandbox no longer exists, so Glass stops trying to reach it.
@@ -69,20 +76,19 @@ export interface SandboxRequest {
   readonly threadId: string
   readonly harness: AgentHarness
   readonly repository: { readonly owner: string; readonly repo: string }
-  /** The Thread's own branch, made from `baseBranch`. */
+  /** The Thread's own branch, made from `baseBranch`. Glass may rename it once the host starts. */
   readonly branch: string
   /** The clone's `origin` remote must have it, as Review changes diffs against it. */
   readonly baseBranch: string
   /** Where the clone goes, relative to the folder the host is started in. */
   readonly folder: string
-  readonly host: SandboxHost
+  /** The port the host will listen on in the Sandbox, which `target` reaches. */
+  readonly hostPort: number
 }
 
 export interface SandboxHost {
   /** The host's bundle on this device, one self-contained file for the provider to copy into the Sandbox and run with Node. */
   readonly bundle: string
-  /** The port the host listens on in the Sandbox, which `target` reaches. */
-  readonly port: number
   /** The environment to start the host with, including its port and address. */
   readonly environment: Readonly<Record<string, string>>
 }
@@ -119,11 +125,11 @@ export interface Glass {
  * and skipped.
  *
  * A provider that throws anything but the errors `Glass` offers shows the user a safe failure, with
- * the cause in the backend log. If `create` fails or is cancelled after `record`, Glass calls
- * `remove` with that state.
+ * the cause in the backend log. If making a Sandbox fails or is cancelled after `record`, Glass
+ * calls `remove` with that state.
  *
  * Glass gives every call but `create` a deadline and aborts its `signal` once that passes, then
- * stops waiting for it. Glass retries what it still needs, such as `remove` and `extend`, so
- * those must be safe to call again while an earlier call may still run.
+ * stops waiting for it. Glass retries what it still needs, such as `startHost`, `remove`, and
+ * `extend`, so those must be safe to call again while an earlier call may still run.
  */
 export type Plugin = (glass: Glass) => void | Promise<void>

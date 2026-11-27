@@ -79,7 +79,7 @@ export const waiting = (turns: ReadonlyArray<Turn>) =>
 
 type Work = typeof WorkRole.Type
 
-const transcriptsDirectory = process.env["GLASS_TRANSCRIPTS_DIR"]
+const replayedTranscripts = process.env["GLASS_REPLAYED_TRANSCRIPTS"]
 
 const drive = Effect.fnUntraced(function* <Role extends ThreadRole>(
   scenario: string,
@@ -95,12 +95,12 @@ const drive = Effect.fnUntraced(function* <Role extends ThreadRole>(
   const activity = yield* SubscriptionRef.make(AgentStatusesChanged.make({ agentStatuses: [] }))
   const reported: Array<HostEvent> = []
 
-  if (transcriptsDirectory !== undefined)
+  if (replayedTranscripts !== undefined)
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
-        mkdirSync(transcriptsDirectory, { recursive: true })
+        mkdirSync(replayedTranscripts, { recursive: true })
         writeFileSync(
-          join(transcriptsDirectory, `${scenario}.json`),
+          join(replayedTranscripts, `${scenario}.json`),
           Schema.encodeSync(ReplayedTranscript)({ harness, events: reported }),
         )
       }),
@@ -217,6 +217,32 @@ export const reviewDrafts: ReadonlyArray<{
     says: "length of at least 1",
   },
 ]
+
+export const reviewAnswers: ReadonlyArray<{
+  readonly answer: Schema.JsonObject
+  readonly status: "done" | "failed"
+  readonly says: string
+}> = [
+  {
+    answer: { markdown: " ", hotspots: [], lowAttention: [] },
+    status: "failed",
+    says: "length of at least 1",
+  },
+  {
+    answer: { markdown: "**Nothing stands out.**", hotspots: [], lowAttention: [] },
+    status: "done",
+    says: "Glass has your Agent review",
+  },
+]
+
+export const assertReviewAnswers = (calls: ReadonlyArray<typeof ToolCallPart.Type>) => {
+  assert.lengthOf(calls, reviewAnswers.length)
+
+  reviewAnswers.forEach(({ status, says }, index) => {
+    assert.equal(calls[index]?.status, status)
+    assert.include(calls[index]?.output, says)
+  })
+}
 
 export const assertSuggestedDrafts = (calls: ReadonlyArray<typeof ToolCallPart.Type>) => {
   assert.lengthOf(calls, reviewDrafts.length)

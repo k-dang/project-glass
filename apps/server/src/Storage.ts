@@ -27,6 +27,7 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["thread", "threads"],
   ["thread_turn", "threads"],
   ["thread_turn_part", "threads"],
+  ["visualization", "threads"],
   ["thread_queued_message", "threads"],
   ["thread_unsent_message", "threads"],
   ["feedback_note", "threads"],

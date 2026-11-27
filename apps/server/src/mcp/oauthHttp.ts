@@ -9,16 +9,15 @@ import {
   type OAuthUrls,
   protectedResourceMetadata,
   redirectForError,
-  renderApproval,
   renderError,
+  renderWaiting,
   requestUrls,
   type AuthorizationQuery,
 } from "./McpOAuth"
 
-// WARNING: form-action must name loopback hosts: under no-referrer Chrome treats this page's origin as null, so 'self' matches neither the form nor the redirect.
 const PAGE_HEADERS = {
   "content-security-policy":
-    "default-src 'none'; style-src 'unsafe-inline'; form-action 'self' http://127.0.0.1:* http://localhost:* http://[::1]:*; frame-ancestors 'none'",
+    "default-src 'none'; style-src 'unsafe-inline'; frame-ancestors 'none'",
   "x-frame-options": "DENY",
   "cache-control": "no-store",
   "referrer-policy": "no-referrer",
@@ -57,6 +56,14 @@ const hostUrls = HttpServerRequest.HttpServerRequest.pipe(
   Effect.map((request) => Option.fromNullishOr(requestUrls(request))),
 )
 
+const backgroundRequestFromAnotherSite = (
+  headers: HttpServerRequest.HttpServerRequest["headers"],
+) => {
+  const site = headers["sec-fetch-site"]
+
+  return (site === "cross-site" || site === "same-site") && headers["sec-fetch-dest"] !== "document"
+}
+
 const oauthError = (error: string, description: string) =>
   json(400, { error, error_description: description })
 
@@ -64,9 +71,9 @@ const missingHost = oauthError("invalid_request", "The request host is missing."
 
 const missingHostPage = page(400, renderError("The request host is missing."))
 
-const staleApproval = page(
-  400,
-  renderError("This approval page is out of date. Start the sign-in again."),
+const notInATabPage = page(
+  403,
+  renderError("Glass opens a sign-in only in a browser tab. Start it again from the app."),
 )
 
 const queryOf = (url: URL): AuthorizationQuery => ({
@@ -82,16 +89,6 @@ const queryOf = (url: URL): AuthorizationQuery => ({
 const stringField = Schema.decodeUnknownOption(Schema.String)
 
 const stringArray = Schema.decodeUnknownOption(Schema.Array(Schema.String))
-
-const Decision = Schema.Struct({
-  client_id: Schema.String,
-  redirect_uri: Schema.String,
-  code_challenge: Schema.String,
-  state: Schema.String,
-  resource: Schema.String,
-  csrf: Schema.String,
-  decision: Schema.Literals(["approve", "deny"]),
-})
 
 const readParam = (params: UrlParams.UrlParams, key: string) =>
   Option.getOrUndefined(UrlParams.getFirst(key)(params))
@@ -152,6 +149,8 @@ const authorize = Effect.gen(function* () {
 
   if (Option.isNone(found)) return missingHostPage
 
+  if (backgroundRequestFromAnotherSite(request.headers)) return notInATabPage
+
   const validated = yield* oauth
     .validateAuthorization({
       urls: found.value,
@@ -161,62 +160,25 @@ const authorize = Effect.gen(function* () {
 
   if (Result.isFailure(validated)) return shown(validated.failure, found.value.issuer)
 
-  const authorization = validated.success
-
-  return page(200, renderApproval(authorization, oauth.csrfFor(authorization)))
+  return page(200, renderWaiting(yield* oauth.open(validated.success)))
 })
 
-const decide = Effect.gen(function* () {
+const decision = Effect.gen(function* () {
   const oauth = yield* McpOAuth
   const request = yield* HttpServerRequest.HttpServerRequest
   const found = yield* hostUrls
 
   if (Option.isNone(found)) return missingHostPage
 
-  const origin = request.headers.origin
+  const id = new URL(request.url, found.value.issuer).searchParams.get("request") ?? ""
+  const collected = yield* oauth.collect(id).pipe(Effect.result)
 
-  // WARNING: Chrome and sandboxed frames both send origin "null", so only the signed csrf field below stops a forged decision.
-  if (origin !== undefined && origin !== "null" && origin !== found.value.issuer) {
-    return staleApproval
-  }
+  if (Result.isFailure(collected)) return shown(collected.failure, found.value.issuer)
 
-  const decoded = yield* HttpServerRequest.schemaBodyUrlParams(Decision).pipe(Effect.result)
-
-  if (Result.isFailure(decoded)) return staleApproval
-
-  const form = decoded.success
-
-  if (
-    !oauth.csrfMatches(
-      {
-        clientId: form.client_id,
-        redirectUri: form.redirect_uri,
-        codeChallenge: form.code_challenge,
-        state: form.state,
-        resource: form.resource,
-      },
-      form.csrf,
-    )
-  ) {
-    return staleApproval
-  }
-
-  const validated = yield* oauth
-    .validateAuthorization({
-      urls: found.value,
-      request: { ...form, response_type: "code", code_challenge_method: "S256" },
-    })
-    .pipe(Effect.result)
-
-  if (Result.isFailure(validated)) return shown(validated.failure, found.value.issuer)
-
-  const target = yield* Match.value(form.decision).pipe(
-    Match.when("deny", () => Effect.succeed(oauth.deny(validated.success))),
-    Match.when("approve", () => oauth.approve(validated.success)),
-    Match.exhaustive,
-  )
-
-  return HttpServerResponse.redirect(target, { headers: REDIRECT_HEADERS })
+  return Match.valueTags(collected.success, {
+    Waiting: ({ request: waiting }) => page(200, renderWaiting(waiting)),
+    Decided: ({ redirect }) => HttpServerResponse.redirect(redirect, { headers: REDIRECT_HEADERS }),
+  })
 })
 
 const register = Effect.gen(function* () {
@@ -308,6 +270,6 @@ export const OAuthRoutes = Layer.mergeAll(
   ),
   HttpRouter.add("POST", "/oauth/mcp/register", register),
   HttpRouter.add("GET", "/oauth/mcp/authorize", authorize),
-  HttpRouter.add("POST", "/oauth/mcp/decision", decide),
+  HttpRouter.add("GET", "/oauth/mcp/decision", decision),
   HttpRouter.add("POST", "/oauth/mcp/token", token),
 )

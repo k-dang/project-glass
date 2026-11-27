@@ -17,7 +17,7 @@ import {
   LocalCheckout,
   MessageDelivery,
   MessageText,
-  NeedsYouItem,
+  InboxItems,
   type PullRequestAccessDenied,
   type PullRequestNotFound,
   type QueueError,
@@ -60,7 +60,7 @@ import { LocalCheckouts } from "../LocalCheckouts"
 import { AskProgress } from "./AskProgress"
 import { CHECK_IN_MAX_TIMEOUT_SECONDS, CHECK_IN_TIMEOUT_SECONDS, CheckIns } from "../CheckIns"
 import { McpCaller, type McpCallerIdentity, type OutsideAgentCaller } from "./McpCredentials"
-import { NeedsYou } from "../NeedsYou"
+import { Inbox } from "../Inbox"
 import { ASK_PROGRESS_SECONDS, ASK_TIMEOUT_SECONDS, OutsideQuestions } from "../OutsideQuestions"
 import { Sandboxes } from "../Sandboxes"
 import { type Starter, StartedItem, StartedWork } from "../StartedWork"
@@ -80,7 +80,7 @@ const MAX_TEXT_CHARS = 4_000
 
 const MAX_DIFF_CHARS = 60_000
 
-const readOnly = Context.make(Tool.Readonly, true).pipe(
+export const readOnly = Context.make(Tool.Readonly, true).pipe(
   Context.add(Tool.Destructive, false),
   Context.add(Tool.OpenWorld, false),
 )
@@ -133,10 +133,10 @@ const ListThreads = Tool.make("list_threads", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const ListNeedsYou = Tool.make("list_needs_you", {
+const ListInbox = Tool.make("list_inbox", {
   description:
-    "Lists what waits on the user in Glass now: Threads with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, Review threads awaiting their reply, or ready to merge. Threads and outside questions come first, then the longest waiting.",
-  success: Schema.Struct({ items: Schema.Array(NeedsYouItem) }),
+    "Lists the user's Glass Inbox: what waits on them now, in four groups in this order. Stopped on you: Threads with a Permission request or Question waiting, questions from an agent outside Glass, Check-ins, and the Global chat's own waiting requests. Agent reviews to read: queued PRs whose Agent review is finished. Your pull requests: the user's own PRs with changes requested, failing checks, Review threads awaiting their reply, or ready to merge. Threads that finished: Threads whose latest Turn ended since the user last looked. Within a group, the longest waiting comes first.",
+  success: Schema.Struct({ items: InboxItems }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
@@ -223,7 +223,7 @@ const ListThreadOptions = Tool.make("list_thread_options", {
   failure: GlassToolFailure,
 }).annotateMerge(readOnly)
 
-const action = Context.make(Tool.Readonly, false).pipe(
+export const acting = Context.make(Tool.Readonly, false).pipe(
   Context.add(Tool.Destructive, false),
   Context.add(Tool.Idempotent, false),
   Context.add(Tool.OpenWorld, false),
@@ -254,7 +254,7 @@ const CreateThread = Tool.make("create_thread", {
   }),
   success: Schema.Struct({ thread: Thread }),
   failure: GlassToolFailure,
-}).annotateMerge(action)
+}).annotateMerge(acting)
 
 const SendThreadMessage = Tool.make("send_thread_message", {
   description:
@@ -272,7 +272,7 @@ const SendThreadMessage = Tool.make("send_thread_message", {
     }),
   }),
   failure: GlassToolFailure,
-}).annotateMerge(action)
+}).annotateMerge(acting)
 
 const ReadAgentReview = Tool.make("read_agent_review", {
   description:
@@ -310,7 +310,7 @@ const AskUser = Tool.make("ask_user", {
   }),
   success: AskUserResult,
   failure: GlassToolFailure,
-}).annotateMerge(action)
+}).annotateMerge(acting)
 
 const CheckIn = Tool.make("check_in", {
   description:
@@ -347,11 +347,11 @@ const CheckIn = Tool.make("check_in", {
   }),
   success: CheckInResult,
   failure: GlassToolFailure,
-}).annotateMerge(action)
+}).annotateMerge(acting)
 
 const StartAgentReview = Tool.make("start_agent_review", {
   description:
-    "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
+    "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one. A review runs on this device and asks the user nothing, so a Thread can start one only when it is on this device and has no Permission mode.",
   parameters: Schema.Struct({
     pullRequest: PullRequestRef,
     revision: Revision.annotate({
@@ -360,7 +360,7 @@ const StartAgentReview = Tool.make("start_agent_review", {
   }),
   success: AgentReviewState,
   failure: GlassToolFailure,
-}).annotateMerge(action)
+}).annotateMerge(acting)
 
 export const GlassTools = Toolkit.make(
   ListPullRequests,
@@ -368,7 +368,7 @@ export const GlassTools = Toolkit.make(
   ListToDos,
   ListRecentActivity,
   ListThreads,
-  ListNeedsYou,
+  ListInbox,
   ListStartedWork,
   ReadThreadTranscript,
   ReadPullRequest,
@@ -528,7 +528,7 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const checkouts = yield* LocalCheckouts
     const sandboxes = yield* Sandboxes
     const agentReviews = yield* AgentReviews
-    const needsYou = yield* NeedsYou
+    const inbox = yield* Inbox
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const startedWork = yield* StartedWork
@@ -582,14 +582,16 @@ export const GlassToolHandlers = GlassTools.toLayer(
       list_threads: () =>
         Effect.all([first(threads.watch()), first(threads.watchWaiting())]).pipe(
           Effect.map(([listed, waiting]) => ({
-            threads: listed.map((thread) => ({
-              thread,
-              waiting: waiting.some((found) => found.thread.id === thread.id),
-            })),
+            threads: listed
+              .filter(({ forReview }) => !forReview)
+              .map((thread) => ({
+                thread,
+                waiting: waiting.some((found) => found.thread.id === thread.id),
+              })),
           })),
           Effect.mapError(explained),
         ),
-      list_needs_you: () => first(needsYou.watch()).pipe(Effect.map((items) => ({ items }))),
+      list_inbox: () => first(inbox.watch()).pipe(Effect.map((items) => ({ items }))),
       list_started_work: () =>
         Effect.gen(function* () {
           const starter = starterOf(yield* McpCaller.current)
@@ -631,9 +633,17 @@ export const GlassToolHandlers = GlassTools.toLayer(
       read_agent_review: ({ pullRequest }) =>
         first(agentReviews.watch(pullRequest)).pipe(Effect.mapError(explained)),
       start_agent_review: ({ pullRequest, revision }) =>
-        recordedFor(agentReviews.start(pullRequest, revision), (starter, since) =>
-          startedWork.startedAgentReview(starter, pullRequest, since),
-        ).pipe(Effect.andThen(first(agentReviews.watch(pullRequest))), Effect.mapError(explained)),
+        Effect.gen(function* () {
+          const starter = yield* callingThreadId
+
+          if (Option.isSome(starter)) yield* threads.refuseReviewFrom(starter.value)
+
+          yield* recordedFor(agentReviews.start(pullRequest, revision), (recorded, since) =>
+            startedWork.startedAgentReview(recorded, pullRequest, since),
+          )
+
+          return yield* first(agentReviews.watch(pullRequest))
+        }).pipe(Effect.mapError(explained)),
       list_thread_places: () =>
         Effect.gen(function* () {
           return {

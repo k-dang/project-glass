@@ -90,7 +90,8 @@ export default async function (pi) {
           .map((block) => block.text)
           .join("\\n")
         if (result.isError) throw new Error(text)
-        return { content: [{ type: "text", text }], details: undefined }
+        const images = result.content.filter((block) => block.type === "image")
+        return { content: [{ type: "text", text }, ...images], details: undefined }
       },
     })
 }

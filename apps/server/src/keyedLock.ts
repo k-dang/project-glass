@@ -1,6 +1,6 @@
 import { Effect, Semaphore } from "effect"
 
-export interface KeyedLock {
+interface KeyedLock {
   readonly withLock: <A, E, R>(
     key: string,
     effect: Effect.Effect<A, E, R>,

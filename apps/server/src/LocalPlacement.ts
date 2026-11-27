@@ -2,7 +2,7 @@ import { AgentHarness, ThreadError, type FollowedRepository } from "@glass/contr
 import { Context, Effect, FileSystem, Layer, Option, Stream } from "effect"
 import { join } from "node:path"
 import { placeholderBranch } from "./BranchNames"
-import { Git, type GitFailed } from "./git"
+import { Git, type GitFailed, renameBranch } from "./git"
 import { type CarriedOn, LocalAgentHost } from "./LocalAgentHost"
 import { LocalCheckouts } from "./LocalCheckouts"
 import { asThreadError, type Placement, type PlacedThread, type SubscribeLost } from "./Placement"
@@ -70,7 +70,10 @@ export class LocalPlacement extends Context.Service<
 
         const discard = git
           .run(checkout.path, ["worktree", "remove", "--force", folder])
-          .pipe(Effect.andThen(git.run(checkout.path, ["branch", "-D", name])), Effect.ignore)
+          .pipe(
+            Effect.andThen(git.run(checkout.path, ["update-ref", "-d", `refs/heads/${name}`])),
+            Effect.ignore,
+          )
 
         return { branch: name, folder, discard }
       })
@@ -102,10 +105,12 @@ export class LocalPlacement extends Context.Service<
         return `${local}\n${remote}`.split("\n").map((line) => line.replace(/^.*refs\/heads\//, ""))
       })
 
-      const useBranch = ({ folder }: PlacedThread, branch: string) =>
-        git
-          .run(folder, ["branch", "-m", branch])
-          .pipe(gitFailure(`Couldn't rename the Thread's branch to ${branch}.`))
+      // WARNING: `git branch -m` and `branch -D` rewrite .git/config, which fails on Windows while any other git process reads it.
+      const useBranch = ({ thread, folder }: PlacedThread, branch: string) =>
+        renameBranch(git, folder, thread.branch, branch).pipe(
+          gitFailure(`Couldn't rename the Thread's branch to ${branch}.`),
+          Effect.withSpan("LocalPlacement.useBranch"),
+        )
 
       const baseRef = Effect.fn("LocalPlacement.baseRef")(function* ({ thread }: PlacedThread) {
         const checkout = yield* checkoutOf(thread.repository)

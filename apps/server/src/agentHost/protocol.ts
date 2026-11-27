@@ -31,7 +31,7 @@ export const SteersNotTakenIn = Schema.Array(MessageWithContext)
 
 export type SteersNotTakenIn = typeof SteersNotTakenIn.Type
 
-export const HostTurnEnded = Schema.TaggedStruct("TurnEnded", {
+const HostTurnEnded = Schema.TaggedStruct("TurnEnded", {
   ...TurnEnded.fields,
   steersNotTakenIn: Schema.optional(SteersNotTakenIn),
 })
@@ -55,8 +55,8 @@ export const JournalEntry = Schema.Struct({
 
 export type JournalEntry = typeof JournalEntry.Type
 
-// WARNING: Raise HOST_PROTOCOL when an AgentHostRpcs change breaks talking to a previous host; Sandboxes keep hosts running across upgrades.
-export const HOST_PROTOCOL = 3
+// WARNING: Raise HOST_PROTOCOL when an AgentHostRpcs change breaks talking to a previous host, or a previous host must not keep running; Sandboxes keep hosts running across upgrades.
+export const HOST_PROTOCOL = 5
 
 // WARNING: Glass asks hosts of every version for Hello, so its shape must never change.
 export const Hello = Rpc.make("Hello", {
@@ -110,13 +110,13 @@ export const ReviewBrief = Schema.Struct({
 
 export type ReviewBrief = typeof ReviewBrief.Type
 
-export const SkillFile = Schema.Struct({
+const SkillFile = Schema.Struct({
   path: Schema.String,
   executable: Schema.Boolean,
   contents: Schema.Uint8Array,
 })
 
-export type SkillFile = typeof SkillFile.Type
+type SkillFile = typeof SkillFile.Type
 
 export const SentSkill = Schema.Struct({ name: Schema.String, files: Schema.Array(SkillFile) })
 
@@ -222,6 +222,10 @@ export class AgentHostRpcs extends RpcGroup.make(
     payload: { threadId: Schema.String, turnId: Schema.String },
     success: Schema.NullOr(SteersNotTakenIn),
   }),
+  Rpc.make("StopBackgroundTask", {
+    payload: { threadId: Schema.String, taskId: Schema.String },
+    error: HostThreadError,
+  }),
   Rpc.make("StopThread", { payload: { threadId: Schema.String } }),
   Rpc.make("GetChanges", {
     payload: { folder: HostFolder, baseRef: Schema.String },
@@ -251,6 +255,10 @@ export class AgentHostRpcs extends RpcGroup.make(
   Rpc.make("CurrentBranch", {
     payload: { folder: HostFolder },
     success: Schema.NullOr(Schema.String),
+    error: HostThreadError,
+  }),
+  Rpc.make("UseBranch", {
+    payload: { folder: HostFolder, branch: Schema.String },
     error: HostThreadError,
   }),
   Rpc.make("WatchJournal", {

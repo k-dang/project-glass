@@ -8,6 +8,8 @@ export const DEMO_GATEWAY_REPOSITORY = { owner: "octo-org", repo: "api-gateway" 
 
 export const RATE_LIMIT_TITLE = "Rate-limit the public API"
 
+export const SLOW_QUERY_TITLE = "Log slow database queries"
+
 type Line = readonly [" " | "-" | "+", string]
 
 const lines = (prefix: Line[0], ...texts: Array<string>) =>
@@ -272,6 +274,62 @@ export const rateLimitFiles = [
   ]),
 ]
 
+interface SettledPullRequest {
+  readonly title: string
+  readonly body: string
+  readonly files: ReadonlyArray<DemoFile>
+}
+
+export const settledPullRequests: ReadonlyArray<SettledPullRequest> = [
+  {
+    title: "Bump Node to 22",
+    body: "Moves CI and the engines field to Node 22.",
+    files: [modified(".nvmrc", [...remove("20"), ...add("22")])],
+  },
+  {
+    title: "Drop the unused lodash dependency",
+    body: "Nothing imports it anymore.",
+    files: [
+      modified("package.json", [
+        ...keep('  "dependencies": {'),
+        ...remove('    "lodash": "^4.17.21",'),
+        ...keep('    "zod": "^3.23.8"', "  }"),
+      ]),
+    ],
+  },
+  {
+    title: "Explain the release steps",
+    body: "Writes down how we cut a release.",
+    files: [
+      added("docs/releasing.md", [
+        "# Releasing",
+        "",
+        "1. Bump the version in package.json.",
+        "2. Tag the commit and push the tag.",
+      ]),
+    ],
+  },
+]
+
+export const settledBranch = ({ title }: SettledPullRequest) => slug(title)
+
+export const seedMergedPullRequest = (
+  github: FakeGitHub,
+  { title, body, files }: SettledPullRequest,
+) =>
+  seed(
+    github,
+    {
+      title,
+      body,
+      author: VIEWER.login,
+      state: "MERGED",
+      reviewDecision: "APPROVED",
+      checkRuns: [["build", "SUCCESS"]],
+    },
+    files,
+  )
+
 export const seedDemoPullRequests = (github: FakeGitHub) => {
   const rateLimit = seed(
     github,
@@ -392,7 +450,7 @@ export const seedDemoPullRequests = (github: FakeGitHub) => {
   const slowQueries = seed(
     github,
     {
-      title: "Log slow database queries",
+      title: SLOW_QUERY_TITLE,
       author: VIEWER.login,
       body: "Logs any query slower than 500 ms.",
       reviewDecision: "APPROVED",

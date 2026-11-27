@@ -60,6 +60,7 @@ export const StartedItem = Schema.Union([StartedThread, StartedAgentReview])
 const startedWorkUpdateFields = {
   started_work_update_outcome_at: Schema.NullOr(Schema.DateTimeUtcFromString),
   startedWorkUpdate: Schema.NullOr(Schema.fromJsonString(StartedWorkUpdate)),
+  startedWorkUpdateEnded: Schema.NullOr(Schema.fromJsonString(TurnEnd)),
 }
 
 const ThreadRow = Schema.Struct({
@@ -98,7 +99,7 @@ export interface Starter {
   readonly sessionId: string
 }
 
-export interface PendingOutcome {
+interface PendingOutcome {
   readonly work: WorkOutcome
   readonly at: DateTime.Utc
 }
@@ -203,13 +204,13 @@ export class StartedWork extends Context.Service<
           {
             threadRows: sql`
               SELECT c.thread_id, c.asked_with, c.started_at, c.started_work_update_outcome_at,
-                t.context AS startedWorkUpdate
+                t.context AS startedWorkUpdate, t.ended AS startedWorkUpdateEnded
               FROM started_thread c LEFT JOIN thread_turn t ON t.id = c.started_work_update_turn_id
               WHERE ${matching}
             `.pipe(Effect.flatMap(decodeThreadRows)),
             reviewRows: sql`
               SELECT c.owner, c.repo, c.number, c.asked_with, c.started_at, c.started_work_update_outcome_at,
-                t.context AS startedWorkUpdate
+                t.context AS startedWorkUpdate, t.ended AS startedWorkUpdateEnded
               FROM started_agent_review c LEFT JOIN thread_turn t ON t.id = c.started_work_update_turn_id
               WHERE ${matching}
             `.pipe(Effect.flatMap(decodeReviewRows)),
@@ -452,8 +453,15 @@ export class StartedWork extends Context.Service<
 
             for (const row of [...threadRows, ...reviewRows]) {
               const context = row.startedWorkUpdate
+              const ended = row.startedWorkUpdateEnded
 
-              if (context === null || row.started_work_update_outcome_at === null) continue
+              if (
+                context === null ||
+                row.started_work_update_outcome_at === null ||
+                ended === null ||
+                Predicate.isTagged(ended.ending, "Failed")
+              )
+                continue
 
               if ("thread_id" in row) {
                 const matched = context.work.find(

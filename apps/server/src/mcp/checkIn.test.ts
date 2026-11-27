@@ -5,7 +5,7 @@ import {
   CheckInResult,
   CheckInSendFeedback,
   LineNote,
-  type NeedsYou,
+  type InboxItems,
 } from "@glass/contracts"
 import { Effect, Fiber, Option, Predicate, Schema, Stream } from "effect"
 import { writeFileSync } from "node:fs"
@@ -14,19 +14,17 @@ import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { gitIn } from "../../test/gitRepositories"
 import { startBackend } from "../../test/harness"
+import { inboxWhen } from "../../test/inboxWhen"
 import { connectMcp, toolResult, toolText } from "../../test/mcpClient"
 
 type Backend = Effect.Success<ReturnType<typeof startBackend>>
 
-const checkIns = (items: NeedsYou) => items.filter((item) => Predicate.isTagged(item, "CheckIn"))
+const checkIns = (items: InboxItems) => items.filter((item) => Predicate.isTagged(item, "CheckIn"))
 
 const checkInResult = Schema.decodeUnknownSync(CheckInResult)
 
-const needsYou = (client: Backend["client"], until: (items: NeedsYou) => boolean) =>
-  client.WatchNeedsYou().pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
-
 const waitingCheckIn = (client: Backend["client"]) =>
-  needsYou(client, (items) => checkIns(items).length === 1).pipe(
+  inboxWhen(client, (items) => checkIns(items).length === 1).pipe(
     Effect.map((items) => checkIns(items)[0]!),
   )
 
@@ -119,7 +117,7 @@ describe("check_in", () => {
           ],
         }),
       )
-      assert.equal(checkIns(yield* needsYou(client, () => true)).length, 0)
+      assert.equal(checkIns(yield* inboxWhen(client, () => true)).length, 0)
     }),
   )
 
@@ -143,7 +141,7 @@ describe("check_in", () => {
           .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
         yield* client.RevokeOutsideAgent({ id: agent!.id })
-        yield* needsYou(client, (items) => checkIns(items).length === 0)
+        yield* inboxWhen(client, (items) => checkIns(items).length === 0)
 
         const again = yield* connectMcp(
           backend.baseUrl,

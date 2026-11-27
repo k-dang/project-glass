@@ -84,6 +84,9 @@ catalogs:
     '@types/react-dom':
       specifier: 19.3.0
       version: 19.3.0
+    '@types/ws':
+      specifier: 8.18.2
+      version: 8.18.2
     '@ui-sdk/core':
       specifier: 0.1.0-beta.2
       version: 0.1.0-beta.2
@@ -126,6 +129,9 @@ catalogs:
     pele:
       specifier: 1.13.0
       version: 1.13.0
+    playwright-core:
+      specifier: 1.64.1
+      version: 1.64.1
     react:
       specifier: 19.3.0
       version: 19.3.0
@@ -162,6 +168,9 @@ catalogs:
     vitest:
       specifier: 5.0.3
       version: 5.0.3
+    ws:
+      specifier: 8.22.0
+      version: 8.22.0
     zod:
       specifier: 4.6.7
       version: 4.6.7
@@ -283,6 +292,9 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.3.0(@types/react@19.3.0)
+      '@types/ws':
+        specifier: 'catalog:'
+        version: 8.18.2
       '@ui-sdk/core':
         specifier: 'catalog:'
         version: 0.1.0-beta.2
@@ -358,6 +370,9 @@ importers:
       vite-plus:
         specifier: 'catalog:'
         version: 1.1.0(@types/node@24.19.2)(@vitest/ui@5.0.3)(happy-dom@21.0.3)(jiti@2.7.0)(playwright@1.64.1)(typescript@7.0.2)(yaml@2.9.0)
+      ws:
+        specifier: 'catalog:'
+        version: 8.22.0
 
   apps/gallery:
     devDependencies:
@@ -430,6 +445,9 @@ importers:
       pele:
         specifier: 'catalog:'
         version: 1.13.0
+      playwright-core:
+        specifier: 'catalog:'
+        version: 1.64.1
       tar:
         specifier: 7.5.22
         version: 7.5.22
@@ -448,6 +466,12 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.6.7
+
+  examples/upstash-boxes:
+    dependencies:
+      '@upstash/box':
+        specifier: 0.8.0
+        version: 0.8.0(zod@4.6.7)
 
   examples/vercel-sandboxes:
     dependencies:
@@ -2106,6 +2130,12 @@ packages:
 
   '@ungap/structured-clone@1.4.0':
     resolution: {integrity: sha512-1mEZtMKPM09vDmQt5y7YvmN2+DFTP7Tg0EWXdic8/C6VRnpb33e4ghisCIE3WZjsE2N8mf+QV1Zqh7ZFYLWInQ==}
+
+  '@upstash/box@0.8.0':
+    resolution: {integrity: sha512-P9oMOEn8KqDjhbamnEk08PVLBmKek5hHOYTZbaU+bzzLIqxIDbEZHNzR1nCToahkaz933oUKck3Zib+DDO0lvw==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      zod: ^3.25.0 || ^4.0.0
 
   '@vercel/cli-config@0.3.1':
     resolution: {integrity: sha512-sISbygqlFXYb8qfPu/+2Cf/A8IjrlAuZePdag3EDQr2PRA455s7UZtl9Ro674CWsB/saBRmz3jEkw0YsQs8OoQ==}
@@ -7175,6 +7205,15 @@ snapshots:
       '@types/react': 19.3.0
 
   '@ungap/structured-clone@1.4.0': {}
+
+  '@upstash/box@0.8.0(zod@4.6.7)':
+    dependencies:
+      ws: 8.22.0
+      zod: 4.6.7
+      zod-to-json-schema: 3.25.2(zod@4.6.7)
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   '@vercel/cli-config@0.3.1':
     dependencies:

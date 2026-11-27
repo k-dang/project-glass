@@ -1,4 +1,5 @@
 import { NodeRuntime } from "@effect/platform-node"
+import { burstCounter } from "@glass/contracts"
 import {
   Cause,
   Clock,
@@ -16,9 +17,10 @@ import {
 import { OtlpLogger, OtlpSerialization, OtlpTracer } from "effect/observability"
 import { randomUUID } from "node:crypto"
 import type { Delivery } from "./ThreadTurns"
+import { untilDesktopStops } from "./desktopMain"
 
 // WARNING: Fields hold only IDs, counts, choices and durations, never message text, prompts, diffs, transcripts or credentials: users attach backend.log to bug reports.
-export interface UnitFields {
+interface UnitFields {
   readonly pr?: string
   readonly head?: string
   readonly thread_id?: string
@@ -175,6 +177,10 @@ type Sink = (line: string) => void
 
 const isLoud = (line: UnitLine | LogLine) => line.level === "WARN" || line.level === "ERROR"
 
+export const STORM_CALLS = 50
+
+export const STORM_WINDOW_MS = 5000
+
 const emitter = (source: Source, stdout: Sink, stderr?: Sink): Emit => {
   const launch = {
     source,
@@ -182,11 +188,43 @@ const emitter = (source: Source, stdout: Sink, stderr?: Sink): Emit => {
     platform: `${process.platform}-${process.arch}`,
   }
 
-  return (at, line, extra) => {
+  const storming = burstCounter(STORM_CALLS, STORM_WINDOW_MS)
+
+  const write: Emit = (at, line, extra) => {
     const text = Formatter.formatJson({ at, ...launch, ...Object.fromEntries(extra), ...line })
     const sink = stderr !== undefined && isLoud(line) ? stderr : stdout
 
     sink(text)
+  }
+
+  return (at, line, extra) => {
+    const fields = Object.fromEntries(extra)
+    write(at, line, Object.entries(fields))
+
+    const method = fields["rpc.method"]
+
+    if ("event" in line && Predicate.isString(method)) {
+      const threadId = Predicate.isString(fields.thread_id) ? fields.thread_id : null
+
+      if (storming(`${method} ${threadId}`, Date.parse(at)))
+        write(
+          at,
+          {
+            level: "WARN",
+            message: "A request is repeating fast",
+            details: undefined,
+            cause: undefined,
+            trace_id: undefined,
+          },
+          [
+            ["event", "RpcStorm"],
+            ["rpc.method", method],
+            ["thread_id", threadId],
+            ["calls", STORM_CALLS],
+            ["window_ms", STORM_WINDOW_MS],
+          ],
+        )
+    }
   }
 }
 
@@ -198,7 +236,7 @@ export const wideEvents = (source: Source, stdout: Sink, stderr?: Sink) => {
   const emit = emitter(source, stdout, stderr)
 
   return Layer.mergeAll(
-    // WARNING: Logger.layer replaces the logger set, dropping Effect's text logger, which would add non-JSON lines to backend.log (ADR 0012).
+    // WARNING: Logger.layer replaces the logger set, dropping Effect's text logger, which would add non-JSON lines to backend.log.
     Logger.layer([lineLogger(emit)]),
     unitTracer(emit),
   )
@@ -229,6 +267,7 @@ export const runMain =
         Cause.hasInterruptsOnly(cause) ? Effect.void : Effect.logError("Stopped", cause),
       ),
       Effect.provide(output),
+      untilDesktopStops,
       NodeRuntime.runMain({ disableErrorReporting: true }),
     )
 

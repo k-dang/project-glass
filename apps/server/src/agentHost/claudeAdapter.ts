@@ -3,6 +3,8 @@ import {
   createSdkMcpServer,
   type EffortLevel as SdkEffortLevel,
   getSessionInfo,
+  type McpServerConfig,
+  type McpServerProvenance,
   type Options,
   type ModelInfo,
   type PermissionResult,
@@ -17,7 +19,7 @@ import {
   type AgentCommand,
   type AgentModel,
   AgentModels,
-  type AgentStatusesChanged,
+  AgentStatusesChanged,
   QuestionPart,
   type QuestionReply,
   type RequestAnswer,
@@ -28,6 +30,7 @@ import {
   withContextOf,
 } from "@glass/contracts"
 import {
+  DateTime,
   Deferred,
   Effect,
   FiberSet,
@@ -64,14 +67,14 @@ import { settleWith } from "./requests"
 import type { WrittenSkills } from "./sentSkills"
 import { claudeToolInput, type ToolReply } from "./hostTool"
 import { suggestDraft, suggestDraftDescription, suggestDraftParameters } from "./suggestDraftTool"
-import { drawDiagram, drawDiagramDescription, drawDiagramParameters } from "./drawDiagramTool"
 import {
-  GLASS_MCP_SERVER,
-  GLASS_TOOLS_MCP_SERVER,
-  isGlassTool,
-  permissionRequest,
-  ToolInput,
-} from "./toolCalls"
+  SUBMIT_REVIEW_TOOL,
+  submitReview,
+  submitReviewDescription,
+  submitReviewParameters,
+} from "./submitReviewTool"
+import { drawDiagram, drawDiagramDescription, drawDiagramParameters } from "./drawDiagramTool"
+import { GLASS_MCP_SERVER, GLASS_TOOLS_MCP_SERVER, permissionRequest, ToolInput } from "./toolCalls"
 import { runTurns } from "./turnLoop"
 import { workInstructions } from "./workRole"
 
@@ -98,6 +101,8 @@ export interface ClaudeQuery extends AsyncIterable<SDKMessage> {
   readonly setPermissionMode: Query["setPermissionMode"]
   readonly applyFlagSettings: Query["applyFlagSettings"]
   readonly interrupt: Query["interrupt"]
+  readonly stopTask: Query["stopTask"]
+  readonly setMcpServers: Query["setMcpServers"]
 }
 
 export interface ClaudeSdk {
@@ -116,12 +121,14 @@ const startFailure = (cause: unknown) =>
 
 const suggestDraftInput = claudeToolInput(suggestDraftParameters)
 
+const submitReviewInput = claudeToolInput(submitReviewParameters)
+
 const drawDiagramInput = claudeToolInput(drawDiagramParameters)
 
 const toolResult = ({ accepted, text }: ToolReply) =>
   Promise.resolve({ content: [{ type: "text" as const, text }], isError: !accepted })
 
-const reviewTools = claudeTools.shell
+const reviewTools = claudeTools.review
 
 const reviewOptions = (brief: ReviewBrief): Options => ({
   systemPrompt: { type: "preset", preset: "claude_code", append: brief.instructions },
@@ -132,6 +139,9 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
     [GLASS_MCP_SERVER]: createSdkMcpServer({
       name: GLASS_MCP_SERVER,
       tools: [
+        tool(SUBMIT_REVIEW_TOOL, submitReviewDescription, submitReviewInput, (input) =>
+          toolResult(submitReview(input)),
+        ),
         tool(SUGGEST_DRAFT_TOOL, suggestDraftDescription, suggestDraftInput, (input) =>
           toolResult(suggestDraft(brief.diffLines)(input)),
         ),
@@ -140,39 +150,51 @@ const reviewOptions = (brief: ReviewBrief): Options => ({
   },
 })
 
-const workOptions = (tools: GlassToolsAccess | undefined): Options => {
-  const mcpServers: NonNullable<Options["mcpServers"]> = {
-    [GLASS_MCP_SERVER]: createSdkMcpServer({
-      name: GLASS_MCP_SERVER,
-      tools: [
-        tool(DRAW_DIAGRAM_TOOL, drawDiagramDescription, drawDiagramInput, (input) =>
-          toolResult(drawDiagram(input)),
-        ),
-      ],
-    }),
-  }
+interface RoleSetup {
+  readonly options: Options
+  // WARNING: The SDK puts startup mcpServers on Claude Code's command line, and setMcpServers drops each in-process server it isn't given, so Work adds all of its servers after start.
+  readonly addedServers?: Record<string, McpServerConfig>
+}
 
-  if (tools === undefined) return { mcpServers }
+const workSetup = (tools: GlassToolsAccess | undefined): RoleSetup => {
+  const glass = createSdkMcpServer({
+    name: GLASS_MCP_SERVER,
+    tools: [
+      tool(DRAW_DIAGRAM_TOOL, drawDiagramDescription, drawDiagramInput, (input) =>
+        toolResult(drawDiagram(input)),
+      ),
+    ],
+  })
 
-  mcpServers[GLASS_TOOLS_MCP_SERVER] = {
-    type: "http",
-    url: tools.url,
-    headers: { authorization: `Bearer ${Redacted.value(tools.bearer)}` },
-  }
+  if (tools === undefined) return { options: {}, addedServers: { [GLASS_MCP_SERVER]: glass } }
 
   return {
-    mcpServers,
-    systemPrompt: { type: "preset", preset: "claude_code", append: workInstructions },
+    options: {
+      systemPrompt: { type: "preset", preset: "claude_code", append: workInstructions },
+    },
+    addedServers: {
+      [GLASS_MCP_SERVER]: glass,
+      [GLASS_TOOLS_MCP_SERVER]: {
+        type: "http",
+        url: tools.url,
+        headers: { authorization: `Bearer ${Redacted.value(tools.bearer)}` },
+      },
+    },
   }
 }
 
-const roleOptions = (role: RepositoryRole, glassTools: GlassToolsAccess | undefined): Options =>
+const roleSetup = (role: RepositoryRole, glassTools: GlassToolsAccess | undefined): RoleSetup =>
   Match.value(role).pipe(
     Match.tagsExhaustive({
-      Work: () => workOptions(glassTools),
-      Review: ({ brief }) => reviewOptions(brief),
+      Work: () => workSetup(glassTools),
+      Review: ({ brief }) => ({ options: reviewOptions(brief) }),
     }),
   )
+
+// WARNING: A folder's own config may name an MCP server anything, even one whose tool names start like Glass's, so trust only where Claude Code says a server came from.
+const isGlassServer = (server: McpServerProvenance | undefined) =>
+  (server?.source === "sdk" && server.name === GLASS_MCP_SERVER) ||
+  (server?.source === "dynamic" && server.name === GLASS_TOOLS_MCP_SERVER)
 
 // WARNING: Approve these here, not in allowedTools: Claude Code skips canUseTool for allowedTools.
 const approvedIn = (role: RepositoryRole) => {
@@ -180,7 +202,8 @@ const approvedIn = (role: RepositoryRole) => {
     Match.tagsExhaustive({ Work: () => [], Review: () => reviewTools }),
   )
 
-  return (toolName: string) => isGlassTool(toolName) || builtIn.includes(toolName)
+  return (toolName: string, server: McpServerProvenance | undefined) =>
+    isGlassServer(server) || builtIn.includes(toolName)
 }
 
 const pluginOptions = (skills: ReadonlyArray<WrittenSkills>): Options =>
@@ -200,7 +223,7 @@ const startClaude = (
   folder: string,
   prompt: AsyncIterable<SDKUserMessage>,
   canUseTool: CanUseTool,
-  extra: Options = {},
+  { options, addedServers }: RoleSetup,
 ): Effect.Effect<
   {
     readonly session: ClaudeQuery
@@ -222,7 +245,7 @@ const startClaude = (
             // WARNING: The Agent SDK's default system prompt is empty, unlike the terminal claude's.
             systemPrompt: { type: "preset", preset: "claude_code" },
             includePartialMessages: true,
-            ...extra,
+            ...options,
             canUseTool,
             // WARNING: Required so the user can switch to bypassPermissions between Turns.
             allowDangerouslySkipPermissions: true,
@@ -235,14 +258,21 @@ const startClaude = (
       (opened) => Effect.sync(() => opened.close()),
     )
 
-    const initialized = yield* Effect.tryPromise(() => session.initializationResult()).pipe(
+    const { initialized, unconnected } = yield* Effect.tryPromise(async () => ({
+      initialized: await session.initializationResult(),
+      unconnected:
+        addedServers === undefined ? {} : (await session.setMcpServers(addedServers)).errors,
+    })).pipe(
       Effect.timeoutOrElse({
         duration: START_TIMEOUT,
-        orElse: () => Effect.fail("claude didn't answer the SDK's handshake"),
+        orElse: () => Effect.fail("claude didn't finish starting"),
       }),
       Effect.tapError((cause) => Effect.logWarning("Claude Code could not start", cause)),
       Effect.mapError(startFailure),
     )
+
+    if (Object.keys(unconnected).length > 0)
+      yield* Effect.logWarning("Claude Code couldn't connect to MCP servers", unconnected)
 
     return { session, initialized }
   })
@@ -293,8 +323,7 @@ const interruptAll = (session: ClaudeQuery) =>
     Effect.orElseSucceed((): ReadonlyArray<string> => []),
   )
 
-const sameStrings = (a: ReadonlyArray<string>, b: ReadonlyArray<string>) =>
-  a.length === b.length && a.every((value, index) => value === b[index])
+const sameActivity = Schema.toEquivalence(AgentStatusesChanged)
 
 const control = (what: "model" | "effort" | "Permission mode", call: () => Promise<void>) =>
   Effect.tryPromise(call).pipe(
@@ -375,14 +404,14 @@ interface Asked {
 }
 
 // WARNING: The handshake sends the model nothing but still starts the folder's MCP servers, plugins, and SessionStart hooks.
-const handshake = (sdk: ClaudeSdk, command: string, folder: string, extra: Options = {}) =>
+const handshake = (sdk: ClaudeSdk, command: string, folder: string, options: Options = {}) =>
   startClaude(
     sdk,
     command,
     folder,
     Stream.toAsyncIterable(Stream.never),
     () => Promise.resolve({ behavior: "deny", message: "Glass is only asking what it offers." }),
-    extra,
+    { options },
   ).pipe(Effect.map(({ initialized }) => initialized))
 
 export const claudeAdapter = (
@@ -456,8 +485,8 @@ export const claudeAdapter = (
 
     const approved = approvedIn(role)
 
-    const canUseTool: CanUseTool = (toolName, input, { toolUseID, signal }) =>
-      approved(toolName)
+    const canUseTool: CanUseTool = (toolName, input, { toolUseID, signal, mcpServer }) =>
+      approved(toolName, mcpServer)
         ? Promise.resolve({ behavior: "allow", updatedInput: input })
         : runPromise(
             ask(
@@ -468,6 +497,8 @@ export const claudeAdapter = (
             { signal },
           )
 
+    const setup = roleSetup(role, glassTools)
+
     const { session } = yield* startClaude(
       sdk,
       command,
@@ -475,9 +506,12 @@ export const claudeAdapter = (
       Stream.toAsyncIterable(Stream.fromQueue(prompts)),
       canUseTool,
       {
-        ...(saved === undefined ? { sessionId: thread } : { resume: thread }),
-        ...roleOptions(role, glassTools),
-        ...pluginOptions(skills),
+        ...setup,
+        options: {
+          ...(saved === undefined ? { sessionId: thread } : { resume: thread }),
+          ...setup.options,
+          ...pluginOptions(skills),
+        },
       },
     )
 
@@ -486,11 +520,7 @@ export const claudeAdapter = (
 
     const show = (activity: AgentStatusesChanged) =>
       Effect.suspend(() => {
-        if (
-          sameStrings(activity.agentStatuses, shown.agentStatuses) &&
-          sameStrings(activity.backgroundToolCalls, shown.backgroundToolCalls)
-        )
-          return Effect.void
+        if (sameActivity(activity, shown)) return Effect.void
 
         shown = activity
 
@@ -498,8 +528,8 @@ export const claudeAdapter = (
       })
 
     const follow = (message: SDKMessage) =>
-      Effect.suspend(() => {
-        const tracked = trackBackgroundTasks(background, message)
+      Effect.flatMap(DateTime.now, (now) => {
+        const tracked = trackBackgroundTasks(background, message, now)
         background = tracked.tasks
 
         const inputs = [
@@ -566,8 +596,22 @@ export const claudeAdapter = (
 
           const cancelled = yield* interruptAll(session)
 
-          return steers.filter(({ id }) => cancelled.includes(id)).map(withContextOf)
+          const returned = yield* Effect.filter(steers, ({ id }) =>
+            cancelled.includes(id) ? turns.dropSteer(id) : Effect.succeed(false),
+          )
+
+          return returned.map(withContextOf)
         }),
+      stopBackgroundTask: (taskId) =>
+        Effect.tryPromise(() => session.stopTask(taskId)).pipe(
+          Effect.tapError((cause) =>
+            Effect.logWarning("Claude Code refused to stop a background task", cause),
+          ),
+          Effect.mapError(
+            () =>
+              new HostThreadError({ message: "Claude Code couldn't stop that task. Try again." }),
+          ),
+        ),
       answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
         const asked = waiting.get(requestId)
 

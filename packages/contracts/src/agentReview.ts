@@ -1,5 +1,5 @@
-import { Option, Schema } from "effect"
-import type { ToolCallPart } from "./thread"
+import { Schema } from "effect"
+import { acceptedCallInput } from "./thread"
 import { Revision } from "./revision"
 import { CheckoutRunReason } from "./checkoutRun"
 import { DiffSide } from "./comment"
@@ -14,8 +14,6 @@ export const AgentReviewDone = Schema.Struct({
 
 export type AgentReviewDone = typeof AgentReviewDone.Type
 
-export const FollowUpMessage = Schema.Trimmed.check(Schema.isNonEmpty())
-
 export const SuggestedDraft = Schema.Struct({
   path: Schema.String,
   side: DiffSide,
@@ -27,12 +25,7 @@ export type SuggestedDraft = typeof SuggestedDraft.Type
 
 export const SUGGEST_DRAFT_TOOL = "suggest_draft"
 
-const decodeSuggestedDraft = Schema.decodeUnknownOption(Schema.fromJsonString(SuggestedDraft))
-
-export const acceptedSuggestedDraftOf = (call: typeof ToolCallPart.Type): SuggestedDraft | null =>
-  call.name === SUGGEST_DRAFT_TOOL && call.status === "done"
-    ? Option.getOrNull(decodeSuggestedDraft(call.input))
-    : null
+export const acceptedSuggestedDraftOf = acceptedCallInput(SUGGEST_DRAFT_TOOL, SuggestedDraft)
 
 export const RiskKind = Schema.Literals([
   "data-access",
@@ -65,7 +58,7 @@ export const AgentReview = Schema.Struct({
   markdown: Schema.String,
   hotspots: Schema.Array(Hotspot),
   lowAttention: Schema.Array(LowAttentionFile),
-  threadId: Schema.NullOr(Schema.String),
+  threadId: Schema.String,
   done: Schema.Boolean,
   includedInStartedWorkUpdate: Schema.Boolean,
 })
@@ -96,17 +89,6 @@ export const AgentReviewState = Schema.Struct({
       runner: Schema.NullOr(AgentRunnerIdentity),
     }),
     Schema.Struct({ status: Schema.Literal("failed"), reason: AgentReviewFailure }),
-    Schema.Struct({
-      status: Schema.Literal("starting-thread"),
-      message: FollowUpMessage,
-      startedAt: Schema.Number,
-      runner: AgentRunnerIdentity,
-    }),
-    Schema.Struct({
-      status: Schema.Literal("thread-start-failed"),
-      message: FollowUpMessage,
-      reason: AgentReviewFailure,
-    }),
   ]),
 })
 
@@ -114,8 +96,6 @@ export type AgentReviewState = typeof AgentReviewState.Type
 
 const finishedWhile: Record<AgentReviewState["job"]["status"], boolean> = {
   idle: true,
-  "starting-thread": true,
-  "thread-start-failed": true,
   waiting: false,
   reviewing: false,
   failed: false,

@@ -69,7 +69,7 @@ describe("Glass tools over MCP", () => {
           ["list_to_dos", true],
           ["list_recent_activity", true],
           ["list_threads", true],
-          ["list_needs_you", true],
+          ["list_inbox", true],
           ["list_started_work", true],
           ["read_thread_transcript", true],
           ["read_pull_request", true],
@@ -81,6 +81,7 @@ describe("Glass tools over MCP", () => {
           ["send_thread_message", false],
           ["ask_user", false],
           ["check_in", false],
+          ["show_visualization", true],
         ],
       )
     }),
@@ -205,6 +206,27 @@ describe("Glass tools over MCP", () => {
       assert.isTrue(result.isError)
       assert.include(toolText(result), "changed since that Revision")
     }),
+  )
+
+  it.live(
+    "refuses the browser tools to a caller that isn't a Thread, even one naming itself a Thread's host",
+    () =>
+      Effect.gen(function* () {
+        const { baseUrl, mcpCredentials } = yield* startGlass
+
+        const posing = yield* connectMcp(
+          baseUrl,
+          yield* mcpCredentials.issue(
+            GlobalChatCaller.make({ globalChatId: "global-chat", sessionId: "posing-session" }),
+          ),
+          "glass-agent-host",
+        )
+
+        const result = yield* posing.call("open_browser", { url: "http://localhost:3000/" })
+
+        assert.isTrue(result.isError)
+        assert.include(toolText(result), "Only a Thread's agent has a Browser pane")
+      }),
   )
 
   it.live("explains a Thread that doesn't exist as a tool failure", () =>

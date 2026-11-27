@@ -11,9 +11,9 @@ import {
 import { Context, Effect, FileSystem, Layer, Schema } from "effect"
 import { createHash } from "node:crypto"
 import { join } from "node:path"
-import { Git } from "./git"
+import { Git, renameBranch } from "./git"
 
-export class ChangesFailed extends Schema.TaggedError<ChangesFailed>()("ChangesFailed", {
+class ChangesFailed extends Schema.TaggedError<ChangesFailed>()("ChangesFailed", {
   cause: Schema.Unknown,
 }) {}
 
@@ -113,6 +113,7 @@ export class Changes extends Context.Service<
     ) => Effect.Effect<ReadonlyArray<ChangedFile>, ChangesFailed>
     readonly uncommitted: (folder: string) => Effect.Effect<boolean, ChangesFailed>
     readonly branch: (folder: string) => Effect.Effect<string | null, ChangesFailed>
+    readonly useBranch: (folder: string, branch: string) => Effect.Effect<void, ChangesFailed>
     readonly files: (folder: string) => Effect.Effect<ReadonlyArray<string>, ChangesFailed>
   }
 >()("@glass/server/Changes") {
@@ -121,6 +122,12 @@ export class Changes extends Context.Service<
     Effect.gen(function* () {
       const git = yield* Git
       const fs = yield* FileSystem.FileSystem
+
+      const currentBranch = (folder: string) =>
+        git.run(folder, ["branch", "--show-current"]).pipe(
+          Effect.map((branch) => (branch === "" ? null : branch)),
+          failed,
+        )
 
       const workingTreeSnapshot = Effect.fnUntraced(function* (folder: string) {
         const [index, scratch] = yield* Effect.all(
@@ -190,9 +197,12 @@ export class Changes extends Context.Service<
             Effect.map((status) => status !== ""),
             failed,
           ),
-        branch: (folder) =>
-          git.run(folder, ["branch", "--show-current"]).pipe(
-            Effect.map((branch) => (branch === "" ? null : branch)),
+        branch: currentBranch,
+        useBranch: (folder, branch) =>
+          currentBranch(folder).pipe(
+            Effect.flatMap((current) =>
+              current === branch ? Effect.void : renameBranch(git, folder, current, branch),
+            ),
             failed,
           ),
         files: (folder) =>

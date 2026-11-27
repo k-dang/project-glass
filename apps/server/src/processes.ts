@@ -1,6 +1,6 @@
 import { ChildProcess } from "effect/process"
 import { readFileSync, statSync } from "node:fs"
-import { dirname, extname, join } from "node:path"
+import { dirname, extname, join, resolve as absolute } from "node:path"
 import { fileURLToPath } from "node:url"
 
 const thisHost = { platform: globalThis.process.platform, env: globalThis.process.env }
@@ -9,25 +9,40 @@ const isFile = (path: string) => statSync(path, { throwIfNoEntry: false })?.isFi
 
 const isScript = (path: string) => /\.(cmd|bat)$/i.test(path)
 
+// WARNING: Windows looks for a bare command in the child's cwd before PATH, so a command always leaves here as a full path.
 const resolve = (command: string, host: typeof thisHost) => {
   if (host.platform !== "win32") return command
 
   const extensions = (host.env["PATHEXT"] ?? ".COM;.EXE;.BAT;.CMD").split(";").filter(Boolean)
   const names = extname(command) === "" ? extensions.map((ext) => command + ext) : [command]
-  const folders = /[\\/]/.test(command) ? [""] : (host.env["PATH"] ?? "").split(";").filter(Boolean)
 
-  return (
-    folders.flatMap((folder) => names.map((name) => join(folder, name))).find(isFile) ?? command
-  )
+  const folders = /[\\/]/.test(command)
+    ? [""]
+    : (host.env["PATH"] ?? "")
+        .split(";")
+        .map((folder) => folder.replace(/^"(.*)"$/, "$1"))
+        .filter(Boolean)
+
+  const found = folders.flatMap((folder) => names.map((name) => join(folder, name))).find(isFile)
+
+  return found === undefined
+    ? absolute(dirname(globalThis.process.execPath), command)
+    : absolute(found)
 }
 
 // WARNING: cmd.exe parses a .cmd's arguments twice, so metacharacters are escaped twice, as cross-spawn does.
 const metacharacters = /([()\][%!^"`<>&|;, *?])/g
 
-const escapeArgument = (argument: string) =>
+const quoteArgument = (argument: string) =>
   `"${argument.replace(/(\\*)"/g, '$1$1\\"').replace(/(\\*)$/, "$1$1")}"`
-    .replace(metacharacters, "^$1")
-    .replace(metacharacters, "^$1")
+
+const escapeArgument = (argument: string) =>
+  quoteArgument(argument).replace(metacharacters, "^$1").replace(metacharacters, "^$1")
+
+export const argumentLength = (command: string, argument: string, host = thisHost) =>
+  host.platform !== "win32"
+    ? argument.length
+    : (isScript(resolve(command, host)) ? escapeArgument(argument) : quoteArgument(argument)).length
 
 export const nodeEntry = (script: string, args: ReadonlyArray<string> = []) => ({
   command: globalThis.process.execPath,
@@ -54,6 +69,9 @@ export const launchCommand = (
 
   if (!isScript(resolved)) return ChildProcess.make(resolved, args, options)
 
+  if (args.some((argument) => /[\r\n]/.test(argument)))
+    throw new Error(`cmd.exe ends ${resolved}'s command line at a line break in an argument`)
+
   const line = [resolved.replace(metacharacters, "^$1"), ...args.map(escapeArgument)].join(" ")
 
   return ChildProcess.make(line, [], { ...options, shell: true })
@@ -66,7 +84,7 @@ export const sdkExecutable = (command: string, host = thisHost) => {
 
   const target = /"%(?:dp0%\\|~dp0)([^"]+)"\s+%\*/.exec(readFileSync(resolved, "utf8"))?.[1]
 
-  return target === undefined ? command : join(dirname(resolved), target)
+  return target === undefined ? resolved : join(dirname(resolved), target)
 }
 
 export const bundledEntry = (name: string, callerUrl: string) =>

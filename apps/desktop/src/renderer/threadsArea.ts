@@ -12,6 +12,7 @@ import {
   type MessageInput,
   type ModelChoice,
   type NewThread,
+  type FeedbackNote,
   type PermissionMode,
   type PlaceTag,
   type RequestAnswer,
@@ -19,30 +20,23 @@ import {
   type SentMessage,
   type Transcript,
   type TranscriptUpdate,
-  type UnsentFeedback,
   repositoryKey,
   localPlace,
   nothingUnsent,
 } from "@glass/contracts"
 import { useNavigate } from "@tanstack/react-router"
-import { Data, Effect, Exit, Option, Predicate, Schema, Stream } from "effect"
+import { Data, Effect, Exit, Option, Predicate, Stream } from "effect"
 import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity"
 import { Cloud, Laptop, type LucideIcon } from "lucide-react"
 import { toast } from "@/components/ui/toast"
 import { Backend, type BackendError, backendRuntime, backendRuntimeOf } from "./backend"
 import { problemOf } from "./problems"
 
-export type ThreadTab = "chat" | "changes"
-
 export const threadsPanelOpenAtom = Atom.make(true)
 
 export const threadDetailsPinnedAtom = Atom.make(true).pipe(Atom.keepAlive)
 
-export const settledOpenAtom = Atom.make(true).pipe(Atom.keepAlive)
-
-export const ThreadSearch = Schema.Struct({
-  view: Schema.optional(Schema.Literal("changes")),
-})
+export const settledOpenAtom = Atom.make(false).pipe(Atom.keepAlive)
 
 export const placeKey = (place: ThreadPlace) =>
   Predicate.isTagged(place, "sandbox") ? `sandbox:${place.providerId}` : place._tag
@@ -132,12 +126,14 @@ export const feedbackNotesAtom = Atom.family((threadId: string) =>
   backendRuntime.atom(Backend.use((backend) => backend.ListFeedbackNotes({ threadId }))),
 )
 
+export type NoteEditor = "page" | "changes"
+
 export const writtenFeedbackAtom = Atom.family((_threadId: string) =>
-  Atom.make<UnsentFeedback | null>(null),
+  Atom.make<ReadonlyArray<FeedbackNote> | null>(null),
 )
 
-export const pageNoteEditingAtom = Atom.family((_threadId: string) =>
-  Atom.make<string | null>(null),
+export const noteEditorsAtom = Atom.family((_threadId: string) =>
+  Atom.make<ReadonlyArray<NoteEditor>>([]),
 )
 
 export const localCheckoutsAtom = backendRuntime
@@ -229,21 +225,22 @@ export const noFiles: ReadonlyArray<string> = []
 const listedOr = <A>(
   listing: Atom.Atom<AsyncResult.AsyncResult<ReadonlyArray<A>, unknown>>,
   none: ReadonlyArray<A>,
-) => Atom.map(listing, (listed) => Option.getOrElse(AsyncResult.value(listed), () => none))
+) =>
+  Atom.map(listing, (listed) => Option.getOrElse(AsyncResult.value(listed), () => none)).pipe(
+    Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL),
+  )
 
 const newThreadCommandsFamily = Atom.family((newThread: NewThreadOf) =>
   listedOr(
-    backendRuntime
-      .atom(
-        Backend.use((backend) =>
-          backend.ListNewThreadCommands({
-            harness: newThread.harness,
-            place: placeOfKey(newThread.place),
-            repository: newThread.repository,
-          }),
-        ),
-      )
-      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+    backendRuntime.atom(
+      Backend.use((backend) =>
+        backend.ListNewThreadCommands({
+          harness: newThread.harness,
+          place: placeOfKey(newThread.place),
+          repository: newThread.repository,
+        }),
+      ),
+    ),
     noCommands,
   ),
 )
@@ -270,13 +267,11 @@ const relistedOnReachAtom = <A>(
   none: ReadonlyArray<A>,
 ) =>
   listedOr(
-    backendRuntime
-      .atom((get) => {
-        get(sandboxReachableAtom(threadId))
+    backendRuntime.atom((get) => {
+      get(sandboxReachableAtom(threadId))
 
-        return list
-      })
-      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+      return list
+    }),
     none,
   )
 
@@ -296,17 +291,15 @@ class NewThreadBranch extends Data.Class<{
 
 const newThreadFilesFamily = Atom.family((branch: NewThreadBranch) =>
   listedOr(
-    backendRuntime
-      .atom(
-        Backend.use((backend) =>
-          backend.ListNewThreadFiles({
-            place: placeOfKey(branch.place),
-            repository: branch.repository,
-            baseBranch: branch.baseBranch,
-          }),
-        ),
-      )
-      .pipe(Atom.setIdleTTL(COMPOSER_LISTING_IDLE_TTL)),
+    backendRuntime.atom(
+      Backend.use((backend) =>
+        backend.ListNewThreadFiles({
+          place: placeOfKey(branch.place),
+          repository: branch.repository,
+          baseBranch: branch.baseBranch,
+        }),
+      ),
+    ),
     noFiles,
   ),
 )
@@ -395,6 +388,19 @@ export const steerAtom = Atom.family((threadId: string) =>
 
 export const stopTurnAtom = Atom.family((threadId: string) =>
   backendRuntime.fn(() => Backend.use((backend) => backend.StopTurn({ threadId }))),
+)
+
+export class ThreadBackgroundTask extends Data.Class<{
+  readonly threadId: string
+  readonly taskId: string
+}> {}
+
+export const stopBackgroundTaskAtom = Atom.family((task: ThreadBackgroundTask) =>
+  backendRuntime.fn(() =>
+    Backend.use((backend) =>
+      backend.StopBackgroundTask({ threadId: task.threadId, taskId: task.taskId }),
+    ),
+  ),
 )
 
 export const reachSandboxAtom = Atom.family((threadId: string) =>

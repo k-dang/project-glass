@@ -1,14 +1,9 @@
 import { Schema } from "effect"
 import { Rpc, RpcGroup } from "effect/rpc"
 import { Activity, ActivityKind, ActivityLogError, ActivityPage, ActivityStamp } from "./activity"
-import {
-  AgentReviewDone,
-  AgentReviewFailure,
-  AgentReviewState,
-  FollowUpMessage,
-  ReviewPrompt,
-} from "./agentReview"
+import { AgentReviewDone, AgentReviewFailure, AgentReviewState, ReviewPrompt } from "./agentReview"
 import { AskAnswer, AskFailure, AskPlace, AskQuestion } from "./ask"
+import { RendererEvent } from "./diagnostics"
 import {
   Thread,
   ThreadBusy,
@@ -56,12 +51,18 @@ import {
 } from "./comment"
 import { CreateDraftError, Draft, UpdateDraftError } from "./draft"
 import { EngineFeature, EngineSettings } from "./engine"
-import { FeedbackNote, LineNote, UnsentFeedback } from "./feedbackNote"
+import { FeedbackNote, LineNote } from "./feedbackNote"
+import { BrowserControl, BrowserPageAnswer, BrowserPageRequest } from "./browserPage"
 import { CheckInAnswer, CheckInChanges, CheckInError, CheckInNotWaiting } from "./checkIn"
 import { FollowedRepository, InvalidRepositoryInput } from "./followedRepository"
 import { MergeAction, MergePullRequestError } from "./merge"
-import { NeedsYou, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./needsYou"
-import { OutsideAgent, OutsideAgentNotFound } from "./outsideAgent"
+import { InboxItems, OutsideQuestionAnswer, OutsideQuestionNotWaiting, TurnSeen } from "./inbox"
+import {
+  OutsideAgent,
+  OutsideAgentDecision,
+  OutsideAgentNotFound,
+  OutsideAgentRequestNotWaiting,
+} from "./outsideAgent"
 import {
   LoadPullRequestError,
   PullRequestRef,
@@ -97,6 +98,8 @@ import { ToDo, ToDoError, ToDoImageSize, ToDoImageUploads, ToDoTitle } from "./t
 import { TourFailure, TourState } from "./tour"
 
 export const RPC_PATH = "/rpc"
+
+export const THREAD_FILES_PATH = "/thread-files"
 
 export const TOKEN_PARAM = "token"
 
@@ -137,10 +140,6 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("StartAgentReview", {
     payload: { pullRequest: PullRequestRef, revision: Revision },
-    error: AgentReviewFailure,
-  }),
-  Rpc.make("FollowUpAgentReview", {
-    payload: { pullRequest: PullRequestRef, revision: Revision, message: FollowUpMessage },
     error: AgentReviewFailure,
   }),
   Rpc.make("CancelAgentReview", {
@@ -383,6 +382,16 @@ export class GlassRpcs extends RpcGroup.make(
     stream: true,
   }),
   Rpc.make("WatchWorkingThreads", { success: Schema.Array(Schema.String), stream: true }),
+  Rpc.make("WatchBrowserPageRequests", {
+    success: Schema.Array(BrowserPageRequest),
+    stream: true,
+  }),
+  Rpc.make("AnswerBrowserPageRequest", {
+    payload: { id: Schema.String, answer: BrowserPageAnswer },
+  }),
+  Rpc.make("WatchBrowserControl", { success: Schema.Array(BrowserControl), stream: true }),
+  Rpc.make("TakeOverBrowser", { payload: { threadId: Schema.String } }),
+  Rpc.make("HandBackBrowser", { payload: { threadId: Schema.String } }),
   Rpc.make("WatchSettledThreads", { success: Schema.Array(Schema.String), stream: true }),
   Rpc.make("BringBackThread", {
     payload: { threadId: Schema.String },
@@ -393,7 +402,7 @@ export class GlassRpcs extends RpcGroup.make(
     error: ThreadError,
     stream: true,
   }),
-  Rpc.make("WatchNeedsYou", { success: NeedsYou, stream: true }),
+  Rpc.make("WatchInbox", { success: InboxItems, stream: true }),
   Rpc.make("MarkTurnSeen", {
     payload: TurnSeen,
     error: ThreadError,
@@ -428,6 +437,10 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("GetMcpEndpoint", { success: Schema.Struct({ url: Schema.String }) }),
   Rpc.make("WatchOutsideAgents", { success: Schema.Array(OutsideAgent), stream: true }),
+  Rpc.make("AnswerOutsideAgentRequest", {
+    payload: { id: Schema.String, decision: OutsideAgentDecision },
+    error: OutsideAgentRequestNotWaiting,
+  }),
   Rpc.make("RevokeOutsideAgent", {
     payload: { id: Schema.String },
     error: OutsideAgentNotFound,
@@ -516,7 +529,7 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("CancelQueuedMessage", {
     payload: { threadId: Schema.String, queuedMessageId: Schema.String },
-    success: UnsentFeedback,
+    success: Schema.Array(FeedbackNote),
     error: Schema.Union([ThreadNotFound, QueuedMessageStarted, ThreadError]),
   }),
   Rpc.make("SendQueuedMessage", {
@@ -525,6 +538,10 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("StopTurn", {
     payload: { threadId: Schema.String },
+    error: Schema.Union([ThreadNotFound, ThreadError]),
+  }),
+  Rpc.make("StopBackgroundTask", {
+    payload: { threadId: Schema.String, taskId: Schema.String },
     error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("ReachSandbox", {
@@ -566,22 +583,17 @@ export class GlassRpcs extends RpcGroup.make(
   }),
   Rpc.make("ListFeedbackNotes", {
     payload: { threadId: Schema.String },
-    success: UnsentFeedback,
-    error: Schema.Union([ThreadNotFound, ThreadError]),
-  }),
-  Rpc.make("StageFeedbackNotes", {
-    payload: { threadId: Schema.String },
-    success: UnsentFeedback,
+    success: Schema.Array(FeedbackNote),
     error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("SaveFeedbackNote", {
     payload: { threadId: Schema.String, note: FeedbackNote },
-    success: UnsentFeedback,
+    success: Schema.Array(FeedbackNote),
     error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("RemoveFeedbackNote", {
     payload: { threadId: Schema.String, noteId: Schema.String },
-    success: UnsentFeedback,
+    success: Schema.Array(FeedbackNote),
     error: Schema.Union([ThreadNotFound, ThreadError]),
   }),
   Rpc.make("RemoveThread", {
@@ -649,6 +661,9 @@ export class GlassRpcs extends RpcGroup.make(
   Rpc.make("LoadEarlierGlobalChatSessionTurns", {
     payload: { id: Schema.String, before: Schema.String },
     error: Schema.Union([GlobalChatSessionNotFound, ThreadError]),
+  }),
+  Rpc.make("ReportRendererEvents", {
+    payload: { events: Schema.Array(RendererEvent) },
   }),
 ) {}
 

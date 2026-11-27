@@ -11,7 +11,7 @@ import {
   type TurnContext,
   type StartedWorkUpdate,
 } from "@glass/contracts"
-import { Match, Predicate } from "effect"
+import { Match } from "effect"
 
 const withoutBlockTags = (text: string) =>
   text.replaceAll(
@@ -56,13 +56,17 @@ const startedWorkUpdateBlock = ({ work }: StartedWorkUpdate) =>
     ...work.map(workOutcomeEntry),
   ])
 
-const contextBlock = (context: TurnContext) => {
-  if (Predicate.isTagged(context, "StartedWorkUpdate")) return startedWorkUpdateBlock(context)
+const viewingBlock = (context: CapturedContext) =>
+  block("glass_context", [`The user sent this while viewing ${viewing(context)}.`])
 
-  if (Predicate.isTagged(context, "BackgroundWorkEnded")) return null
-
-  return block("glass_context", [`The user sent this while viewing ${viewing(context)}.`])
-}
+const contextBlock = (context: TurnContext) =>
+  Match.valueTags(context, {
+    StartedWorkUpdate: startedWorkUpdateBlock,
+    BackgroundWorkEnded: () => null,
+    AgentReview: () => null,
+    PullRequest: viewingBlock,
+    Thread: viewingBlock,
+  })
 
 const entry = ({ id, title, notes, done, images }: ToDo) =>
   [
@@ -83,9 +87,15 @@ const lineEntry = ({ path, side, start, end, code, text }: LineNote) =>
     "</feedback_note>",
   ].join("\n")
 
-const pageEntry = ({ path, part, text }: PageNote) =>
+const pageAttribute = (page: PageNote["page"]) =>
+  Match.valueTags(page, {
+    FilePage: ({ path }) => `path="${attribute(path)}"`,
+    WebPage: ({ url }) => `url="${attribute(url)}"`,
+  })
+
+const pageEntry = ({ page, part, text }: PageNote) =>
   [
-    `<feedback_note path="${attribute(path)}" selector="${attribute(part.selector)}"${
+    `<feedback_note ${pageAttribute(page)} selector="${attribute(part.selector)}"${
       part.heading === null ? "" : ` heading="${attribute(part.heading)}"`
     }>`,
     ...Match.valueTags(part, {
@@ -111,9 +121,9 @@ const feedbackIntro = (feedback: ReadonlyArray<FeedbackNote>) => {
     return "The user left these Feedback notes on your changes, each on the code they read. Lines on the old side are from before your changes, on the new side from after them; the code may have changed since."
 
   if (!onLines)
-    return "The user left these Feedback notes on pages in your files, each on the part of the page they pointed at; the page may have changed since."
+    return "The user left these Feedback notes on pages, each on the part of the page they pointed at; the page may have changed since."
 
-  return "The user left these Feedback notes on your changes and on pages in your files. A note with lines is on the code they read: lines on the old side are from before your changes, on the new side from after them. A note with a selector is on the part of the page they pointed at. Either may have changed since."
+  return "The user left these Feedback notes on your changes and on pages. A note with lines is on the code they read: lines on the old side are from before your changes, on the new side from after them. A note with a selector is on the part of the page they pointed at. Either may have changed since."
 }
 
 const block = (tag: string, lines: ReadonlyArray<string>) =>

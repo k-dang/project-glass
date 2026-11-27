@@ -22,6 +22,12 @@ import pageNotes from "./migrations/0020_page_notes"
 import conversationToDos from "./migrations/0021_conversation_to_dos"
 import reviewThreadReplies from "./migrations/0022_review_thread_replies"
 import threads from "./migrations/0023_threads"
+import pageLocations from "./migrations/0024_page_locations"
+import journalTurn from "./migrations/0025_journal_turn"
+import visualizations from "./migrations/0026_visualizations"
+import dropFeedbackNoteStaged from "./migrations/0027_drop_feedback_note_staged"
+import agentReviewSession from "./migrations/0028_agent_review_session"
+import agentReviewTurns from "./migrations/0030_agent_review_turns"
 
 const migrations = {
   "0001_baseline": baseline,
@@ -47,6 +53,12 @@ const migrations = {
   "0021_conversation_to_dos": conversationToDos,
   "0022_review_thread_replies": reviewThreadReplies,
   "0023_threads": threads,
+  "0024_page_locations": pageLocations,
+  "0025_journal_turn": journalTurn,
+  "0026_visualizations": visualizations,
+  "0027_drop_feedback_note_staged": dropFeedbackNoteStaged,
+  "0028_agent_review_session": agentReviewSession,
+  "0030_agent_review_turns": agentReviewTurns,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

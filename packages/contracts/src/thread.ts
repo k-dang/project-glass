@@ -1,5 +1,5 @@
 import { agentHarnesses } from "@glass/plugin"
-import { Effect, Match, Predicate, Schema } from "effect"
+import { Effect, Match, Option, Predicate, Schema } from "effect"
 import { FeedbackNote } from "./feedbackNote"
 import { FollowedRepository } from "./followedRepository"
 import { BinaryFile, ChangedFile, PullRequestRef } from "./pullRequest"
@@ -10,7 +10,7 @@ export const AgentHarness = Schema.Literals(agentHarnesses)
 
 export type AgentHarness = typeof AgentHarness.Type
 
-export const LocalPlace = Schema.TaggedStruct("local", {})
+const LocalPlace = Schema.TaggedStruct("local", {})
 
 export const SandboxPlace = Schema.TaggedStruct("sandbox", { providerId: Schema.String })
 
@@ -58,7 +58,7 @@ export type PermissionMode = typeof PermissionMode.Type
 
 export const defaultPermissionMode: PermissionMode = "auto"
 
-export interface AgentCapabilities {
+interface AgentCapabilities {
   readonly permissionModes: ReadonlyArray<PermissionMode>
 }
 
@@ -116,7 +116,6 @@ export const SandboxReach = Schema.Literals([
   "connecting",
   "reachable",
   "unreachable",
-  "incompatible",
   ...GoneReach.literals,
 ])
 
@@ -124,17 +123,10 @@ export type SandboxReach = typeof SandboxReach.Type
 
 export const isGone = Schema.is(GoneReach)
 
-export const isOutOfReach = (reach: SandboxReach) =>
-  reach === "unreachable" || reach === "incompatible" || isGone(reach)
+export const isOutOfReach = (reach: SandboxReach) => reach === "unreachable" || isGone(reach)
 
 export const goneExplanation = (reach: GoneReach) =>
   `This Thread's Sandbox ${reach === "expired" ? "expired" : "was deleted"}, so it can't take messages. Its transcript stays until you remove the Thread.`
-
-export const incompatibleExplanation =
-  "This Thread's Sandbox runs a different version of Glass, so it can't take messages. Its transcript stays until you remove the Thread."
-
-export const readOnlyExplanation = (reach: SandboxReach | undefined) =>
-  isGone(reach) ? goneExplanation(reach) : reach === "incompatible" ? incompatibleExplanation : null
 
 export class SandboxStatus extends Schema.Class<SandboxStatus>("SandboxStatus")({
   expiresAt: Schema.NullOr(Schema.DateTimeUtcFromString),
@@ -237,15 +229,28 @@ export const BackgroundWork = Schema.Struct({
 
 export type BackgroundWork = typeof BackgroundWork.Type
 
+export const BackgroundTask = Schema.Struct({
+  taskId: Schema.String,
+  kind: BackgroundWork.fields.kind,
+  description: Schema.String,
+  toolCallId: Schema.NullOr(Schema.String),
+  startedAt: Schema.DateTimeUtcFromString,
+})
+
+export type BackgroundTask = typeof BackgroundTask.Type
+
 export const BackgroundWorkEnded = Schema.TaggedStruct("BackgroundWorkEnded", {
   work: Schema.NonEmptyArray(BackgroundWork),
 })
+
+export const AgentReviewTurn = Schema.TaggedStruct("AgentReview", {})
 
 export const TurnContext = Schema.Union([
   PullRequestContext,
   ThreadContext,
   StartedWorkUpdate,
   BackgroundWorkEnded,
+  AgentReviewTurn,
 ])
 
 export type TurnContext = typeof TurnContext.Type
@@ -263,12 +268,12 @@ export const withContextOf = <Context extends TurnContext>({
   context,
 }: SentMessage & { readonly context: Context | null }) => ({ message, images, context })
 
-export const AcceptedMessage = Schema.Struct({
+const AcceptedMessage = Schema.Struct({
   ...MessageWithContext.fields,
   feedback: Schema.Array(FeedbackNote),
 })
 
-export type AcceptedMessage = typeof AcceptedMessage.Type
+type AcceptedMessage = typeof AcceptedMessage.Type
 
 export const TextPart = Schema.TaggedStruct("Text", { text: Schema.String })
 
@@ -287,6 +292,13 @@ export const ToolCallPart = Schema.TaggedStruct("ToolCall", {
   status: ToolCallStatus,
   parentToolCallId: Schema.NullOr(Schema.String),
 })
+
+export const acceptedCallInput = <S extends Schema.Decoder<unknown>>(name: string, schema: S) => {
+  const decode = Schema.decodeUnknownOption(Schema.fromJsonString(schema))
+
+  return (call: typeof ToolCallPart.Type): S["Type"] | null =>
+    call.name === name && call.status === "done" ? Option.getOrNull(decode(call.input)) : null
+}
 
 const Decision = Schema.Literals(["waiting", "allowed", "denied", "expired"])
 
@@ -475,7 +487,7 @@ export const Transcript = Schema.Struct({
   agentStatuses: Schema.Array(Schema.String).pipe(
     Schema.withConstructorDefault(Effect.succeed([])),
   ),
-  backgroundToolCalls: Schema.Array(Schema.String).pipe(
+  backgroundTasks: Schema.Array(BackgroundTask).pipe(
     Schema.withConstructorDefault(Effect.succeed([])),
   ),
 })
@@ -488,7 +500,7 @@ export const emptyTranscript: Transcript = {
   queued: [],
   status: null,
   agentStatuses: [],
-  backgroundToolCalls: [],
+  backgroundTasks: [],
 }
 
 export const TranscriptSnapshot = Schema.TaggedStruct("Snapshot", Transcript.fields)
@@ -503,7 +515,7 @@ export const StatusChanged = Schema.TaggedStruct("StatusChanged", {
 
 export const AgentStatusesChanged = Schema.TaggedStruct("AgentStatusesChanged", {
   agentStatuses: Transcript.fields.agentStatuses,
-  backgroundToolCalls: Transcript.fields.backgroundToolCalls,
+  backgroundTasks: Transcript.fields.backgroundTasks,
 })
 
 export type AgentStatusesChanged = typeof AgentStatusesChanged.Type
@@ -606,13 +618,13 @@ export const applyTranscriptUpdate = (
   Match.value(update).pipe(
     Match.tag(
       "Snapshot",
-      ({ turns, earlierTurns, queued, status, agentStatuses, backgroundToolCalls }) => ({
+      ({ turns, earlierTurns, queued, status, agentStatuses, backgroundTasks }) => ({
         turns,
         earlierTurns,
         queued,
         status,
         agentStatuses,
-        backgroundToolCalls,
+        backgroundTasks,
       }),
     ),
     Match.tag("EarlierTurns", ({ before, turns, earlierTurns }) =>
@@ -622,10 +634,10 @@ export const applyTranscriptUpdate = (
     ),
     Match.tag("QueuedMessagesChanged", ({ queued }) => ({ ...transcript, queued })),
     Match.tag("StatusChanged", ({ status }) => ({ ...transcript, status })),
-    Match.tag("AgentStatusesChanged", ({ agentStatuses, backgroundToolCalls }) => ({
+    Match.tag("AgentStatusesChanged", ({ agentStatuses, backgroundTasks }) => ({
       ...transcript,
       agentStatuses,
-      backgroundToolCalls,
+      backgroundTasks,
     })),
     Match.orElse((event) => ({
       ...transcript,

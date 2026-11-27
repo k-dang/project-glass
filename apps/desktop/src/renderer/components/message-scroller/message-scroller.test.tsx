@@ -315,6 +315,25 @@ describe("MessageScroller", () => {
     })
   })
 
+  it("follows the end before the next frame paints when content above grows", async () => {
+    const rendered = await renderTestScroller({
+      autoScroll: true,
+      messages: [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+      ],
+    })
+
+    expect(rendered.viewport().scrollTop).toBe(140)
+
+    rendered.message("message-1").dataset.testHeight = "200"
+
+    await triggerResize(rendered.content(), 0)
+
+    expect(rendered.viewport().scrollTop).toBe(260)
+  })
+
   it("holds a newly appended anchor at the reading line while the reply streams with autoScroll", async () => {
     const rendered = await renderTestScroller({
       autoScroll: true,
@@ -409,7 +428,44 @@ describe("MessageScroller", () => {
     expect(rendered.state().end).toBe(false)
   })
 
-  it("drains a released tail spacer after a manual scroll during an anchored stream", async () => {
+  it("keeps the reader in place when they scroll up into a released tail spacer", async () => {
+    const rendered = await renderTestScroller({
+      autoScroll: true,
+      messages: [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+      ],
+    })
+
+    await rendered.rerender(
+      [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+        { id: "message-4", height: 20, scrollAnchor: true },
+      ],
+      { autoScroll: true },
+    )
+
+    expect(rendered.viewport().scrollTop).toBe(176)
+    expect(rendered.viewport().scrollHeight).toBe(276)
+
+    await act(async () => {
+      await flushAnimationFrames(12)
+    })
+    await act(async () => {
+      rendered.viewport().dispatchEvent(new WheelEvent("wheel", { bubbles: true }))
+      rendered.viewport().scrollTop = 170
+      rendered.viewport().dispatchEvent(new Event("scroll", { bubbles: true }))
+      await flushAnimationFrames()
+    })
+
+    expect(rendered.viewport().scrollTop).toBe(170)
+    expect(rendered.viewport().scrollHeight).toBe(270)
+  })
+
+  it("drops the tail spacer below a reader who scrolled up, and follows again from the live edge", async () => {
     const rendered = await renderTestScroller({
       autoScroll: true,
       messages: [
@@ -436,11 +492,9 @@ describe("MessageScroller", () => {
     expect(rendered.viewport().scrollTop).toBe(176)
     expect(rendered.message("message-4").getBoundingClientRect().top).toBe(64)
 
-    // A manual scroll during the anchored (pre-handoff) phase releases the
-    // anchor and strands the reserved tail spacer. The reader scrolls up out of
-    // the spacer zone entirely, so the reply growing below must NOT yank them
-    // back to the live edge - the spacer is left untouched until they reach the
-    // real bottom.
+    await act(async () => {
+      await flushAnimationFrames(12)
+    })
     await act(async () => {
       rendered.viewport().dispatchEvent(new WheelEvent("wheel", { bubbles: true }))
       rendered.viewport().scrollTop = 150
@@ -448,8 +502,9 @@ describe("MessageScroller", () => {
       await flushAnimationFrames()
     })
 
-    // The reply keeps streaming below the released anchor. The reader is above
-    // the spacer zone, so the drain must not move them or collapse the spacer.
+    const spacer = rendered.content().querySelector<HTMLElement>("[data-message-scroller-spacer]")
+    expect(spacer?.hidden).toBe(true)
+
     await rendered.rerender(
       [
         { id: "message-1", height: 80 },
@@ -464,21 +519,11 @@ describe("MessageScroller", () => {
 
     expect(rendered.viewport().scrollTop).toBe(150)
 
-    const spacer = rendered.content().querySelector<HTMLElement>("[data-message-scroller-spacer]")
-    expect(spacer?.hidden).toBe(false)
-
-    // Scrolling to the real bottom - contentBottom plus the remaining spacer -
-    // drains the dead space and re-engages following at the live edge (268 -
-    // 100 = 168). The reader was not yanked mid-stream - the spacer shrank to
-    // absorb the new content instead of collapsing in a single frame.
     await act(async () => {
-      rendered.viewport().scrollTop = rendered.viewport().scrollHeight
+      rendered.viewport().scrollTop = 168
       rendered.viewport().dispatchEvent(new Event("scroll", { bubbles: true }))
       await flushAnimationFrames()
     })
-
-    expect(rendered.viewport().scrollTop).toBe(168)
-    expect(spacer?.hidden).toBe(true)
 
     // Follow-output stays engaged for the rest of the stream.
     rendered.message("message-5").dataset.testHeight = "60"
@@ -486,64 +531,6 @@ describe("MessageScroller", () => {
 
     expect(rendered.viewport().scrollTop).toBe(220)
     expect(rendered.state().end).toBe(false)
-  })
-
-  it("drains a stranded tail spacer on scroll when the stream ends mid-drain", async () => {
-    const rendered = await renderTestScroller({
-      autoScroll: true,
-      messages: [
-        { id: "message-1", height: 80 },
-        { id: "message-2", height: 80 },
-        { id: "message-3", height: 80 },
-      ],
-    })
-
-    // The submitted turn anchors with tail spacer room for the reply to stream.
-    await rendered.rerender(
-      [
-        { id: "message-1", height: 80 },
-        { id: "message-2", height: 80 },
-        { id: "message-3", height: 80 },
-        { id: "message-4", height: 20, scrollAnchor: true },
-      ],
-      { autoScroll: true },
-    )
-
-    // A manual scroll releases the anchor and strands the reserved spacer.
-    await act(async () => {
-      rendered.viewport().dispatchEvent(new WheelEvent("wheel", { bubbles: true }))
-      rendered.viewport().scrollTop = 150
-      rendered.viewport().dispatchEvent(new Event("scroll", { bubbles: true }))
-      await flushAnimationFrames()
-    })
-
-    const strandedSpacer = rendered
-      .content()
-      .querySelector<HTMLElement>("[data-message-scroller-spacer]")
-
-    expect(strandedSpacer?.hidden).toBe(false)
-
-    // The stream ends before the reply drains the spacer (no further resize).
-    // A scroll to the real bottom - contentBottom plus the remaining spacer -
-    // must finish the drain: the dead space is reclaimed and following re-arms.
-    await act(async () => {
-      rendered.viewport().scrollTop = rendered.viewport().scrollHeight
-      rendered.viewport().dispatchEvent(new Event("scroll", { bubbles: true }))
-      await flushAnimationFrames()
-    })
-
-    const drainedSpacer = rendered
-      .content()
-      .querySelector<HTMLElement>("[data-message-scroller-spacer]")
-
-    expect(drainedSpacer?.hidden).toBe(true)
-
-    // The reader reached the live edge: the spacer is gone and the viewport
-    // sits at the real bottom (scrollHeight minus viewport). Following is
-    // re-engaged, so state.end reads false by design (follow-output suppresses
-    // the end button); the re-arm is observable through the settled scrollTop.
-    const finalViewport = rendered.viewport()
-    expect(finalViewport.scrollTop).toBe(finalViewport.scrollHeight - finalViewport.clientHeight)
   })
 
   it("applies the default end target after async messages mount", async () => {
@@ -703,12 +690,12 @@ describe("MessageScroller", () => {
 
     await act(async () => {
       rendered.viewport().dispatchEvent(new WheelEvent("wheel", { bubbles: true }))
-      rendered.viewport().scrollTop = rendered.viewport().scrollHeight
+      rendered.viewport().scrollTop = 150
       rendered.viewport().dispatchEvent(new Event("scroll", { bubbles: true }))
       await flushAnimationFrames()
     })
 
-    expect(rendered.viewport().scrollTop).toBe(168)
+    expect(rendered.viewport().scrollTop).toBe(150)
     expect(spacer?.hidden).toBe(true)
   })
 
@@ -778,6 +765,68 @@ describe("MessageScroller", () => {
     ])
 
     expect(rendered.viewport().scrollTop).toBe(0)
+  })
+
+  it("leaves the reader in place when a new anchor arrives after they scroll away with autoScroll", async () => {
+    const rendered = await renderTestScroller({
+      autoScroll: true,
+      messages: [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+      ],
+    })
+
+    await act(async () => {
+      rendered.viewport().dispatchEvent(new WheelEvent("wheel", { bubbles: true }))
+      rendered.viewport().scrollTop = 60
+      rendered.viewport().dispatchEvent(new Event("scroll", { bubbles: true }))
+      await flushAnimationFrames()
+    })
+
+    await rendered.rerender(
+      [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+        { id: "message-4", height: 40, scrollAnchor: true },
+      ],
+      { autoScroll: true },
+    )
+
+    expect(rendered.viewport().scrollTop).toBe(60)
+    expect(rendered.button().dataset.active).toBe("true")
+  })
+
+  it("anchors a new turn when the reader wheeled at the end without leaving it", async () => {
+    const rendered = await renderTestScroller({
+      autoScroll: true,
+      messages: [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+      ],
+    })
+
+    expect(rendered.viewport().scrollTop).toBe(140)
+
+    // Wheeling down at the end scrolls nothing, so no scroll event follows.
+    await act(async () => {
+      rendered.viewport().dispatchEvent(new WheelEvent("wheel", { bubbles: true }))
+      await flushAnimationFrames()
+    })
+
+    await rendered.rerender(
+      [
+        { id: "message-1", height: 80 },
+        { id: "message-2", height: 80 },
+        { id: "message-3", height: 80 },
+        { id: "message-4", height: 40, scrollAnchor: true },
+      ],
+      { autoScroll: true },
+    )
+
+    expect(rendered.message("message-4").getBoundingClientRect().top).toBe(64)
   })
 
   it("releases follow-bottom on a bare scroll-away so later resizes do not snap back", async () => {
@@ -1096,14 +1145,14 @@ async function renderTestScrollerWithParent(options: TestScrollerOptions): Promi
   return rendered
 }
 
-async function triggerResize(element: Element) {
+async function triggerResize(element: Element, frames?: number) {
   await act(async () => {
     resizeObservers.forEach((observer) => {
       if (observer.has(element)) {
         observer.trigger()
       }
     })
-    await flushAnimationFrames()
+    await flushAnimationFrames(frames)
   })
 }
 

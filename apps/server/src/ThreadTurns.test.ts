@@ -35,7 +35,7 @@ import { migrationLoader } from "./Migrations"
 import { ToDos } from "./ToDos"
 import { Transcripts } from "./Transcripts"
 import { wideEvents } from "./wideEvents"
-import { HostThreadError, type SteersNotTakenIn } from "./agentHost/protocol"
+import { HostThreadError, notRunning, type SteersNotTakenIn } from "./agentHost/protocol"
 
 type StopRequest = Parameters<ThreadHost["StopTurn"]>[0]
 
@@ -61,6 +61,7 @@ const hostThatStarts = (
   AnswerRequest: unused("AnswerRequest"),
   Steer: unused("Steer"),
   StopTurn: unused("StopTurn"),
+  StopBackgroundTask: unused("StopBackgroundTask"),
 })
 
 const scriptedHost = (
@@ -85,6 +86,7 @@ const scriptedHost = (
   AnswerRequest: unused("AnswerRequest"),
   Steer: () => (script.steer ?? unused("Steer"))(),
   StopTurn: (request) => (script.stopTurn?.(request) ?? Effect.succeed(null)).pipe(Effect.orDie),
+  StopBackgroundTask: unused("StopBackgroundTask"),
 })
 
 const layer = ThreadTurns.layer.pipe(
@@ -886,6 +888,74 @@ it.effect(
     }).pipe(Effect.provide(layer)),
 )
 
+const database = Layer.provideMerge(
+  SqliteMigrator.layer({ loader: migrationLoader }),
+  SqliteClient.layer({ filename: ":memory:" }),
+)
+
+const glassRun = ThreadTurns.layer.pipe(
+  Layer.provideMerge(Transcripts.layer),
+  Layer.provideMerge(Layer.mock(ToDos)({})),
+)
+
+const stopStartedWorkUpdate = Effect.gen(function* () {
+  const begun = yield* Deferred.make<void>()
+
+  const desk = yield* scripted({
+    "agent-1": {
+      running: true,
+      startTurn: () => Deferred.succeed(begun, undefined).pipe(Effect.asVoid),
+      stopTurn: () => Effect.succeed([]),
+    },
+  })
+
+  const thread = desk.threads.get("agent-1")
+  assert.isDefined(thread)
+
+  yield* desk.turns.whenIdle("agent-1", (start) => start(startedWorkUpdateTurn, () => Effect.void))
+  yield* Deferred.await(begun)
+  yield* desk.turns.stop(thread)
+
+  const turn = (yield* desk.transcripts.read("agent-1")).turns[0]
+  assert.isDefined(turn)
+  assert.equal(turn.ended, null)
+
+  return turn.id
+})
+
+it.effect(
+  "ends a Turn that retries delivery when Glass restarts after the user stops it and before the host's Stopped is saved",
+  () =>
+    Effect.gen(function* () {
+      const turnId = yield* stopStartedWorkUpdate.pipe(Effect.provide(glassRun))
+
+      yield* Effect.gen(function* () {
+        const transcripts = yield* Transcripts
+
+        yield* reportStopped("agent-1", turnId)
+
+        const stopped = yield* transcripts.read("agent-1")
+        assert.deepStrictEqual(stopped.turns[0]?.ended?.ending, TurnStopped.make({}))
+        assert.lengthOf(yield* transcripts.retryDeliveries(["agent-1"]), 0)
+      }).pipe(Effect.provide(glassRun))
+    }).pipe(Effect.provide(database)),
+)
+
+it.effect(
+  "ends a Turn that retries delivery when the agent host is replaced after the user stops it",
+  () =>
+    Effect.gen(function* () {
+      const transcripts = yield* Transcripts
+
+      yield* stopStartedWorkUpdate
+      yield* transcripts.endRunning(TurnCutOff.make({}), ["agent-1"])
+
+      const cutOff = yield* transcripts.read("agent-1")
+      assert.deepStrictEqual(cutOff.turns[0]?.ended?.ending, TurnCutOff.make({}))
+      assert.lengthOf(yield* transcripts.retryDeliveries(["agent-1"]), 0)
+    }).pipe(Effect.provide(layer)),
+)
+
 it.effect(
   "ends a Turn that retries delivery when the user stops it after a timeout, once the host reports Stopped",
   () =>
@@ -1390,4 +1460,24 @@ it.effect("keeps a part that arrives after StopTurn times out", () =>
       ])
     }),
   ).pipe(Effect.provide(layer)),
+)
+
+it.effect("queues a Steer the host refuses, as it does once the Turn is stopping", () =>
+  Effect.gen(function* () {
+    const desk = yield* scripted({
+      "agent-a": { running: true, steer: () => Effect.fail(notRunning) },
+    })
+
+    const thread = desk.threads.get("agent-a")
+    assert.isDefined(thread)
+
+    yield* desk.turns.send("agent-a", sent("Build it"))
+    yield* desk.turns.steer(thread, sent("nudge"))
+
+    const { queued } = yield* desk.transcripts.read("agent-a")
+    assert.deepStrictEqual(
+      queued.map(({ message }) => message),
+      ["nudge"],
+    )
+  }).pipe(Effect.provide(layer)),
 )

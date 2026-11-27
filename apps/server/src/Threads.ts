@@ -1,4 +1,5 @@
 import {
+  AgentReviewTurn,
   Thread,
   ThreadBusy,
   type AgentHarness,
@@ -29,7 +30,8 @@ import {
   NoPermissionModes,
   type RequestNotWaiting,
   type RequestWaiting,
-  type Revision,
+  PullRequestRef,
+  Revision,
   localPlace,
   mentionedToDoIds,
   repositoryKey,
@@ -37,7 +39,6 @@ import {
   type TranscriptUpdate,
   type TurnEnd,
   type SentMessage,
-  type UnsentFeedback,
 } from "@glass/contracts"
 import {
   Array as Arr,
@@ -57,6 +58,7 @@ import {
 import { SqlClient, type SqlError } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { changesId } from "./Changes"
+import { Checkouts } from "./Checkouts"
 import { ActivityLog } from "./ActivityLog"
 import { firstFreeBranch } from "./BranchNames"
 import { threadBranchNaming } from "./threadBranchNaming"
@@ -76,9 +78,14 @@ import { LocalPlacement } from "./LocalPlacement"
 import { type RepositoryRole, ReviewBrief, ReviewRole, WorkRole } from "./agentHost/protocol"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
-import { forgetStartedWork } from "./startedWorkRows"
 import { ToDos } from "./ToDos"
 import { Transcripts, type WaitingRequest } from "./Transcripts"
+import {
+  reviewThreadHosting,
+  reviewColumns,
+  type ReviewedRevision,
+  stopOnHost,
+} from "./reviewHosting"
 import { annotateUnit } from "./wideEvents"
 
 const changesOf = (files: ReadonlyArray<ChangedFile>) =>
@@ -86,12 +93,6 @@ const changesOf = (files: ReadonlyArray<ChangedFile>) =>
     id: changesId(files),
     files,
   })
-
-const BriefJson = Schema.fromJsonString(ReviewBrief)
-
-const encodeBrief = Schema.encodeSync(BriefJson)
-
-const decodeBrief = Schema.decodeUnknownEffect(Schema.Array(Schema.Struct({ brief: BriefJson })))
 
 const decodeKeptGoing = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.String, keptGoingAt: Schema.DateTimeUtcFromString })),
@@ -123,14 +124,15 @@ const couldNotSave = (cause: SqlError.SqlError) =>
 
 type Purpose = Data.TaggedEnum<{
   Work: { readonly packs: ReadonlyArray<string> }
-  Review: { readonly brief: ReviewBrief }
+  Review: { readonly brief: ReviewBrief; readonly reviewed: ReviewedRevision }
 }>
 
 const Purpose = Data.taggedEnum<Purpose>()
 
-export interface NewReviewThread {
+interface NewReviewThread {
+  readonly id: string
   readonly name: string
-  readonly repository: FollowedRepository
+  readonly pullRequest: PullRequestRef
   readonly revision: Revision
   readonly harness: AgentHarness
   readonly model: string | null
@@ -210,12 +212,22 @@ export class Threads extends Context.Service<
       threadId: string,
       path: string,
     ) => Effect.Effect<ThreadFile, ThreadNotFound | ThreadError>
+    readonly placeOf: (threadId: string) => Effect.Effect<ThreadPlace, ThreadNotFound>
     readonly create: (input: NewThread) => Effect.Effect<Thread, InvalidLocalCheckout | ThreadError>
     readonly createFrom: (
       parentId: string,
       input: Omit<NewThread, "permissionMode">,
     ) => Effect.Effect<Thread, ThreadNotFound | InvalidLocalCheckout | ThreadError>
     readonly createForReview: (input: NewReviewThread) => Effect.Effect<Thread, ThreadError>
+    readonly reviewThreads: Effect.Effect<
+      ReadonlyArray<{ readonly id: string; readonly folder: string }>
+    >
+    readonly dropReviewCheckout: (
+      threadId: string,
+    ) => Effect.Effect<void, ThreadNotFound | ThreadBusy | ThreadError>
+    readonly refuseReviewFrom: (
+      threadId: string,
+    ) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly send: (
       threadId: string,
       input: SentMessage,
@@ -233,7 +245,10 @@ export class Threads extends Context.Service<
     readonly cancelQueued: (
       threadId: string,
       queuedId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | QueuedMessageStarted | ThreadError>
+    ) => Effect.Effect<
+      ReadonlyArray<FeedbackNote>,
+      ThreadNotFound | QueuedMessageStarted | ThreadError
+    >
     readonly sendQueued: (
       threadId: string,
       queuedId: string,
@@ -243,19 +258,20 @@ export class Threads extends Context.Service<
     ) => Effect.Effect<ThreadChanges, ThreadNotFound | ThreadError>
     readonly feedbackNotes: (
       threadId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
-    readonly stageFeedbackNotes: (
-      threadId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadNotFound | ThreadError>
     readonly saveFeedbackNote: (
       threadId: string,
       note: FeedbackNote,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadNotFound | ThreadError>
     readonly removeFeedbackNote: (
       threadId: string,
       noteId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadNotFound | ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadNotFound | ThreadError>
     readonly stop: (threadId: string) => Effect.Effect<void, ThreadNotFound | ThreadError>
+    readonly stopBackgroundTask: (
+      threadId: string,
+      taskId: string,
+    ) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly reachSandbox: (threadId: string) => Effect.Effect<void, ThreadNotFound | ThreadError>
     readonly unsent: (threadId: string) => Effect.Effect<SentMessage, ThreadNotFound | ThreadError>
     readonly saveUnsent: (
@@ -299,6 +315,7 @@ export class Threads extends Context.Service<
       const toDos = yield* ToDos
       const localSkills = yield* LocalSkills
       const fs = yield* FileSystem.FileSystem
+      const checkouts = yield* Checkouts
       const lock = yield* Semaphore.make(1)
 
       const stored = yield* sql`
@@ -306,7 +323,7 @@ export class Threads extends Context.Service<
           branch, harness, model, effort, permission_mode AS permissionMode, local_skills AS localSkills, folder,
           created_at AS createdAt,
           review_brief IS NOT NULL AS forReview
-        FROM thread ORDER BY created_at
+        FROM thread ORDER BY created_at DESC
       `.pipe(Effect.flatMap(decodeStored), Effect.orDie)
 
       const packsOfThreads = yield* skillPacks.threadPacks.pipe(Effect.orDie)
@@ -369,22 +386,10 @@ export class Threads extends Context.Service<
             )
       }
 
-      const reviewHosting: ThreadHosting = {
-        prepareHost: localPlacement.prepareHost,
-        hostIfPrepared: () => Effect.succeedNone,
-        connectedHost: localPlacement.connectedHost,
-        baseRef: localPlacement.baseRef,
-        remove: ({ folder }) =>
-          fs.remove(folder, { recursive: true, force: true }).pipe(
-            Effect.tapError((cause) =>
-              Effect.logWarning("Couldn't remove an Agent review's checkout", cause),
-            ),
-            Effect.mapError(storageFailure),
-          ),
-      }
+      const review = reviewThreadHosting({ sql, fs, checkouts, localPlacement, storageFailure })
 
       const hostingOf = (row: PlacedThread): ThreadHosting =>
-        row.forReview ? reviewHosting : placementFor(row.thread.place)
+        row.forReview ? review.hosting : placementFor(row.thread.place)
 
       const saveBranch = (
         threadId: string,
@@ -433,27 +438,40 @@ export class Threads extends Context.Service<
 
       const naming = yield* threadBranchNaming(claimBranch)
 
-      // WARNING: A Sandbox makes its branch when its host is prepared, so the host waits for the name.
+      // WARNING: A Sandbox is made on the branch it had when prepared, so its host takes the name before any Turn.
+      const useNamedBranch = Effect.fnUntraced(function* (row: PlacedThread, client: HostClient) {
+        yield* naming.named(row.thread.id)
+
+        const { thread } = yield* find(row.thread.id)
+
+        if (thread.branch === null || thread.branch === row.thread.branch) return
+
+        yield* client
+          .UseBranch({ folder: row.folder, branch: thread.branch })
+          .pipe(
+            Effect.catch((cause) =>
+              Effect.logWarning("Kept a Sandbox's placeholder branch", cause).pipe(
+                Effect.andThen(saveBranch(thread.id, { branch: row.thread.branch })),
+              ),
+            ),
+          )
+      })
+
       const prepareHostOf = (threadId: string) =>
-        naming.named(threadId).pipe(
-          Effect.andThen(find(threadId)),
-          Effect.flatMap((row) => hostingOf(row).prepareHost(row)),
+        find(threadId).pipe(
+          Effect.flatMap((row) =>
+            hostingOf(row)
+              .prepareHost(row)
+              .pipe(
+                Effect.tap((client) =>
+                  inSandbox(row.thread.place) ? useNamedBranch(row, client) : Effect.void,
+                ),
+              ),
+          ),
         )
 
       const withSandbox = (thread: Thread) =>
         sandboxes.status(thread.id).pipe(Effect.map((sandbox) => threadWith(thread, { sandbox })))
-
-      const reviewBrief = (row: PlacedThread) =>
-        sql`SELECT review_brief AS brief FROM thread WHERE id = ${row.thread.id}`.pipe(
-          Effect.flatMap(decodeBrief),
-          Effect.tapError((cause) => Effect.logWarning("Couldn't read a review brief", cause)),
-          Effect.mapError(storageFailure),
-          Effect.flatMap(([found]) =>
-            found === undefined
-              ? Effect.fail(new ThreadError({ message: "This Thread was removed." }))
-              : Effect.succeed(found.brief),
-          ),
-        )
 
       // WARNING: pi keeps the first skill of a name, so Local skills go first to win over a pack's.
       const skillsOf = (thread: Thread) =>
@@ -493,9 +511,9 @@ export class Threads extends Context.Service<
           id,
           ensureStarted: (client) =>
             (row.forReview
-              ? reviewBrief(row).pipe(
-                  Effect.flatMap((brief) => startAs(client, ReviewRole.make({ brief }))),
-                )
+              ? review
+                  .brief(id)
+                  .pipe(Effect.flatMap((brief) => startAs(client, ReviewRole.make({ brief }))))
               : startAs(client, WorkRole.make({}))
             ).pipe(Effect.asVoid),
           settings: { model, effort, permissionMode },
@@ -557,11 +575,27 @@ export class Threads extends Context.Service<
         return lock
           .withPermits(1)(
             Effect.gen(function* () {
+              const purposed = Purpose.$match(purpose, {
+                Work: ({ packs }) => ({
+                  packs,
+                  columns: { review_brief: null, reviewed_revision: null },
+                  linked: toDos.linkThread(id, mentionedToDoIds(first.message)),
+                  startFirst: transcripts.startOrQueue(id, { ...first, context: null }),
+                }),
+                Review: ({ brief, reviewed }) => ({
+                  packs: [],
+                  columns: reviewColumns(brief, reviewed),
+                  linked: Effect.void,
+                  startFirst: transcripts.startIfIdle(
+                    id,
+                    { ...first, context: AgentReviewTurn.make({}), retriesDelivery: false },
+                    () => Effect.void,
+                  ),
+                }),
+              })
+
               const thread = threadWith(placed.thread, {
-                skillPacks: yield* skillPacks.pinForThread(
-                  id,
-                  Purpose.$match(purpose, { Work: ({ packs }) => packs, Review: () => [] }),
-                ),
+                skillPacks: yield* skillPacks.pinForThread(id, purposed.packs),
               })
 
               yield* annotateThread(thread)
@@ -581,20 +615,14 @@ export class Threads extends Context.Service<
                 folder: placed.folder,
                 created_at: DateTime.formatIso(thread.createdAt),
                 kept_going_at: DateTime.formatIso(thread.createdAt),
-                review_brief: Purpose.$match(purpose, {
-                  Work: () => null,
-                  Review: ({ brief }) => encodeBrief(brief),
-                }),
+                ...purposed.columns,
               })}`
 
-              yield* Purpose.$match(purpose, {
-                Work: () => toDos.linkThread(id, mentionedToDoIds(first.message)),
-                Review: () => Effect.void,
-              })
+              yield* purposed.linked
 
-              yield* SubscriptionRef.update(rows, (current) => [...current, { ...placed, thread }])
+              yield* SubscriptionRef.update(rows, (current) => [{ ...placed, thread }, ...current])
               yield* setKeptGoing(id, thread.createdAt)
-              yield* transcripts.startOrQueue(id, { ...first, context: null })
+              yield* purposed.startFirst
 
               return thread
             }).pipe(sql.withTransaction),
@@ -617,12 +645,14 @@ export class Threads extends Context.Service<
       const createForReview = Effect.fn("Threads.createForReview")(function* (
         input: NewReviewThread,
       ) {
+        const { pullRequest, revision } = input
+
         const thread = new Thread({
-          id: randomUUID(),
+          id: input.id,
           name: input.name,
           place: localPlace,
-          repository: input.repository,
-          baseBranch: input.revision.base,
+          repository: new FollowedRepository({ owner: pullRequest.owner, repo: pullRequest.repo }),
+          baseBranch: revision.base,
           branch: null,
           harness: input.harness,
           model: input.model,
@@ -638,8 +668,16 @@ export class Threads extends Context.Service<
         return yield* insert(
           { thread, folder: input.checkout, forReview: true },
           { message: input.message, images: [] },
-          Purpose.Review({ brief: input.review }),
+          Purpose.Review({ brief: input.review, reviewed: { pullRequest, revision } }),
         )
+      })
+
+      const dropReviewCheckout = Effect.fn("Threads.dropReviewCheckout")(function* (
+        threadId: string,
+      ) {
+        const row = yield* find(threadId)
+
+        yield* turns.whileIdle(threadId, review.dropCheckout(row))
       })
 
       const createWith = Effect.fnUntraced(function* (
@@ -726,6 +764,21 @@ export class Threads extends Context.Service<
         return yield* createWith(input, permissionMode)
       })
 
+      const refuseReviewFrom = Effect.fn("Threads.refuseReviewFrom")(function* (threadId: string) {
+        const starter = (yield* find(threadId)).thread
+
+        yield* refuseReach(
+          starter,
+          { place: localPlace, permissionMode: null },
+          {
+            leavesSandbox:
+              "An Agent review runs on this device, so a Thread in a Sandbox can't start one. Ask the user to.",
+            asksLess:
+              "An Agent review asks the user less than you do, so you can't start one. Ask the user to.",
+          },
+        )
+      })
+
       const findWritable = (threadId: string) =>
         find(threadId).pipe(Effect.tap(() => sandboxes.refuseIfGone(threadId)))
 
@@ -791,6 +844,13 @@ export class Threads extends Context.Service<
 
       const stop = Effect.fn("Threads.stop")(function* (threadId: string) {
         yield* turns.stop(threadOf(yield* find(threadId)))
+      })
+
+      const stopBackgroundTask = Effect.fn("Threads.stopBackgroundTask")(function* (
+        threadId: string,
+        taskId: string,
+      ) {
+        yield* turns.stopBackgroundTask(threadOf(yield* find(threadId)), taskId)
       })
 
       const unsent = Effect.fn("Threads.unsent")(function* (threadId: string) {
@@ -871,6 +931,9 @@ export class Threads extends Context.Service<
           }),
         ).pipe(Effect.withSpan("Threads.file"))
 
+      const placeOf = (threadId: string): Effect.Effect<ThreadPlace, ThreadNotFound> =>
+        find(threadId).pipe(Effect.map(({ thread }) => thread.place))
+
       const update = Effect.fn("Threads.update")(function* (
         threadId: string,
         change: Partial<Pick<Thread, "model" | "effort" | "permissionMode">>,
@@ -920,6 +983,9 @@ export class Threads extends Context.Service<
       const removalWarnings = Effect.fn("Threads.removalWarnings")(function* (threadId: string) {
         const row = yield* find(threadId)
 
+        if ((yield* sandboxes.status(threadId))?.reach === "unreachable")
+          return new RemovalWarnings({ uncommittedChanges: "unchecked" })
+
         return yield* hostingOf(row)
           .hostIfPrepared(row)
           .pipe(
@@ -954,13 +1020,8 @@ export class Threads extends Context.Service<
 
         yield* Effect.gen(function* () {
           const hosting = hostingOf(row)
-          const running = yield* hosting.connectedHost(row)
 
-          if (Option.isSome(running))
-            yield* running.value
-              .StopThread({ threadId })
-              .pipe(Effect.ignore({ log: "Warn", message: "Couldn't stop a Thread" }))
-
+          yield* stopOnHost(hosting, row)
           yield* hosting.remove(row)
 
           yield* Effect.gen(function* () {
@@ -968,15 +1029,19 @@ export class Threads extends Context.Service<
             yield* turns.removeUnsent(threadId)
             yield* notes.removeAll(threadNotes(threadId))
             yield* skillPacks.releaseThread(threadId)
-            yield* forgetStartedWork(sql, threadId)
+            yield* sql`DELETE FROM started_thread WHERE thread_id = ${threadId} OR started_by = ${threadId}`
+            yield* sql`DELETE FROM started_agent_review WHERE started_by = ${threadId}`
             yield* toDos.unlinkThread(threadId)
             yield* sql`DELETE FROM thread WHERE id = ${threadId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
+
+          // WARNING: The host can start a Turn delivered before the first stop, so stop it again once its Turns are gone.
+          yield* stopOnHost(hosting, row)
         }).pipe(
           Effect.tapError(() =>
             SubscriptionRef.update(rows, (current) =>
               [...current, row].toSorted((a, b) =>
-                DateTime.Order(a.thread.createdAt, b.thread.createdAt),
+                DateTime.Order(b.thread.createdAt, a.thread.createdAt),
               ),
             ),
           ),
@@ -1022,16 +1087,24 @@ export class Threads extends Context.Service<
         files,
         existingFiles,
         file,
+        placeOf,
         create,
         createFrom,
         createForReview,
+        reviewThreads: SubscriptionRef.get(rows).pipe(
+          Effect.map((current) =>
+            current.flatMap(({ thread, folder, forReview }) =>
+              forReview ? [{ id: thread.id, folder }] : [],
+            ),
+          ),
+        ),
+        dropReviewCheckout,
+        refuseReviewFrom,
         send,
         sendFrom,
         changes,
         feedbackNotes: (threadId) =>
           find(threadId).pipe(Effect.andThen(notes.list(threadNotes(threadId)))),
-        stageFeedbackNotes: (threadId) =>
-          find(threadId).pipe(Effect.andThen(notes.stage(threadNotes(threadId)))),
         saveFeedbackNote: (threadId, note) =>
           find(threadId).pipe(Effect.andThen(notes.save(threadNotes(threadId), note))),
         removeFeedbackNote: (threadId, noteId) =>
@@ -1048,6 +1121,7 @@ export class Threads extends Context.Service<
           ),
         sendQueued,
         stop,
+        stopBackgroundTask,
         reachSandbox: (threadId) => prepareHostOf(threadId).pipe(Effect.asVoid),
         unsent,
         saveUnsent,

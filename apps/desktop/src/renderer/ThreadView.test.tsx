@@ -2,9 +2,10 @@
 import {
   ActivityPage,
   AllowRequest,
+  type BackgroundTask,
   Thread,
   ThreadChanges,
-  ThreadNeedsYou,
+  InboxThread,
   ThreadPullRequest,
   type ThreadPullRequestState,
   DRAW_DIAGRAM_TOOL,
@@ -20,8 +21,15 @@ import {
   type TurnPart,
   FollowedRepository,
   PartAppended,
+  type BrowserPageAnswer,
+  BrowserControl,
+  BrowserPageReady,
+  BrowserPageRequest,
+  type PageEvent,
+  type PageState,
   PageText,
   PartSet,
+  PublishedComment,
   PullRequestRef,
   PullRequestMerged,
   PullRequestOpen,
@@ -49,25 +57,68 @@ import {
   TurnStarted,
   TurnStopped,
   QueuedMessageStarted,
-  UnsentFeedback,
   WaitingRequests,
   GitHubUnavailable,
+  type FeedbackNote,
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
-import { DateTime, Deferred, Effect, Exit, Stream } from "effect"
+import { DateTime, Deferred, Effect, Exit, Stream, SubscriptionRef } from "effect"
 import { afterEach, expect, it, onTestFinished, vi } from "vite-plus/test"
 import { thread, threadFields } from "../../test/thread"
 import { changedFile, workspace } from "../../test/workspace"
 import { modelOption, mount, pixel } from "../../test/threadApp"
-import type { PageEvent, PageState } from "./pageMessages"
-import { withPageNotes } from "./pageNotesScript"
+import { BROWSER_PARTITION, PAGE_EVENT_CHANNEL } from "@glass/contracts/desktop"
+import { threadFileAddress } from "./browserAddress"
+import { agentHeldThreads, releaseBrowserPage } from "./browserPages"
 
 const sentAt = DateTime.makeUnsafe("2026-10-26T12:00:00Z")
+
+const attachPage = () => {
+  const page = document.querySelector("webview")!
+
+  const laidOut = vi
+    .spyOn(HTMLElement.prototype, "getBoundingClientRect")
+    .mockReturnValue(new DOMRect(0, 0, 800, 600))
+
+  onTestFinished(() => laidOut.mockRestore())
+
+  const loaded: Array<string> = []
+  const toPage: Array<PageState> = []
+  let reloads = 0
+
+  Object.assign(page, {
+    reload: () => void reloads++,
+    loadURL: (url: string) => Promise.resolve(void loaded.push(url)),
+    send: (_channel: string, state: PageState) => Promise.resolve(void toPage.push(state)),
+    canGoBack: () => false,
+    canGoForward: () => false,
+    getURL: () => "about:blank",
+    getTitle: () => "",
+    getWebContentsId: () => 7,
+    isWaitingForResponse: () => false,
+  })
+  page.dispatchEvent(new Event("dom-ready"))
+
+  return {
+    page,
+    loaded,
+    toPage,
+    reloads: () => reloads,
+    navigate: (url: string) =>
+      page.dispatchEvent(Object.assign(new Event("did-navigate"), { url })),
+    fromPage: (event: PageEvent) =>
+      page.dispatchEvent(
+        Object.assign(new Event("ipc-message"), { channel: PAGE_EVENT_CHANNEL, args: [event] }),
+      ),
+  }
+}
 
 afterEach(() => {
   cleanup()
   vi.unstubAllGlobals()
+
+  for (const threadId of agentHeldThreads()) releaseBrowserPage(threadId, "agent")
 })
 
 it("shows the Thread under Local and its Turn's parts as they stream", async () => {
@@ -214,7 +265,7 @@ it("marks a Thread in the Threads panel as working while its Turn runs", async (
   ).toBeTruthy()
 })
 
-it("lists Settled Threads apart from the ones still going, in a section that collapses", async () => {
+it("lists Settled Threads apart from the ones still going, in a section that starts collapsed", async () => {
   const broughtBack: Array<string> = []
 
   mount(
@@ -227,18 +278,22 @@ it("lists Settled Threads apart from the ones still going, in a section that col
 
   const settled = await screen.findByRole("region", { name: "Settled" })
 
-  expect(within(settled).getByRole("link", { name: thread.name })).toBeTruthy()
+  expect(within(settled).queryByRole("link")).toBeNull()
   expect(screen.queryByRole("region", { name: "Local" })).toBeNull()
 
   const user = userEvent.setup()
   const toggle = within(settled).getByRole("button", { name: "Settled 1" })
   await user.click(toggle)
+  expect(await within(settled).findByRole("link", { name: thread.name })).toBeTruthy()
+
+  await user.click(toggle)
   await waitFor(() => expect(within(settled).queryByRole("link")).toBeNull())
 
   await user.click(toggle)
-  expect(await within(settled).findByRole("link", { name: thread.name })).toBeTruthy()
 
-  await user.click(within(settled).getByRole("button", { name: `Bring back ${thread.name}` }))
+  await user.click(
+    await within(settled).findByRole("button", { name: `Bring back ${thread.name}` }),
+  )
   await waitFor(() => expect(broughtBack).toEqual([thread.id]))
 })
 
@@ -280,9 +335,9 @@ it("says in the Threads panel how a Turn that finished unseen ended", async () =
 
   mount(
     {
-      WatchNeedsYou: () =>
+      WatchInbox: () =>
         Stream.make([
-          ThreadNeedsYou.make({
+          InboxThread.make({
             thread,
             reasons: [TurnFinished.make({ ended })],
             since: ended.at,
@@ -341,7 +396,7 @@ it("sends a message with Enter and clears the composer", async () => {
   expect(composer).toHaveProperty("textContent", "")
 })
 
-it("switches between Chat and Changes with Mod+D, even from the composer", async () => {
+it("picks a pane with Mod+D and a letter, even from the composer, and closes it with Mod+D", async () => {
   const user = mount({
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
@@ -350,11 +405,15 @@ it("switches between Chat and Changes with Mod+D, even from the composer", async
 
   await user.click(await screen.findByRole("textbox", { name: "Message" }))
   await user.keyboard("{Control>}d{/Control}")
-  await screen.findByRole("region", { name: "Changes" })
+  const picker = await screen.findByRole("complementary", { name: "Pane picker" })
+  expect(within(picker).queryByRole("button", { name: /Pull request/ })).toBeNull()
+
+  await user.keyboard("d")
+  await screen.findByRole("complementary", { name: "Changes" })
+  expect(screen.getByRole("textbox", { name: "Message" })).toBeTruthy()
 
   await user.keyboard("{Meta>}d{/Meta}")
-  await screen.findByRole("textbox", { name: "Message" })
-  expect(screen.queryByRole("region", { name: "Changes" })).toBeNull()
+  await waitFor(() => expect(screen.queryByRole("complementary", { name: "Changes" })).toBeNull())
 })
 
 it("sends Markdown and HTML exactly as written", async () => {
@@ -415,11 +474,26 @@ const filedPullRequest = (pullRequestUrl: string) =>
     status: null,
   })
 
-it("opens a PR the agent links to in a pane beside the chat, with its diffs and its review", async () => {
+it("opens a PR the agent links to in a pane beside the chat, with its comments, its diffs and its review", async () => {
   const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/42"
 
   const user = mount({
-    LoadPullRequest: () => Effect.succeed(workspace([], { files: [changedFile("greet.ts")] })),
+    LoadPullRequest: () =>
+      Effect.succeed(
+        workspace([], {
+          files: [changedFile("greet.ts")],
+          timeline: [
+            new PublishedComment({
+              id: "C1",
+              author: "hubot",
+              avatarUrl: null,
+              bodyHtml: "<p>Ship it after the rename.</p>",
+              createdAt: DateTime.makeUnsafe("2026-01-01T00:00:00Z"),
+              reactions: [],
+            }),
+          ],
+        }),
+      ),
     WatchTranscript: () => Stream.make(filedPullRequest(pullRequestUrl)),
   })
 
@@ -430,6 +504,7 @@ it("opens a PR the agent links to in a pane beside the chat, with its diffs and 
   const pane = await screen.findByRole("complementary", { name: "Pull request" })
   expect(await within(pane).findByText("Greet the world")).toBeTruthy()
   expect(window.location.hash).toBe(threadHash)
+  expect(within(pane).getByText("Ship it after the rename.")).toBeTruthy()
 
   await user.click(within(pane).getByRole("tab", { name: "Code" }))
   expect(await within(pane).findByRole("button", { name: "Hide greet.ts" })).toBeTruthy()
@@ -464,6 +539,30 @@ it("shows the PR as merged after merging it from the pane", async () => {
   await waitFor(() => expect(within(pane).queryByText("No conflicts")).toBeNull())
   expect(within(pane).getByText("Greet the world")).toBeTruthy()
   expect(loads).toHaveLength(2)
+})
+
+it("shows the PR as it is on GitHub now after reloading the pane", async () => {
+  const pullRequestUrl = "https://github.com/octo-org/hello-world/pull/42"
+  let loads = 0
+
+  const user = mount({
+    LoadPullRequest: () =>
+      Effect.sync(() => {
+        loads += 1
+
+        return workspace([], {
+          pullRequest: { title: loads === 1 ? "Greet the world" : "Greet everyone" },
+        })
+      }),
+    WatchTranscript: () => Stream.make(filedPullRequest(pullRequestUrl)),
+  })
+
+  await user.click(await screen.findByRole("link", { name: pullRequestUrl }))
+  const pane = await screen.findByRole("complementary", { name: "Pull request" })
+  expect(await within(pane).findByText("Greet the world")).toBeTruthy()
+  await user.click(within(pane).getByRole("button", { name: "Reload" }))
+
+  expect(await within(pane).findByText("Greet everyone")).toBeTruthy()
 })
 
 it("keeps the hidden panel recoverable across Thread navigation", async () => {
@@ -649,41 +748,43 @@ it("tells the user the Thread's PR merged, in its header and its row in the list
   ).toBeTruthy()
 })
 
+const diagramTranscript = () =>
+  Stream.make(
+    TranscriptSnapshot.make({
+      queued: [],
+      status: null,
+      turns: [
+        {
+          id: "turn-1",
+          message: "Draw a diagram",
+          images: [],
+          context: null,
+          feedback: [],
+          sentAt,
+          ended: { at: sentAt, ending: TurnDone.make({}) },
+          parts: [
+            ToolCallPart.make({
+              toolCallId: "draw-1",
+              name: DRAW_DIAGRAM_TOOL,
+              inputSummary: "Component map",
+              input: JSON.stringify({
+                title: "Component map",
+                kind: "existing",
+                mermaid: "flowchart LR\n  A --> B",
+              }),
+              output: null,
+              status: "done",
+              parentToolCallId: null,
+            }),
+          ],
+        },
+      ],
+    }),
+  )
+
 it("opens a Diagram from the Thread's details, without scrolling back to its card", async () => {
   const user = mount({
-    WatchTranscript: () =>
-      Stream.make(
-        TranscriptSnapshot.make({
-          queued: [],
-          status: null,
-          turns: [
-            {
-              id: "turn-1",
-              message: "Draw a diagram",
-              images: [],
-              context: null,
-              feedback: [],
-              sentAt,
-              ended: { at: sentAt, ending: TurnDone.make({}) },
-              parts: [
-                ToolCallPart.make({
-                  toolCallId: "draw-1",
-                  name: DRAW_DIAGRAM_TOOL,
-                  inputSummary: "Component map",
-                  input: JSON.stringify({
-                    title: "Component map",
-                    kind: "existing",
-                    mermaid: "flowchart LR\n  A --> B",
-                  }),
-                  output: null,
-                  status: "done",
-                  parentToolCallId: null,
-                }),
-              ],
-            },
-          ],
-        }),
-      ),
+    WatchTranscript: diagramTranscript,
   })
 
   await user.click(await screen.findByRole("button", { name: "Details" }))
@@ -691,6 +792,50 @@ it("opens a Diagram from the Thread's details, without scrolling back to its car
 
   const pane = await screen.findByRole("complementary", { name: "Diagram" })
   expect(within(pane).getByText("Component map")).toBeTruthy()
+})
+
+it("keeps a Thread as the user left it when they come back to it from another Thread or a New Thread", async () => {
+  const other = new Thread({ ...threadFields, id: "agent-2", name: "agent/calm-heron" })
+
+  const user = mount({
+    WatchThreads: () => Stream.make([thread, other]),
+    WatchTranscript: diagramTranscript,
+  })
+
+  await user.type(
+    (await screen.findByRole("textbox", { name: "Message" })).firstElementChild!,
+    "Half",
+  )
+  await user.click(screen.getByRole("button", { name: "Details" }))
+  await user.click(await screen.findByRole("button", { name: "Component map" }))
+  await screen.findByRole("complementary", { name: "Diagram" })
+
+  await user.click(screen.getByRole("link", { name: other.name }))
+  await screen.findByRole("heading", { name: other.name })
+  expect(screen.queryByRole("complementary", { name: "Diagram" })).toBeNull()
+
+  await user.click(screen.getByRole("link", { name: thread.name }))
+  expect(await screen.findByRole("complementary", { name: "Diagram" })).toBeTruthy()
+
+  await user.click(screen.getByRole("link", { name: "New Thread" }))
+  await screen.findByRole("region", { name: "New Thread" })
+  await user.click(screen.getByRole("link", { name: thread.name }))
+  expect(await screen.findByRole("complementary", { name: "Diagram" })).toBeTruthy()
+
+  const composer = screen.getByRole("textbox", { name: "Message" })
+  await user.type(composer.firstElementChild!, " a thought")
+  expect(composer.textContent).toBe("Half a thought")
+})
+
+it("names the shown Thread in the title strip, never one kept in the background", async () => {
+  const other = new Thread({ ...threadFields, id: "agent-2", name: "agent/calm-heron" })
+  const user = mount({ WatchThreads: () => Stream.make([thread, other]) })
+  await screen.findByRole("heading", { name: thread.name })
+
+  await user.click(screen.getByRole("link", { name: other.name }))
+  await screen.findByRole("heading", { name: other.name })
+  expect(screen.queryByRole("heading", { name: thread.name })).toBeNull()
+  expect(screen.getByRole("heading", { name: other.name }).closest(".title-strip")).not.toBeNull()
 })
 
 it("floats a Thread's details over its chat on a wide window, until the user hides them", async () => {
@@ -708,11 +853,10 @@ it("floats a Thread's details over its chat on a wide window, until the user hid
   const details = await screen.findByRole("complementary", { name: "Details" })
   await user.click(within(details).getByRole("button", { name: /Changes/ }))
 
-  expect(await screen.findByRole("heading", { name: "Changes" })).toBeTruthy()
+  expect(await screen.findByRole("complementary", { name: "Changes" })).toBeTruthy()
   expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull()
 
-  await user.click(screen.getByRole("button", { name: "Details" }))
-  await user.click(await screen.findByRole("button", { name: /Back to Chat/ }))
+  await user.click(screen.getByRole("button", { name: "Close the Changes" }))
   await user.click(await screen.findByRole("button", { name: "Hide details" }))
 
   expect(screen.queryByRole("complementary", { name: "Details" })).toBeNull()
@@ -822,6 +966,13 @@ it("changes the open Thread's model from the composer, closing the picker", asyn
   await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
 })
 
+const backgroundTask = (
+  taskId: string,
+  kind: BackgroundTask["kind"],
+  description: string,
+  toolCallId: string,
+): BackgroundTask => ({ taskId, kind, description, toolCallId, startedAt: sentAt })
+
 const call = (toolCallId: string, name: string, parentToolCallId: string | null) =>
   ToolCallPart.make({
     toolCallId,
@@ -910,8 +1061,7 @@ it("shows a replied Turn still running while its background work runs", async ()
         TranscriptSnapshot.make({
           queued: [],
           status: null,
-          agentStatuses: ["Running a command: Run the tests"],
-          backgroundToolCalls: ["bash-1"],
+          backgroundTasks: [backgroundTask("task-1", "command", "Run the tests", "bash-1")],
           turns: [
             {
               id: "turn-1",
@@ -940,6 +1090,75 @@ it("shows a replied Turn still running while its background work runs", async ()
   expect(within(transcript).queryByText(/^Done in/)).toBeNull()
 })
 
+it("stops each background task from its own Agent status after the Turn ended", async () => {
+  const stops: Array<{ threadId: string; taskId: string }> = []
+  const stopped = Deferred.makeUnsafe<void>()
+
+  const user = mount({
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          queued: [],
+          status: null,
+          backgroundTasks: [
+            backgroundTask("task-1", "command", "Run the tests", "bash-1"),
+            backgroundTask("task-2", "subagent", "Explore: Trace it", "agent-1"),
+          ],
+          turns: [
+            {
+              id: "turn-1",
+              message: "Test it",
+              images: [],
+              context: null,
+              feedback: [],
+              sentAt,
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+              parts: [call("bash-1", "Bash", null), call("agent-1", "Agent", null)],
+            },
+          ],
+        }),
+      ).pipe(
+        Stream.concat(
+          Stream.fromEffect(
+            Deferred.await(stopped).pipe(
+              Effect.as(
+                AgentStatusesChanged.make({
+                  agentStatuses: [],
+                  backgroundTasks: [
+                    backgroundTask("task-2", "subagent", "Explore: Trace it", "agent-1"),
+                  ],
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+    StopBackgroundTask: (request) =>
+      Effect.sync(() => stops.push(request)).pipe(Effect.andThen(Deferred.await(stopped))),
+  })
+
+  const statuses = await screen.findByRole("list", { name: "Background tasks" })
+  const stopTests = within(statuses).getByRole("button", { name: "Stop Run the tests" })
+  const stopExplore = within(statuses).getByRole("button", { name: "Stop Explore: Trace it" })
+
+  await user.click(stopTests)
+  await user.click(stopExplore)
+
+  await waitFor(() =>
+    expect(stops).toEqual([
+      { threadId: thread.id, taskId: "task-1" },
+      { threadId: thread.id, taskId: "task-2" },
+    ]),
+  )
+  expect(stopTests.textContent).toBe("Stopping…")
+  expect(stopExplore.textContent).toBe("Stopping…")
+
+  Deferred.doneUnsafe(stopped, Exit.void)
+
+  await waitFor(() => expect(within(statuses).queryByText(/Run the tests/)).toBeNull())
+  expect(within(statuses).getByText("Running a subagent: Explore: Trace it")).toBeTruthy()
+})
+
 it("marks a tool call running in the background until its work ends, then continues its Turn with what ended", async () => {
   const ended = Deferred.makeUnsafe<void>()
 
@@ -949,8 +1168,9 @@ it("marks a tool call running in the background until its work ends, then contin
         TranscriptSnapshot.make({
           queued: [],
           status: null,
-          agentStatuses: ["Running a subagent: general-purpose: Count"],
-          backgroundToolCalls: ["agent-1"],
+          backgroundTasks: [
+            backgroundTask("task-1", "subagent", "general-purpose: Count", "agent-1"),
+          ],
           turns: [
             {
               id: "turn-1",
@@ -1074,7 +1294,9 @@ it("folds subagents started together into one line counting how they stand", asy
         TranscriptSnapshot.make({
           queued: [],
           status: null,
-          backgroundToolCalls: ["agent-1"],
+          backgroundTasks: [
+            backgroundTask("task-1", "subagent", "general-purpose: Review", "agent-1"),
+          ],
           turns: [
             {
               id: "turn-1",
@@ -1212,9 +1434,9 @@ it("marks a Thread waiting on a Permission request, and denies it with a reason 
   const answers: Array<{ requestId: string; answer: RequestAnswer }> = []
 
   const user = mount({
-    WatchNeedsYou: () =>
+    WatchInbox: () =>
       Stream.make([
-        ThreadNeedsYou.make({
+        InboxThread.make({
           thread,
           reasons: [WaitingRequests.make({ requests: [bashRequest] })],
           since: sentAt,
@@ -1420,7 +1642,7 @@ it("lists Queued messages, cancels one, and sends one now once no Turn runs", as
       Effect.sync(() => {
         cancelled.push(queuedMessageId)
 
-        return new UnsentFeedback({ notes: [], staged: [] })
+        return []
       }),
     SendQueuedMessage: ({ queuedMessageId }: { queuedMessageId: string }) =>
       Effect.sync(() => void sentNow.push(queuedMessageId)),
@@ -1624,20 +1846,6 @@ it("dims a Sandbox Thread Glass can't reach, and makes one whose Sandbox expired
   ).toBeTruthy()
   expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
   expect(screen.getByRole("link", { description: /Sandbox expired/ })).toBeTruthy()
-
-  cleanup()
-  mount({
-    WatchThreads: () => Stream.make([inSandboxWith("incompatible")]),
-    WatchTranscript: noTranscript,
-  })
-
-  expect(
-    await screen.findByText(
-      "This Thread's Sandbox runs a different version of Glass, so it can't take messages. Its transcript stays until you remove the Thread.",
-    ),
-  ).toBeTruthy()
-  expect(screen.queryByRole("textbox", { name: "Message" })).toBeNull()
-  expect(screen.getByRole("link", { description: /Sandbox on another Glass version/ })).toBeTruthy()
 })
 
 const flaky = new ToDo({ id: 3, title: "Fix the flaky test", notes: "", done: false })
@@ -1785,17 +1993,9 @@ it("keeps pasted lines and To-do mentions as written", async () => {
   expect(sent).toEqual([pasted])
 })
 
-it("links the files a Turn named once it ends, and opens HTML beside the Chat as its own sandboxed page", async () => {
+it("links the files a Turn named once it ends, and opens HTML in the Browser pane from the Thread's folder", async () => {
   const ended = Deferred.makeUnsafe<void>()
   const asked: Array<ReadonlyArray<string>> = []
-  const opened: Array<string> = []
-
-  vi.stubGlobal("glass", {
-    htmlPages: {
-      open: (html: string) => Promise.resolve(`glass-page://page/${opened.push(html)}`),
-      close: () => Promise.resolve(),
-    },
-  })
 
   const user = mount({
     FindThreadFiles: ({ paths }) =>
@@ -1804,7 +2004,6 @@ it("links the files a Turn named once it ends, and opens HTML beside the Chat as
 
         return paths.filter((path) => path.endsWith(".html"))
       }),
-    GetThreadFile: ({ path }) => Effect.succeed(TextFile.make({ text: `<h1>${path}</h1>` })),
     WatchTranscript: () =>
       Stream.make(
         TranscriptSnapshot.make({
@@ -1843,19 +2042,11 @@ it("links the files a Turn named once it ends, and opens HTML beside the Chat as
   expect(within(transcript).queryByRole("button", { name: "notes.md" })).toBeNull()
   expect(asked).toContainEqual(["docs/explainer.html", "notes.md"])
 
-  const pane = await screen.findByRole("complementary", { name: "File" })
-  expect(within(pane).getByRole("heading", { name: "explainer.html" })).toBeTruthy()
+  await screen.findByRole("complementary", { name: "Browser" })
+  const { page, loaded } = attachPage()
 
-  const frame = await waitFor(() => {
-    const found = pane.querySelector("iframe")
-    expect(found).not.toBeNull()
-
-    return found!
-  })
-
-  expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-forms allow-popups")
-  expect(frame.getAttribute("src")).toBe("glass-page://page/1")
-  expect(opened).toEqual([withPageNotes("<h1>docs/explainer.html</h1>")])
+  expect(page.getAttribute("partition")).toBe(BROWSER_PARTITION)
+  await waitFor(() => expect(loaded).toEqual([threadFileAddress(thread.id, "docs/explainer.html")]))
 })
 
 it("shows a Turn's Markdown images and links to Windows paths in the Thread's folder, rereading images when a Turn ends", async () => {
@@ -1917,6 +2108,15 @@ it("shows a Turn's Markdown images and links to Windows paths in the Thread's fo
 
   await waitFor(() => expect(image.getAttribute("src")).toBe("data:image/png;base64,shot2"))
 
+  await user.click(within(transcript).getByRole("button", { name: "The picker" }))
+
+  const viewer = await screen.findByRole("dialog", { name: "The picker" })
+  expect(within(viewer).getByRole("img").getAttribute("src")).toBe("data:image/png;base64,shot2")
+  expect(screen.queryByRole("complementary", { name: "File" })).toBeNull()
+
+  await user.keyboard("{Escape}")
+  await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull())
+
   await user.click(await within(transcript).findByRole("button", { name: "the log" }))
 
   const pane = await screen.findByRole("complementary", { name: "File" })
@@ -1928,21 +2128,294 @@ it("shows a Turn's Markdown images and links to Windows paths in the Thread's fo
   ])
 })
 
-it("leaves a Feedback note on the part of an HTML page the page reports, and sends it with the next message", async () => {
-  let unsent = new UnsentFeedback({ notes: [], staged: [] })
-  const sent: Array<{ message: string; feedback: ReadonlyArray<string> }> = []
-
-  vi.stubGlobal("glass", {
-    htmlPages: {
-      open: () => Promise.resolve("glass-page://page/1"),
-      close: () => Promise.resolve(),
-    },
-  })
+it("reloads an HTML file in the Browser pane when the next Turn ends, as the agent may have changed it", async () => {
+  const nextEnded = Deferred.makeUnsafe<void>()
+  const nextTurn = { ...runningTurn, id: "turn-2" }
 
   const user = mount({
     FindThreadFiles: ({ paths }) => Effect.succeed(paths),
-    GetThreadFile: () =>
-      Effect.succeed(TextFile.make({ text: "<p>A refill of five per minute.</p>" })),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              ...runningTurn,
+              parts: [TextPart.make({ text: "Wrote `docs/plan.html`." })],
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+            },
+            nextTurn,
+          ],
+          queued: [],
+          status: null,
+        }),
+      ).pipe(
+        Stream.concat(
+          Stream.fromEffect(
+            Deferred.await(nextEnded).pipe(
+              Effect.as(
+                TurnEnded.make({
+                  turnId: nextTurn.id,
+                  ended: { at: DateTime.add(sentAt, { seconds: 3 }), ending: TurnDone.make({}) },
+                }),
+              ),
+            ),
+          ),
+        ),
+      ),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
+
+  const { navigate, reloads } = attachPage()
+
+  navigate(threadFileAddress(thread.id, "docs/plan.html"))
+  expect(reloads()).toBe(0)
+
+  Deferred.doneUnsafe(nextEnded, Exit.void)
+
+  await waitFor(() => expect(reloads()).toBe(1))
+})
+
+it("drops an unsaved Feedback note's editor when the page loads again, as its part is gone", async () => {
+  const user = mount({
+    FindThreadFiles: ({ paths }) => Effect.succeed(paths),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              ...runningTurn,
+              parts: [TextPart.make({ text: "Wrote `docs/plan.html`." })],
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
+
+  await screen.findByRole("complementary", { name: "Browser" })
+  const { navigate, fromPage, toPage } = attachPage()
+  navigate(threadFileAddress(thread.id, "docs/plan.html"))
+  fromPage({ type: "ready" })
+  await waitFor(() => expect(toPage).not.toHaveLength(0))
+  fromPage({
+    type: "part",
+    part: PageText.make({ selector: "body > p", heading: null, excerpt: "five per minute" }),
+    rect: { top: 10, left: 10, bottom: 30, right: 200 },
+  })
+
+  const editor = await screen.findByRole("textbox", {
+    name: "Feedback on the selected part of the page",
+  })
+
+  await user.type(editor, "Make this ten")
+
+  fromPage({ type: "ready" })
+
+  await waitFor(() =>
+    expect(
+      screen.queryByRole("textbox", { name: "Feedback on the selected part of the page" }),
+    ).toBeNull(),
+  )
+})
+
+const pageRequest = (id: string, restoreLastPage: boolean) =>
+  new BrowserPageRequest({ id, threadId: thread.id, restoreLastPage })
+
+it("opens the Thread's Browser pane for its agent, answers once its last page loads unless the agent names another, and lets go when the Turn ends", async () => {
+  const answers = new Map<string, BrowserPageAnswer>()
+  const loaded: Array<string> = []
+  const lastPageLoaded = Promise.withResolvers<void>()
+  localStorage.setItem(`glass.browserPane.${thread.id}`, "http://localhost:3000/settings")
+  const turnEnded = Deferred.makeUnsafe<void>()
+
+  vi.stubGlobal("glass", {
+    browserRelay: (webContentsId: number) => Promise.resolve(`ws://relay/${webContentsId}`),
+    onBrowserUserInput: () => undefined,
+  })
+
+  mount({
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    WatchWorkingThreads: () =>
+      Stream.make([thread.id]).pipe(
+        Stream.concat(Stream.fromEffect(Deferred.await(turnEnded).pipe(Effect.as([])))),
+      ),
+    WatchBrowserPageRequests: () =>
+      Stream.make([
+        pageRequest("open", true),
+        pageRequest("read", true),
+        pageRequest("open-address", false),
+      ]).pipe(Stream.concat(Stream.never)),
+    AnswerBrowserPageRequest: ({ id, answer }) => Effect.sync(() => void answers.set(id, answer)),
+  })
+
+  await screen.findByRole("complementary", { name: "Browser" })
+
+  const page = document.querySelector("webview")!
+  Object.assign(page, {
+    getWebContentsId: () => 7,
+    getURL: () => "about:blank",
+    loadURL: (url: string) => {
+      loaded.push(url)
+
+      return lastPageLoaded.promise
+    },
+  })
+  page.dispatchEvent(new Event("dom-ready"))
+
+  const ready = BrowserPageReady.make({ endpoint: "ws://relay/7" })
+
+  await waitFor(() => expect([...answers]).toEqual([["open-address", ready]]))
+  expect(loaded).toEqual(["http://localhost:3000/settings"])
+
+  lastPageLoaded.resolve()
+
+  await waitFor(() => expect(answers.size).toBe(3))
+  expect([answers.get("open"), answers.get("read")]).toEqual([ready, ready])
+
+  await userEvent.click(screen.getByRole("button", { name: "Close the Browser" }))
+  expect(document.querySelector("webview")).toBe(page)
+
+  Deferred.doneUnsafe(turnEnded, Exit.void)
+
+  await waitFor(() => expect(document.querySelector("webview")).toBeNull())
+})
+
+const control = (agentUsing: boolean, userTookOver: boolean) => [
+  new BrowserControl({ threadId: thread.id, agentUsing, userTookOver }),
+]
+
+it("shows the agent using the browser, takes it over when the user clicks or types in the agent's page, stopping the agent's page load, and hands it back", async () => {
+  const answers = new Map<string, BrowserPageAnswer>()
+  const controls = Effect.runSync(SubscriptionRef.make<ReadonlyArray<BrowserControl>>([]))
+  const tookOver: Array<string> = []
+  const handedBack: Array<string> = []
+  const userInput = Promise.withResolvers<(webContentsId: number) => void>()
+
+  vi.stubGlobal("glass", {
+    browserRelay: (webContentsId: number) => Promise.resolve(`ws://relay/${webContentsId}`),
+    onBrowserUserInput: (listener: (webContentsId: number) => void) => userInput.resolve(listener),
+  })
+
+  mount({
+    WatchTranscript: () =>
+      Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
+    WatchWorkingThreads: () => Stream.make([thread.id]).pipe(Stream.concat(Stream.never)),
+    WatchBrowserPageRequests: () =>
+      Stream.make([pageRequest("open", false)]).pipe(Stream.concat(Stream.never)),
+    AnswerBrowserPageRequest: ({ id, answer }) => Effect.sync(() => void answers.set(id, answer)),
+    WatchBrowserControl: () => SubscriptionRef.changes(controls),
+    TakeOverBrowser: ({ threadId }) =>
+      Effect.sync(() => void tookOver.push(threadId)).pipe(
+        Effect.andThen(SubscriptionRef.set(controls, control(false, true))),
+      ),
+    HandBackBrowser: ({ threadId }) =>
+      Effect.sync(() => void handedBack.push(threadId)).pipe(
+        Effect.andThen(SubscriptionRef.set(controls, [])),
+      ),
+  })
+
+  await screen.findByRole("complementary", { name: "Browser" })
+
+  const { page } = attachPage()
+  let stops = 0
+
+  await waitFor(() => expect(answers.has("open")).toBe(true))
+
+  await Effect.runPromise(SubscriptionRef.set(controls, control(true, false)))
+  await screen.findByRole("status", { name: "Agent is using the browser" })
+  expect(screen.queryByRole("button", { name: "Hand back to agent" })).toBeNull()
+
+  const onUserInput = await userInput.promise
+  onUserInput(8)
+  Object.assign(page, { isWaitingForResponse: () => true, stop: () => void stops++ })
+  onUserInput(7)
+
+  const handBack = await screen.findByRole("button", { name: "Hand back to agent" })
+  onUserInput(7)
+  await userEvent.click(handBack)
+  expect(tookOver).toEqual([thread.id])
+  expect(stops).toBe(1)
+  expect(screen.queryByText("Agent is using the browser")).toBeNull()
+
+  await waitFor(() =>
+    expect(screen.queryByRole("button", { name: "Hand back to agent" })).toBeNull(),
+  )
+  expect(handedBack).toEqual([thread.id])
+})
+
+const appLinkTurn = (place: Thread["place"]) => ({
+  WatchThreads: () => Stream.make([new Thread({ ...threadFields, place })]),
+  WatchTranscript: () =>
+    Stream.make(
+      TranscriptSnapshot.make({
+        turns: [
+          {
+            ...runningTurn,
+            parts: [
+              TextPart.make({ text: "It runs at [the app](http://localhost:3000/settings)." }),
+            ],
+            ended: { at: sentAt, ending: TurnDone.make({}) },
+          },
+        ],
+        queued: [],
+        status: null,
+      }),
+    ),
+})
+
+it("opens a Turn's link to this device in a local Thread's Browser pane", async () => {
+  const user = mount(appLinkTurn(thread.place))
+
+  await user.click(await screen.findByRole("link", { name: "the app" }))
+
+  const { loaded } = attachPage()
+
+  await waitFor(() => expect(loaded).toEqual(["http://localhost:3000/settings"]))
+})
+
+it("closes a Thread's Browser pane when the user leaves the Thread", async () => {
+  const other = new Thread({ ...threadFields, id: "agent-2", name: "agent/calm-heron" })
+
+  const user = mount({
+    ...appLinkTurn(thread.place),
+    WatchThreads: () => Stream.make([thread, other]),
+  })
+
+  await user.click(await screen.findByRole("link", { name: "the app" }))
+  const { loaded } = attachPage()
+  await waitFor(() => expect(loaded).toEqual(["http://localhost:3000/settings"]))
+
+  await user.click(screen.getByRole("link", { name: other.name }))
+  await screen.findByRole("heading", { name: other.name })
+  await user.click(screen.getByRole("link", { name: thread.name }))
+  await screen.findByRole("heading", { name: thread.name })
+
+  expect(screen.queryByRole("complementary", { name: "Browser" })).toBeNull()
+})
+
+it("shows a Sandbox Thread's Browser pane nothing from this device, not even an address it remembers", async () => {
+  localStorage.setItem(`glass.browserPane.${thread.id}`, "http://localhost:3000/settings")
+  const user = mount(appLinkTurn(SandboxPlace.make({ providerId: "fake" })))
+
+  await user.click(await screen.findByRole("button", { name: "Details" }))
+  await user.click(await screen.findByRole("button", { name: "Browser" }))
+
+  const pane = await screen.findByRole("complementary", { name: "Browser" })
+  expect(within(pane).getByText(/This Thread's apps run in its Sandbox/)).toBeTruthy()
+})
+
+it("leaves a Feedback note on the part of a page in the Browser pane the page reports, and sends it with the next message", async () => {
+  let unsent: ReadonlyArray<FeedbackNote> = []
+  const sent: Array<{ message: string; feedback: ReadonlyArray<string> }> = []
+
+  const user = mount({
+    FindThreadFiles: ({ paths }) => Effect.succeed(paths),
     WatchTranscript: () =>
       Stream.make(
         TranscriptSnapshot.make({
@@ -1958,38 +2431,16 @@ it("leaves a Feedback note on the part of an HTML page the page reports, and sen
         }),
       ),
     ListFeedbackNotes: () => Effect.sync(() => unsent),
-    SaveFeedbackNote: ({ note }) =>
-      Effect.sync(
-        () =>
-          (unsent = new UnsentFeedback({
-            notes: [...unsent.notes, note],
-            staged: [...unsent.staged, note.id],
-          })),
-      ),
+    SaveFeedbackNote: ({ note }) => Effect.sync(() => (unsent = [...unsent, note])),
     SendMessage: ({ message, feedback }) =>
       Effect.sync(() => void sent.push({ message, feedback })),
   })
 
   await user.click(await screen.findByRole("button", { name: "docs/plan.html" }))
 
-  const pane = await screen.findByRole("complementary", { name: "File" })
-
-  const frame = await waitFor(() => {
-    const found = pane.querySelector("iframe")
-    expect(found).not.toBeNull()
-
-    return found!
-  })
-
-  const toPage: Array<{ readonly glassPageState: PageState }> = []
-  const { port1: page } = new MessageChannel()
-  page.postMessage = (data: { readonly glassPageState: PageState }) => void toPage.push(data)
-  Object.defineProperty(frame, "contentWindow", { value: page })
-
-  const fromPage = (event: PageEvent) =>
-    window.dispatchEvent(
-      new MessageEvent("message", { source: page, data: { glassPageEvent: event } }),
-    )
+  await screen.findByRole("complementary", { name: "Browser" })
+  const { toPage, navigate, fromPage } = attachPage()
+  navigate(threadFileAddress(thread.id, "docs/plan.html"))
 
   const part = PageText.make({
     selector: "body > p",
@@ -1998,36 +2449,33 @@ it("leaves a Feedback note on the part of an HTML page the page reports, and sen
   })
 
   fromPage({ type: "ready" })
-  await waitFor(() =>
-    expect(toPage.at(-1)).toEqual({ glassPageState: { pick: false, notes: [], active: null } }),
-  )
+  await waitFor(() => expect(toPage.at(-1)).toEqual({ pick: false, notes: [], active: null }))
 
   fromPage({ type: "part", part, rect: { top: 10, left: 10, bottom: 30, right: 200 } })
 
   await user.type(
-    await within(pane).findByRole("textbox", { name: "Feedback on the selected part of the page" }),
+    await screen.findByRole("textbox", { name: "Feedback on the selected part of the page" }),
     "Make this ten",
   )
   await user.keyboard("{Control>}{Enter}{/Control}")
 
   const attached = await screen.findByRole("region", { name: "Feedback attached to this message" })
+  await user.click(within(attached).getByText("1 Feedback note attached to this message"))
   expect(within(attached).getByText("docs/plan.html · “refill of five per minute”")).toBeTruthy()
   expect(within(attached).getByText("Make this ten")).toBeTruthy()
 
-  const [note] = unsent.notes
-  expect(toPage.at(-1)).toEqual({
-    glassPageState: { pick: false, notes: [{ id: note?.id, part }], active: null },
-  })
+  const [note] = unsent
+  expect(toPage.at(-1)).toEqual({ pick: false, notes: [{ id: note?.id, part }], active: null })
 
   fromPage({ type: "open", id: note!.id, rect: { top: 10, left: 10, bottom: 30, right: 200 } })
-  await within(pane).findByRole("form", { name: "Edit Feedback note" })
-  expect(screen.getByRole("button", { name: "Send" }).hasAttribute("disabled")).toBe(true)
+  await screen.findByRole("form", { name: "Edit Feedback note" })
+  await waitFor(() =>
+    expect(screen.getByRole("button", { name: "Send" }).hasAttribute("disabled")).toBe(true),
+  )
 
-  await user.click(within(pane).getByRole("button", { name: "Cancel" }))
+  await user.click(screen.getByRole("button", { name: "Cancel" }))
   await user.type(screen.getByRole("textbox", { name: "Message" }), "{Enter}")
 
   await waitFor(() => expect(sent).toEqual([{ message: "", feedback: [note?.id] }]))
-  await waitFor(() =>
-    expect(toPage.at(-1)).toEqual({ glassPageState: { pick: false, notes: [], active: null } }),
-  )
+  await waitFor(() => expect(toPage.at(-1)).toEqual({ pick: false, notes: [], active: null }))
 })

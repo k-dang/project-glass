@@ -445,6 +445,29 @@
   }
 }
 
+@utility pinned-details-motion {
+  transform-origin: top right;
+  transition:
+    opacity 150ms var(--ease-out),
+    scale 150ms var(--ease-out),
+    visibility 150ms;
+
+  &[data-open="false"] {
+    visibility: hidden;
+    opacity: 0;
+    scale: 0.97;
+    transition-duration: 100ms;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    transition-property: opacity, visibility;
+
+    &[data-open="false"] {
+      scale: 1;
+    }
+  }
+}
+
 @utility backdrop-motion {
   transition: opacity 150ms var(--ease-out);
 
@@ -482,6 +505,18 @@
   animation: start-thread-message 200ms --theme(--ease-out) 50ms both;
 }
 
+:active-view-transition-type(start-thread)::view-transition-new(thread-details) {
+  animation: thread-details-in 200ms --theme(--ease-out) 60ms both;
+  transform-origin: top right;
+}
+
+@keyframes thread-details-in {
+  from {
+    opacity: 0;
+    scale: 0.97;
+  }
+}
+
 @keyframes start-thread-message {
   from {
     opacity: 0;
@@ -489,7 +524,7 @@
   }
 }
 
-@keyframes start-thread-message-fade {
+@keyframes fade-in {
   from {
     opacity: 0;
   }
@@ -500,19 +535,21 @@
     animation: none;
   }
 
-  :active-view-transition-type(start-thread)::view-transition-new(new-thread-start) {
-    animation-name: start-thread-message-fade;
+  :active-view-transition-type(start-thread)::view-transition-new(new-thread-start),
+  :active-view-transition-type(start-thread)::view-transition-new(thread-details) {
+    animation-name: fade-in;
   }
 }
 
 .title-strip {
   height: max(2.25rem, calc(env(titlebar-area-height, 0px) + 1px));
+  background: var(--chrome);
   app-region: drag;
   user-select: none;
 }
 
-[data-layout="inset"] .title-strip {
-  background: var(--chrome);
+.title-strip :is(a, button, input, select, textarea, [role="button"], [tabindex]) {
+  app-region: no-drag;
 }
 
 .title-strip-clear-controls {
@@ -734,6 +771,44 @@
 
 .thread-markdown li {
   padding: 0;
+}
+
+.thread-markdown-table {
+  overflow-x: auto;
+}
+
+.thread-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  overflow-wrap: normal;
+}
+
+.thread-markdown :is(thead, tbody, tr) {
+  border: 0;
+  background: none;
+}
+
+.thread-markdown :is(th, td) {
+  max-width: 24rem;
+  padding: 0.45rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: start;
+  vertical-align: top;
+  white-space: normal;
+  text-wrap: pretty;
+  overflow-wrap: break-word;
+}
+
+.thread-markdown :is(th, td):first-child {
+  padding-inline-start: 0;
+}
+
+.thread-markdown :is(th, td):last-child {
+  padding-inline-end: 0;
+}
+
+.thread-markdown th {
+  font-weight: 600;
 }
 
 .thread-markdown li + li {

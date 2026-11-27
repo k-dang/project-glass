@@ -3,7 +3,7 @@ import type { PullRequest, PullRequestRef, PullRequestWorkspace } from "@glass/c
 import { useNavigate } from "@tanstack/react-router"
 import { Option } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
-import { FileDiff, Maximize2 } from "lucide-react"
+import { FileDiff, Maximize2, RotateCw } from "lucide-react"
 import { useCallback, useContext, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Skeleton } from "@/components/ui/skeleton"
@@ -18,10 +18,12 @@ import { settledProblem } from "./problems"
 import { LineCounts } from "./LineCounts"
 import { useLiveStatus } from "./liveStatus"
 import { plural } from "./plural"
-import { ChecksChip, ConflictsChip, ReviewersChip } from "./PullRequestStatus"
+import { InlineStatusChips, PullRequestStateIcon } from "./PullRequestStatus"
 import { preloadAtom, reloadPreloaded } from "./reviewsArea"
 import { SidePanel } from "./SidePanel"
+import { Timeline } from "./Timeline"
 import { useFullFiles } from "./useFullFiles"
+import type { Reactions } from "./workspaceFeedback"
 
 const paneWidthAtom = Atom.make(560).pipe(Atom.keepAlive)
 
@@ -33,7 +35,7 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
   const navigate = useNavigate()
   const problem = settledProblem(result)
   const loaded = Option.getOrNull(AsyncResult.value(result))
-  const pullRequest = useLiveStatus(loaded?.pullRequest ?? null)
+  const pullRequest = useLiveStatus(loaded?.workspace.pullRequest ?? null)
 
   return (
     <SidePanel
@@ -57,11 +59,22 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
       }
       actions={
         <>
+          <TooltipHint content="Reload">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label="Reload"
+              onClick={reload}
+              disabled={result.waiting}
+            >
+              <RotateCw className={result.waiting ? "animate-spin" : undefined} aria-hidden />
+            </Button>
+          </TooltipHint>
           {loaded !== null && pullRequest !== null && (
             <MergePullRequest
               key={pullRequest.id}
               pullRequest={pullRequest}
-              revision={loaded.revision}
+              revision={loaded.workspace.revision}
               onReload={reload}
             />
           )}
@@ -83,7 +96,11 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
       onClose={props.onClose}
     >
       {loaded !== null && pullRequest !== null ? (
-        <LoadedPullRequest workspace={loaded} pullRequest={pullRequest} />
+        <LoadedPullRequest
+          workspace={loaded.workspace}
+          reactions={loaded.reactions}
+          pullRequest={pullRequest}
+        />
       ) : problem !== null ? (
         <div className="px-5 py-4">
           <ProblemAlert problem={problem} action={{ label: "Try again", run: reload }} />
@@ -99,17 +116,28 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
   )
 }
 
-function LoadedPullRequest(props: { workspace: PullRequestWorkspace; pullRequest: PullRequest }) {
+function LoadedPullRequest(props: {
+  workspace: PullRequestWorkspace
+  reactions: Reactions
+  pullRequest: PullRequest
+}) {
   const { pullRequest } = props
-  const { files } = props.workspace
+  const { files, timeline } = props.workspace
 
   return (
     <>
       <div className="flex flex-col gap-2 border-b px-5 py-3 text-sm">
-        <h3 className="truncate text-base font-semibold">{pullRequest.title}</h3>
+        <div className="flex min-w-0 items-center gap-2">
+          <PullRequestStateIcon pullRequest={pullRequest} />
+          <h3 className="truncate text-base font-semibold">{pullRequest.title}</h3>
+        </div>
         <div className="flex min-w-0 items-center gap-3 text-xs text-muted-foreground">
-          <span className="min-w-0 truncate font-mono">
-            {pullRequest.baseBranch} ← {pullRequest.headBranch}
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="min-w-0 truncate font-mono">
+              {pullRequest.baseBranch} ← {pullRequest.headBranch}
+            </span>
+            <span aria-hidden>·</span>
+            <span className="shrink-0">by {pullRequest.author}</span>
           </span>
           <span className="ml-auto flex shrink-0 items-center gap-2 tabular-nums">
             <FileDiff aria-hidden className="size-3.5" />
@@ -127,20 +155,14 @@ function LoadedPullRequest(props: { workspace: PullRequestWorkspace; pullRequest
             <TabsTrigger value="summary">Summary</TabsTrigger>
             <TabsTrigger value="code">Code</TabsTrigger>
           </TabsList>
-          <span className="ml-auto">
-            <ChecksChip pullRequest={pullRequest} />
-          </span>
+          <InlineStatusChips pullRequest={pullRequest} />
         </div>
         <TabsContent
           value="summary"
           className="flex min-h-0 flex-col gap-4 overflow-y-auto px-5 py-4"
         >
-          <div className="flex flex-wrap items-center gap-1 text-sm text-muted-foreground">
-            <span className="mr-1">by {pullRequest.author}</span>
-            <ReviewersChip pullRequest={pullRequest} />
-            <ConflictsChip pullRequest={pullRequest} />
-          </div>
           <DescriptionBody html={pullRequest.descriptionHtml} />
+          <Timeline items={timeline} reactions={props.reactions} />
         </TabsContent>
         <TabsContent value="code" className="flex min-h-0 min-w-0 flex-col">
           <PaneChanges workspace={props.workspace} />

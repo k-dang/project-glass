@@ -321,11 +321,13 @@ const stallableHost = (calls: {
             AnswerRequest: () => Effect.die("This test does not call AnswerRequest"),
             Steer: () => Effect.die("This test does not call Steer"),
             StopTurn: () => calls.stopTurn(),
+            StopBackgroundTask: () => Effect.die("This test does not call StopBackgroundTask"),
             StopThread: () => calls.stopThread?.() ?? Effect.void,
             GetChanges: () => Effect.die("This test does not call GetChanges"),
             HasUncommittedChanges: () =>
               Effect.die("This test does not call HasUncommittedChanges"),
             CurrentBranch: () => Effect.die("This test does not call CurrentBranch"),
+            UseBranch: () => Effect.die("This test does not call UseBranch"),
             ListFiles: () => Effect.die("This test does not call ListFiles"),
             ExistingFiles: () => Effect.die("This test does not call ExistingFiles"),
             ReadFile: () => Effect.die("This test does not call ReadFile"),

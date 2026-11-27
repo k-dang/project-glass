@@ -1,6 +1,7 @@
 import {
   RegistryContext,
   useAtom,
+  useAtomMount,
   useAtomRefresh,
   useAtomSet,
   useAtomValue,
@@ -9,6 +10,8 @@ import {
   type Thread,
   emptyTranscript,
   asksPermission,
+  goneExplanation,
+  isGone,
   isNothingUnsent,
   isWaiting,
   nothingUnsent,
@@ -20,13 +23,24 @@ import {
   type SentMessage,
   sentOf,
   type Turn,
-  readOnlyExplanation,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
-import { ArrowUp, Activity, FileDiff, MessageCircle, Workflow, X } from "lucide-react"
 import {
+  ArrowUp,
+  FileDiff,
+  GitPullRequest,
+  Globe,
+  PanelRightClose,
+  PanelRightOpen,
+  Workflow,
+  X,
+} from "lucide-react"
+import {
+  Activity,
+  Fragment,
+  memo,
   type ReactNode,
   useCallback,
   useContext,
@@ -36,15 +50,18 @@ import {
   useState,
 } from "react"
 import { Button } from "@/components/ui/button"
-import { Kbd } from "@/components/ui/kbd"
+import { useMountWatch } from "./rendererEvents"
+import { AgentStatuses } from "./AgentStatuses"
 import { Transcript } from "./Transcript"
 import { BackgroundToolCalls, ToolCallView } from "./TurnParts"
 import { sentFrom } from "./UserMessage"
 import { threadColumn } from "./threadColumn"
-import { ThreadChanges } from "./ThreadChanges"
+import { ChangesPane } from "./ThreadChanges"
 import { ThreadDetailsAction, ThreadFrame } from "./ThreadFrame"
+import { ThreadName } from "./ThreadName"
 import { PullRequestPanes, useThreadPullRequest } from "./ThreadPullRequest"
 import { PullRequestPane } from "./PullRequestPane"
+import { type PaneChoice, PanePicker } from "./PanePicker"
 import { PreloadPullRequest } from "./preloadPullRequest"
 import {
   QueueItem,
@@ -56,8 +73,8 @@ import {
   QueueList,
 } from "@/components/ui/queue"
 import {
-  type ThreadTab,
   threadsAtom,
+  transcriptAtom,
   changeModelAtom,
   changePermissionModeAtom,
   writtenAtom,
@@ -75,27 +92,29 @@ import { requestElementId } from "./RequestCard"
 import { ProblemAlert } from "./ProblemAlert"
 import { type Problem, problemText, settledProblem, streamProblem } from "./problems"
 import { rememberPlace } from "./savedPlace"
-import { useActions } from "./actions"
-import { shortcutLabel } from "./shortcutLabel"
-import { useStagedFeedback } from "./useStagedFeedback"
+import { type Action, useActions } from "./actions"
+import { useComposerFeedback } from "./useComposerFeedback"
 import { DiagramPane, useDiagrams } from "./ThreadDiagrams"
-import { FileLinks, FilePane, lastEndedOf, useFileLinks } from "./ThreadFiles"
+import { BrowserLinks, type BrowserOpening, BrowserPane } from "./BrowserPane"
+import { browserPolicyOf, threadFileAddress } from "./browserAddress"
+import { useAgentHoldsBrowserPage } from "./browserPages"
+import { FileLinks, FilePane, isHtmlFile, lastEndedOf, useFileLinks } from "./ThreadFiles"
 import { type FeedbackNotesStore, useFeedbackNotes } from "./useFeedbackNotes"
-import { markTurnSeenAtom } from "./needsYou"
+import { markTurnSeenAtom } from "./inboxArea"
 import { useWindowFocused } from "./useWindowFocused"
 
 type SidePane =
+  | { kind: "picker" }
+  | { kind: "changes"; wide: boolean }
   | { kind: "diagram"; title: string }
   | { kind: "file"; path: string }
+  | { kind: "browser"; opening: BrowserOpening }
   | { kind: "pullRequest"; pullRequest: PullRequestRef }
   | null
 
-interface ThreadTabs {
-  tab: ThreadTab
-  onTabChange: (tab: ThreadTab) => void
-}
-
 const SAVE_DELAY_MS = 400
+
+const KEPT_THREADS = 4
 
 const lastSent = (
   turns: ReadonlyArray<Turn>,
@@ -108,73 +127,176 @@ const lastSent = (
   return last === undefined || isNothingUnsent(last) ? null : sentOf(last)
 }
 
-export function ThreadView(props: { threadId: string } & ThreadTabs) {
-  const threads = useAtomValue(threadsAtom)
+function useKeptThreads(shown: string | null, listed: ReadonlyArray<Thread>) {
+  const [kept, setKept] = useState<ReadonlyArray<string>>([])
 
-  const thread = Option.getOrNull(AsyncResult.value(threads))?.find(
-    ({ id }) => id === props.threadId,
-  )
-
-  if (thread === undefined)
-    return (
-      <ThreadFrame
-        label="Thread"
-        heading={<h1 className="truncate font-medium">Thread</h1>}
-        details={null}
-      >
-        {AsyncResult.isSuccess(threads) && (
-          <p className="p-6 text-sm text-muted-foreground">
-            This Thread is gone. Pick another Thread or start a new one.
-          </p>
-        )}
-      </ThreadFrame>
+  if (shown !== null && kept[0] !== shown)
+    setKept(
+      [
+        shown,
+        ...kept.filter((id) => id !== shown && listed.some((thread) => thread.id === id)),
+      ].slice(0, KEPT_THREADS),
     )
 
+  return kept
+}
+
+export function ThreadViews(props: { threadId: string | null }) {
+  const { threadId } = props
+  const threads = useAtomValue(threadsAtom)
+  const listed = Option.getOrElse(AsyncResult.value(threads), () => [])
+  const listedShown = threadId !== null && listed.some(({ id }) => id === threadId)
+  const kept = useKeptThreads(listedShown ? threadId : null, listed)
+
+  useMountWatch("ThreadViews", null)
+
   return (
-    <OpenThread key={thread.id} thread={thread} tab={props.tab} onTabChange={props.onTabChange} />
+    <>
+      {threadId !== null && !listedShown && (
+        <ThreadFrame
+          label="Thread"
+          heading={<h1 className="truncate font-medium">Thread</h1>}
+          details={null}
+        >
+          {AsyncResult.isSuccess(threads) && (
+            <p className="p-6 text-sm text-muted-foreground">
+              This Thread is gone. Pick another Thread or start a new one.
+            </p>
+          )}
+        </ThreadFrame>
+      )}
+      {kept
+        // WARNING: sorting by recency would move a kept Thread's DOM on a switch, losing its scroll position.
+        .toSorted()
+        .flatMap((id) => {
+          const thread = listed.find((listedThread) => listedThread.id === id)
+
+          return thread === undefined
+            ? []
+            : [
+                <Fragment key={id}>
+                  <KeepTranscript threadId={id} />
+                  <Activity mode={id === threadId ? "visible" : "hidden"}>
+                    <OpenThread thread={thread} />
+                  </Activity>
+                </Fragment>,
+              ]
+        })}
+    </>
   )
 }
 
-function OpenThread(props: { thread: Thread } & ThreadTabs) {
-  const { thread, tab, onTabChange } = props
+function KeepTranscript(props: { threadId: string }) {
+  useAtomMount(transcriptAtom(props.threadId))
+
+  return null
+}
+
+const OpenThread = memo(function OpenThread(props: { thread: Thread }) {
+  const { thread } = props
   const atoms = useMemo(() => threadAtoms(thread.id), [thread.id])
   const loaded = AsyncResult.value(useAtomValue(atoms.transcript))
   const { turns } = Option.getOrElse(loaded, () => emptyTranscript)
 
-  const [changesOpened, setChangesOpened] = useState(tab === "changes")
+  useMountWatch("OpenThread", thread.id)
+
   const [pane, setPane] = useState<SidePane>(null)
   const openDiagram = useCallback((title: string) => setPane({ kind: "diagram", title }), [setPane])
   const closePane = useCallback(() => setPane(null), [setPane])
   const diagrams = useDiagrams(turns, Option.isSome(loaded), openDiagram)
   const openedDiagram = pane?.kind === "diagram" ? diagrams.diagrams.get(pane.title) : undefined
 
-  const openFile = useCallback((path: string) => setPane({ kind: "file", path }), [setPane])
+  const openBrowser = useCallback(
+    (address: string | null) =>
+      setPane((current) => ({
+        kind: "browser",
+        opening: { address, seq: current?.kind === "browser" ? current.opening.seq + 1 : 0 },
+      })),
+    [setPane],
+  )
+
+  const agentHoldsPage = useAgentHoldsBrowserPage(thread.id)
+  const [seenAgentHold, setSeenAgentHold] = useState(false)
+
+  // WARNING: BrowserPane's effects would load an old address over its page when shown again, so hiding the Thread closes it, as leaving a Thread always did.
+  useEffect(
+    () => () => {
+      setPane((current) => (current?.kind === "browser" ? null : current))
+      setSeenAgentHold(false)
+    },
+    [],
+  )
+
+  if (agentHoldsPage !== seenAgentHold) {
+    setSeenAgentHold(agentHoldsPage)
+
+    if (agentHoldsPage && pane?.kind !== "browser") openBrowser(null)
+  }
+
+  const openFile = useCallback(
+    (path: string) =>
+      isHtmlFile(path)
+        ? openBrowser(threadFileAddress(thread.id, path))
+        : setPane({ kind: "file", path }),
+    [setPane, openBrowser, thread.id],
+  )
+
+  const policy = useMemo(() => browserPolicyOf(thread.place), [thread.place])
+  const browserLinks = useMemo(() => ({ policy, open: openBrowser }), [policy, openBrowser])
   const fileLinks = useFileLinks(thread.id, turns, Option.isSome(loaded), openFile)
 
   const openPullRequestPane = useCallback(
-    (pullRequest: PullRequestRef) => {
-      setPane({ kind: "pullRequest", pullRequest })
-      onTabChange("chat")
-    },
-    [setPane, onTabChange],
+    (pullRequest: PullRequestRef) => setPane({ kind: "pullRequest", pullRequest }),
+    [setPane],
   )
 
-  if (tab === "changes" && !changesOpened) setChangesOpened(true)
+  const openChanges = useCallback(() => setPane({ kind: "changes", wide: false }), [setPane])
 
   const pullRequest = useThreadPullRequest(thread.id)
 
   const registry = useContext(RegistryContext)
 
+  const paneChoices: ReadonlyArray<PaneChoice> = [
+    { id: "changes", label: "Changes", icon: FileDiff, key: "d", open: openChanges },
+    { id: "browser", label: "Browser", icon: Globe, key: "b", open: () => openBrowser(null) },
+    ...(pullRequest === undefined
+      ? []
+      : [
+          {
+            id: "pull-request",
+            label: "Pull request",
+            icon: GitPullRequest,
+            key: "p",
+            open: () => openPullRequestPane(pullRequest.ref),
+          },
+        ]),
+    ...diagrams.titles.map((title) => ({
+      id: `diagram:${title}`,
+      label: title,
+      icon: Workflow,
+      open: () => openDiagram(title),
+    })),
+  ]
+
   useActions([
     {
-      id: "thread-tab",
-      title: tab === "chat" ? "Show Changes" : "Show Chat",
+      id: "thread-pane",
+      title: pane === null ? "Open a pane" : "Close the pane",
       group: "Thread",
-      icon: tab === "chat" ? FileDiff : MessageCircle,
+      icon: pane === null ? PanelRightOpen : PanelRightClose,
       shortcut: { key: "d", mod: true, allowInEditable: true },
-      run: () => onTabChange(tab === "chat" ? "changes" : "chat"),
+      run: () => setPane((current) => (current === null ? { kind: "picker" } : null)),
     },
+    ...paneChoices.map(({ id, label, icon, open }): Action => ({
+      id: `thread-pane-${id}`,
+      title: `Open ${label}`,
+      group: "Thread",
+      icon,
+      run: open,
+    })),
   ])
+
+  const chatHidden = pane?.kind === "changes" && pane.wide
 
   useEffect(() => {
     rememberPlace(registry, { area: "threads", threadId: thread.id })
@@ -185,9 +307,9 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
   const endedAt = turns.at(-1)?.ended?.at
 
   useEffect(() => {
-    if (focused && tab === "chat" && endedAt !== undefined)
+    if (focused && !chatHidden && endedAt !== undefined)
       markTurnSeen({ threadId: thread.id, endedAt })
-  }, [markTurnSeen, focused, tab, endedAt, thread.id])
+  }, [markTurnSeen, focused, chatHidden, endedAt, thread.id])
 
   return (
     <ThreadAtomsContext value={atoms}>
@@ -198,23 +320,11 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
         <ThreadFrame
           label={thread.name}
           heading={
-            tab === "changes" ? (
-              <>
-                <button
-                  type="button"
-                  className="truncate text-muted-foreground hover:text-foreground"
-                  onClick={() => onTabChange("chat")}
-                >
-                  {thread.name}
-                </button>
-                <span className="text-muted-foreground/50">/</span>
-                <h1 className="font-medium">Changes</h1>
-              </>
-            ) : (
-              <h1 className="truncate font-medium">{thread.name}</h1>
-            )
+            <h1 className="truncate font-medium">
+              <ThreadName name={thread.name} />
+            </h1>
           }
-          pinnable={tab === "chat" && pane === null}
+          pinnable={pane === null}
           details={{
             place: thread.place,
             repository: repositoryKey(thread.repository),
@@ -223,37 +333,39 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
             pullRequest,
             skillPacks: thread.skillPacks,
             localSkills: thread.localSkills,
-            actions:
-              tab === "chat" ? (
-                <>
-                  <ThreadDetailsAction onNavigate={() => onTabChange("changes")}>
-                    <FileDiff aria-hidden className="text-muted-foreground" />
-                    Changes
-                    <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
-                  </ThreadDetailsAction>
-                  {diagrams.titles.map((title) => (
-                    <ThreadDetailsAction key={title} onNavigate={() => openDiagram(title)}>
-                      <Workflow aria-hidden className="text-muted-foreground" />
-                      <span className="truncate">{title}</span>
-                    </ThreadDetailsAction>
-                  ))}
-                </>
-              ) : (
-                <ThreadDetailsAction onNavigate={() => onTabChange("chat")}>
-                  <MessageCircle aria-hidden className="text-muted-foreground" />
-                  Back to Chat
-                  <Kbd className="ml-auto">{shortcutLabel("D")}</Kbd>
-                </ThreadDetailsAction>
-              ),
+            actions: paneChoices.map(({ id, label, icon: Icon, open }) => (
+              <ThreadDetailsAction key={id} onNavigate={open}>
+                <Icon aria-hidden className="text-muted-foreground" />
+                <span className="truncate">{label}</span>
+              </ThreadDetailsAction>
+            )),
           }}
         >
           <TranscriptProblem />
-          <div hidden={tab !== "chat"} className="flex min-h-0 flex-1">
-            <ToolCallView value={diagrams.cardOf}>
-              <FileLinks value={fileLinks}>
-                <ThreadChat thread={thread} place="thread" />
-              </FileLinks>
-            </ToolCallView>
+          <div className="flex min-h-0 flex-1">
+            <div hidden={chatHidden} className="flex min-h-0 min-w-0 flex-1">
+              <ToolCallView value={diagrams.cardOf}>
+                <FileLinks value={fileLinks}>
+                  <BrowserLinks value={browserLinks}>
+                    <ThreadChat thread={thread} place="thread" />
+                  </BrowserLinks>
+                </FileLinks>
+              </ToolCallView>
+            </div>
+            {pane?.kind === "picker" && <PanePicker choices={paneChoices} onClose={closePane} />}
+            {pane?.kind === "changes" && (
+              <ChangesPane
+                thread={thread}
+                turns={turns}
+                wide={pane.wide}
+                onWideChange={(wide) =>
+                  setPane((current) =>
+                    current?.kind === "changes" ? { kind: "changes", wide } : current,
+                  )
+                }
+                onClose={closePane}
+              />
+            )}
             {openedDiagram !== undefined && (
               <DiagramPane diagram={openedDiagram} onClose={closePane} />
             )}
@@ -265,6 +377,15 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
                 onClose={closePane}
               />
             )}
+            {pane?.kind === "browser" && (
+              <BrowserPane
+                threadId={thread.id}
+                policy={policy}
+                lastEnded={lastEndedOf(turns)}
+                opening={pane.opening}
+                onClose={closePane}
+              />
+            )}
             {pane?.kind === "pullRequest" && (
               <PullRequestPane
                 key={referenceKey(pane.pullRequest)}
@@ -273,24 +394,11 @@ function OpenThread(props: { thread: Thread } & ThreadTabs) {
               />
             )}
           </div>
-          <section
-            aria-label="Changes"
-            hidden={tab !== "changes"}
-            className="flex min-h-0 min-w-0 flex-1 flex-col"
-          >
-            {changesOpened && (
-              <ThreadChanges
-                thread={thread}
-                turns={turns}
-                onReviewFeedback={() => onTabChange("chat")}
-              />
-            )}
-          </section>
         </ThreadFrame>
       </PullRequestPanes>
     </ThreadAtomsContext>
   )
-}
+})
 
 export function TranscriptProblem() {
   const atoms = useThreadAtoms()
@@ -315,13 +423,18 @@ export function ThreadChat(props: { thread: Thread; place: "thread" | "inbox" })
   const atoms = useThreadAtoms()
   const loadEarlier = useAtomSet(atoms.loadEarlier)
 
-  const { turns, earlierTurns, queued, status, agentStatuses, backgroundToolCalls } =
-    Option.getOrElse(AsyncResult.value(useAtomValue(atoms.transcript)), () => emptyTranscript)
+  const { turns, earlierTurns, queued, status, agentStatuses, backgroundTasks } = Option.getOrElse(
+    AsyncResult.value(useAtomValue(atoms.transcript)),
+    () => emptyTranscript,
+  )
 
-  const inBackground = useMemo(() => new Set(backgroundToolCalls), [backgroundToolCalls])
+  const inBackground = useMemo(
+    () => new Set(backgroundTasks.flatMap(({ toolCallId }) => toolCallId ?? [])),
+    [backgroundTasks],
+  )
 
   const reach = thread.sandbox?.reach
-  const readOnly = readOnlyExplanation(reach)
+  const readOnly = isGone(reach) ? goneExplanation(reach) : null
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col">
@@ -334,7 +447,7 @@ export function ThreadChat(props: { thread: Thread; place: "thread" | "inbox" })
           latestOnly={props.place === "inbox"}
         />
       </BackgroundToolCalls>
-      <AgentStatuses statuses={agentStatuses} />
+      <AgentStatuses threadId={thread.id} statuses={agentStatuses} tasks={backgroundTasks} />
       {reach === "unreachable" && <UnreachableNotice threadId={thread.id} />}
       {readOnly !== null ? (
         <output
@@ -408,27 +521,6 @@ function WaitingNotice(props: { waiting: RequestPart }) {
   )
 }
 
-function AgentStatuses(props: { statuses: ReadonlyArray<string> }) {
-  return (
-    props.statuses.length > 0 && (
-      <output
-        aria-label="Agent statuses"
-        className={cn(
-          threadColumn,
-          "flex w-full flex-wrap gap-x-4 gap-y-1 px-6 pt-2 text-xs text-muted-foreground",
-        )}
-      >
-        {props.statuses.map((status) => (
-          <span key={status} className="flex items-center gap-1.5">
-            <Activity aria-hidden className="size-3" />
-            {status}
-          </span>
-        ))}
-      </output>
-    )
-  )
-}
-
 function UnreachableNotice({ threadId }: { threadId: string }) {
   const tried = useAtomValue(reachSandboxAtom(threadId))
   const tryAgain = useAtomSet(reachSandboxAtom(threadId))
@@ -463,6 +555,8 @@ function Composer(props: {
   const modeChanged = useAtomValue(changePermissionModeAtom(thread.id))
   const changePermissionMode = useAtomSet(changePermissionModeAtom(thread.id))
   const feedback = useFeedbackNotes(thread.id)
+
+  useMountWatch("Composer", thread.id)
 
   return (
     <ThreadComposer
@@ -521,7 +615,7 @@ export function ThreadComposer(props: {
   const canceled = useAtomValue(atoms.cancelQueued)
   const sentNow = useAtomValue(atoms.sendQueued)
 
-  const { editing, ...staged } = useStagedFeedback(
+  const { editing, ...feedback } = useComposerFeedback(
     props.feedback,
     async (message) => Exit.isSuccess(await send(message)),
     async (message) => Exit.isSuccess(await steer(message)),
@@ -550,7 +644,7 @@ export function ThreadComposer(props: {
           props.problem ??
           null
         }
-        {...staged}
+        {...feedback}
         recall={lastSent(turns, props.queued)}
         onStop={running ? () => stop() : null}
         beam={props.beam ?? false}

@@ -26,19 +26,19 @@ import {
   useOpenedFiles,
   type ViewHandle,
 } from "./ChangedFilesView"
-import { type CollapseChoices, layOut, noneCollapsedWhenSuggested } from "./changesView"
+import { type CollapseChoices, layOut } from "./changesView"
 import { ChangesToolbar } from "./ChangesToolbar"
 import { type FeedbackAnnotation, isOlder } from "./feedbackLines"
 import { FilePanelTabsList, FilePanelTabTrigger } from "./FilePanelTabs"
 import { plural } from "./plural"
 import { ProblemAlert } from "./ProblemAlert"
 import { problemOf } from "./problems"
-import { useFeedbackComposer } from "./useFeedbackComposer"
+import { type NoteOpen, useFeedbackComposer } from "./useFeedbackComposer"
 import type { LineNotesEditor } from "./useFeedbackNotes"
 
 export type SidebarTab = "files" | "feedback"
 
-const NoteOpenContext = createContext(false)
+const NoteOpenContext = createContext<NoteOpen>("none")
 
 export const useNoteOpen = () => useContext(NoteOpenContext)
 
@@ -48,11 +48,11 @@ export function ChangesWithFeedback(props: {
     | "loading"
     | "unavailable"
   store: LineNotesEditor
-  sidebarTab: SidebarTab
-  setSidebarTab: (tab: SidebarTab) => void
+  sidebar: { tab: SidebarTab; onTabChange: (tab: SidebarTab) => void } | null
+  wide: { on: boolean; onChange: (on: boolean) => void } | null
   footer: ReactNode
 }) {
-  const { changes, store, sidebarTab, setSidebarTab } = props
+  const { changes, store, sidebar } = props
   const read = changes === "loading" || changes === "unavailable" ? null : changes
   const changesId = read?.id ?? null
   const layout = useMemo(() => layOut(read?.files ?? []), [read])
@@ -60,11 +60,23 @@ export function ChangesWithFeedback(props: {
   const [filePanelOpen, setFilePanelOpen] = useState(true)
   const filePanelId = useId()
   const [display, setDisplay] = useState<Display>(defaultDisplay)
-  const [all, setAll] = useState<CollapseChoices["all"]>("expanded")
+
+  const [all, setAll] = useState<CollapseChoices["all"]>(
+    sidebar === null ? "suggested" : "expanded",
+  )
+
   const view = useRef<ViewHandle<FeedbackAnnotation>>(null)
   const viewOf = useCallback(() => view.current, [])
   const { opened, setOpened, setFilesOpen } = useOpenedFiles(viewOf)
   const older = store.notes.filter((note) => isOlder(note, changesId)).length
+
+  const withoutNotes = useMemo(() => {
+    const noted = new Set(
+      store.notes.filter((note) => !isOlder(note, changesId)).map(({ path }) => path),
+    )
+
+    return new Set(layout.files.map(({ file }) => file.path).filter((path) => !noted.has(path)))
+  }, [store.notes, changesId, layout])
 
   const setFileOpen = useCallback(
     (path: string, open: boolean) => setFilesOpen([path], open),
@@ -99,78 +111,90 @@ export function ChangesWithFeedback(props: {
 
   const filePanelLabel = filePanelOpen ? "Hide file panel" : "Show file panel"
 
+  const empty =
+    changes === "loading" || layout.files.length > 0 ? null : (
+      <p className="px-4 py-6 text-sm text-muted-foreground">
+        {changes === "unavailable" ? "Glass couldn't read these changes." : "No files changed."}
+      </p>
+    )
+
   return (
     <div className="flex min-h-0 flex-1">
-      <aside
-        id={filePanelId}
-        aria-label="Changed files"
-        className={cn("flex w-80 shrink-0 flex-col border-r", !filePanelOpen && "hidden")}
-      >
-        <Tabs value={sidebarTab} onValueChange={setSidebarTab} className="min-h-0 flex-1 gap-0">
-          <FilePanelTabsList>
-            <FilePanelTabTrigger value="files" icon={FolderTree}>
-              Files
-            </FilePanelTabTrigger>
-            <FilePanelTabTrigger value="feedback" icon={MessageSquareText}>
-              Feedback
-              {store.notes.length > 0 && (
-                <span className="text-xs text-muted-foreground tabular-nums">
-                  {store.notes.length}
-                </span>
-              )}
-            </FilePanelTabTrigger>
-          </FilePanelTabsList>
-          <TabsContent value="files" keepMounted className="flex min-h-0 flex-col">
-            {changes === "loading" ? null : layout.files.length === 0 ? (
-              <p className="px-4 py-6 text-sm text-muted-foreground">
-                {changes === "unavailable"
-                  ? "Glass couldn't read these changes."
-                  : "No files changed."}
-              </p>
-            ) : (
-              <ChangedFilesTree layout={layout} onSelect={showFile} viewedFiles={null} />
-            )}
-          </TabsContent>
-          <TabsContent value="feedback" className="flex min-h-0 flex-col">
-            {feedback.overview}
-          </TabsContent>
-        </Tabs>
-      </aside>
+      {sidebar !== null && (
+        <aside
+          id={filePanelId}
+          aria-label="Changed files"
+          className={cn("flex w-80 shrink-0 flex-col border-r", !filePanelOpen && "hidden")}
+        >
+          <Tabs
+            value={sidebar.tab}
+            onValueChange={sidebar.onTabChange}
+            className="min-h-0 flex-1 gap-0"
+          >
+            <FilePanelTabsList>
+              <FilePanelTabTrigger value="files" icon={FolderTree}>
+                Files
+              </FilePanelTabTrigger>
+              <FilePanelTabTrigger value="feedback" icon={MessageSquareText}>
+                Feedback
+                {store.notes.length > 0 && (
+                  <span className="text-xs text-muted-foreground tabular-nums">
+                    {store.notes.length}
+                  </span>
+                )}
+              </FilePanelTabTrigger>
+            </FilePanelTabsList>
+            <TabsContent value="files" keepMounted className="flex min-h-0 flex-col">
+              {changes === "loading"
+                ? null
+                : (empty ?? (
+                    <ChangedFilesTree layout={layout} onSelect={showFile} viewedFiles={null} />
+                  ))}
+            </TabsContent>
+            <TabsContent value="feedback" className="flex min-h-0 flex-col">
+              {feedback.overview}
+            </TabsContent>
+          </Tabs>
+        </aside>
+      )}
       <div className="flex min-w-0 flex-1 flex-col">
         <ChangesToolbar
           filePanelToggle={
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={filePanelLabel}
-              aria-expanded={filePanelOpen}
-              aria-controls={filePanelId}
-              title={filePanelLabel}
-              onClick={() => setFilePanelOpen((open) => !open)}
-            >
-              <PanelLeft aria-hidden />
-            </Button>
+            sidebar !== null && (
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={filePanelLabel}
+                aria-expanded={filePanelOpen}
+                aria-controls={filePanelId}
+                title={filePanelLabel}
+                onClick={() => setFilePanelOpen((open) => !open)}
+              >
+                <PanelLeft aria-hidden />
+              </Button>
+            )
           }
           fileCount={changes === "loading" ? "loading" : layout.files.length}
           viewedCount={null}
           display={display}
           onDisplayChange={setDisplay}
-          all={all}
+          all={all === "suggested" && withoutNotes.size === layout.files.length ? "collapsed" : all}
           onAllChange={showAll}
           tourOrder={null}
-          fullScreen={null}
+          expand={props.wide && { label: "Full width", ...props.wide }}
           agentWork={null}
         />
         <NoteOpenContext value={feedback.editing}>{props.footer}</NoteOpenContext>
-        {older > 0 && (
+        {sidebar !== null && older > 0 && (
           <OlderNotes
             count={older}
             onView={() => {
               setFilePanelOpen(true)
-              setSidebarTab("feedback")
+              sidebar.onTabChange("feedback")
             }}
           />
         )}
+        {sidebar === null && empty}
         {layout.files.length > 0 && (
           <div
             role="presentation"
@@ -186,7 +210,7 @@ export function ChangesWithFeedback(props: {
               display={display}
               opened={opened}
               all={all}
-              collapsedWhenSuggested={noneCollapsedWhenSuggested}
+              collapsedWhenSuggested={withoutNotes}
               onOpenChange={setFileOpen}
               {...feedback.diffProps}
             />

@@ -7,7 +7,7 @@ const vertexShader = `#version 300 es
 in vec2 corner;
 void main() { gl_Position = vec4(corner, 0.0, 1.0); }`
 
-export interface ShaderSize {
+interface ShaderSize {
   readonly width: number
   readonly height: number
   readonly deviceWidth: number
@@ -15,14 +15,14 @@ export interface ShaderSize {
   readonly pixelRatio: number
 }
 
-export interface ShaderCanvas {
+interface ShaderCanvas {
   readonly canvas: HTMLCanvasElement
   readonly gl: WebGL2RenderingContext
   readonly uniform: (name: string) => WebGLUniformLocation | null
   readonly paint: () => void
 }
 
-export interface ShaderDrawing {
+interface ShaderDrawing {
   readonly resize: (size: ShaderSize) => void
   readonly restyle: () => void
   readonly draw: (seconds: number) => void

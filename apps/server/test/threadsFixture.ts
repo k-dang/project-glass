@@ -14,7 +14,7 @@ import {
   localPlace,
   type Turn,
 } from "@glass/contracts"
-import { Effect, Exit, Option, Predicate, type Schema, Scope, Stream } from "effect"
+import { Effect, Exit, Option, Predicate, Schema, Scope, Stream } from "effect"
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
@@ -23,6 +23,7 @@ import { VIEWER } from "./fakePullRequest"
 import { installFakeSandboxProvider } from "./fakeSandboxProvider"
 import { seedClone } from "./gitRepositories"
 import { isolatedHome, startBackend } from "./harness"
+import { scriptedReviews } from "./scriptedReviews"
 import { vi } from "vite-plus/test"
 
 export const repository = new FollowedRepository({ owner: "glass-demo", repo: "greeter" })
@@ -34,12 +35,14 @@ export const scriptedHost = fileURLToPath(
 export const threadsFixtureWith = ({
   agentHostBundle = scriptedHost,
   agentRunners,
+  git = false,
 }: {
   readonly agentHostBundle?: string
   readonly agentRunners?: Parameters<typeof startBackend>[2]
+  readonly git?: boolean
 } = {}) =>
   Effect.gen(function* () {
-    const github = yield* startFakeGitHub()
+    const github = yield* startFakeGitHub({ git })
     const home = yield* isolatedHome
     const repositories = yield* isolatedHome
     const gates = join(home, "gates")
@@ -60,6 +63,7 @@ export const threadsFixtureWith = ({
     const env = {
       GH_TOKEN: VIEWER.token,
       GLASS_GITHUB_API_URL: github.url,
+      GLASS_GIT_REMOTE: github.gitUrl,
       GLASS_AGENT_HOST_BUNDLE: agentHostBundle,
     }
 
@@ -198,6 +202,7 @@ export const threadsFixtureWith = ({
       home,
       clone,
       release: (name: string) => Effect.sync(() => writeFileSync(join(gates, name), "")),
+      reviews: scriptedReviews(gates),
       watch,
       transcript,
       sandboxStatus,
@@ -266,3 +271,13 @@ export const glassCalls = (turn: Turn | undefined) =>
   turn?.parts.flatMap((part) =>
     Predicate.isTagged(part, "ToolCall") ? [{ status: part.status, output: part.output }] : [],
   )
+
+const decodeResult = Schema.decodeUnknownSync(
+  Schema.fromJsonString(Schema.Tuple([Schema.Struct({ text: Schema.String })])),
+)
+
+export const calledBy = (turn: Turn | undefined) => {
+  const [called] = glassCalls(turn) ?? []
+
+  return { status: called?.status, text: decodeResult(called?.output)[0].text }
+}

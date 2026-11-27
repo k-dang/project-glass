@@ -1,7 +1,27 @@
-import type { NeedsYouGroup, NeedsYouItem, PullRequestReason, RequestPart } from "@glass/contracts"
+import {
+  type AgentReviewDone,
+  AgentReviewFinished,
+  ChecksFailing,
+  type InboxGroup,
+  type InboxItem,
+  type InboxPullRequest,
+  type InboxThread,
+  type PullRequestReason,
+  referenceKey,
+  type RequestPart,
+  TurnFinished,
+  type TurnSeen,
+} from "@glass/contracts"
 import { cn } from "cn"
-import { Array as Arr, DateTime, Match, Predicate } from "effect"
-import { CircleHelp, FileDiff, GitPullRequest, MessagesSquare, Sparkles } from "lucide-react"
+import { Array as Arr, DateTime, Match, Predicate, Schema } from "effect"
+import {
+  CircleHelp,
+  FileDiff,
+  GitPullRequest,
+  MessagesSquare,
+  PlugZap,
+  Sparkles,
+} from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 import { fileName } from "./fileName"
 import { ago } from "./PullRequestRow"
@@ -18,13 +38,42 @@ const toneClass: Record<Tone, string> = {
   neutral: "text-muted-foreground",
 }
 
-export const groupLooks: Record<NeedsYouGroup, { readonly label: string; readonly tone: string }> =
-  {
-    stopped: { label: "Stopped on you", tone: warningTone },
-    reviews: { label: "Agent reviews to read", tone: "text-muted-foreground" },
-    mine: { label: "Your pull requests", tone: "text-muted-foreground" },
-    finished: { label: "Threads that finished", tone: "text-muted-foreground" },
-  }
+export const groupLooks: Record<InboxGroup, { readonly label: string; readonly tone: string }> = {
+  stopped: { label: "Stopped on you", tone: warningTone },
+  reviews: { label: "Agent reviews to read", tone: "text-muted-foreground" },
+  mine: { label: "Your pull requests", tone: "text-muted-foreground" },
+  finished: { label: "Threads that finished", tone: "text-muted-foreground" },
+}
+
+export const inboxItemKey = (item: InboxItem): string =>
+  Match.valueTags(item, {
+    Thread: ({ thread }) => `thread:${thread.id}`,
+    OutsideQuestion: ({ id }) => `ask:${id}`,
+    CheckIn: ({ id }) => `check-in:${id}`,
+    OutsideAgentRequest: ({ id }) => `outside-agent:${id}`,
+    PullRequest: ({ pullRequest }) => `pr:${referenceKey(pullRequest.ref)}`,
+    GlobalChat: () => "global",
+  })
+
+export const finishedAgentReviewOf = (item: InboxPullRequest) =>
+  item.reasons.find(Schema.is(AgentReviewFinished))
+
+export const failingChecksOf = (item: InboxPullRequest) =>
+  item.reasons.find(Schema.is(ChecksFailing))?.failing ?? []
+
+export const reviewDoneOf = (item: InboxPullRequest): AgentReviewDone | null => {
+  const review = finishedAgentReviewOf(item)
+
+  return review === undefined
+    ? null
+    : { pullRequest: item.pullRequest.ref, writtenAt: review.writtenAt }
+}
+
+export const turnSeenOf = ({ thread, reasons }: InboxThread): TurnSeen | null => {
+  const finished = reasons.find(Schema.is(TurnFinished))
+
+  return finished === undefined ? null : { threadId: thread.id, endedAt: finished.ended.at }
+}
 
 export const inboxKeys = ["E", "A"] as const
 
@@ -60,7 +109,7 @@ const pullRequestReason = (reason: PullRequestReason): Reason =>
     ReadyToMerge: () => ({ label: "Ready to merge", tone: toneClass.success }),
   })
 
-const reasonsOf = (item: NeedsYouItem): ReadonlyArray<Reason> =>
+const reasonsOf = (item: InboxItem): ReadonlyArray<Reason> =>
   Arr.dedupeWith(
     Match.valueTags(item, {
       Thread: ({ reasons }) =>
@@ -72,13 +121,14 @@ const reasonsOf = (item: NeedsYouItem): ReadonlyArray<Reason> =>
         ),
       OutsideQuestion: () => [{ label: "Question", tone: toneClass.warning }],
       CheckIn: () => [{ label: "Check-in", tone: toneClass.warning }],
+      OutsideAgentRequest: () => [{ label: "Outside agent", tone: toneClass.warning }],
       PullRequest: ({ reasons }) => reasons.map(pullRequestReason),
       GlobalChat: ({ requests }) => requests.map(requestReason),
     }),
     (a, b) => a.label === b.label,
   )
 
-export function Reasons(props: { item: NeedsYouItem }) {
+export function Reasons(props: { item: InboxItem }) {
   return reasonsOf(props.item).map((reason) => (
     <Badge
       key={reason.label}
@@ -90,17 +140,18 @@ export function Reasons(props: { item: NeedsYouItem }) {
   ))
 }
 
-export function ItemIcon(props: { item: NeedsYouItem; className: string }) {
+export function ItemIcon(props: { item: InboxItem; className: string }) {
   return Match.valueTags(props.item, {
     Thread: () => <Sparkles className={props.className} aria-hidden />,
     OutsideQuestion: () => <CircleHelp className={props.className} aria-hidden />,
     CheckIn: () => <FileDiff className={props.className} aria-hidden />,
+    OutsideAgentRequest: () => <PlugZap className={props.className} aria-hidden />,
     PullRequest: () => <GitPullRequest className={props.className} aria-hidden />,
     GlobalChat: () => <MessagesSquare className={props.className} aria-hidden />,
   })
 }
 
-const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
+const requestsOf = (item: InboxItem): ReadonlyArray<RequestPart> =>
   Match.valueTags(item, {
     Thread: ({ reasons }) =>
       reasons.flatMap((reason) =>
@@ -111,11 +162,12 @@ const requestsOf = (item: NeedsYouItem): ReadonlyArray<RequestPart> =>
       ),
     OutsideQuestion: () => [],
     CheckIn: () => [],
+    OutsideAgentRequest: () => [],
     PullRequest: () => [],
     GlobalChat: ({ requests }) => requests,
   })
 
-export const firstPermission = (item: NeedsYouItem) =>
+export const firstPermission = (item: InboxItem) =>
   Match.valueTags(item, {
     Thread: (waiting) => {
       const part = requestsOf(waiting).find((request) =>
@@ -126,6 +178,7 @@ export const firstPermission = (item: NeedsYouItem) =>
     },
     OutsideQuestion: () => null,
     CheckIn: () => null,
+    OutsideAgentRequest: () => null,
     PullRequest: () => null,
     GlobalChat: () => null,
   })
@@ -138,20 +191,22 @@ export const summaryParts = (summary: string | null) => {
   return { title, details: rest.join("\n").trim() }
 }
 
-export const titleOf = (item: NeedsYouItem) =>
+export const titleOf = (item: InboxItem) =>
   Match.valueTags(item, {
     Thread: ({ thread }) => thread.name,
     OutsideQuestion: ({ question }) => question,
     CheckIn: ({ folder, summary }) => summaryParts(summary)?.title ?? fileName(folder),
+    OutsideAgentRequest: ({ name }) => `${name} wants to connect`,
     PullRequest: ({ pullRequest }) => pullRequest.title,
     GlobalChat: () => "Global chat",
   })
 
-export const contextOf = (item: NeedsYouItem) =>
+export const contextOf = (item: InboxItem) =>
   Match.valueTags(item, {
     Thread: ({ thread }) => `${thread.repository.owner}/${thread.repository.repo}`,
     OutsideQuestion: ({ askedBy }) => `Asked by ${askedBy}`,
     CheckIn: ({ askedBy, folder }) => `${folder} · Asked by ${askedBy}`,
+    OutsideAgentRequest: ({ redirectHost }) => `Sends the approval to ${redirectHost}`,
     GlobalChat: () => "",
     PullRequest: ({ pullRequest }) =>
       `${referenceText(pullRequest.ref)}${pullRequest.isDraft ? " · Draft" : ""}`,

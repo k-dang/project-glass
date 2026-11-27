@@ -8,7 +8,7 @@ import {
   MergeWhenReady,
 } from "@glass/contracts"
 import { Match, Schema } from "effect"
-import type { GitHubPullRequestState } from "./pullRequestStatus"
+import type { GitHubPullRequestState } from "./repositoryPullRequests"
 
 export const MERGING_FIELDS = `mergeStateStatus
       isMergeQueueEnabled

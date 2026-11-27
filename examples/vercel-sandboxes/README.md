@@ -1,6 +1,6 @@
 # Vercel Sandboxes
 
-A Sandbox provider Plugin (ADR 0010) that runs pi Threads in
+A Sandbox provider Plugin (ADR 0011) that runs pi Threads in
 [Vercel Sandboxes](https://vercel.com/docs/sandbox). Each Thread gets its own persistent Sandbox
 in a Vercel project named `glass-sandboxes`, which the Plugin creates on first use.
 
@@ -44,6 +44,8 @@ image and the pi Glass pins; update all three together.
 - A Sandbox session lasts at most 45 minutes, the Hobby plan's limit. When a session ends, Vercel
   stops the Sandbox and keeps its files; the next time Glass connects, the Plugin resumes it and
   restarts the agent host, and a Turn that was running is cut off.
+- After a Glass upgrade that changes how Glass talks to the agent host, Glass has the Plugin replace
+  the host in each Sandbox; a Turn that was running is cut off.
 - Removing the Thread deletes the Sandbox and its snapshots.
 
 ## Check it

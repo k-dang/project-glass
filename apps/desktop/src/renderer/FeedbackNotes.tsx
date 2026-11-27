@@ -1,6 +1,6 @@
 import { type FeedbackNote, LineNote, PageNote, type PagePart } from "@glass/contracts"
 import { cn } from "cn"
-import { Match } from "effect"
+import { Match, Predicate } from "effect"
 import { History, MessageSquarePlus, PenLine, Trash2, X } from "lucide-react"
 import { type ReactNode, useState } from "react"
 import { Badge } from "@/components/ui/badge"
@@ -54,12 +54,12 @@ const viewOf = (note: FeedbackNote): NoteView =>
 
       return { place, location: `${path} ${place}`, about: "code", code, quote: null }
     },
-    PageNote: ({ path, part }): NoteView => {
+    PageNote: ({ page, part }): NoteView => {
       const place = pagePartLabel(part)
 
       return {
         place,
-        location: `${path} · ${place}`,
+        location: `${Predicate.isTagged(page, "FilePage") ? page.path : page.url} · ${place}`,
         about: "page",
         code: null,
         quote: part.excerpt,
@@ -69,13 +69,15 @@ const viewOf = (note: FeedbackNote): NoteView =>
 
 export function FeedbackNoteCard(props: {
   note: FeedbackNote
-  olderCode: string | null
+  snippet: "none" | "current" | "older"
   location: string
   onShow: (() => void) | null
   onEdit: (() => void) | null
   onRemove: () => Promise<Problem | null>
 }) {
-  const { note, olderCode } = props
+  const { note } = props
+  const view = viewOf(note)
+  const snippet = props.snippet === "none" ? null : view.code
   const [removing, setRemoving] = useState(false)
   const [problem, setProblem] = useState<Problem | null>(null)
 
@@ -89,7 +91,7 @@ export function FeedbackNoteCard(props: {
 
   return (
     <article
-      aria-label={`Feedback on ${viewOf(note).location}`}
+      aria-label={`Feedback on ${view.location}`}
       className="flex flex-col gap-2 rounded-lg border bg-background p-3 font-sans text-sm"
     >
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -104,9 +106,9 @@ export function FeedbackNoteCard(props: {
             {props.location}
           </button>
         )}
-        {olderCode !== null && <OlderVersion />}
+        {props.snippet === "older" && <OlderVersion />}
       </div>
-      {olderCode !== null && <Snippet code={olderCode} />}
+      {snippet !== null && <Snippet code={snippet} />}
       <p className="whitespace-pre-wrap wrap-anywhere">{note.text}</p>
       {problem !== null && (
         <ProblemAlert problem={problem} action={{ label: "Retry", run: () => void remove() }} />
@@ -138,63 +140,62 @@ export const withText = (note: FeedbackNote, text: string) =>
     PageNote: (page) => new PageNote({ ...page, text }),
   })
 
-export interface StagedEdit {
+export interface AttachedEdit {
   readonly id: string
   readonly draft: string
 }
 
-export function StagedFeedback(props: {
+export function AttachedFeedback(props: {
   notes: ReadonlyArray<FeedbackNote>
-  editing: StagedEdit | null
-  onEditingChange: (editing: StagedEdit | null) => void
+  editing: AttachedEdit | null
+  onEditingChange: (editing: AttachedEdit | null) => void
   onSave: (note: FeedbackNote) => Promise<Problem | null>
   onRemove: (noteId: string) => Promise<Problem | null>
 }) {
   const { editing, onEditingChange: setEditing } = props
 
   return (
-    <section
-      aria-label="Feedback attached to this message"
-      className="flex max-h-72 flex-col gap-2 overflow-y-auto py-1 text-left"
-    >
-      <p className="text-xs text-muted-foreground">
-        {plural(props.notes.length, "Feedback note")} attached to this message
-      </p>
-      <ul className="flex flex-col gap-2">
-        {props.notes.map((note) => (
-          <li key={note.id}>
-            {editing?.id === note.id ? (
-              <FeedbackEditor
-                place={viewOf(note).place}
-                about={viewOf(note).about}
-                olderCode={null}
-                saved
-                draft={editing.draft}
-                onDraftChange={(draft) => setEditing({ id: note.id, draft })}
-                onSave={async (text) => {
-                  const problem = await props.onSave(withText(note, text))
+    <section aria-label="Feedback attached to this message" className="py-1 text-left">
+      <details>
+        <summary className="cursor-pointer text-xs text-muted-foreground">
+          {plural(props.notes.length, "Feedback note")} attached to this message
+        </summary>
+        <ul className="flex max-h-72 flex-col gap-2 overflow-y-auto pt-2">
+          {props.notes.map((note) => (
+            <li key={note.id}>
+              {editing?.id === note.id ? (
+                <FeedbackEditor
+                  place={viewOf(note).place}
+                  about={viewOf(note).about}
+                  olderCode={null}
+                  saved
+                  draft={editing.draft}
+                  onDraftChange={(draft) => setEditing({ id: note.id, draft })}
+                  onSave={async (text) => {
+                    const problem = await props.onSave(withText(note, text))
 
-                  if (problem === null) setEditing(null)
+                    if (problem === null) setEditing(null)
 
-                  return problem
-                }}
-                onCancel={() => setEditing(null)}
-              />
-            ) : (
-              <FeedbackNoteCard
-                note={note}
-                olderCode={null}
-                location={viewOf(note).location}
-                onShow={null}
-                onEdit={
-                  editing === null ? () => setEditing({ id: note.id, draft: note.text }) : null
-                }
-                onRemove={() => props.onRemove(note.id)}
-              />
-            )}
-          </li>
-        ))}
-      </ul>
+                    return problem
+                  }}
+                  onCancel={() => setEditing(null)}
+                />
+              ) : (
+                <FeedbackNoteCard
+                  note={note}
+                  snippet="current"
+                  location={viewOf(note).location}
+                  onShow={null}
+                  onEdit={
+                    editing === null ? () => setEditing({ id: note.id, draft: note.text }) : null
+                  }
+                  onRemove={() => props.onRemove(note.id)}
+                />
+              )}
+            </li>
+          ))}
+        </ul>
+      </details>
     </section>
   )
 }
@@ -371,7 +372,7 @@ export function FeedbackOverview(props: {
             ) : (
               <FeedbackNoteCard
                 note={note}
-                olderCode={older ? note.code : null}
+                snippet={older ? "older" : "none"}
                 location={viewOf(note).location}
                 onShow={older ? null : () => props.onShow(note)}
                 onEdit={onEdit === null ? null : () => onEdit(note)}

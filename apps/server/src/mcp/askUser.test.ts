@@ -5,7 +5,7 @@ import {
   AskUserCancelled,
   AskUserResult,
   AskUserTimedOut,
-  type NeedsYou,
+  type InboxItems,
   OutsideChoice,
   OutsideText,
 } from "@glass/contracts"
@@ -24,18 +24,13 @@ import {
 import { TestClock } from "effect/testing"
 import { withWatchedClock } from "../../test/deadlines"
 import { startBackend } from "../../test/harness"
+import { inboxWhen } from "../../test/inboxWhen"
 import { connectMcp, initialize, mcpPost, toolResult, toolText } from "../../test/mcpClient"
 
-const outside = (items: NeedsYou) =>
+const outside = (items: InboxItems) =>
   items.filter((item) => Predicate.isTagged(item, "OutsideQuestion"))
 
 const askResult = Schema.decodeUnknownSync(AskUserResult)
-
-const needsYou = (
-  client: Effect.Success<ReturnType<typeof startBackend>>["client"],
-  until: (items: NeedsYou) => boolean,
-) =>
-  client.WatchNeedsYou().pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
 
 const approve = (backend: Effect.Success<ReturnType<typeof startBackend>>) =>
   backend.outsideAgents.issue("Claude Code")
@@ -112,7 +107,7 @@ describe("ask_user", () => {
       })
 
       const inFlight = yield* Effect.forkChild(call.response)
-      const shown = yield* needsYou(client, (items) => outside(items).length === 1)
+      const shown = yield* inboxWhen(client, (items) => outside(items).length === 1)
       const question = outside(shown)[0]
 
       assert.ok(question !== undefined)
@@ -131,7 +126,7 @@ describe("ask_user", () => {
         askResult(result.structuredContent),
         AskUserAnswered.make({ answer: "Ship it", by: "text" }),
       )
-      assert.equal(outside(yield* needsYou(client, () => true)).length, 0)
+      assert.equal(outside(yield* inboxWhen(client, () => true)).length, 0)
     }),
   )
 
@@ -148,7 +143,7 @@ describe("ask_user", () => {
       })
 
       const inFlight = yield* Effect.forkChild(call.response)
-      const shown = yield* needsYou(client, (items) => outside(items).length === 1)
+      const shown = yield* inboxWhen(client, (items) => outside(items).length === 1)
       const question = outside(shown)[0]
 
       assert.ok(question !== undefined)
@@ -180,7 +175,7 @@ describe("ask_user", () => {
 
         const inFlight = yield* Effect.forkChild(call.response)
 
-        const [asked] = outside(yield* needsYou(client, (items) => outside(items).length === 1))
+        const [asked] = outside(yield* inboxWhen(client, (items) => outside(items).length === 1))
         assert.isDefined(asked)
 
         yield* deadlineSet
@@ -190,7 +185,7 @@ describe("ask_user", () => {
           askResult(toolResult(yield* Fiber.join(inFlight)).structuredContent),
           AskUserTimedOut.make({}),
         )
-        yield* needsYou(client, (items) => outside(items).length === 0)
+        yield* inboxWhen(client, (items) => outside(items).length === 0)
 
         const late = yield* client
           .AnswerOutsideQuestion({ id: asked.id, answer: OutsideText.make({ text: "too late" }) })
@@ -221,7 +216,7 @@ describe("ask_user", () => {
       ).pipe(Effect.map((responses) => responses.map((response) => response.status)))
 
       assert.deepStrictEqual(statuses, [401, 401])
-      assert.equal(outside(yield* needsYou(client, () => true)).length, 0)
+      assert.equal(outside(yield* inboxWhen(client, () => true)).length, 0)
     }),
   )
 
@@ -239,7 +234,7 @@ describe("ask_user", () => {
 
       const inFlight = yield* Effect.forkChild(call.response)
 
-      yield* needsYou(backend.client, (items) => outside(items).length === 1)
+      yield* inboxWhen(backend.client, (items) => outside(items).length === 1)
       yield* Scope.close(scope, Exit.void)
 
       assert.deepStrictEqual(
@@ -259,7 +254,7 @@ describe("ask_user", () => {
       assert.include(body.text, "ask-1")
       assert.equal(body.text.includes('"id":1'), false)
 
-      const shown = yield* needsYou(backend.client, (items) => outside(items).length === 1)
+      const shown = yield* inboxWhen(backend.client, (items) => outside(items).length === 1)
       const question = outside(shown)[0]
 
       assert.ok(question !== undefined)
@@ -276,7 +271,7 @@ describe("ask_user", () => {
       const backend = yield* startBackend({})
       const body = yield* askUntilProgress(backend.baseUrl, yield* approve(backend))
 
-      yield* needsYou(backend.client, (items) => outside(items).length === 1)
+      yield* inboxWhen(backend.client, (items) => outside(items).length === 1)
 
       const [thread] = yield* backend.client
         .WatchOutsideAgents()
@@ -285,7 +280,7 @@ describe("ask_user", () => {
       assert.ok(thread !== undefined)
       yield* backend.client.RevokeOutsideAgent({ id: thread.id })
 
-      yield* needsYou(backend.client, (items) => outside(items).length === 0)
+      yield* inboxWhen(backend.client, (items) => outside(items).length === 0)
 
       const rest = yield* Effect.promise(async () => {
         const decoder = new TextDecoder()
@@ -314,7 +309,7 @@ describe("ask_user", () => {
         }).response,
       )
 
-      yield* needsYou(client, (items) => outside(items).length === 1)
+      yield* inboxWhen(client, (items) => outside(items).length === 1)
 
       const second = toolResult(
         yield* mcp.request("tools/call", {
@@ -333,7 +328,7 @@ describe("ask_user", () => {
         }).response,
       )
 
-      const shown = outside(yield* needsYou(client, (items) => outside(items).length === 2))
+      const shown = outside(yield* inboxWhen(client, (items) => outside(items).length === 2))
 
       yield* Effect.forEach(shown, (question) =>
         client.AnswerOutsideQuestion({
@@ -363,7 +358,7 @@ describe("ask_user", () => {
 
       assert.isTrue(result.isError)
       assert.include(toolText(result), "its own Question tool")
-      assert.equal(outside(yield* needsYou(client, () => true)).length, 0)
+      assert.equal(outside(yield* inboxWhen(client, () => true)).length, 0)
     }),
   )
 })

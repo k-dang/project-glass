@@ -7,12 +7,21 @@ import { Match, Option } from "effect"
 import { type ComponentProps, createContext, use } from "react"
 import { AsyncResult } from "effect/reactivity"
 import { buttonVariants } from "@/components/ui/button"
-import { TooltipHint } from "@/components/ui/tooltip"
 import { threadPullRequestsAtom } from "./threadsArea"
 import { usePreloadOnHover } from "./preloadPullRequest"
 import { checksLabels, closedLabel, mergedLabel, StatusIcon, type StatusLabel } from "./status"
 
 export const PullRequestPanes = createContext<((pullRequest: PullRequestRef) => void) | null>(null)
+
+export const useOpenPullRequest = () => {
+  const navigate = useNavigate()
+  const openPane = use(PullRequestPanes)
+
+  return (pullRequest: PullRequestRef) =>
+    openPane === null
+      ? void navigate({ to: "/reviews/$owner/$repo/$number", params: pullRequest })
+      : openPane(pullRequest)
+}
 
 export const useThreadPullRequest = (threadId: string) =>
   Option.getOrUndefined(AsyncResult.value(useAtomValue(threadPullRequestsAtom)))?.get(threadId)
@@ -27,7 +36,7 @@ const statusOf = (state: ThreadPullRequestState): StatusLabel =>
     Closed: () => ({ ...closedLabel, label: "closed" }),
   })
 
-export const pullRequestLabel = ({ ref, state }: ThreadPullRequest) =>
+const pullRequestLabel = ({ ref, state }: ThreadPullRequest) =>
   `PR #${ref.number}, ${statusOf(state).label}`
 
 export function PullRequestStatusIcon(props: { state: ThreadPullRequestState; className: string }) {
@@ -41,8 +50,7 @@ export function PullRequestLink({
   children,
   ...props
 }: ComponentProps<"a"> & { href: string; pullRequest: PullRequestRef }) {
-  const navigate = useNavigate()
-  const openPane = use(PullRequestPanes)
+  const openPullRequest = useOpenPullRequest()
   const preloadOnHover = usePreloadOnHover(pullRequest)
 
   return (
@@ -59,10 +67,7 @@ export function PullRequestLink({
         if (opensInBrowser) return
 
         event.preventDefault()
-
-        if (openPane !== null) return openPane(pullRequest)
-
-        void navigate({ to: "/reviews/$owner/$repo/$number", params: pullRequest })
+        openPullRequest(pullRequest)
       }}
     >
       {children}
@@ -74,20 +79,18 @@ export function ThreadPullRequestLink(props: { pullRequest: ThreadPullRequest })
   const { pullRequest } = props
 
   return (
-    <TooltipHint content={pullRequest.title} side="bottom">
-      <PullRequestLink
-        href={pullRequest.url}
-        pullRequest={pullRequest.ref}
-        aria-label={`Open ${pullRequestLabel(pullRequest)}`}
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "sm" }),
-          "shrink-0 gap-1.5 tabular-nums",
-        )}
-      >
-        <PullRequestStatusIcon state={pullRequest.state} className="size-3.5" />#
-        {pullRequest.ref.number}
-      </PullRequestLink>
-    </TooltipHint>
+    <PullRequestLink
+      href={pullRequest.url}
+      pullRequest={pullRequest.ref}
+      aria-label={`Open ${pullRequestLabel(pullRequest)}`}
+      className={cn(
+        buttonVariants({ variant: "ghost", size: "sm" }),
+        "shrink-0 gap-1.5 tabular-nums",
+      )}
+    >
+      <PullRequestStatusIcon state={pullRequest.state} className="size-3.5" />#
+      {pullRequest.ref.number}
+    </PullRequestLink>
   )
 }
 

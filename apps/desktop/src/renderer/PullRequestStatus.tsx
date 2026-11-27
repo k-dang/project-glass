@@ -5,6 +5,7 @@ import type {
   CheckState,
   MergeUnderWay,
   PullRequest,
+  PullRequestState,
   Reviewer,
   ReviewerState,
 } from "@glass/contracts"
@@ -18,6 +19,10 @@ import {
   CircleX,
   FileDiff,
   GitMerge,
+  GitPullRequest,
+  GitPullRequestClosed,
+  GitPullRequestDraft,
+  type LucideIcon,
   TriangleAlert,
   Users,
 } from "lucide-react"
@@ -80,28 +85,66 @@ const checkStates: Record<CheckState, StatusLabel> = {
 
 const checkOrder: ReadonlyArray<CheckState> = ["failed", "running", "passed", "skipped"]
 
-export const isOpen = (pullRequest: PullRequest) =>
+const isOpen = (pullRequest: PullRequest) =>
   pullRequest.state === "open" || pullRequest.state === "draft"
 
 export const closedAs = (pullRequest: PullRequest) =>
   pullRequest.state === "closed" || pullRequest.state === "merged" ? pullRequest.state : null
+
+const states: Record<
+  PullRequestState,
+  { readonly label: string; readonly icon: LucideIcon; readonly className: string }
+> = {
+  open: { label: "Open", icon: GitPullRequest, className: "bg-emerald-600 text-white" },
+  draft: { label: "Draft", icon: GitPullRequestDraft, className: "bg-zinc-500 text-white" },
+  closed: { label: "Closed", icon: GitPullRequestClosed, className: "bg-red-600 text-white" },
+  merged: { label: "Merged", icon: GitMerge, className: "bg-violet-600 text-white" },
+}
+
+export function PullRequestStateIcon(props: { pullRequest: PullRequest }) {
+  const { label, icon: Icon, className } = states[props.pullRequest.state]
+
+  return (
+    <TooltipHint content={label}>
+      <span
+        className={cn("flex size-5 shrink-0 items-center justify-center rounded-full", className)}
+      >
+        <Icon aria-label={label} className="size-3" />
+      </span>
+    </TooltipHint>
+  )
+}
 
 export function StatusChips(props: { pullRequest: PullRequest }) {
   const { pullRequest } = props
 
   return (
     <>
-      <ReviewersChip pullRequest={pullRequest} />
-      <ChecksChip pullRequest={pullRequest} />
-      <ConflictsChip pullRequest={pullRequest} />
+      <ReviewersChip pullRequest={pullRequest} look="chip" />
+      <ChecksChip pullRequest={pullRequest} look="chip" />
+      <ConflictsChip pullRequest={pullRequest} look="chip" />
       {pullRequest.mergeUnderWay !== null && (
-        <HintChip summary={mergesUnderWay[pullRequest.mergeUnderWay]} />
+        <HintChip summary={mergesUnderWay[pullRequest.mergeUnderWay]} look="chip" />
       )}
     </>
   )
 }
 
-export function ReviewersChip(props: { pullRequest: PullRequest }) {
+export function InlineStatusChips(props: { pullRequest: PullRequest }) {
+  const { pullRequest } = props
+
+  return (
+    <span className="@container -mr-1 flex min-w-0 flex-1 items-center justify-end gap-0.5">
+      <ReviewersChip pullRequest={pullRequest} look="inline" />
+      <ConflictsChip pullRequest={pullRequest} look="inline" />
+      <ChecksChip pullRequest={pullRequest} look="inline" />
+    </span>
+  )
+}
+
+type Look = "chip" | "inline"
+
+function ReviewersChip(props: { pullRequest: PullRequest; look: Look }) {
   const { approval, reviewers } = props.pullRequest
 
   return (
@@ -109,11 +152,12 @@ export function ReviewersChip(props: { pullRequest: PullRequest }) {
       summary={approval === null ? reviewersSummary(reviewers) : approvalSummaries[approval]}
       title="Reviewers"
       details={reviewers.length === 0 ? null : <ReviewerList reviewers={reviewers} />}
+      look={props.look}
     />
   )
 }
 
-export function ChecksChip(props: { pullRequest: PullRequest }) {
+function ChecksChip(props: { pullRequest: PullRequest; look: Look }) {
   const checks = props.pullRequest.checks.toSorted(
     (a, b) => checkOrder.indexOf(a.state) - checkOrder.indexOf(b.state),
   )
@@ -123,25 +167,47 @@ export function ChecksChip(props: { pullRequest: PullRequest }) {
       summary={checksSummary(checks)}
       title="Checks"
       details={checks.length === 0 ? null : <CheckList checks={checks} />}
+      look={props.look}
     />
   )
 }
 
-const chipClass = "h-6 gap-1 rounded-full px-2 text-xs font-normal text-foreground"
+const lookClasses: Record<Look, string> = {
+  chip: "h-6 gap-1 rounded-full px-2 text-xs font-normal text-foreground",
+  inline: "h-6 gap-1 px-1 text-xs font-normal text-muted-foreground",
+}
 
-function StatusChip(props: { summary: StatusLabel; title: string; details: ReactNode | null }) {
+function Label(props: { look: Look; children: string }) {
+  return props.look === "inline" ? (
+    <span className="@max-[22rem]:sr-only">{props.children}</span>
+  ) : (
+    props.children
+  )
+}
+
+function StatusChip(props: {
+  summary: StatusLabel
+  title: string
+  details: ReactNode | null
+  look: Look
+}) {
   const { label, icon: Icon, tone } = props.summary
 
   const content = (
     <>
       <Icon aria-hidden className={cn("size-3.5", tone)} />
-      {label}
+      <Label look={props.look}>{label}</Label>
     </>
   )
 
   if (props.details === null) {
     return (
-      <span className={cn("inline-flex items-center border border-transparent", chipClass)}>
+      <span
+        className={cn(
+          "inline-flex items-center border border-transparent",
+          lookClasses[props.look],
+        )}
+      >
         {content}
       </span>
     )
@@ -149,9 +215,19 @@ function StatusChip(props: { summary: StatusLabel; title: string; details: React
 
   return (
     <Popover>
-      <PopoverTrigger render={<Button variant="outline" size="xs" className={chipClass} />}>
+      <PopoverTrigger
+        render={
+          <Button
+            variant={props.look === "chip" ? "outline" : "ghost"}
+            size="xs"
+            className={lookClasses[props.look]}
+          />
+        }
+      >
         {content}
-        <ChevronDown aria-hidden className="size-3 text-muted-foreground" />
+        {props.look === "chip" && (
+          <ChevronDown aria-hidden className="size-3 text-muted-foreground" />
+        )}
       </PopoverTrigger>
       <PopoverContent align="start" className="w-80 gap-1 p-1.5">
         <PopoverTitle className="px-1.5 pt-1 text-xs text-muted-foreground">
@@ -242,20 +318,25 @@ interface HintedSummary extends StatusLabel {
   readonly title: string
 }
 
-function HintChip(props: { summary: HintedSummary }) {
+function HintChip(props: { summary: HintedSummary; look: Look }) {
   const { label, icon: Icon, tone, title } = props.summary
 
   return (
     <TooltipHint content={title}>
-      <span className={cn("inline-flex items-center border border-transparent", chipClass)}>
+      <span
+        className={cn(
+          "inline-flex items-center border border-transparent",
+          lookClasses[props.look],
+        )}
+      >
         <Icon aria-hidden className={cn("size-3.5", tone)} />
-        {label}
+        <Label look={props.look}>{label}</Label>
       </span>
     </TooltipHint>
   )
 }
 
-export function ConflictsChip(props: { pullRequest: PullRequest }) {
+function ConflictsChip(props: { pullRequest: PullRequest; look: Look }) {
   const { mergeable, baseBranch } = props.pullRequest
 
   if (!isOpen(props.pullRequest)) return null
@@ -287,5 +368,5 @@ export function ConflictsChip(props: { pullRequest: PullRequest }) {
     },
   }
 
-  return <HintChip summary={summaries[mergeable]} />
+  return <HintChip summary={summaries[mergeable]} look={props.look} />
 }

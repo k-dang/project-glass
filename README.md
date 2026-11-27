@@ -29,7 +29,7 @@ it counts.
 | `apps/desktop`       | Electron app: main, preload, and React renderer, built separately.             |
 | `apps/server`        | Effect backend: RPC over WebSocket on `127.0.0.1`, behind a per-launch secret. |
 | `packages/contracts` | Effect Schema RPC definitions and errors shared by every app.                  |
-| `packages/plugin`    | The types a Plugin implements to add a kind of Sandbox (ADR 0010).             |
+| `packages/plugin`    | The types a Plugin implements to add a kind of Sandbox (ADR 0011).             |
 | `examples`           | A fake Sandbox provider Plugin and a prompt for writing your own.              |
 | `tools/oxlint`       | Lint rules `pnpm check` runs, including Glass's import and test-wait policies. |
 

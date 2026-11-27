@@ -9,13 +9,19 @@ import { migrationLoader } from "./Migrations"
 import { StartedWork } from "./StartedWork"
 import { Transcripts } from "./Transcripts"
 
-const layer = StartedWork.layer.pipe(
-  Layer.provideMerge(Transcripts.layer),
-  Layer.provide(Layer.mock(Threads)({ harnesses: () => ["pi"], markTurnSeen: () => Effect.void })),
-  Layer.provide(Layer.mock(AgentReviews)({})),
-  Layer.provideMerge(SqliteMigrator.layer({ loader: migrationLoader })),
-  Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
-)
+const layer = (seen: Array<string> = []) =>
+  StartedWork.layer.pipe(
+    Layer.provideMerge(Transcripts.layer),
+    Layer.provide(
+      Layer.mock(Threads)({
+        harnesses: () => ["pi"],
+        markTurnSeen: (threadId) => Effect.sync(() => void seen.push(threadId)),
+      }),
+    ),
+    Layer.provide(Layer.mock(AgentReviews)({})),
+    Layer.provideMerge(SqliteMigrator.layer({ loader: migrationLoader })),
+    Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
+  )
 
 const at = DateTime.makeUnsafe("2026-11-14T12:00:00Z")
 
@@ -79,5 +85,34 @@ it.live(
           },
         ],
       )
-    }).pipe(Effect.provide(layer)),
+    }).pipe(Effect.provide(layer())),
 )
+
+it.live("leaves a started Thread unseen when its Started work update fails", () => {
+  const seen: Array<string> = []
+
+  return Effect.gen(function* () {
+    const sql = yield* SqlClient.SqlClient
+    const transcripts = yield* Transcripts
+    const started = yield* StartedWork
+    yield* sql`INSERT INTO started_thread (started_by, thread_id, started_at)
+    VALUES ('starter', 'started', ${DateTime.formatIso(at)})`
+
+    yield* transcripts.startIfIdle(
+      "starter",
+      { ...startedWorkUpdateTurn, retriesDelivery: false },
+      (turnId) =>
+        started.recordStartedWorkUpdate("starter", turnId, [
+          { work: startedWorkUpdate.work[0], at },
+        ]),
+    )
+    const [turn] = (yield* transcripts.read("starter")).turns
+    assert.isDefined(turn)
+    yield* started.reconcileStartedWorkUpdates("starter")
+
+    yield* transcripts.settleUndelivered("starter", turn.id, "The Thread's agent is gone.")
+    yield* started.reconcileStartedWorkUpdates("starter")
+
+    assert.deepStrictEqual(seen, [])
+  }).pipe(Effect.provide(layer(seen)))
+})

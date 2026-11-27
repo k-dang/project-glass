@@ -4,18 +4,17 @@ import {
   type BackendEndpoint,
   BRING_TO_FRONT_CHANNEL,
   CHOOSE_FOLDER_CHANNEL,
-  CLOSE_HTML_PAGE_CHANNEL,
   type BackendFailure,
   DISCARD_DOGFOOD_REPORT_CHANNEL,
   type DogfoodReportDetails,
   type DogfoodReportRecorded,
   FINISH_DOGFOOD_REPORT_CHANNEL,
-  HTML_PAGE_SCHEME,
-  OPEN_HTML_PAGE_CHANNEL,
   RECORD_DOGFOOD_REPORT_CHANNEL,
   RELAUNCH_CHANNEL,
   RESOURCE_USAGE_CHANNEL,
   SET_APPEARANCE_CHANNEL,
+  THREAD_FILE_SCHEME,
+  VISUALIZATION_SCHEME,
   type Appearance,
 } from "@glass/contracts/desktop"
 import type { Theme } from "@glass/contracts"
@@ -35,8 +34,8 @@ import { execFile } from "node:child_process"
 import { homedir } from "node:os"
 import { join, relative } from "node:path"
 import { pathToFileURL } from "node:url"
+import { keepVisualizationsOffThisDevice, setUpBrowserPanes } from "./browserPanes"
 import { dogfoodReportWriter } from "./dogfoodReports"
-import { htmlPages } from "./htmlPages"
 import { summarizeResourceUsage } from "./resourceUsage"
 
 const devServerUrl = process.env["VITE_DEV_SERVER_URL"]
@@ -72,8 +71,8 @@ const CONTENT_SECURITY_POLICY = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: https://github.com https://*.githubusercontent.com",
   "media-src https://github.com https://*.githubusercontent.com",
-  `frame-src ${HTML_PAGE_SCHEME}:`,
   "connect-src ws://127.0.0.1:*",
+  `frame-src ${VISUALIZATION_SCHEME}:`,
   "object-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
@@ -81,10 +80,12 @@ const CONTENT_SECURITY_POLICY = [
 
 protocol.registerSchemesAsPrivileged([
   { scheme: APP_SCHEME, privileges: { standard: true, secure: true, supportFetchAPI: true } },
-  { scheme: HTML_PAGE_SCHEME, privileges: { standard: true, secure: true } },
+  {
+    scheme: THREAD_FILE_SCHEME,
+    privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true },
+  },
+  { scheme: VISUALIZATION_SCHEME, privileges: { standard: true, secure: true } },
 ])
-
-const pages = htmlPages()
 
 const serveRenderer = () =>
   protocol.handle(APP_SCHEME, async (request) => {
@@ -107,45 +108,35 @@ const openInBrowser = (url: string) => {
   if (scheme === "https:" || scheme === "http:") void shell.openExternal(url)
 }
 
-let appearance: Pick<Appearance, "theme" | "layout"> = { theme: "glass", layout: "classic" }
+let theme: Theme = "glass"
 
 const titleBarColors = {
   glass: {
-    light: { background: "#ffffff", chrome: "#f5f5f5", symbolColor: "#0a0a0a" },
-    dark: { background: "#0a0a0a", chrome: "#050505", symbolColor: "#fafafa" },
+    light: { chrome: "#f5f5f5", symbolColor: "#0a0a0a" },
+    dark: { chrome: "#050505", symbolColor: "#fafafa" },
   },
   charcoal: {
-    light: { background: "#f4f4f4", chrome: "#eaeaea", symbolColor: "#2b2b2b" },
-    dark: { background: "#111111", chrome: "#0b0b0b", symbolColor: "#cecece" },
+    light: { chrome: "#eaeaea", symbolColor: "#2b2b2b" },
+    dark: { chrome: "#0b0b0b", symbolColor: "#cecece" },
   },
   catppuccin: {
-    light: { background: "#e6e9ef", chrome: "#dce0e8", symbolColor: "#4c4f69" },
-    dark: { background: "#181825", chrome: "#11111b", symbolColor: "#cdd6f4" },
+    light: { chrome: "#dce0e8", symbolColor: "#4c4f69" },
+    dark: { chrome: "#11111b", symbolColor: "#cdd6f4" },
   },
   linear: {
-    light: { background: "#fcfcfd", chrome: "#f3f3f5", symbolColor: "#282a30" },
-    dark: { background: "#010102", chrome: "#000000", symbolColor: "#f7f8f8" },
+    light: { chrome: "#f3f3f5", symbolColor: "#282a30" },
+    dark: { chrome: "#000000", symbolColor: "#f7f8f8" },
   },
   vercel: {
-    light: { background: "#fafafa", chrome: "#f0f0f0", symbolColor: "#171717" },
-    dark: { background: "#000000", chrome: "#000000", symbolColor: "#ededed" },
+    light: { chrome: "#f0f0f0", symbolColor: "#171717" },
+    dark: { chrome: "#000000", symbolColor: "#ededed" },
   },
-} satisfies Record<
-  Theme,
-  Record<"light" | "dark", { background: string; chrome: string; symbolColor: string }>
->
+} satisfies Record<Theme, Record<"light" | "dark", { chrome: string; symbolColor: string }>>
 
 const titleBarOverlay = () => {
-  const colors =
-    titleBarColors[appearance.theme][nativeTheme.shouldUseDarkColors ? "dark" : "light"]
+  const colors = titleBarColors[theme][nativeTheme.shouldUseDarkColors ? "dark" : "light"]
 
-  const inset = appearance.layout === "inset"
-
-  return {
-    color: inset ? colors.chrome : colors.background,
-    symbolColor: colors.symbolColor,
-    height: inset ? 44 : 36,
-  }
+  return { color: colors.chrome, symbolColor: colors.symbolColor, height: 44 }
 }
 
 const updateWindowTheme = (window: BrowserWindow) => {
@@ -157,9 +148,9 @@ const updateWindowTheme = (window: BrowserWindow) => {
 
 const glassHome = process.env["GLASS_HOME"] || homedir()
 
-const logFile = join(glassHome, ".glass", "logs", "backend.log")
-
 const dataDirectory = join(glassHome, ".project-glass")
+
+const logFile = join(dataDirectory, "backend.log")
 
 const dogfoodReports = dogfoodReportWriter(join(dataDirectory, "dogfood-reports"))
 
@@ -206,6 +197,7 @@ const createWindow = () => {
       sandbox: true,
       nodeIntegration: false,
       spellcheck: true,
+      webviewTag: true,
       // WARNING: Chromium throttles timers in hidden windows, which can miss the backend WebSocket's pings.
       backgroundThrottling: false,
     },
@@ -266,9 +258,6 @@ const createWindow = () => {
 
     return { action: "deny" }
   })
-  // WARNING: A reload or crash skips the pages' close, so the next document starts with none.
-  window.webContents.on("did-navigate", pages.clear)
-  window.on("closed", pages.clear)
   window.webContents.on("will-navigate", (event) => {
     if (event.url.startsWith(`${rendererOrigin}/`)) return
 
@@ -278,7 +267,13 @@ const createWindow = () => {
   void window.loadURL(devServerUrl ?? `${APP_ORIGIN}/index.html`)
 }
 
-const backendReady = Promise.withResolvers<BackendEndpoint>()
+let backendEndpoint = Promise.withResolvers<BackendEndpoint>()
+
+const backendUp = (endpoint: BackendEndpoint) => backendEndpoint.resolve(endpoint)
+
+const backendDown = () => {
+  backendEndpoint = Promise.withResolvers()
+}
 
 const backendFailed = Promise.withResolvers<BackendFailure>()
 
@@ -286,11 +281,11 @@ const reportFailure = (kind: BackendFailure["kind"], message: string) =>
   backendFailed.resolve({ kind, message, logFile })
 
 void app.whenReady().then(() => {
-  ipcMain.handle(BACKEND_ENDPOINT_CHANNEL, () => backendReady.promise)
+  ipcMain.handle(BACKEND_ENDPOINT_CHANNEL, () => backendEndpoint.promise)
   ipcMain.handle(BACKEND_FAILURE_CHANNEL, () => backendFailed.promise)
   ipcMain.handle(RESOURCE_USAGE_CHANNEL, () => summarizeResourceUsage(app.getAppMetrics()))
   ipcMain.handle(SET_APPEARANCE_CHANNEL, (_event, next: Appearance) => {
-    appearance = next
+    theme = next.theme
     nativeTheme.themeSource = next.colorScheme
 
     for (const window of BrowserWindow.getAllWindows()) updateWindowTheme(window)
@@ -333,9 +328,6 @@ void app.whenReady().then(() => {
   )
   ipcMain.handle(DISCARD_DOGFOOD_REPORT_CHANNEL, (_event, id: string) => dogfoodReports.discard(id))
 
-  ipcMain.handle(OPEN_HTML_PAGE_CHANNEL, (_event, html: string) => pages.open(html))
-  ipcMain.handle(CLOSE_HTML_PAGE_CHANNEL, (_event, url: string) => pages.close(url))
-  protocol.handle(HTML_PAGE_SCHEME, pages.serve)
   ipcMain.handle(RELAUNCH_CHANNEL, () => {
     app.relaunch()
     app.quit()
@@ -345,6 +337,34 @@ void app.whenReady().then(() => {
 
   if (devIcon !== undefined) app.dock?.setIcon(devIcon)
 
+  setUpBrowserPanes({
+    preload: join(__dirname, "../browserPreload/index.cjs"),
+    threadFileUrl: async (place, file) => {
+      const [{ threadFileUrl }, endpoint] = await Promise.all([
+        import("./backend"),
+        backendEndpoint.promise,
+      ])
+
+      return threadFileUrl(endpoint, place, file)
+    },
+  })
+  keepVisualizationsOffThisDevice()
+  protocol.handle(VISUALIZATION_SCHEME, async (request) => {
+    const [{ visualizationUrl }, endpoint] = await Promise.all([
+      import("./backend"),
+      backendEndpoint.promise,
+    ])
+
+    const url = visualizationUrl(endpoint, new URL(request.url).hostname)
+
+    if (url === null) return new Response("No such Visualization.", { status: 404 })
+
+    try {
+      return await fetch(url)
+    } catch {
+      return new Response("Glass's backend isn't answering", { status: 503 })
+    }
+  })
   createWindow()
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
@@ -358,7 +378,8 @@ void app.whenReady().then(() => {
         rendererOrigin,
         logFile,
         dataDirectory,
-        onReady: backendReady.resolve,
+        onReady: backendUp,
+        onDown: backendDown,
         onFailure: reportFailure,
       }),
     )

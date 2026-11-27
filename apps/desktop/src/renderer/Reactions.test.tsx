@@ -6,7 +6,7 @@ import userEvent from "@testing-library/user-event"
 import { DateTime, Effect } from "effect"
 import { afterEach, expect, it } from "vite-plus/test"
 import { CommentReactions } from "./Reactions"
-import { createReactions, type ReactionChange } from "./useReactions"
+import { createReactions, type ReactionChange } from "./workspaceFeedback"
 import { type Held, hold, next, testRegistry } from "../../test/testBackend"
 
 const registries: Array<ReturnType<typeof testRegistry>> = []

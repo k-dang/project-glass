@@ -1,4 +1,5 @@
 import {
+  getAgentDir,
   type ModelRuntime,
   resolveModelScopeWithDiagnostics,
   SettingsManager,
@@ -66,13 +67,14 @@ import {
 import { settleWith } from "./requests"
 import { scopedFolder } from "./scopedFolder"
 import type { WrittenSkills } from "./sentSkills"
-import { piLoadsNothing, piTools } from "../agentTools"
+import { piFilesFolder, piLoadsNothing, piTools } from "../agentTools"
 import { piSubagentStatusExtension } from "./piSubagentStatus"
-import { PI_DIFF_LINES } from "./piSuggestDraft"
+import { PI_DIFF_LINES } from "./piReviewTools"
+import { SUBMIT_REVIEW_TOOL } from "./submitReviewTool"
 import { runTurns } from "./turnLoop"
 import { startedWorkUpdateDelivery, SessionEntries } from "./piStartedWorkUpdate"
 import piDrawDiagramSource from "virtual:pi-draw-diagram"
-import piSuggestDraftSource from "virtual:pi-suggest-draft"
+import piReviewToolsSource from "virtual:pi-review-tools"
 
 const thinkingLevels = ["off", "minimal", "low", "medium", "high", "xhigh", "max"]
 
@@ -162,50 +164,50 @@ interface PiFile {
   readonly source: string
 }
 
-interface PiExtension extends PiFile {
-  readonly besideIt?: ReadonlyArray<PiFile>
+interface PiFlagFile extends PiFile {
+  readonly flag: "--extension" | "--append-system-prompt"
+  readonly besideIt: ReadonlyArray<PiFile>
 }
 
-const writtenExtensions = Effect.fnUntraced(function* (
+const extension = (
+  name: string,
+  source: string,
+  besideIt: ReadonlyArray<PiFile> = [],
+): PiFlagFile => ({ flag: "--extension", name, source, besideIt })
+
+const instructions = (source: string): PiFlagFile => ({
+  flag: "--append-system-prompt",
+  name: "instructions.md",
+  source,
+  besideIt: [],
+})
+
+const writtenFiles = Effect.fnUntraced(function* (
   folder: string,
-  extensions: ReadonlyArray<PiExtension>,
+  files: ReadonlyArray<PiFlagFile>,
 ) {
   const fs = yield* FileSystem.FileSystem
-  const directory = yield* scopedFolder(`${folder}.pi`)
+  const directory = yield* scopedFolder(piFilesFolder(folder))
 
-  const flags = yield* Effect.forEach(extensions, ({ name, source, besideIt = [] }) => {
+  const flags = yield* Effect.forEach(files, ({ flag, name, source, besideIt }) => {
     const file = join(directory, name)
 
     return Effect.forEach(besideIt, (data) =>
       fs.writeFileString(join(directory, data.name), data.source),
-    ).pipe(Effect.andThen(fs.writeFileString(file, source)), Effect.as(["--extension", file]))
+    ).pipe(Effect.andThen(fs.writeFileString(file, source)), Effect.as([flag, file]))
   })
 
-  return { directory, flags: flags.flat() }
+  return flags.flat()
 })
 
-const lockedDownFlags = Effect.fnUntraced(function* (
+const lockedDownFlags = (
   folder: string,
   tools: ReadonlyArray<string>,
-  extensions: ReadonlyArray<PiExtension>,
-  instructionsText: string,
-) {
-  const fs = yield* FileSystem.FileSystem
-  const { directory, flags } = yield* writtenExtensions(folder, extensions)
-
-  const instructions = join(directory, "instructions.md")
-
-  yield* fs.writeFileString(instructions, instructionsText)
-
-  return [
-    "--tools",
-    tools.join(","),
-    ...piLoadsNothing,
-    ...flags,
-    "--append-system-prompt",
-    instructions,
-  ]
-})
+  files: ReadonlyArray<PiFlagFile>,
+) =>
+  writtenFiles(folder, files).pipe(
+    Effect.map((flags) => ["--tools", tools.join(","), ...piLoadsNothing, ...flags]),
+  )
 
 const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
   skills.flatMap((plugin) => plugin.skills.flatMap((skill) => ["--skill", skill]))
@@ -219,41 +221,39 @@ const roleFlags = (
   Match.value(role).pipe(
     Match.tagsExhaustive({
       Work: () =>
-        writtenExtensions(folder, [
-          { name: "draw-diagram.mjs", source: piDrawDiagramSource },
-          { name: "subagent-status.js", source: piSubagentStatusExtension },
+        writtenFiles(folder, [
+          extension("draw-diagram.mjs", piDrawDiagramSource),
+          extension("subagent-status.js", piSubagentStatusExtension),
           ...(glassTools === undefined
             ? []
-            : [{ name: "glass-tools.js", source: piGlassToolsExtension }]),
-        ]).pipe(
-          Effect.map(({ flags }) => [
-            ...skillFlags(skills),
-            ...flags,
-            ...(glassTools === undefined ? [] : ["--append-system-prompt", workInstructions]),
-          ]),
-        ),
+            : [extension("glass-tools.js", piGlassToolsExtension), instructions(workInstructions)]),
+        ]).pipe(Effect.map((flags) => [...skillFlags(skills), ...flags])),
       Review: ({ brief }) =>
         lockedDownFlags(
           folder,
-          [...piTools.shell, SUGGEST_DRAFT_TOOL],
+          [...piTools.review, SUBMIT_REVIEW_TOOL, SUGGEST_DRAFT_TOOL],
           [
-            {
-              name: "suggest-draft.mjs",
-              source: piSuggestDraftSource,
-              besideIt: [{ name: PI_DIFF_LINES, source: JSON.stringify(brief.diffLines) }],
-            },
+            extension("review-tools.mjs", piReviewToolsSource, [
+              { name: PI_DIFF_LINES, source: JSON.stringify(brief.diffLines) },
+            ]),
+            instructions(brief.instructions),
           ],
-          brief.instructions,
+        ).pipe(
+          Effect.map((flags) => [
+            "--session-dir",
+            join(getAgentDir(), "sessions", "glass-reviews"),
+            ...flags,
+          ]),
         ),
       Global: () =>
         lockedDownFlags(
           folder,
           [PI_QUESTION_TOOL, PI_GLASS_TOOLS],
           [
-            { name: "ask-user.js", source: piQuestionExtension },
-            { name: "glass-tools.js", source: piGlassToolsExtension },
+            extension("ask-user.js", piQuestionExtension),
+            extension("glass-tools.js", piGlassToolsExtension),
+            instructions(globalInstructions),
           ],
-          globalInstructions,
         ),
     }),
   )
@@ -573,6 +573,8 @@ export const piAdapter = (command: string) =>
 
             return yield* new HostThreadError({ message: "pi didn't take the message in." })
           }),
+          stopBackgroundTask: () =>
+            Effect.fail(new HostThreadError({ message: "pi has no background tasks to stop." })),
           stopTurn: (turnId, ending) =>
             Effect.gen(function* () {
               const steers = yield* turns.stop(turnId, ending)

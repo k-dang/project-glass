@@ -3,7 +3,6 @@ import type {
   DiffSide,
   PullRequest,
   PullRequestRef,
-  PullRequestState,
   PullRequestWorkspace,
   Revision,
   TourCodeTarget,
@@ -14,11 +13,6 @@ import {
   ChevronRight,
   FileDiff,
   FolderTree,
-  GitMerge,
-  GitPullRequest,
-  GitPullRequestClosed,
-  GitPullRequestDraft,
-  type LucideIcon,
   MessageCircle,
   PanelLeft,
   RotateCw,
@@ -71,7 +65,7 @@ import { FinishReview } from "./FinishReview"
 import { useLiveStatus } from "./liveStatus"
 import { MergePullRequest } from "./MergePullRequest"
 import { OpenPullRequestButton } from "./CommandMenu"
-import { closedAs, StatusChips } from "./PullRequestStatus"
+import { closedAs, PullRequestStateIcon, StatusChips } from "./PullRequestStatus"
 import {
   type ChangesOrder,
   readAgentReviewOnOpenAtom,
@@ -84,8 +78,7 @@ import type { AskStore } from "./useAsks"
 import { type DraftStore, useDraftCount, useDraftsLocked } from "./useDrafts"
 import { useFullFiles } from "./useFullFiles"
 import type { ReplyStore } from "./useReplies"
-import type { Reactions } from "./useReactions"
-import type { Resolutions } from "./useResolutions"
+import type { Reactions, Resolutions } from "./workspaceFeedback"
 import { type ViewedFilesStore, useViewedFiles } from "./useViewedFiles"
 import { useActions } from "./actions"
 import { useShortcuts } from "./useShortcuts"
@@ -161,8 +154,6 @@ export function Workspace(props: {
     setPendingReview(null)
 
     if (!reviewOpen) setReviewOpen(true)
-
-    setView((previous) => (previous.tab === "changes" ? previous : { ...previous, tab: "changes" }))
   }
 
   const fullFiles = useFullFiles(pullRequest.ref, revision)
@@ -346,7 +337,7 @@ export function Workspace(props: {
 
   const showInReview = (rank: number) => {
     setHotspotFocus({ rank })
-    readAgentReview()
+    setReviewOpen(true)
   }
 
   const showAll = (next: CollapseChoices["all"]) => {
@@ -368,16 +359,6 @@ export function Workspace(props: {
     if (next === "changes") returnToCurrent(tourShown !== null)
   }
 
-  const readAgentReview = () => {
-    flushSync(() => {
-      setReviewOpen(true)
-      setView((previous) => ({ ...previous, tab: "changes" }))
-    })
-
-    returnToCurrent(tourShown !== null)
-  }
-
-  const reviewShown = inChanges && reviewOpen
   const layoutKnown = tour.known && agentReview.known
 
   const agentWork = (
@@ -386,7 +367,7 @@ export function Workspace(props: {
       reading={reading}
       review={agentReview}
       onReadTour={startReading}
-      onReadReview={readAgentReview}
+      onReadReview={() => setReviewOpen(true)}
     />
   )
 
@@ -402,11 +383,11 @@ export function Workspace(props: {
     },
     agentReview.review !== null && {
       id: "agent-review",
-      title: reviewShown ? "Close the Agent review" : "Open the Agent review",
+      title: reviewOpen ? "Close the Agent review" : "Open the Agent review",
       group: "Pull request",
       icon: Sparkles,
       shortcut: { key: "d", mod: true, allowInEditable: true },
-      run: () => (reviewShown ? setReviewOpen(false) : readAgentReview()),
+      run: () => setReviewOpen((open) => !open),
     },
   ])
 
@@ -575,7 +556,7 @@ export function Workspace(props: {
               <div className="flex flex-col gap-8 px-6 py-8">
                 <AgentReviewCard
                   controls={agentReview}
-                  onRead={readAgentReview}
+                  onRead={() => setReviewOpen(true)}
                   onReadHotspot={showInReview}
                 />
                 <Description html={pullRequest.descriptionHtml} />
@@ -600,7 +581,7 @@ export function Workspace(props: {
               all={all}
               onAllChange={showAll}
               tourOrder={reading === null ? null : { current: chosenOrder, onChange: showOrder }}
-              fullScreen={{ on: fullScreen, onChange: setFullScreen }}
+              expand={{ label: "Full screen", on: fullScreen, onChange: setFullScreen }}
               agentWork={fullScreen && agentWork}
             />
             {tourShown !== null ? (
@@ -655,7 +636,19 @@ export function Workspace(props: {
               )
             )}
           </TabsContent>
-          {reviewShown && agentReview.review !== null && (
+          <TabsContent value="files" keepMounted className="flex min-w-0">
+            {browsed && (
+              <RepositoryBrowser
+                key={revisionKey}
+                pullRequest={pullRequest.ref}
+                revision={revision}
+                changedFiles={files}
+                path={repositoryFile}
+                onSelect={(path) => setView((previous) => ({ ...previous, repositoryFile: path }))}
+              />
+            )}
+          </TabsContent>
+          {reviewOpen && agentReview.review !== null && (
             <AgentReviewSidePanel onClose={() => setReviewOpen(false)}>
               <AgentReviewPanel
                 review={agentReview.review}
@@ -672,18 +665,6 @@ export function Workspace(props: {
               />
             </AgentReviewSidePanel>
           )}
-          <TabsContent value="files" keepMounted className="flex min-w-0">
-            {browsed && (
-              <RepositoryBrowser
-                key={revisionKey}
-                pullRequest={pullRequest.ref}
-                revision={revision}
-                changedFiles={files}
-                path={repositoryFile}
-                onSelect={(path) => setView((previous) => ({ ...previous, repositoryFile: path }))}
-              />
-            )}
-          </TabsContent>
         </div>
       )}
     </Tabs>
@@ -755,7 +736,7 @@ function PullRequestHeader(props: {
     <header className="flex flex-col border-b px-4">
       <div className="flex h-11 items-center gap-2">
         <BackToPullRequests onBack={props.onBack} disabled={props.busy} iconOnly />
-        <StateIcon pullRequest={pullRequest} />
+        <PullRequestStateIcon pullRequest={pullRequest} />
         <h1 className="min-w-0 truncate text-base font-semibold tracking-tight">
           {pullRequest.title} <span className="font-normal text-muted-foreground">#{number}</span>
         </h1>
@@ -812,30 +793,6 @@ function PullRequestHeader(props: {
         </div>
       </div>
     </header>
-  )
-}
-
-const states: Record<
-  PullRequestState,
-  { readonly label: string; readonly icon: LucideIcon; readonly className: string }
-> = {
-  open: { label: "Open", icon: GitPullRequest, className: "bg-emerald-600 text-white" },
-  draft: { label: "Draft", icon: GitPullRequestDraft, className: "bg-zinc-500 text-white" },
-  closed: { label: "Closed", icon: GitPullRequestClosed, className: "bg-red-600 text-white" },
-  merged: { label: "Merged", icon: GitMerge, className: "bg-violet-600 text-white" },
-}
-
-function StateIcon(props: { pullRequest: PullRequest }) {
-  const { label, icon: Icon, className } = states[props.pullRequest.state]
-
-  return (
-    <TooltipHint content={label}>
-      <span
-        className={cn("flex size-5 shrink-0 items-center justify-center rounded-full", className)}
-      >
-        <Icon aria-label={label} className="size-3" />
-      </span>
-    </TooltipHint>
   )
 }
 

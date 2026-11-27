@@ -1,10 +1,4 @@
-import {
-  type Appearance,
-  type ColorScheme,
-  ColorSchemePreference,
-  Layout,
-  Theme,
-} from "@glass/contracts"
+import { type Appearance, type ColorScheme, ColorSchemePreference, Theme } from "@glass/contracts"
 import { useAtom } from "@effect/atom-react"
 import { Option, Schema } from "effect"
 import { Atom } from "effect/reactivity"
@@ -13,12 +7,9 @@ const themeKey = "glass.theme"
 
 const colorSchemeKey = "glass.colorScheme"
 
-const layoutKey = "glass.layout"
-
 const appearanceAtom = Atom.writable(savedAppearance, (ctx, appearance: Appearance) => {
   localStorage.setItem(themeKey, appearance.theme)
   localStorage.setItem(colorSchemeKey, appearance.colorScheme)
-  localStorage.setItem(layoutKey, appearance.layout)
   ctx.setSelf(appearance)
 }).pipe(Atom.keepAlive)
 
@@ -29,13 +20,11 @@ export function savedAppearance(): Appearance {
   return {
     theme: saved(themeKey, Theme, "glass"),
     colorScheme: saved(colorSchemeKey, ColorSchemePreference, "system"),
-    layout: saved(layoutKey, Layout, "classic"),
   }
 }
 
 export function applyAppearance(appearance: Appearance) {
   document.documentElement.dataset.theme = appearance.theme
-  document.documentElement.dataset.layout = appearance.layout
 
   return window.glass.setAppearance(appearance)
 }
@@ -84,6 +73,5 @@ export function useAppearance() {
     ...appearance,
     setTheme: (theme: Theme) => change({ ...appearance, theme }),
     setColorScheme: (colorScheme: ColorSchemePreference) => change({ ...appearance, colorScheme }),
-    setLayout: (layout: Layout) => change({ ...appearance, layout }),
   }
 }

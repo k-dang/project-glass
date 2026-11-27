@@ -1,5 +1,4 @@
 import { RegistryContext, useAtom, useAtomValue } from "@effect/atom-react"
-import type { Layout } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import {
@@ -31,12 +30,11 @@ import { type Action, useActions } from "./actions"
 import { CommandMenu } from "./CommandMenu"
 import { useStartThread } from "./threadsArea"
 import { ConfirmationDialog } from "./ConfirmationDialog"
-import { ConnectionAvatar } from "./ConnectionAvatar"
 import { ConnectionMenu } from "./ConnectionMenu"
 import { globalChatOpenAtom, globalUnseenAtom } from "./globalChat"
 import { HistoryNav } from "./HistoryNav"
-import { NeedsYouBadge } from "./NeedsYouCount"
-import { threadsNeedingYouAtom, needsYouCount as countOf, watchedNeedsYouAtom } from "./needsYou"
+import { InboxBadge } from "./InboxCount"
+import { inboxCountAtom, threadsInInboxAtom } from "./inboxArea"
 import {
   confirmLeave,
   discardPromptAtom,
@@ -44,33 +42,14 @@ import {
   listSearchAtom,
   reviewsLinkAtom,
 } from "./reviewsArea"
-import {
-  ResourceUsage,
-  TitleStripResourceUsage,
-  titleStripResourceUsageAtom,
-} from "./ResourceUsage"
-import { ShellPanelSlot } from "./shellPanelSlot"
-import { ShortcutsButton, ShortcutsDialog } from "./ShortcutsDialog"
-import { useAppearance } from "./theme"
+import { RailResourceUsage, railResourceUsageAtom } from "./ResourceUsage"
+import { ShellPanelSlot, ShellTitleSlot, useShellSlot } from "./shellSlots"
+import { ShortcutsDialog } from "./ShortcutsDialog"
 
-const classicRailLink =
-  "relative flex size-8 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent aria-[current=page]:text-accent-foreground aria-[current=page]:before:absolute aria-[current=page]:before:-left-2 aria-[current=page]:before:h-3 aria-[current=page]:before:w-0.5 aria-[current=page]:before:rounded-full aria-[current=page]:before:bg-foreground aria-pressed:bg-accent aria-pressed:text-accent-foreground"
-
-const insetRailLink =
+const railLink =
   "relative flex size-9 items-center justify-center rounded-lg text-muted-foreground outline-none hover:bg-black/5 hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-black/[0.07] aria-[current=page]:text-foreground aria-pressed:bg-black/[0.07] aria-pressed:text-foreground dark:hover:bg-white/5 dark:aria-[current=page]:bg-white/10 dark:aria-pressed:bg-white/10"
 
 type AreaLabel = "Dashboard" | "Inbox" | "Reviews" | "To-dos" | "Threads" | "Activity" | "Settings"
-
-interface RailStyle {
-  readonly link: string
-  readonly bottomFrom: AreaLabel
-  readonly connection: ComponentType
-}
-
-const railStyles = {
-  classic: { link: classicRailLink, bottomFrom: "Settings", connection: ConnectionAvatar },
-  inset: { link: insetRailLink, bottomFrom: "Activity", connection: ConnectionMenu },
-} satisfies Record<Layout, RailStyle>
 
 interface Area {
   readonly label: AreaLabel
@@ -117,7 +96,6 @@ export function AppShell() {
   const startThread = useStartThread()
   const [chatting, setChatting] = useAtom(globalChatOpenAtom)
   const [GlobalChatDialog, setGlobalChatDialog] = useState<ComponentType>()
-  const { layout } = useAppearance()
 
   const current = useMatch({ from: "/reviews/$owner/$repo/$number", shouldThrow: false })?.params
 
@@ -169,31 +147,11 @@ export function AppShell() {
       leavesPullRequest(registry, next) && !(await confirmLeave(registry)),
   })
 
-  const rail = (
-    <AreaRail
-      areas={areas}
-      chatting={chatting}
-      onToggleChatting={toggleChatting}
-      style={railStyles[layout]}
-    />
-  )
-
-  const page = (
-    <>
-      <Reconnecting />
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <Outlet />
-      </div>
-    </>
-  )
-
   return (
     <div className="relative flex h-screen flex-col overflow-clip">
-      {layout === "inset" ? (
-        <InsetFrame rail={rail}>{page}</InsetFrame>
-      ) : (
-        <ClassicFrame rail={rail}>{page}</ClassicFrame>
-      )}
+      <Frame
+        rail={<AreaRail areas={areas} chatting={chatting} onToggleChatting={toggleChatting} />}
+      />
       {GlobalChatDialog && <GlobalChatDialog />}
       <CommandMenu
         current={current}
@@ -215,40 +173,11 @@ export function AppShell() {
   )
 }
 
-function ClassicFrame(props: { rail: ReactNode; children: ReactNode }) {
-  return (
-    <>
-      <div className="title-strip flex shrink-0 items-center border-b pr-2 pl-[calc(env(titlebar-area-x,0px)+0.75rem)]">
-        <HistoryNav />
-      </div>
-      <div className="flex min-h-0 flex-1">
-        <aside className="flex w-12 shrink-0 flex-col items-center gap-4 border-r bg-muted/40 py-3">
-          <TooltipHint content="Glass" side="right">
-            <div className="flex h-8 items-center">
-              <GlassMark />
-              <span className="sr-only">Glass</span>
-            </div>
-          </TooltipHint>
-          {props.rail}
-        </aside>
-        <div className="flex min-w-0 flex-1 flex-col">
-          {props.children}
-          <footer className="flex h-7 shrink-0 items-center justify-end gap-1 border-t bg-muted/20 px-3">
-            <ShortcutsButton />
-            <ResourceUsage />
-          </footer>
-        </div>
-      </div>
-    </>
-  )
-}
+function Frame(props: { rail: ReactNode }) {
+  const showsResourceUsage = useAtomValue(railResourceUsageAtom)
 
-function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
-  const showsResourceUsage = useAtomValue(titleStripResourceUsageAtom)
-
-  const [panelSlot] = useState(() =>
-    Object.assign(document.createElement("div"), { className: "contents" }),
-  )
+  const [panelSlot, attachPanelSlot] = useShellSlot()
+  const [titleSlot, attachTitleSlot] = useShellSlot()
 
   return (
     <div className="flex min-h-0 flex-1 bg-chrome">
@@ -262,20 +191,23 @@ function InsetFrame(props: { rail: ReactNode; children: ReactNode }) {
           </TooltipHint>
         </div>
         {props.rail}
+        {showsResourceUsage && <RailResourceUsage />}
       </aside>
-      <div
-        ref={(node) => {
-          if (node !== null && panelSlot.parentNode !== node) node.append(panelSlot)
-        }}
-        className="contents"
-      />
+      <div ref={attachPanelSlot} className="contents" />
       <div className="flex min-w-0 flex-1 flex-col">
         <div className="title-strip title-strip-clear-controls flex shrink-0 items-center pl-[max(0px,calc(env(titlebar-area-x,0px)-3.5rem))]">
           <HistoryNav />
-          {showsResourceUsage && <TitleStripResourceUsage />}
+          <div ref={attachTitleSlot} className="contents" />
         </div>
         <div className="mr-2 mb-2 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background shadow-sm">
-          <ShellPanelSlot value={panelSlot}>{props.children}</ShellPanelSlot>
+          <ShellPanelSlot value={panelSlot}>
+            <ShellTitleSlot value={titleSlot}>
+              <Reconnecting />
+              <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+                <Outlet />
+              </div>
+            </ShellTitleSlot>
+          </ShellPanelSlot>
         </div>
       </div>
     </div>
@@ -286,12 +218,11 @@ function AreaRail(props: {
   areas: ReadonlyArray<Area>
   chatting: boolean
   onToggleChatting: () => void
-  style: RailStyle
 }) {
-  const needsYouBadgeId = useId()
-  const needsYouCount = countOf(useAtomValue(watchedNeedsYouAtom))
-  const threadsNeedYouId = useId()
-  const threadsNeedYou = useAtomValue(threadsNeedingYouAtom).size > 0
+  const inboxBadgeId = useId()
+  const inboxWaiting = Option.getOrElse(useAtomValue(inboxCountAtom), () => 0)
+  const threadsInInboxId = useId()
+  const threadsInInbox = useAtomValue(threadsInInboxAtom).size > 0
   const unseen = Option.getOrNull(AsyncResult.value(useAtomValue(globalUnseenAtom)))
   const unread = unseen !== null && !props.chatting
 
@@ -305,23 +236,25 @@ function AreaRail(props: {
               activeOptions={{ includeSearch: false }}
               aria-label={label}
               aria-describedby={
-                label === "Inbox" && Option.isSome(needsYouCount) && needsYouCount.value > 0
-                  ? needsYouBadgeId
-                  : label === "Threads" && threadsNeedYou
-                    ? threadsNeedYouId
+                label === "Inbox" && inboxWaiting > 0
+                  ? inboxBadgeId
+                  : label === "Threads" && threadsInInbox
+                    ? threadsInInboxId
                     : undefined
               }
               aria-keyshortcuts={`Meta+${index + 1} Control+${index + 1}`}
-              className={cn(props.style.link, label === props.style.bottomFrom && "mt-auto")}
+              className={cn(railLink, label === "Activity" && "mt-auto")}
             >
               <Icon className="size-4" aria-hidden />
-              {label === "Inbox" && <NeedsYouBadge id={needsYouBadgeId} />}
-              {label === "Threads" && threadsNeedYou && (
+              {label === "Inbox" && inboxWaiting > 0 && (
+                <InboxBadge id={inboxBadgeId} count={inboxWaiting} />
+              )}
+              {label === "Threads" && threadsInInbox && (
                 <span
-                  id={threadsNeedYouId}
+                  id={threadsInInboxId}
                   className="absolute top-1 right-1 size-2 rounded-full bg-primary"
                 >
-                  <span className="sr-only">Needs you</span>
+                  <span className="sr-only">In your Inbox</span>
                 </span>
               )}
             </Link>
@@ -334,7 +267,7 @@ function AreaRail(props: {
           aria-label="Global chat"
           aria-pressed={props.chatting}
           aria-keyshortcuts="Meta+J Control+J"
-          className={props.style.link}
+          className={railLink}
           onClick={props.onToggleChatting}
         >
           <MessagesSquare className="size-4" aria-hidden />
@@ -345,7 +278,7 @@ function AreaRail(props: {
           )}
         </button>
       </TooltipHint>
-      <props.style.connection />
+      <ConnectionMenu />
     </>
   )
 }

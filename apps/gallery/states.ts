@@ -62,7 +62,11 @@ const demoRows = (list: Locator) => list.getByRole("link").filter({ hasNotText: 
 
 const markers = /Finished|Working|Waiting on you|Failed|Interrupted/
 
-const listRow = (name: string, row: (list: Locator) => Locator): State => {
+const listRow = (
+  name: string,
+  row: (list: Locator) => Locator,
+  setUp?: (window: Page) => Promise<void>,
+): State => {
   const found = (window: Page) =>
     row(window.getByRole("navigation", { name: "Threads list" })).first()
 
@@ -73,9 +77,23 @@ const listRow = (name: string, row: (list: Locator) => Locator): State => {
     focusPadding: 0,
     reach: async (window) => {
       await threadsList(window)
+      await setUp?.(window)
       await found(window).scrollIntoViewIfNeeded()
     },
   }
+}
+
+const finishedRows = (list: Locator) =>
+  list.getByRole("link", { description: /Finished/ }).filter({ hasNotText: REPLAYED_PREFIX })
+
+const workingRow = (list: Locator) =>
+  list.getByRole("link", { name: "demo/keeps-working", exact: true })
+
+const openRow = async (window: Page, row: (list: Locator) => Locator) => {
+  const list = await threadsList(window)
+  const href = await row(list).getAttribute("href")
+  await row(list).click()
+  await list.locator(`a[href="${href}"][aria-current="page"]`).waitFor()
 }
 
 const thread = async (window: Page, status: RegExp) => {
@@ -299,9 +317,7 @@ export const states: ReadonlyArray<State> = [
       await demoRows(list).last().scrollIntoViewIfNeeded()
     },
   },
-  listRow("Finished", (list) =>
-    list.getByRole("link", { description: /Finished/ }).filter({ hasNotText: REPLAYED_PREFIX }),
-  ),
+  listRow("Finished", finishedRows),
   listRow("Working", (list) => list.getByRole("link", { description: /Working/ })),
   listRow("Waiting on you", (list) => list.getByRole("link", { description: /Waiting on you/ })),
   listRow("Failed", (list) =>
@@ -350,16 +366,20 @@ export const states: ReadonlyArray<State> = [
       window.getByRole("navigation", { name: "Threads list" }).locator('a[aria-current="page"]'),
     focusPadding: 0,
     reach: async (window) => {
-      const list = await threadsList(window)
-      await demoRows(list).first().click()
-      await list.locator('a[aria-current="page"]').waitFor()
+      await openRow(window, workingRow)
       await window.mouse.move(0, 0)
     },
   },
-  listRow("Seen", (list) =>
-    demoRows(list)
-      .and(list.locator('a:not([aria-current="page"])'))
-      .filter({ hasNotText: markers }),
+  listRow(
+    "Seen",
+    (list) =>
+      demoRows(list)
+        .and(list.locator('a:not([aria-current="page"])'))
+        .filter({ hasNotText: markers }),
+    async (window) => {
+      await openRow(window, (list) => finishedRows(list).last())
+      await openRow(window, workingRow)
+    },
   ),
   {
     area: "Threads",

@@ -1,6 +1,6 @@
 # Fake Sandboxes
 
-A Sandbox provider Plugin (ADR 0010) for trying the plugin system without a Sandbox platform. Each
+A Sandbox provider Plugin (ADR 0011) for trying the plugin system without a Sandbox platform. Each
 "Sandbox" is a folder under the system's temp folder: the Plugin clones the repository there and
 runs the agent host on this device, with `claude.mjs`, a fake Claude Code, in place of the real
 one. The seam it implements is `@glass/plugin`. To build a provider for your own platform, paste
@@ -28,3 +28,6 @@ keeps its data in a fresh temp folder, so it won't see the Plugin; use `pnpm dev
 Its Sandboxes run only Claude Code, offering its models and efforts. Their Threads answer every
 message with "Fake reply from <model> at <effort> effort to: …" and need no login. Cloning uses your
 own git credentials.
+
+A real provider's `startHost` ends a host that still runs. This one only waits for the host Glass
+asked to end to free its port, so it never signals a process on your device.

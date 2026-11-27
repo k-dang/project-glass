@@ -1,11 +1,6 @@
 import type { SDKMessage } from "@anthropic-ai/claude-agent-sdk"
-import { AgentStatusesChanged, type BackgroundWork } from "@glass/contracts"
-
-interface BackgroundTask {
-  readonly kind: BackgroundWork["kind"]
-  readonly description: string
-  readonly toolCallId: string | null
-}
+import { AgentStatusesChanged, type BackgroundTask, type BackgroundWork } from "@glass/contracts"
+import type { DateTime } from "effect"
 
 export interface BackgroundTasks {
   readonly unendedById: ReadonlyMap<string, BackgroundTask>
@@ -20,24 +15,32 @@ const kinds = new Map<string, BackgroundWork["kind"]>([
 ])
 
 interface TaskFrame {
+  readonly task_id: string
   readonly task_type?: string | undefined
   readonly subagent_type?: string | undefined
   readonly description: string
   readonly ambient?: boolean | undefined
 }
 
-const taskOf = (frame: TaskFrame, toolCallId: string | null): BackgroundTask | null => {
+const taskOf = (
+  frame: TaskFrame,
+  known: BackgroundTask | undefined,
+  toolUseId: string | undefined,
+  now: DateTime.Utc,
+): BackgroundTask | null => {
   const kind = kinds.get(frame.task_type ?? "")
 
   if (kind === undefined || frame.ambient === true) return null
 
   return {
+    taskId: frame.task_id,
     kind,
     description:
       kind === "subagent"
         ? `${frame.subagent_type ?? "subagent"}: ${frame.description}`
         : frame.description,
-    toolCallId,
+    toolCallId: toolUseId ?? known?.toolCallId ?? null,
+    startedAt: known?.startedAt ?? now,
   }
 }
 
@@ -46,19 +49,24 @@ interface Ended {
   readonly toolCallId: string | null
 }
 
-export interface Tracked {
+interface Tracked {
   readonly tasks: BackgroundTasks
   readonly ended: Ended | null
 }
 
 const unchanged = (tasks: BackgroundTasks): Tracked => ({ tasks, ended: null })
 
-export const trackBackgroundTasks = (tasks: BackgroundTasks, message: SDKMessage): Tracked => {
+export const trackBackgroundTasks = (
+  tasks: BackgroundTasks,
+  message: SDKMessage,
+  now: DateTime.Utc,
+): Tracked => {
   if (message.type !== "system") return unchanged(tasks)
 
   switch (message.subtype) {
     case "task_started": {
-      const task = taskOf(message, message.tool_use_id ?? null)
+      const known = tasks.unendedById.get(message.task_id)
+      const task = taskOf(message, known, message.tool_use_id, now)
 
       if (task === null) return unchanged(tasks)
 
@@ -73,7 +81,7 @@ export const trackBackgroundTasks = (tasks: BackgroundTasks, message: SDKMessage
       const runningIds: Array<string> = []
 
       for (const frame of message.tasks) {
-        const task = taskOf(frame, tasks.unendedById.get(frame.task_id)?.toolCallId ?? null)
+        const task = taskOf(frame, tasks.unendedById.get(frame.task_id), undefined, now)
 
         if (task === null) continue
 
@@ -109,21 +117,7 @@ export const trackBackgroundTasks = (tasks: BackgroundTasks, message: SDKMessage
   }
 }
 
-const statusOf = (kind: BackgroundWork["kind"], running: ReadonlyArray<BackgroundTask>) => {
-  const descriptions = running.flatMap((task) => (task.kind === kind ? [task.description] : []))
-
-  if (descriptions.length === 0) return []
-
-  const counted = descriptions.length === 1 ? `a ${kind}` : `${descriptions.length} ${kind}s`
-
-  return [`Running ${counted}: ${descriptions.join(", ")}`]
-}
-
-export const backgroundActivity = (tasks: BackgroundTasks) => {
-  const running = tasks.runningIds.flatMap((id) => tasks.unendedById.get(id) ?? [])
-
-  return AgentStatusesChanged.make({
-    agentStatuses: [...statusOf("subagent", running), ...statusOf("command", running)],
-    backgroundToolCalls: running.flatMap((task) => task.toolCallId ?? []),
+export const backgroundActivity = (tasks: BackgroundTasks) =>
+  AgentStatusesChanged.make({
+    backgroundTasks: tasks.runningIds.flatMap((id) => tasks.unendedById.get(id) ?? []),
   })
-}

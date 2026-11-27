@@ -28,7 +28,7 @@ import {
   Attention,
   type Candidate,
   type CandidatesPage,
-  type CheckObservation,
+  type PullRequestObservation,
 } from "./github/repositoryPullRequests"
 import { ServerConfig } from "./ServerConfig"
 
@@ -103,7 +103,7 @@ export const mirrorOf = (mirror: Mirror, repository: FollowedRepository) =>
 const newestFirst = (pullRequests: ReadonlyArray<MirroredPullRequest>) =>
   Arr.sortWith(pullRequests, (pr) => pr.updatedAt, Order.flip(DateTime.Order))
 
-export interface Synced {
+interface Synced {
   readonly mirror: Mirror
   readonly failures: ReadonlyMap<string, GitHubUnavailable>
 }
@@ -262,12 +262,14 @@ export class PullRequestMirror extends Context.Service<
         mirror: Mirror,
         shown: ReadonlyArray<MirroredPullRequest>,
       ) {
-        const latestChecks = github.pullRequestChecks(shown.map((pr) => pr.id)).pipe(
-          Effect.tapError((error) => Effect.logWarning("Couldn't read PR checks", error)),
+        const latestObservations = github.pullRequestObservations(shown.map((pr) => pr.id)).pipe(
+          Effect.tapError((error) =>
+            Effect.logWarning("Couldn't read PR states and checks", error),
+          ),
           Effect.match({
-            onSuccess: (checks) => ({ checks, problem: null }),
+            onSuccess: (observations) => ({ observations, problem: null }),
             onFailure: (error) => ({
-              checks: new Map<string, CheckObservation>(),
+              observations: new Map<string, PullRequestObservation>(),
               problem: new GitHubUnavailable({
                 message: `Checks couldn't refresh. ${error.message}`,
               }),
@@ -275,9 +277,12 @@ export class PullRequestMirror extends Context.Service<
           }),
         )
 
-        const [result, attention] = yield* Effect.all([latestChecks, latestAttention(shown)], {
-          concurrency: "unbounded",
-        })
+        const [result, attention] = yield* Effect.all(
+          [latestObservations, latestAttention(shown)],
+          {
+            concurrency: "unbounded",
+          },
+        )
 
         const shownRepositories = new Set(shown.map((pr) => repositoryKey(pr.ref)))
         const problem = result.problem
@@ -287,12 +292,19 @@ export class PullRequestMirror extends Context.Service<
             ...mirror,
             repositories: mirror.repositories.map((repository) => ({
               ...repository,
-              pullRequests: repository.pullRequests.map((pr) => {
-                return {
-                  ...pr,
-                  ...result.checks.get(pr.id),
-                  attention: attention.get(pr.id) ?? pr.attention,
-                }
+              pullRequests: repository.pullRequests.flatMap((pr) => {
+                const observed = result.observations.get(pr.id)
+
+                return observed?.isOpen === false
+                  ? []
+                  : [
+                      {
+                        ...pr,
+                        head: observed?.head ?? pr.head,
+                        checks: observed?.checks ?? pr.checks,
+                        attention: attention.get(pr.id) ?? pr.attention,
+                      },
+                    ]
               }),
             })),
           } satisfies Mirror,

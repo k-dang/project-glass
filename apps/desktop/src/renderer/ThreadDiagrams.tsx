@@ -91,7 +91,7 @@ export function DiagramPane(props: { diagram: Diagram; onClose: () => void }) {
       onClose={props.onClose}
     >
       <p className="px-5 pt-3 text-xs text-muted-foreground">{kindLabel[props.diagram.kind]}</p>
-      <MermaidDiagram source={props.diagram.mermaid} zoomable className="m-4 min-h-0 flex-1" />
+      <MermaidDiagram source={props.diagram.mermaid} zoom="always" className="m-4 min-h-0 flex-1" />
     </SidePanel>
   )
 }

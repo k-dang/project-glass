@@ -2,6 +2,7 @@ import { NodeServices } from "@effect/platform-node"
 import type { EngineModels } from "@glass/contracts"
 import { Effect, Schema } from "effect"
 import { ChildProcessSpawner } from "effect/process"
+import { spawnSync } from "node:child_process"
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import { delimiter, dirname, join, resolve } from "node:path"
@@ -37,7 +38,9 @@ const { values } = parseArgs({
   },
 })
 
-if (values.help || values["pi-model"] === undefined) {
+const pnpmPath = process.env["npm_execpath"]
+
+if (values.help || values["pi-model"] === undefined || pnpmPath === undefined) {
   console.log(USAGE)
   process.exit(values.help ? 0 : 1)
 }
@@ -137,3 +140,9 @@ const record = async (scenario: RunnerScenario) => {
 
 for (const scenario of runnerScenarios)
   if (values.only === undefined || values.only === scenario.name) await record(scenario)
+
+process.exit(
+  spawnSync(process.execPath, [pnpmPath, "exec", "vp", "fmt", "test/recordings/runners"], {
+    stdio: "inherit",
+  }).status ?? 1,
+)

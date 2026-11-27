@@ -14,12 +14,13 @@ import {
   useRef,
   useState,
 } from "react"
+import { DialogTrigger } from "@ui-sdk/react/dialog"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
 import { fileName } from "./fileName"
 import { ProblemAlert } from "./ProblemAlert"
-import { PageWithNotes } from "./PageNotes"
 import { problemOf } from "./problems"
+import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { imageSrc } from "./pastedImages"
 import { FileContentsView } from "./RepositoryBrowser"
 import { SidePanel } from "./SidePanel"
@@ -229,30 +230,32 @@ function LoadedImage(props: { links: FileLinksValue; path: string; alt: string }
   const atom = threadFileAtom(new FileKey({ threadId: links.threadId, path }))
   const result = useAtomValue(atom)
   const file = AsyncResult.isFailure(result) ? null : Option.getOrNull(AsyncResult.value(result))
+  const [viewer] = useState(createImageViewer)
 
   useRereadWhenTurnEnds(atom, links.lastEnded)
 
   if (file?._tag !== "ImageFile") return <ImageAlt text={props.alt} />
 
-  const image = (
-    <img
-      src={imageSrc(file.mediaType, file.data)}
-      alt={props.alt}
-      className="max-h-96 max-w-full rounded-md border"
-    />
-  )
+  const src = imageSrc(file.mediaType, file.data)
+  const image = <img src={src} alt={props.alt} className="max-h-96 max-w-full rounded-md border" />
 
   return insideLink ? (
     image
   ) : (
-    <button
-      type="button"
-      title={`Open ${path}`}
-      className="block cursor-pointer"
-      onClick={() => links.open(path)}
-    >
-      {image}
-    </button>
+    <>
+      <DialogTrigger
+        controller={viewer}
+        payload={{
+          images: [{ src, name: props.alt }],
+          index: 0,
+        }}
+        title={path}
+        className="block cursor-zoom-in"
+      >
+        {image}
+      </DialogTrigger>
+      <ImageViewer controller={viewer} />
+    </>
   )
 }
 
@@ -305,7 +308,7 @@ export const FilePane = memo(function FilePane(props: {
             <ProblemAlert problem={problemOf(cause)} action={{ label: "Try again", run: retry }} />
           </div>
         ))
-        .onSuccess((file) => <FileView threadId={props.threadId} path={props.path} file={file} />)
+        .onSuccess((file) => <FileView path={props.path} file={file} />)
         .render()}
     </SidePanel>
   )
@@ -313,7 +316,9 @@ export const FilePane = memo(function FilePane(props: {
 
 const extension = (path: string) => /\.([^./\\]+)$/.exec(path)?.[1]?.toLowerCase() ?? ""
 
-function FileView(props: { threadId: string; path: string; file: ThreadFile }) {
+export const isHtmlFile = (path: string) => ["html", "htm"].includes(extension(path))
+
+function FileView(props: { path: string; file: ThreadFile }) {
   const { path, file } = props
 
   return Match.value(file).pipe(
@@ -325,15 +330,6 @@ function FileView(props: { threadId: string; path: string; file: ThreadFile }) {
       ),
       TextFile: (text) =>
         Match.value(extension(path)).pipe(
-          Match.when(Match.is("html", "htm"), () => (
-            <PageWithNotes
-              key={`${path}
-${text.text}`}
-              threadId={props.threadId}
-              path={path}
-              html={text.text}
-            />
-          )),
           Match.when(Match.is("md", "markdown"), () => (
             <AgentReviewMarkdown
               markdown={text.text}

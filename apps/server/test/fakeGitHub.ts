@@ -30,12 +30,12 @@ import { startFakeGitRemote, type TrafficMeter, trafficMeter } from "./fakeGitRe
 import { gitBasicAuthorization } from "../src/gitEnv.ts"
 import { blobSha, type FakeFiles, fakeRepositories } from "./fakeRepositories.ts"
 
-export interface FakeGraphQLError {
+interface FakeGraphQLError {
   readonly type: string
   readonly message: string
 }
 
-export type FakeFailure = number | "disconnect"
+type FakeFailure = number | "disconnect"
 
 const PullRequestVariables = Schema.Struct({
   owner: Schema.String,
@@ -476,6 +476,7 @@ export interface FakeGitHub {
   readonly gitTraffic: TrafficMeter
   readonly unavailableRepositories: Set<string>
   readonly timingOutRepositories: Set<string>
+  readonly unindexedPullRequests: Set<string>
   readonly gitRefusedRepositories: Set<string>
   readonly graphQLRequests: ReadonlyArray<FakeGraphQLRequest>
 }
@@ -501,6 +502,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
   const pullRequests: Array<FakePullRequest> = []
   const unavailableRepositories = new Set<string>()
   const timingOutRepositories = new Set<string>()
+  const unindexedPullRequests = new Set<string>()
   const gitRefusedRepositories = new Set<string>()
 
   const repositories = fakeRepositories()
@@ -933,11 +935,15 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
 
       case "RepositoryPullRequests":
       case "SearchPullRequests":
-      case "PullRequestChecks":
+      case "PullRequestObservations":
       case "PullRequestAttention":
       case "QueuedPullRequests":
       case "EndedBranchPullRequests":
-        return answerListing(request, pullRequests, unavailableRepositories, timingOutRepositories)
+        return answerListing(request, pullRequests, {
+          unavailableRepositories,
+          timingOutRepositories,
+          unindexedPullRequests,
+        })
 
       case "PullRequestStatus": {
         const pr = pullRequestById(request.variables.id)
@@ -1229,6 +1235,7 @@ export const startFakeGitHub = Effect.fnUntraced(function* (options: FakeGitHubO
     gitTraffic,
     unavailableRepositories,
     timingOutRepositories,
+    unindexedPullRequests,
     gitRefusedRepositories,
     graphQLRequests,
   }

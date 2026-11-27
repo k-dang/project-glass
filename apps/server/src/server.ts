@@ -1,7 +1,7 @@
 import { NodeHttpServer, NodeServices } from "@effect/platform-node"
 import { GlassRpcs, RPC_PATH, TOKEN_PARAM } from "@glass/contracts"
 import { Effect, type FileSystem, Layer } from "effect"
-import { HttpRouter, HttpServerResponse, UrlParams } from "effect/http"
+import { HttpRouter, HttpServer, HttpServerResponse, UrlParams } from "effect/http"
 import type { ChildProcessSpawner } from "effect/process"
 import { RpcSerialization, RpcServer } from "effect/rpc"
 import { createServer } from "node:http"
@@ -9,14 +9,19 @@ import { RendererAccess } from "./access"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
+import { BrowserPages } from "./BrowserPages"
 import { CheckoutRuns } from "./CheckoutRuns"
 import { Checkouts } from "./Checkouts"
 import { CompleteToDosOnMerge } from "./CompleteToDosOnMerge"
 import { ThreadPullRequests } from "./ThreadPullRequests"
+import { ThreadFileRoutes } from "./threadFilesHttp"
+import { VisualizationRoutes } from "./visualizationsHttp"
+import { Visualizations } from "./Visualizations"
 import { Threads } from "./Threads"
 import { ThreadTurns } from "./ThreadTurns"
 import { FeedbackNotes } from "./FeedbackNotes"
 import { DatabaseLive } from "./Database"
+import { reportReady } from "./desktopMain"
 import { Changes } from "./Changes"
 import { CheckIns } from "./CheckIns"
 import { Git } from "./git"
@@ -36,7 +41,7 @@ import { McpOAuth } from "./mcp/McpOAuth"
 import { OAuthRoutes } from "./mcp/oauthHttp"
 import { GlassMcpTools, McpRoutes } from "./mcp/server"
 import { OutsideAgents } from "./OutsideAgents"
-import { NeedsYou } from "./NeedsYou"
+import { Inbox } from "./Inbox"
 import { OutsideQuestions } from "./OutsideQuestions"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
@@ -60,6 +65,8 @@ import { StartedWorkUpdates } from "./StartedWorkUpdates"
 const RendererRoutes = Layer.mergeAll(
   RpcServer.layerHttp({ group: GlassRpcs, path: RPC_PATH, protocol: "websocket" }),
   HttpRouter.add("GET", "/health", HttpServerResponse.empty()),
+  ThreadFileRoutes,
+  VisualizationRoutes,
 ).pipe(Layer.provide(RendererAccess.layer))
 
 // WARNING: server.close only drops the connections idle when it is called. One still answering stays open until its client lets go, so drop each as its response ends.
@@ -123,19 +130,19 @@ const services = (
 ) =>
   Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge)
     .pipe(
-      Layer.provide(NeedsYou.layer),
+      Layer.provide(Inbox.layer),
       Layer.provide(SettledThreads.layer.pipe(Layer.provideMerge(ThreadPullRequests.layer))),
       Layer.provide(StartedWork.layer),
       Layer.provide(PullRequestLists.layer),
       Layer.provide(PullRequestMirror.layer),
       Layer.provide(ToDos.layer),
       Layer.provide(SavedPlaces.layer),
-      Layer.provide(Queue.layer),
       Layer.provide(PullRequestWorkspaces.layer),
+      Layer.provide(Queue.layer),
       Layer.provide(Tours.layer),
       Layer.provide(AgentReviews.layer),
       Layer.provide(Asks.layer),
-      Layer.provide(ThreadsLive),
+      Layer.provideMerge(Visualizations.layer.pipe(Layer.provideMerge(ThreadsLive))),
       Layer.provideMerge(SkillPacks.layer),
       Layer.provideMerge(LocalSkills.layer),
       Layer.provide(Plugins.layer),
@@ -149,6 +156,7 @@ const services = (
     .pipe(
       Layer.provide(BranchNames.layer),
       Layer.provide(agentRunners),
+      Layer.provide(BrowserPages.layer),
       Layer.provide(agentCommands),
       Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
       Layer.provideMerge(OutsideAgents.layer),
@@ -175,12 +183,14 @@ const releaseAskers = Layer.effectDiscard(
   }),
 )
 
+const reportListening = Layer.effectDiscard(HttpServer.HttpServer.pipe(Effect.andThen(reportReady)))
+
 export const serve = (
   agentRunners: AgentRunnersLayer,
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer = AgentCommands.layer,
 ) =>
-  releaseAskers.pipe(
+  Layer.merge(releaseAskers, reportListening).pipe(
     Layer.provideMerge(
       HttpRouter.serve(Layer.mergeAll(RendererRoutes, McpRoutes, OAuthRoutes), {
         disableLogger: true,

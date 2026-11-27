@@ -4,7 +4,7 @@ import { HOST_PROTOCOL, type HostEvent } from "./agentHost/protocol"
 import type { GlassToolRelay, ToolCallOrigin } from "./mcp/GlassToolRelay"
 import type { HostClient } from "./Placement"
 
-export class IncompatibleHost extends Data.TaggedError("IncompatibleHost")<{
+class IncompatibleHost extends Data.TaggedError("IncompatibleHost")<{
   readonly protocol: number | null
 }> {}
 
@@ -89,7 +89,7 @@ export const followHost = (
   Effect.gen(function* () {
     const { save, alreadySaved, relay, origin, calls } = options
 
-    yield* client.OfferGlassTools({ host: position.host, tools: yield* relay.tools })
+    yield* client.OfferGlassTools({ host: position.host, tools: yield* relay.toolsFor(origin) })
 
     const toolCalls = client.WatchToolCalls({ host: position.host }).pipe(
       Stream.runForEach((call) =>

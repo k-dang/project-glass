@@ -34,6 +34,9 @@ const DEFAULT_AGENT_MODEL = MODELS.find(({ id }) => id === `vercel-ai-gateway/${
 if (DEFAULT_AGENT_MODEL === undefined)
   throw new Error(`pi-ai doesn't list ${DEFAULT_MODEL}; pick a default model it has`)
 
+// WARNING: The bracket keeps pkill from matching the shell that runs it.
+const END_HOST = `pkill -f '[n]ode ${HOST}/agent-host.mjs'; flock -w 30 ${HOST}/host.lock true`
+
 const START_HOST = `cd ${WORK} && set -a && . ${HOST}/host.env && set +a && exec flock -n ${HOST}/host.lock node ${HOST}/agent-host.mjs >> ${HOST}/host.log 2>&1`
 
 interface SandboxAddress {
@@ -185,7 +188,7 @@ const shell = async (
 }
 
 // WARNING: Not given a signal: aborting a detached command's request kills the host it started.
-const startHost = (sandbox: Sandbox) =>
+const launchHost = (sandbox: Sandbox) =>
   sandbox.runCommand({ cmd: "bash", args: ["-lc", START_HOST], detached: true })
 
 const vercelSandboxes: Plugin = (glass) => {
@@ -243,34 +246,38 @@ const vercelSandboxes: Plugin = (glass) => {
     create: async (request, { progress, record, signal }) => {
       progress("Creating the Sandbox")
 
-      const [token, bundle, identity] = await Promise.all([
-        vercelToken(),
-        readFile(request.host.bundle),
-        gitIdentity(),
-      ])
+      const [token, identity] = await Promise.all([vercelToken(), gitIdentity()])
 
       const teamId = await defaultTeam(token, signal)
       const projectId = await projectOf(token, teamId, signal)
       const address = { name: `glass-${randomUUID()}`, teamId, projectId }
       const policy = await networkPolicy(token, address, signal)
 
-      record({ ...address, port: request.host.port })
+      record({ ...address, port: request.hostPort })
+      signal.throwIfAborted()
 
+      // WARNING: Glass may have run `remove` before the Sandbox existed, so this isn't given the signal, and a Sandbox that finishes after a cancel deletes itself.
       const sandbox = await Sandbox.create({
         token,
         teamId,
         projectId,
         name: address.name,
-        ports: [request.host.port],
+        ports: [request.hostPort],
         timeout: SESSION,
         networkPolicy: policy,
-        signal,
       }).catch((error: Error) => {
         if (error instanceof APIError && error.response.status === 429)
           throw glass.noCapacity("Vercel has no room for another Sandbox right now")
 
         throw error
       })
+
+      if (signal.aborted) {
+        await sandbox.delete({ deleteOrphanSnapshots: true }).catch((error: Error) => {
+          if (!(error instanceof APIError && error.response.status === 404)) throw error
+        })
+        signal.throwIfAborted()
+      }
 
       progress("Cloning the repository")
       const { owner, repo } = request.repository
@@ -294,20 +301,8 @@ const vercelSandboxes: Plugin = (glass) => {
         },
       )
 
-      progress("Starting the agent")
-
       await sandbox.writeFiles(
         [
-          { path: `${HOST}/agent-host.mjs`, content: bundle },
-          {
-            path: `${HOST}/host.env`,
-            content: shellEnvironment({
-              ...request.host.environment,
-              AI_GATEWAY_API_KEY: PLACEHOLDER,
-              GH_TOKEN: PLACEHOLDER,
-            }),
-            mode: 0o600,
-          },
           {
             path: "/vercel/.pi/agent/settings.json",
             content: JSON.stringify({
@@ -318,7 +313,31 @@ const vercelSandboxes: Plugin = (glass) => {
         ],
         { signal },
       )
-      await startHost(sandbox)
+    },
+    startHost: async (state, host, signal) => {
+      const { sandbox: address } = decode(state)
+      const [token, bundle] = await Promise.all([vercelToken(), readFile(host.bundle)])
+      const sandbox = await missing(() => Sandbox.get({ token, ...address, signal }))
+
+      await missing(() => shell(sandbox, END_HOST, signal, {}))
+      await missing(() =>
+        sandbox.writeFiles(
+          [
+            { path: `${HOST}/agent-host.mjs`, content: bundle },
+            {
+              path: `${HOST}/host.env`,
+              content: shellEnvironment({
+                ...host.environment,
+                AI_GATEWAY_API_KEY: PLACEHOLDER,
+                GH_TOKEN: PLACEHOLDER,
+              }),
+              mode: 0o600,
+            },
+          ],
+          { signal },
+        ),
+      )
+      await missing(() => launchHost(sandbox))
     },
     target: async (state, signal) => {
       const { port, sandbox: address } = decode(state)
@@ -330,7 +349,7 @@ const vercelSandboxes: Plugin = (glass) => {
       ])
 
       await missing(() => sandbox.update({ networkPolicy: policy }, { signal }))
-      await missing(() => startHost(sandbox))
+      await missing(() => launchHost(sandbox))
 
       return { url: sandbox.domain(port), headers: {} }
     },

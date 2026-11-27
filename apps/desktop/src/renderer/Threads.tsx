@@ -7,9 +7,8 @@ import {
 } from "@effect/atom-react"
 import {
   type Thread,
-  type ThreadNeedsYou,
+  type InboxThread,
   isGone,
-  readOnlyExplanation,
   isOutOfReach,
   type PlaceTag,
   repositoryKey,
@@ -32,7 +31,17 @@ import {
   Undo2,
 } from "lucide-react"
 import { cn } from "cn"
-import { use, useContext, useId, useState } from "react"
+import {
+  createContext,
+  type RefObject,
+  use,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useId,
+  useRef,
+  useState,
+} from "react"
 import { createPortal } from "react-dom"
 import { Button, buttonVariants } from "@/components/ui/button"
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
@@ -52,17 +61,21 @@ import {
   workingThreadsAtom,
 } from "./threadsArea"
 import { AgentHarnessIcon } from "./AgentHarnessIcon"
-import { threadsNeedingYouAtom } from "./needsYou"
+import { threadsInInboxAtom } from "./inboxArea"
 import { ThreadPullRequestBadge, useThreadPullRequest } from "./ThreadPullRequest"
 import { useMinuteClock } from "./Inbox"
 import { ago } from "./PullRequestRow"
 import { turnEndingLooks, warningTone } from "./status"
 import { harnessNames } from "./harnesses"
 import { ConfirmationDialog } from "./ConfirmationDialog"
+import { ThreadName } from "./ThreadName"
+import { fadeIn } from "./fadeIn"
+import { useShift } from "./useShift"
 import { settledProblem, streamProblem } from "./problems"
 import { ProblemAlert } from "./ProblemAlert"
 import { useActions } from "./actions"
-import { ShellPanelSlot } from "./shellPanelSlot"
+import { ShellPanelSlot, useShellSlotHost } from "./shellSlots"
+import { ThreadViews } from "./ThreadView"
 import { shortcutLabel } from "./shortcutLabel"
 
 const groupNames: Record<PlaceTag, string> = { ...placeNames, sandbox: "Sandboxes" }
@@ -81,7 +94,7 @@ const workingMarker: Marker = {
   tone: "text-sky-600 dark:text-sky-400",
 }
 
-const markerOf = ({ reasons }: ThreadNeedsYou): Marker => {
+const markerOf = ({ reasons }: InboxThread): Marker => {
   const reason = reasons.find(Predicate.isTagged("WaitingRequests")) ?? reasons[0]
 
   return Match.valueTags(reason, {
@@ -99,8 +112,6 @@ const expiryFormat = new Intl.DateTimeFormat(undefined, {
 const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
   if (isGone(reach)) return `Sandbox ${reach}`
 
-  if (reach === "incompatible") return "Sandbox on another Glass version"
-
   const expiry =
     expiresAt === null ? null : `Expires ${expiryFormat.format(DateTime.toDateUtc(expiresAt))}`
 
@@ -112,37 +123,21 @@ const sandboxLine = ({ reach, expiresAt }: SandboxStatus) => {
 const threadLink =
   "flex flex-col gap-0.5 rounded-lg px-2 py-2 outline-none hover:bg-accent focus-visible:ring-2 focus-visible:ring-ring aria-[current=page]:bg-accent"
 
-const panelStyles: Record<
-  "inline" | "beside",
-  { aside: string; header: string; heading: "h1" | "h2"; title: string }
-> = {
-  inline: {
-    aside: "flex w-64 shrink-0 flex-col gap-4 border-r px-3 py-4",
-    header: "flex items-center justify-between pl-2",
-    heading: "h1",
-    title: "text-sm font-semibold",
-  },
-  beside: {
-    aside: "flex w-64 shrink-0 flex-col gap-2 pr-2 pb-2",
-    header:
-      "title-strip flex shrink-0 items-center justify-between pl-[max(0.5rem,calc(env(titlebar-area-x,0px)-3rem))]",
-    heading: "h2",
-    title: "text-base font-semibold",
-  },
-}
-
 const panelId = "threads-panel"
 
 const panelToggleId = "threads-panel-toggle"
 
 export function ThreadsLayout() {
   const [panelOpen, setPanelOpen] = useAtom(threadsPanelOpenAtom)
-  const panelSlot = use(ShellPanelSlot)
-  const styles = panelSlot === null ? panelStyles.inline : panelStyles.beside
+  const threadId = useParams({ from: "/threads/$threadId", shouldThrow: false })?.threadId ?? null
+
+  const panelSlot = useShellSlotHost(ShellPanelSlot)
 
   const togglePanel = () => {
     if (panelOpen && document.getElementById(panelId)?.contains(document.activeElement))
-      document.getElementById(panelToggleId)?.focus()
+      Array.from(document.querySelectorAll<HTMLElement>(`#${panelToggleId}`))
+        .find((toggle) => toggle.checkVisibility())
+        ?.focus()
 
     setPanelOpen((open) => !open)
   }
@@ -159,12 +154,17 @@ export function ThreadsLayout() {
   ])
 
   const panel = (
-    <aside id={panelId} aria-label="Threads panel" hidden={!panelOpen} className={styles.aside}>
-      <div className={styles.header}>
-        <styles.heading className={styles.title}>Threads</styles.heading>
+    <aside
+      id={panelId}
+      aria-label="Threads panel"
+      hidden={!panelOpen}
+      className="flex w-64 shrink-0 flex-col gap-2 pr-2 pb-2"
+    >
+      <div className="title-strip flex shrink-0 items-center justify-between pl-[max(0.5rem,calc(env(titlebar-area-x,0px)-3rem))]">
+        <h2 className="text-base font-semibold">Threads</h2>
         <NewThreadLink />
       </div>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="no-scrollbar min-h-0 flex-1 scroll-fade-y overflow-y-auto">
         <ThreadList />
       </div>
     </aside>
@@ -172,8 +172,9 @@ export function ThreadsLayout() {
 
   return (
     <main aria-label="Threads" className="flex min-h-0 flex-1">
-      {panelSlot === null ? panel : createPortal(panel, panelSlot)}
+      {createPortal(panel, panelSlot)}
       <div className="flex min-w-0 flex-1 flex-col">
+        <ThreadViews threadId={threadId} />
         <Outlet />
       </div>
     </main>
@@ -222,10 +223,7 @@ function NewThreadLink() {
       <Link
         to="/threads/new"
         aria-label="New Thread"
-        className={cn(
-          buttonVariants({ variant: "ghost", size: "icon-sm" }),
-          "[app-region:no-drag]",
-        )}
+        className={buttonVariants({ variant: "ghost", size: "icon-sm" })}
       >
         <SquarePen aria-hidden />
       </Link>
@@ -250,28 +248,77 @@ function ThreadList() {
     .onFailure((cause) => (
       <ProblemAlert problem={streamProblem(cause)} action={{ label: "Retry", run: retry }} />
     ))
-    .onSuccess((list) => {
-      const shown = list.filter((thread) => !thread.forReview)
-      const going = shown.filter(({ id }) => !settledIds.has(id))
-      const settled = shown.filter(({ id }) => settledIds.has(id))
+    .onSuccess((list) => <ThreadNav list={list} settledIds={settledIds} now={now} />)
+    .render()
+}
 
-      return shown.length === 0 ? (
+const ListMounted = createContext<RefObject<boolean>>({ current: false })
+
+function useArrival<E extends HTMLElement>(animates: boolean) {
+  const mounted = use(ListMounted)
+  const ref = useRef<E>(null)
+
+  useLayoutEffect(() => {
+    if (animates && mounted.current && ref.current !== null)
+      fadeIn(ref.current, { translate: "0 -0.375rem" }, 200)
+  }, [animates, mounted])
+
+  return ref
+}
+
+function ThreadNav(props: {
+  list: ReadonlyArray<Thread>
+  settledIds: ReadonlySet<string>
+  now: Date
+}) {
+  const { settledIds, now } = props
+  const shown = props.list.filter((thread) => !thread.forReview)
+  const mounted = useRef(false)
+  const nav = useRef<HTMLElement>(null)
+  useShift(nav)
+
+  useEffect(() => {
+    mounted.current = true
+
+    return () => {
+      mounted.current = false
+    }
+  }, [])
+
+  const going = shown.filter(({ id }) => !settledIds.has(id))
+  const settled = shown.filter(({ id }) => settledIds.has(id))
+
+  return (
+    <ListMounted value={mounted}>
+      {shown.length === 0 ? (
         <p className="px-2 text-sm text-muted-foreground">No Threads yet.</p>
       ) : (
-        <nav aria-label="Threads list" className="flex min-h-full flex-col gap-4">
+        <nav ref={nav} aria-label="Threads list" className="flex min-h-full flex-col gap-4">
           {groupThreads(going).map(({ machine, threads: onMachine }) => (
             <section key={machine} aria-label={groupNames[machine]} className="flex flex-col gap-1">
-              <h2 className="px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                {groupNames[machine]}
-              </h2>
+              <GroupHeading name={groupNames[machine]} />
               <ThreadRows threads={onMachine} now={now} settled={false} />
             </section>
           ))}
           {settled.length > 0 && <SettledSection threads={settled} now={now} />}
         </nav>
-      )
-    })
-    .render()
+      )}
+    </ListMounted>
+  )
+}
+
+function GroupHeading(props: { name: string }) {
+  const ref = useArrival<HTMLHeadingElement>(true)
+
+  return (
+    <h2
+      ref={ref}
+      data-shift-key={`group:${props.name}`}
+      className="px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase"
+    >
+      {props.name}
+    </h2>
+  )
 }
 
 function ThreadRows(props: { threads: ReadonlyArray<Thread>; now: Date; settled: boolean }) {
@@ -311,7 +358,7 @@ function SettledSection(props: { threads: ReadonlyArray<Thread>; now: Date }) {
       aria-label="Settled"
       className="mt-auto flex flex-col gap-1"
     >
-      <div className="group/settled flex items-center pr-1">
+      <div data-shift-key="settled" className="group/settled flex items-center pr-1">
         <h2 className="min-w-0 flex-1">
           <CollapsibleTrigger className="group/trigger flex w-full items-center gap-1 rounded-sm px-2 text-xs font-medium tracking-wide text-muted-foreground uppercase hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring">
             Settled
@@ -390,6 +437,7 @@ function BringBackButton(props: { thread: Thread }) {
 
 function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
   const { thread } = props
+  const arrival = useArrival<HTMLLIElement>(!props.settled)
   const navigate = useNavigate()
   const open = useParams({ strict: false }).threadId === thread.id
   const registry = useContext(RegistryContext)
@@ -409,16 +457,17 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
   const pullRequestId = useId()
   const pullRequest = useThreadPullRequest(thread.id)
 
-  const needsYou = useAtomValue(threadsNeedingYouAtom).get(thread.id)
+  const inboxThread = useAtomValue(threadsInInboxAtom).get(thread.id)
 
   const working = Option.getOrElse(
     AsyncResult.value(useAtomValue(workingThreadsAtom)),
     () => noThreads,
   ).has(thread.id)
 
-  const showsWorking = needsYou === undefined && working
+  const showsWorking = inboxThread === undefined && working
 
-  const marker = needsYou !== undefined ? markerOf(needsYou) : showsWorking ? workingMarker : null
+  const marker =
+    inboxThread !== undefined ? markerOf(inboxThread) : showsWorking ? workingMarker : null
 
   const removeNow = () => {
     setConfirming(null)
@@ -440,7 +489,7 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
   }
 
   return (
-    <li className="group/row relative">
+    <li ref={arrival} data-shift-key={thread.id} className="group/row relative">
       <Link
         to="/threads/$threadId"
         params={{ threadId: thread.id }}
@@ -484,11 +533,10 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
             </span>
           )}
         </span>
-        <span
+        <ThreadName
+          name={thread.name}
           className={cn("truncate text-sm font-semibold", showsWorking && "text-muted-foreground")}
-        >
-          {thread.name}
-        </span>
+        />
         <span className="flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
           {sandboxText === null ? (
             <>
@@ -502,7 +550,7 @@ function ThreadRow(props: { thread: Thread; now: Date; settled: boolean }) {
               id={originId}
               className={cn(
                 "min-w-0 flex-1 truncate",
-                readOnlyExplanation(sandbox?.reach) !== null && "text-destructive",
+                isGone(sandbox?.reach) && "text-destructive",
               )}
             >
               {sandboxText}

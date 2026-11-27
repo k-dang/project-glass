@@ -1,6 +1,7 @@
 # Agent runners reuse existing credentials through the Claude Code and pi CLIs
 
-The user chooses Claude Code or the pi CLI for each agent task (Tours, Agent reviews, Ask). Both
+The user chooses Claude Code or the pi CLI for each agent task (Tours, Ask, and Agent reviews, which
+run as a Thread's first Turn, ADR 0010). Both
 reuse the user's existing credentials through their installed CLI, so Glass adds no API-key store or
 authentication setup, and tasks can use any model the user's own pi lists, including providers only
 a fork of pi adds, such as a company LiteLLM gateway.
@@ -12,8 +13,10 @@ a model the user didn't choose.
 Three constraints of these CLIs shape the runners and aren't obvious from their documentation:
 
 - Some endpoint security tools kill processes with arguments over about 1,000 characters, so
-  instructions, PR material, and schemas stay out of argv. That rules out Claude Code's
-  `--json-schema`.
+  instructions and PR material stay out of argv. Claude Code gets a schema through `--json-schema`,
+  which makes it return a matching answer, only when the schema fits under that limit once quoted
+  for the command line, where a `.cmd` launcher's escaping can double it; a longer one goes in the
+  prompt, as it always does for pi.
 - pi exits 0 even when the provider rejects the request, so success comes from its final message,
   not its exit code. An unknown model ID also only warns, so Glass checks the model against pi's
   list first.

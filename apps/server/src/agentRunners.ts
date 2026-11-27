@@ -23,7 +23,7 @@ import {
 import { ChildProcessSpawner } from "effect/process"
 import { join } from "node:path"
 import { type AgentFailure, agentFailure, runnerFailureReason } from "./agentFailure"
-import { launchCommand } from "./processes"
+import { argumentLength, launchCommand } from "./processes"
 import { type AgentTools, claudeTools, piLoadsNothing, piTools } from "./agentTools"
 import { AgentCommands } from "./SettingsStore"
 
@@ -36,7 +36,7 @@ export interface AgentTask<A> {
   readonly checkout: string
 }
 
-export interface AgentRunner {
+interface AgentRunner {
   readonly identity: AgentRunnerIdentity
   readonly run: <A>(task: AgentTask<A>) => Effect.Effect<A, AgentFailure>
 }
@@ -47,9 +47,36 @@ const answerSchema = (answer: Schema.Decoder<unknown>): JsonSchema.JsonSchema =>
   return { ...document.schema, $defs: document.definitions }
 }
 
-// WARNING: Not --json-schema: endpoint security tools may kill processes with long arguments.
-const promptWithSchema = (task: AgentTask<unknown>) =>
-  `${task.prompt}\n\nOutput JSON Schema:\n${JSON.stringify(answerSchema(task.answer))}`
+// WARNING: Some endpoint security tools kill processes with an argument this long, as the process receives it, so longer schemas go in the prompt.
+export const argumentLimit = 1000
+
+const schemaText = (task: AgentTask<unknown>) => JSON.stringify(answerSchema(task.answer))
+
+const withSchema = (prompt: string, schema: string) => `${prompt}\n\nOutput JSON Schema:\n${schema}`
+
+const ClaudeEnvelope = Schema.Struct({
+  is_error: Schema.optional(Schema.Boolean),
+  result: Schema.optional(Schema.String),
+  structured_output: Schema.optional(Schema.Unknown),
+})
+
+const claudeAnswer = <A>(command: string, task: AgentTask<A>) => {
+  const schema = schemaText(task)
+
+  return argumentLength(command, schema) < argumentLimit
+    ? {
+        flags: ["--json-schema", schema],
+        prompt: task.prompt,
+        pick: (envelope: typeof ClaudeEnvelope.Type) => envelope.structured_output,
+        decode: task.answer,
+      }
+    : {
+        flags: [],
+        prompt: withSchema(task.prompt, schema),
+        pick: (envelope: typeof ClaudeEnvelope.Type) => envelope.result,
+        decode: Schema.fromJsonString(task.answer),
+      }
+}
 
 const unusableFailure =
   (name: string, subject: string, identity: AgentRunnerIdentity) =>
@@ -77,24 +104,23 @@ const startFailure = (name: string) => (error: { readonly reason: unknown }) => 
 
 const claudeFlags = ["--strict-mcp-config", "--no-session-persistence", "--disable-slash-commands"]
 
-// WARNING: Each flag set keeps the user's settings files, and their hooks, away from the PR's files; shell can't use --restricted, and -p refuses tools not allowed.
+const claudeRequiredFlags = [
+  ...claudeFlags,
+  "--restricted",
+  "--setting-sources",
+  "--tools",
+  "--json-schema",
+]
+
+// WARNING: Each flag set keeps the user's settings files, and their hooks, away from the PR's files.
 const claudeToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
   none: ["--setting-sources", "", "--tools", ""],
   "read-only": ["--restricted", "--tools", claudeTools["read-only"].join(",")],
-  shell: [
-    "--setting-sources",
-    "",
-    "--tools",
-    claudeTools.shell.join(","),
-    "--allowedTools",
-    claudeTools.shell.join(","),
-  ],
 }
 
 const piToolFlags: Record<AgentTools, ReadonlyArray<string>> = {
   none: ["--no-tools"],
   "read-only": ["--tools", piTools["read-only"].join(",")],
-  shell: ["--tools", piTools.shell.join(",")],
 }
 
 const piCliFlags = (tools: AgentTools) => [
@@ -163,18 +189,34 @@ const runnerStrategies = Effect.gen(function* () {
     return { stdout, stderr, code }
   }, logFailedRun)
 
-  const decodeClaude = Schema.decodeUnknownEffect(
-    Schema.fromJsonString(
-      Schema.Struct({
-        is_error: Schema.optional(Schema.Boolean),
-        result: Schema.optional(Schema.String),
-      }),
-    ),
-  )
+  const decodeClaude = Schema.decodeUnknownEffect(Schema.fromJsonString(ClaudeEnvelope))
 
-  const runClaudeCode = (model: string, identity: AgentRunnerIdentity): AgentRunner["run"] =>
+  // WARNING: Both harnesses read the instructions from a file path, which keeps them out of argv, where endpoint security tools may kill long commands.
+  const instructionsWriter =
+    (directory: string, identity: AgentRunnerIdentity, name: string) => (source: string) => {
+      const instructions = join(directory, "instructions.md")
+
+      return fs.writeFileString(instructions, source).pipe(
+        Effect.tapError((cause) =>
+          Effect.logWarning(`Couldn't write ${name}'s instructions`, cause),
+        ),
+        Effect.mapError(() =>
+          agentFailure("storage", `Couldn't prepare ${name}'s instructions. Try again.`, identity),
+        ),
+        Effect.as(instructions),
+      )
+    }
+
+  const runClaudeCode = (
+    writeInstructions: (source: string) => Effect.Effect<string, AgentFailure>,
+    model: string,
+    identity: AgentRunnerIdentity,
+  ): AgentRunner["run"] =>
     Effect.fn("runClaudeCode")(function* <A>(task: AgentTask<A>) {
       const unusable = unusableFailure("Claude Code", task.subject, identity)
+      const channel = claudeAnswer(commands.claudeCommand, task)
+
+      const instructions = yield* writeInstructions(task.instructions)
 
       const result = yield* execute(
         commands.claudeCommand,
@@ -186,9 +228,12 @@ const runnerStrategies = Effect.gen(function* () {
           model,
           "--output-format",
           "json",
+          "--append-system-prompt-file",
+          instructions,
+          ...channel.flags,
         ],
         task.checkout,
-        `${task.instructions}\n\n${promptWithSchema(task)}`,
+        channel.prompt,
       ).pipe(
         Effect.mapError(() =>
           agentFailure("failed", "Claude Code could not start. Check your installation.", identity),
@@ -204,14 +249,13 @@ const runnerStrategies = Effect.gen(function* () {
           identity,
         )
 
-      if (envelope?.result === undefined)
-        return yield* unusable("its output had no result", result.stdout)
+      const answer = envelope === null ? undefined : channel.pick(envelope)
 
-      return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(task.answer))(
-        envelope.result,
-      ).pipe(
+      if (answer === undefined) return yield* unusable("its output had no answer", result.stdout)
+
+      return yield* Schema.decodeUnknownEffect(channel.decode)(answer).pipe(
         Effect.catch((error) =>
-          unusable("the answer didn't match the schema", error.message, envelope.result),
+          unusable("the answer didn't match the schema", error.message, answer),
         ),
       )
     })
@@ -248,9 +292,7 @@ const runnerStrategies = Effect.gen(function* () {
     if (
       Result.isFailure(help) ||
       help.success.code !== 0 ||
-      [...claudeFlags, "--restricted", "--setting-sources", "--tools", "--allowedTools"].some(
-        (flag) => !help.success.stdout.includes(flag),
-      )
+      claudeRequiredFlags.some((flag) => !help.success.stdout.includes(flag))
     )
       return yield* agentFailure(
         "not-ready",
@@ -259,7 +301,10 @@ const runnerStrategies = Effect.gen(function* () {
 
     const identity = runnerIdentity({ harness: "claude-code", models })
 
-    return { identity, run: runClaudeCode(model, identity) } satisfies AgentRunner
+    return {
+      identity,
+      run: runClaudeCode(instructionsWriter(cwd, identity, "Claude Code"), model, identity),
+    } satisfies AgentRunner
   })
 
   const decodePiCliEnd = Schema.decodeUnknownOption(
@@ -284,7 +329,7 @@ const runnerStrategies = Effect.gen(function* () {
   )
 
   const runPiCli = (
-    instructionsDirectory: string,
+    writeInstructions: (source: string) => Effect.Effect<string, AgentFailure>,
     selection: PiModel,
     identity: AgentRunnerIdentity,
   ): AgentRunner["run"] =>
@@ -296,14 +341,7 @@ const runnerStrategies = Effect.gen(function* () {
           identity,
         )
 
-      // WARNING: pi reads --system-prompt from a file path, which keeps instructions out of argv, where endpoint security tools may kill long commands.
-      const instructions = join(instructionsDirectory, "instructions.md")
-      yield* fs.writeFileString(instructions, task.instructions).pipe(
-        Effect.tapError((cause) => Effect.logWarning("Couldn't write pi's instructions", cause)),
-        Effect.mapError(() =>
-          agentFailure("storage", "Couldn't prepare pi's instructions. Try again.", identity),
-        ),
-      )
+      const instructions = yield* writeInstructions(task.instructions)
 
       const result = yield* execute(
         commands.piCommand,
@@ -316,11 +354,11 @@ const runnerStrategies = Effect.gen(function* () {
           selection.provider,
           "--model",
           selection.modelId,
-          "--system-prompt",
+          "--append-system-prompt",
           instructions,
         ],
         task.checkout,
-        promptWithSchema(task),
+        withSchema(task.prompt, schemaText(task)),
       ).pipe(
         Effect.mapError(() =>
           agentFailure("failed", "pi could not start. Check its installation.", identity),
@@ -390,7 +428,10 @@ const runnerStrategies = Effect.gen(function* () {
         `pi has no model ${model}. Run pi --list-models to see yours, then change it in Settings.`,
       )
 
-    return { identity, run: runPiCli(cwd, selection, identity) } satisfies AgentRunner
+    return {
+      identity,
+      run: runPiCli(instructionsWriter(cwd, identity, "pi"), selection, identity),
+    } satisfies AgentRunner
   })
 
   const runners: Record<

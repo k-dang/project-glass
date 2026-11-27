@@ -1,5 +1,6 @@
 import {
   parsePullRequestReference,
+  shownVisualizationOf,
   SUBAGENT_TOOL,
   type ToolCallPart,
   type TurnPart,
@@ -12,6 +13,7 @@ import {
   createContext,
   memo,
   type ReactNode,
+  use,
   useCallback,
   useContext,
   useState,
@@ -45,15 +47,31 @@ import {
 import { plural } from "./plural"
 import { sentFrom, UserMessage } from "./UserMessage"
 import { PullRequestLink } from "./ThreadPullRequest"
+import { BrowserLinks } from "./BrowserPane"
 import { RequestCard } from "./RequestCard"
 import { MermaidDiagram } from "./MermaidDiagram"
 import { FileImage, FileLink, localFilePath, remarkLocalFiles } from "./ThreadFiles"
+import { Visualization } from "./Visualization"
 
 export const ToolCallView = createContext<
   ((call: typeof ToolCallPart.Type) => ReactNode | null) | null
 >(null)
 
 export const BackgroundToolCalls = createContext<ReadonlySet<string>>(new Set())
+
+const builtInView = (call: typeof ToolCallPart.Type) => {
+  const visualization = shownVisualizationOf(call)
+
+  return visualization === null ? null : (
+    <Visualization id={visualization.id} title={visualization.title} />
+  )
+}
+
+const useToolCallView = () => {
+  const screenView = useContext(ToolCallView)
+
+  return (call: typeof ToolCallPart.Type) => builtInView(call) ?? screenView?.(call) ?? null
+}
 
 interface NestedPart {
   readonly part: TurnPart
@@ -204,14 +222,13 @@ const partGroups: Record<
 }
 
 export function TurnParts(props: { parts: ReadonlyArray<TurnPart> }) {
-  const toolCallView = useContext(ToolCallView)
+  const toolCallView = useToolCallView()
   const inBackground = useContext(BackgroundToolCalls)
 
   const kindOf = (part: TurnPart): GroupKind | null => {
     if (Predicate.isTagged(part, "Thinking")) return "steps"
 
-    if (!Predicate.isTagged(part, "ToolCall") || (toolCallView?.(part) ?? null) !== null)
-      return null
+    if (!Predicate.isTagged(part, "ToolCall") || toolCallView(part) !== null) return null
 
     return part.name === SUBAGENT_TOOL ? "subagents" : "steps"
   }
@@ -309,8 +326,28 @@ const streamdownLinkClass = "wrap-anywhere font-medium text-primary underline"
 function MarkdownLink(props: ComponentProps<typeof defaultComponents.a>) {
   const { href } = props
   const localPath = localFilePath(href)
+  const browserLinks = use(BrowserLinks)
 
   if (localPath !== null) return <FileLink text={localPath}>{props.children}</FileLink>
+
+  if (href !== undefined && browserLinks?.policy.opensLink(href) === true)
+    return (
+      <a
+        className={cn(streamdownLinkClass, props.className)}
+        data-streamdown="link"
+        href={href}
+        rel="noreferrer"
+        target="_blank"
+        onClick={(event) => {
+          if (event.metaKey || event.ctrlKey) return
+
+          event.preventDefault()
+          browserLinks.open(href)
+        }}
+      >
+        {props.children}
+      </a>
+    )
 
   const pullRequest = href === undefined ? null : parsePullRequestReference(href)
 
@@ -341,6 +378,11 @@ function MarkdownImage(props: ComponentProps<typeof defaultComponents.img>) {
 const markdownComponents: Components = {
   a: MarkdownLink,
   img: MarkdownImage,
+  table: ({ node: _node, ...props }) => (
+    <div className="thread-markdown-table">
+      <table {...props} />
+    </div>
+  ),
   code: (props) => {
     const language = /language-(\S+)/.exec(props.className ?? "")?.[1] ?? ""
 
@@ -379,7 +421,7 @@ const PartView = memo(function PartView(props: {
   part: TurnPart
   nested: ReadonlyArray<NestedPart>
 }) {
-  const toolCallView = useContext(ToolCallView)
+  const toolCallView = useToolCallView()
   const inBackground = useContext(BackgroundToolCalls)
 
   return Match.value(props.part).pipe(
@@ -410,7 +452,7 @@ const PartView = memo(function PartView(props: {
         </Trace>
       ),
       ToolCall: (call) => {
-        const shown = toolCallView?.(call) ?? null
+        const shown = toolCallView(call)
 
         if (shown !== null) return shown
 

@@ -24,7 +24,7 @@ const formatMemory = (bytes: number | null | undefined) => {
   return `${Math.round(bytes / 1024 ** 2)} MB`
 }
 
-export const titleStripResourceUsageAtom = localStorageBooleanAtom("glass.titleStripResourceUsage")
+export const railResourceUsageAtom = localStorageBooleanAtom("glass.railResourceUsage")
 
 type Kind = "cpu" | "ram"
 
@@ -144,33 +144,24 @@ function Sparkline(props: { values: ReadonlyArray<number>; minSpan: number }) {
   )
 }
 
-function Reading(props: {
-  kind: Kind
-  usage: Usage | null
-  className: string
-  trend?: ReadonlyArray<TrendPoint>
-}) {
+function RailReading(props: { kind: Kind; usage: Usage | null; trend: ReadonlyArray<TrendPoint> }) {
   const { kind, usage, trend } = props
-  const { icon: Icon, label, color, of, format, minSpan } = readings[kind]
+  const { icon: Icon, color, of, format, minSpan } = readings[kind]
 
   return (
-    <span className={cn("flex items-center gap-1.5", props.className)}>
-      <Icon className={cn("size-3.5 shrink-0", color)} strokeWidth={1.65} aria-hidden />
-      {trend === undefined ? (
-        <span>{label}</span>
-      ) : (
-        <span className={cn("hidden @min-[15rem]:block", color)}>
-          <Sparkline values={trend.map((point) => point[kind])} minSpan={minSpan} />
-        </span>
-      )}
-      <span className="ml-auto text-foreground">{format(usage && of(usage))}</span>
+    <span className="flex flex-col items-center gap-1">
+      <Icon className={cn("size-3 shrink-0", color)} strokeWidth={1.65} aria-hidden />
+      <span className={color}>
+        <Sparkline values={trend.map((point) => point[kind])} minSpan={minSpan} />
+      </span>
+      <span className="text-foreground">{format(usage && of(usage))}</span>
     </span>
   )
 }
 
 function ResourceUsagePopover(props: {
   usage: Usage | null
-  side: "top" | "bottom"
+  side: "top" | "right"
   sideOffset: number
   className: string
   children: ReactNode
@@ -181,7 +172,7 @@ function ResourceUsagePopover(props: {
         aria-label="Show Glass resource usage"
         aria-description={describe(props.usage)}
         className={cn(
-          "flex items-center gap-3 text-[11px] text-muted-foreground tabular-nums",
+          "flex items-center text-[11px] text-muted-foreground tabular-nums",
           props.className,
         )}
       >
@@ -199,47 +190,19 @@ function ResourceUsagePopover(props: {
   )
 }
 
-export function ResourceUsage() {
-  const { usage } = useResourceUsage()
+export function RailResourceUsage() {
+  const { usage, trend } = useResourceUsage()
 
   return (
     <ResourceUsagePopover
       usage={usage}
-      side="top"
-      sideOffset={10}
-      className="h-6 rounded px-1.5 hover:bg-accent hover:text-foreground focus-visible:outline-2 focus-visible:outline-ring"
+      side="right"
+      sideOffset={8}
+      className="w-12 flex-col gap-2.5 rounded-md py-2 text-[10px] outline-none hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/5"
     >
-      <Reading kind="cpu" usage={usage} className="w-[84px]" />
-      <Reading kind="ram" usage={usage} className="w-[104px]" />
+      <RailReading kind="cpu" usage={usage} trend={trend} />
+      <RailReading kind="ram" usage={usage} trend={trend} />
     </ResourceUsagePopover>
-  )
-}
-
-export function TitleStripResourceUsage() {
-  const { usage, trend } = useResourceUsage()
-
-  return (
-    <div className="@container flex min-w-0 flex-1 justify-end">
-      <ResourceUsagePopover
-        usage={usage}
-        side="bottom"
-        sideOffset={6}
-        className="h-7 rounded-md px-2 outline-none [app-region:no-drag] hover:bg-black/5 focus-visible:ring-2 focus-visible:ring-ring dark:hover:bg-white/5"
-      >
-        <Reading
-          kind="cpu"
-          usage={usage}
-          trend={trend}
-          className="w-[54px] @min-[15rem]:w-[96px]"
-        />
-        <Reading
-          kind="ram"
-          usage={usage}
-          trend={trend}
-          className="w-[68px] @min-[15rem]:w-[112px]"
-        />
-      </ResourceUsagePopover>
-    </div>
   )
 }
 
@@ -295,8 +258,8 @@ function ResourceUsagePanel(props: { usage: Usage | null }) {
         </table>
       )}
       <p className="text-[10px] leading-relaxed text-muted-foreground">
-        CPU is a share of this computer’s total capacity. RAM can include memory shared between
-        processes. External agents aren’t included.
+        CPU is a share of this computer’s total capacity. RAM leaves out memory shared between
+        processes on Windows, but can include it elsewhere. External agents aren’t included.
       </p>
     </>
   )

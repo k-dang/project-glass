@@ -9,9 +9,11 @@ import { cn } from "cn"
 import { Predicate } from "effect"
 import { FolderGit2, GitBranch, GitPullRequest, Package, PanelTop } from "lucide-react"
 import { createContext, type ReactNode, use, useId, useState, useSyncExternalStore } from "react"
+import { createPortal } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ThreadPullRequestLink, PullRequestLink, PullRequestStatusIcon } from "./ThreadPullRequest"
+import { ShellTitleSlot, useShellSlotHost } from "./shellSlots"
 import { ThreadsPanelToggle } from "./Threads"
 import { threadDetailsPinnedAtom, placeIcons, placeNames } from "./threadsArea"
 import { LOCAL_SKILLS_LABEL } from "./skillChoice"
@@ -19,7 +21,7 @@ import { LOCAL_SKILLS_LABEL } from "./skillChoice"
 const fact =
   "flex h-7 w-full min-w-0 items-center gap-2 rounded-sm px-2 text-xs [&_svg]:size-3.5 [&_svg]:shrink-0"
 
-const action = "text-left outline-none hover:bg-accent focus-visible:bg-accent"
+export const actionRow = "text-left outline-none hover:bg-accent focus-visible:bg-accent"
 
 const wideWindow = window.matchMedia("(min-width: 1200px)")
 
@@ -58,41 +60,49 @@ export function ThreadFrame(props: {
   const { details } = props
   const pins = wide && props.pinnable === true
   const pinnedLabel = pinned ? "Hide details" : "Show details"
+  const titleSlot = useShellSlotHost(ShellTitleSlot)
+
+  const header = (
+    <header className="flex min-w-0 flex-auto items-center gap-2 pr-3 pl-2 text-sm">
+      <ThreadsPanelToggle />
+      <div className="flex min-w-0 flex-1 items-center gap-2">{props.heading}</div>
+      {details?.pullRequest !== undefined && (
+        <ThreadPullRequestLink pullRequest={details.pullRequest} />
+      )}
+      {details !== null &&
+        (pins ? (
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={pinnedLabel}
+            aria-expanded={pinned}
+            aria-controls={detailsId}
+            onClick={() => setPinned((open) => !open)}
+          >
+            <PanelTop aria-hidden />
+          </Button>
+        ) : (
+          <DetailsPopover details={details} />
+        ))}
+    </header>
+  )
 
   return (
     <section
       aria-label={props.label}
       className={cn("flex min-h-0 flex-1 flex-col", props.className)}
     >
-      <header className="box-content flex h-11 shrink-0 items-center gap-2 border-b px-4 text-sm">
-        <ThreadsPanelToggle />
-        <div className="flex min-w-0 flex-1 items-center gap-2">{props.heading}</div>
-        {details?.pullRequest !== undefined && (
-          <ThreadPullRequestLink pullRequest={details.pullRequest} />
-        )}
-        {details !== null &&
-          (pins ? (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              aria-label={pinnedLabel}
-              aria-expanded={pinned}
-              aria-controls={detailsId}
-              onClick={() => setPinned((open) => !open)}
-            >
-              <PanelTop aria-hidden />
-            </Button>
-          ) : (
-            <DetailsPopover details={details} />
-          ))}
-      </header>
+      {createPortal(header, titleSlot)}
       <div className="relative isolate flex min-h-0 min-w-0 flex-1 flex-col">
         {props.children}
-        {details !== null && pins && pinned && (
+        {details !== null && pins && (
           <aside
             id={detailsId}
             aria-label="Details"
-            className="absolute top-2 right-4 z-10 max-h-[calc(100%-1rem)] w-64 overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
+            data-open={pinned}
+            aria-hidden={!pinned}
+            inert={!pinned}
+            className="pinned-details-motion [:active-view-transition-type(start-thread)_&]:data-[open=true]:[view-transition-name:thread-details] absolute top-2 right-4 z-10 max-h-[calc(100%-1rem)] w-64 overflow-y-auto rounded-lg bg-popover p-1 text-popover-foreground shadow-md ring-1 ring-foreground/10"
           >
             <ThreadDetails {...details} />
           </aside>
@@ -186,7 +196,7 @@ function DetailsPullRequestLink(props: { pullRequest: ThreadPullRequest }) {
       href={pullRequest.url}
       pullRequest={pullRequest.ref}
       onClick={close}
-      className={cn(fact, action)}
+      className={cn(fact, actionRow)}
     >
       {Predicate.isTagged(pullRequest.state, "Open") ? (
         <GitPullRequest aria-hidden className="text-muted-foreground" />
@@ -211,7 +221,7 @@ export function ThreadDetailsAction(props: { onNavigate: () => void; children: R
         close()
         props.onNavigate()
       }}
-      className={cn(fact, action)}
+      className={cn(fact, actionRow)}
     >
       {props.children}
     </button>

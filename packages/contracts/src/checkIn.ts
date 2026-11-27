@@ -39,12 +39,12 @@ export class CheckInError extends Schema.TaggedError<CheckInError>()("CheckInErr
 
 export const checkInNoteKeys = ["path", "side", "start", "end", "code", "text"] as const
 
-export const CheckInNote = Schema.Struct({
+const CheckInNote = Schema.Struct({
   ...Struct.pick(LineNote.fields, checkInNoteKeys),
   outdated: Schema.Boolean,
 })
 
-export type CheckInNote = typeof CheckInNote.Type
+type CheckInNote = typeof CheckInNote.Type
 
 const sent = { ...answered, notes: Schema.Array(CheckInNote) }
 

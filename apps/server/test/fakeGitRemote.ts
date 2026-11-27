@@ -194,7 +194,7 @@ const httpBackend = (
     })
   })
 
-export interface FakeGitRemote {
+interface FakeGitRemote {
   readonly publish: PublishCommits
   readonly route: Layer.Layer<never, never, HttpRouter.HttpRouter>
 }

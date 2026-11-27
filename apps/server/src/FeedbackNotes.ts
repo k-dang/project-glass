@@ -1,4 +1,4 @@
-import { ThreadError, FeedbackNote, isPageNote, UnsentFeedback } from "@glass/contracts"
+import { ThreadError, FeedbackNote } from "@glass/contracts"
 import { Context, Effect, Layer, Schema } from "effect"
 import { SqlClient } from "effect/sql"
 
@@ -17,19 +17,14 @@ const notesOf = (rows: ReadonlyArray<unknown>) =>
 
 const encodeNote = Schema.encodeSync(Schema.fromJsonString(FeedbackNote))
 
-const decodeStaged = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ id: Schema.String, staged: Schema.BooleanFromBit })),
-)
-
 const row = (owner: NotesOwner, note: FeedbackNote) => ({
   owner,
   id: note.id,
   note: encodeNote(note),
-  staged: isPageNote(note) ? 1 : 0,
 })
 
 const guarded =
-  (doing: "read" | "save" | "remove" | "stage" | "send" | "restore") =>
+  (doing: "read" | "save" | "remove" | "send" | "restore") =>
   <A, E, R>(effect: Effect.Effect<A, E, R>) =>
     effect.pipe(
       Effect.tapError((cause) => Effect.logWarning(`Couldn't ${doing} Feedback notes`, cause)),
@@ -41,16 +36,15 @@ const guarded =
 export class FeedbackNotes extends Context.Service<
   FeedbackNotes,
   {
-    readonly list: (owner: NotesOwner) => Effect.Effect<UnsentFeedback, ThreadError>
+    readonly list: (owner: NotesOwner) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>
     readonly save: (
       owner: NotesOwner,
       note: FeedbackNote,
-    ) => Effect.Effect<UnsentFeedback, ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>
     readonly remove: (
       owner: NotesOwner,
       noteId: string,
-    ) => Effect.Effect<UnsentFeedback, ThreadError>
-    readonly stage: (owner: NotesOwner) => Effect.Effect<UnsentFeedback, ThreadError>
+    ) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>
     readonly take: (
       owner: NotesOwner,
       noteIds: ReadonlyArray<string>,
@@ -70,20 +64,8 @@ export class FeedbackNotes extends Context.Service<
 
       const list = Effect.fn("FeedbackNotes.list")((owner: NotesOwner) =>
         sql`
-            SELECT id, note, staged FROM feedback_note
-            WHERE owner = ${owner} ORDER BY rowid
-          `.pipe(
-          Effect.flatMap((rows) =>
-            Effect.all({
-              notes: notesOf(rows),
-              staged: decodeStaged(rows).pipe(
-                Effect.map((flags) => flags.flatMap(({ id, staged }) => (staged ? [id] : []))),
-              ),
-            }),
-          ),
-          Effect.map((unsent) => new UnsentFeedback(unsent)),
-          guarded("read"),
-        ),
+            SELECT note FROM feedback_note WHERE owner = ${owner} ORDER BY rowid
+          `.pipe(Effect.flatMap(notesOf), guarded("read")),
       )
 
       return FeedbackNotes.of({
@@ -100,19 +82,13 @@ export class FeedbackNotes extends Context.Service<
             Effect.andThen(list(owner)),
           ),
         ),
-        stage: Effect.fn("FeedbackNotes.stage")((owner) =>
-          sql`UPDATE feedback_note SET staged = 1 WHERE owner = ${owner}`.pipe(
-            guarded("stage"),
-            Effect.andThen(list(owner)),
-          ),
-        ),
         take: Effect.fn("FeedbackNotes.take")(function* (owner, noteIds) {
           if (noteIds.length === 0) return []
 
           const ids = Array.from(new Set(noteIds))
 
           const taken = yield* sql`
-            DELETE FROM feedback_note WHERE owner = ${owner} AND staged = 1 AND ${sql.in("id", noteIds)}
+            DELETE FROM feedback_note WHERE owner = ${owner} AND ${sql.in("id", noteIds)}
             RETURNING id, note
           `.pipe(
             Effect.flatMap(notesOf),
@@ -123,7 +99,7 @@ export class FeedbackNotes extends Context.Service<
           if (taken.length !== ids.length)
             return yield* new ThreadError({
               message:
-                "Some of these Feedback notes were already sent or removed. Review your feedback again.",
+                "Some of these Feedback notes were already sent or removed. Try sending again.",
             })
 
           return taken

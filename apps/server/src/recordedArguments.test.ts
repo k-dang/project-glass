@@ -3,6 +3,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join } from "node:path"
 import { expect, it } from "vite-plus/test"
 import { decodeJson, isJsonArray, isJsonObject, type Json } from "../test/replay"
+import { argumentLimit } from "./agentRunners"
 
 const recordings = join(import.meta.dirname, "..", "test", "recordings")
 
@@ -17,7 +18,7 @@ const argumentsIn = (value: Json): ReadonlyArray<string> =>
         )
       : []
 
-it("stays under the argument length endpoint security tools kill processes for (ADR 0004)", () => {
+it("stays under the argument length endpoint security tools kill processes for", () => {
   const recorded = readdirSync(recordings, { recursive: true, encoding: "utf8" })
     .filter((path) => path.endsWith(".json"))
     .flatMap((path) =>
@@ -25,5 +26,5 @@ it("stays under the argument length endpoint security tools kill processes for (
     )
 
   expect(recorded.length).toBeGreaterThan(0)
-  expect(Math.max(...recorded.map(({ length }) => length))).toBeLessThan(1000)
+  expect(Math.max(...recorded.map(({ length }) => length))).toBeLessThan(argumentLimit)
 })

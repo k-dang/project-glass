@@ -154,9 +154,15 @@ for (const [name, base, from, to] of [
   ],
   [
     "a Claude Code answer that isn't JSON",
-    "claude-answer",
+    "claude-long-schema",
     '"result":"{\\"summary\\":\\"Fine.\\"}"',
     '"result":"not JSON secret-should-not-leak"',
+  ],
+  [
+    "a Claude Code structured answer that doesn't match the schema",
+    "claude-answer",
+    '"structured_output":{"summary":"Fine."}',
+    '"structured_output":{"secret-should-not-leak":true}',
   ],
 ] as const)
   it.live(`fails as unusable output for ${name}`, () =>

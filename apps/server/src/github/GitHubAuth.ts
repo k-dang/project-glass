@@ -1,8 +1,9 @@
 import { NoCredentials, type TokenSource } from "@glass/contracts"
-import { Config, Context, Effect, Layer, Option, Redacted } from "effect"
-import { ChildProcess, ChildProcessSpawner } from "effect/process"
+import { Config, Context, Effect, Exit, Layer, Option, Redacted } from "effect"
+import { ChildProcessSpawner } from "effect/process"
+import { launchCommand } from "../processes"
 
-export interface ResolvedToken {
+interface ResolvedToken {
   readonly token: Redacted.Redacted
   readonly source: TokenSource
 }
@@ -19,6 +20,7 @@ export class GitHubAuth extends Context.Service<
   GitHubAuth,
   {
     readonly resolveToken: Effect.Effect<ResolvedToken, NoCredentials>
+    readonly forgetToken: Effect.Effect<void>
   }
 >()("@glass/server/github/GitHubAuth") {
   static readonly layer = Layer.effect(
@@ -26,7 +28,7 @@ export class GitHubAuth extends Context.Service<
     Effect.gen(function* () {
       const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
 
-      const fromGhCli = spawner.string(ChildProcess.make("gh", ["auth", "token"])).pipe(
+      const fromGhCli = spawner.string(launchCommand("gh", ["auth", "token"])).pipe(
         Effect.map((output) => output.trim()),
         Effect.map((token) =>
           token.length > 0
@@ -36,7 +38,7 @@ export class GitHubAuth extends Context.Service<
         Effect.orElseSucceed(() => Option.none<ResolvedToken>()),
       )
 
-      const resolveToken = Effect.gen(function* () {
+      const lookUp = Effect.gen(function* () {
         for (const candidate of [fromEnv("GH_TOKEN"), fromEnv("GITHUB_TOKEN"), fromGhCli]) {
           const resolved = yield* candidate
 
@@ -46,7 +48,11 @@ export class GitHubAuth extends Context.Service<
         return yield* new NoCredentials()
       }).pipe(Effect.withSpan("GitHubAuth.resolveToken"))
 
-      return GitHubAuth.of({ resolveToken })
+      const [resolveToken, forgetToken] = yield* Effect.cachedInvalidateWithTTL(lookUp, (exit) =>
+        Exit.isSuccess(exit) ? "1 minute" : 0,
+      )
+
+      return GitHubAuth.of({ resolveToken, forgetToken })
     }),
   )
 }

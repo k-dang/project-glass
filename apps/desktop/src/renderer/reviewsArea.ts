@@ -10,8 +10,7 @@ import { AsyncResult, Atom, AtomRegistry } from "effect/reactivity"
 import { ActivityRecorder } from "./activity"
 import { Backend, backendRuntime, backendRuntimeOf } from "./backend"
 import { connectionAtom } from "./connection"
-import { reviewedOutAtom, takeReviewedOut } from "./queue"
-import { reviewingRevisionAtom } from "./workspaceEvents"
+import { reviewedOutAtom, reviewingRevisionAtom, takeReviewedOut } from "./queue"
 import { WorkspaceFeedback, type ReloadFeedback } from "./workspaceFeedback"
 import { savedDestinationsAtom, savedIn } from "./savedPlace"
 import { restoreReviewPosition } from "./reviewPosition"
@@ -298,7 +297,7 @@ export const preloadAtom = Atom.family((ref: PullRequestRef) =>
 
     return loadShared(ref, get.registry).pipe(
       Effect.tap(() => Effect.sync(() => setAgingSince(get.registry, ref, null))),
-      Effect.map((open) => open.workspace),
+      Effect.map((open) => ({ workspace: open.workspace, reactions: open.feedback.reactions })),
     )
   }),
 )

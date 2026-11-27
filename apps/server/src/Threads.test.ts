@@ -3,12 +3,9 @@ import {
   ThreadStarted,
   LineNote,
   Merge,
-  PageNote,
   PullRequestRef,
-  PageText,
   SandboxPlace,
   TextPatch,
-  UnsentFeedback,
   localPlace,
   toDoMention,
 } from "@glass/contracts"
@@ -24,8 +21,9 @@ import {
   scriptedHost,
   settled,
 } from "../test/threadsFixture"
-import { fakeAgentRunnersWith } from "../test/fakeAgentRunners"
-import type { FakePullRequest } from "../test/fakePullRequest"
+import { eventually } from "../test/eventually"
+import { fakeAgentRunners } from "../test/fakeAgentRunners"
+import { type FakePullRequest, VIEWER } from "../test/fakePullRequest"
 import { gitIn } from "../test/gitRepositories"
 import { isolatedHome } from "../test/harness"
 
@@ -105,40 +103,43 @@ it.live("fails only the Turn sent while the agent host bundle is missing", () =>
   }),
 )
 
-it.live("starts a Thread in a worktree, on a new branch it names from its base", () =>
-  Effect.gen(function* () {
-    const f = yield* threadsFixture
-    const thread = yield* f.start()
-    const other = yield* f.start()
-    const worktree = f.worktree(thread.name)
+it.live(
+  "starts a Thread in a worktree, on a new branch it names from its base, and lists the newest Thread first",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadsFixture
+      const thread = yield* f.start()
+      const other = yield* f.start()
+      const worktree = f.worktree(thread.name)
 
-    assert.match(thread.name, /^agent\//)
-    assert.notEqual(other.name, thread.name)
-    assert.equal(gitIn(worktree, "branch", "--show-current"), thread.name)
-    assert.equal(gitIn(worktree, "rev-parse", "HEAD"), f.clone.main)
+      assert.match(thread.name, /^agent\//)
+      assert.notEqual(other.name, thread.name)
+      assert.equal(gitIn(worktree, "branch", "--show-current"), thread.name)
+      assert.equal(gitIn(worktree, "rev-parse", "HEAD"), f.clone.main)
 
-    const [listed] = yield* f.client
-      .WatchThreads()
-      .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
+      const [newest, listed] = yield* f.client
+        .WatchThreads()
+        .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
-    assert.deepStrictEqual(
-      { id: listed?.id, place: listed?.place, repository: listed?.repository },
-      { id: thread.id, place: localPlace, repository },
-    )
+      assert.equal(newest?.id, other.id)
+      assert.deepStrictEqual(
+        { id: listed?.id, place: listed?.place, repository: listed?.repository },
+        { id: thread.id, place: localPlace, repository },
+      )
 
-    const { activities } = yield* f.client.ListActivity({ limit: 10 })
-    assert.deepInclude(
-      activities.map(({ activity }) => activity),
-      ThreadStarted.make({
-        threadId: thread.id,
-        name: thread.name,
-        repository,
-        machine: "local",
-        harness: "pi",
-        message: "Say hello",
-      }),
-    )
-  }),
+      const { activities } = yield* f.client.ListActivity({ limit: 10 })
+      assert.deepInclude(
+        activities.map(({ activity }) => activity),
+        ThreadStarted.make({
+          threadId: thread.id,
+          name: thread.name,
+          repository,
+          machine: "local",
+          harness: "pi",
+          message: "Say hello",
+        }),
+      )
+    }),
 )
 
 it.live(
@@ -287,9 +288,7 @@ it.live(
       assert.notEqual((yield* f.client.GetThreadChanges({ threadId: thread.id })).id, read.id)
 
       const restarted = yield* f.restart
-      assert.deepStrictEqual((yield* restarted.ListFeedbackNotes({ threadId: thread.id })).notes, [
-        edited,
-      ])
+      assert.deepStrictEqual(yield* restarted.ListFeedbackNotes({ threadId: thread.id }), [edited])
 
       yield* restarted.RemoveThread({ threadId: thread.id })
 
@@ -300,48 +299,7 @@ it.live(
 )
 
 it.live(
-  "attaches a Feedback note on a page to the next message as soon as it's saved, beside unstaged notes on changes",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* threadsFixture
-      const thread = yield* f.start("Write a plan")
-      const threadId = thread.id
-      yield* f.transcript(threadId, settled(1))
-
-      const onChanges = new LineNote({
-        id: "line-1",
-        path: "src/retry.ts",
-        side: "new",
-        start: 2,
-        end: 2,
-        code: "attempts++",
-        changesId: "changes-1",
-        text: "Cap the attempts",
-      })
-
-      const onPage = new PageNote({
-        id: "page-1",
-        path: "docs/plan.html",
-        part: PageText.make({
-          selector: "#limits > p",
-          heading: "Limits",
-          excerpt: "five per minute",
-        }),
-        text: "Make this ten",
-      })
-
-      yield* f.client.SaveFeedbackNote({ threadId, note: onChanges })
-      yield* f.client.SaveFeedbackNote({ threadId, note: onPage })
-
-      assert.deepStrictEqual(
-        yield* f.client.ListFeedbackNotes({ threadId }),
-        new UnsentFeedback({ notes: [onChanges, onPage], staged: [onPage.id] }),
-      )
-    }),
-)
-
-it.live(
-  "queues staged Feedback notes for the working Thread as one message, taking only those notes",
+  "queues Feedback notes for the working Thread as one message, taking only the ones sent",
   () =>
     Effect.gen(function* () {
       const f = yield* threadsFixture
@@ -360,32 +318,22 @@ it.live(
 
       const capAttempts = new LineNote({ ...fields, id: "note-1", text: "Cap the attempts" })
       const keepError = new LineNote({ ...fields, id: "note-2", text: "Keep the last error" })
-      const later = new LineNote({ ...fields, id: "note-3", text: "Not staged yet" })
+      const later = new LineNote({ ...fields, id: "note-3", text: "Not sent yet" })
 
-      for (const note of [capAttempts, keepError])
+      for (const note of [capAttempts, keepError, later])
         yield* f.client.SaveFeedbackNote({ threadId, note })
 
-      const staged = [capAttempts.id, keepError.id]
-      assert.deepStrictEqual((yield* f.client.StageFeedbackNotes({ threadId })).staged, staged)
-      yield* f.client.SaveFeedbackNote({ threadId, note: later })
-
-      const unstaged = { threadId, message: "", images: [], feedback: [later.id] }
-      assert.equal((yield* f.client.SendMessage(unstaged).pipe(Effect.flip))._tag, "ThreadError")
-
-      const sent = { threadId, message: "", images: [], feedback: staged }
+      const sent = { threadId, message: "", images: [], feedback: [capAttempts.id, keepError.id] }
       yield* f.client.SendMessage(sent)
 
       const { queued } = yield* f.watch(threadId, (transcript) => transcript.queued.length === 1)
 
       assert.deepStrictEqual(queued[0]?.feedback, [capAttempts, keepError])
-      assert.deepStrictEqual(
-        yield* f.client.ListFeedbackNotes({ threadId }),
-        new UnsentFeedback({ notes: [later], staged: [] }),
-      )
+      assert.deepStrictEqual(yield* f.client.ListFeedbackNotes({ threadId }), [later])
 
       const again = yield* f.client.SendMessage(sent).pipe(Effect.flip)
       assert.equal(again._tag, "ThreadError")
-      assert.lengthOf((yield* f.client.ListFeedbackNotes({ threadId })).notes, 1)
+      assert.lengthOf(yield* f.client.ListFeedbackNotes({ threadId }), 1)
 
       yield* f.release("first")
       yield* f.transcript(threadId, settled(2))
@@ -433,7 +381,6 @@ const queuedFeedback = Effect.gen(function* () {
   ]
 
   for (const note of sent) yield* f.client.SaveFeedbackNote({ threadId, note })
-  yield* f.client.StageFeedbackNotes({ threadId })
   yield* f.client.SendMessage({
     threadId,
     message: "",
@@ -446,7 +393,6 @@ const queuedFeedback = Effect.gen(function* () {
 
   const newer = new LineNote({ ...fields, id: "note-3", text: "Newer" })
   yield* f.client.SaveFeedbackNote({ threadId, note: newer })
-  yield* f.client.StageFeedbackNotes({ threadId })
 
   return { f, threadId, sent, newer, queuedId }
 })
@@ -457,7 +403,7 @@ it.live(
     Effect.gen(function* () {
       const { f, threadId, sent, newer, queuedId } = yield* queuedFeedback
       const cancel = { threadId, queuedMessageId: queuedId }
-      const restored = new UnsentFeedback({ notes: [newer, ...sent], staged: [newer.id] })
+      const restored = [newer, ...sent]
 
       assert.deepStrictEqual(yield* f.client.CancelQueuedMessage(cancel), restored)
       yield* f.watch(threadId, (transcript) => transcript.queued.length === 0)
@@ -480,10 +426,7 @@ it.live("refuses to cancel a Queued message whose Turn started, leaving its feed
       .pipe(Effect.flip)
 
     assert.equal(late._tag, "QueuedMessageStarted")
-    assert.deepStrictEqual(
-      yield* f.client.ListFeedbackNotes({ threadId }),
-      new UnsentFeedback({ notes: [newer], staged: [newer.id] }),
-    )
+    assert.deepStrictEqual(yield* f.client.ListFeedbackNotes({ threadId }), [newer])
     assert.deepStrictEqual((yield* f.transcript(threadId, settled(2)))[1]?.feedback, sent)
   }),
 )
@@ -545,6 +488,44 @@ it.live("finds a Thread's PR from the branch its agent left checked out, not a f
       .pipe(Stream.runHead, Effect.map(Option.getOrThrow))
 
     assert.equal(listed?.branch, "feature/greeting")
+  }),
+)
+
+it.live("shows a Thread's PR as merged before GitHub's search catches up on the merge", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+
+    const thread = yield* f.start("hold:first")
+    yield* f.transcript(thread.id, holding)
+    gitIn(f.worktree(thread.name), "switch", "--quiet", "-c", "feature/greeting")
+
+    const pr = f.github.seedPullRequest({
+      owner: "glass-demo",
+      repo: "greeter",
+      author: VIEWER.login,
+      headBranch: "feature/greeting",
+      base: { sha: "b0", files: {} },
+      head: { sha: "h1", files: {} },
+    })
+
+    yield* f.release("first")
+
+    const stateOf = (tag: "Open" | "Merged") =>
+      f.client.WatchThreadPullRequests().pipe(
+        Stream.filter((listed) =>
+          listed.some(({ threadId, state }) => threadId === thread.id && state._tag === tag),
+        ),
+        Stream.runHead,
+      )
+
+    yield* stateOf("Open")
+
+    f.github.unindexedPullRequests.add(pr.id)
+    pr.edit({ state: "MERGED" })
+    yield* f.client.ListPullRequests()
+
+    yield* stateOf("Merged")
   }),
 )
 
@@ -621,7 +602,7 @@ it.live("leaves out a merged PR from before the Thread on a branch name it reuse
 it.live("names a Local Thread past a branch pushed since its checkout last fetched", () =>
   Effect.gen(function* () {
     const f = yield* threadsFixtureWith({
-      agentRunners: fakeAgentRunnersWith(() => "fix/greeting"),
+      agentRunners: fakeAgentRunners(() => "fix/greeting"),
     })
 
     gitIn(f.clone.origin, "branch", "fix/greeting", "main")
@@ -629,7 +610,11 @@ it.live("names a Local Thread past a branch pushed since its checkout last fetch
     const thread = yield* f.start("hold:first")
     yield* f.transcript(thread.id, holding)
 
-    assert.equal(gitIn(f.worktree(thread.name), "branch", "--show-current"), "fix/greeting-2")
+    yield* eventually(
+      Effect.sync(() =>
+        assert.equal(gitIn(f.worktree(thread.name), "branch", "--show-current"), "fix/greeting-2"),
+      ),
+    )
     yield* f.release("first")
   }),
 )

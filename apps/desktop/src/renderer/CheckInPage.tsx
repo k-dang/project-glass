@@ -19,7 +19,7 @@ import {
 import { useMinuteClock } from "./Inbox"
 import { fileName } from "./fileName"
 import { summaryParts, titleOf, Waited } from "./inboxItem"
-import { watchedNeedsYouAtom } from "./needsYou"
+import { watchedInboxAtom } from "./inboxArea"
 import { plural } from "./plural"
 import { type Problem, problemOf } from "./problems"
 import { checkInChangesAtom, checkInNotesAtom, useCheckInNotes } from "./useCheckInNotes"
@@ -27,12 +27,12 @@ import { useShortcuts } from "./useShortcuts"
 
 export function CheckInPage(props: { checkInId: string }) {
   const navigate = useNavigate()
-  const needsYou = useAtomValue(watchedNeedsYouAtom)
+  const inbox = useAtomValue(watchedInboxAtom)
   const backToInbox = () => void navigate({ to: "/inbox" })
 
   useShortcuts([{ key: "Escape", run: backToInbox }])
 
-  const checkIn = Option.flatMap(AsyncResult.value(needsYou), (items) =>
+  const checkIn = Option.flatMap(AsyncResult.value(inbox), (items) =>
     Option.fromNullishOr(items.filter(Schema.is(CheckIn)).find(({ id }) => id === props.checkInId)),
   )
 
@@ -40,7 +40,7 @@ export function CheckInPage(props: { checkInId: string }) {
     <main aria-label="Check-in" className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {Option.isSome(checkIn) ? (
         <CheckInReview checkIn={checkIn.value} onBack={backToInbox} />
-      ) : AsyncResult.isSuccess(needsYou) ? (
+      ) : AsyncResult.isSuccess(inbox) ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
           <p className="text-sm text-muted-foreground">
             This Check-in isn't waiting anymore: it was answered, or its wait ended.
@@ -121,8 +121,8 @@ function CheckInReview(props: { checkIn: CheckIn; onBack: () => void }) {
         <ChangesWithFeedback
           changes={shown}
           store={store}
-          sidebarTab={sidebarTab}
-          setSidebarTab={setSidebarTab}
+          sidebar={{ tab: sidebarTab, onTabChange: setSidebarTab }}
+          wide={null}
           footer={
             <AnswerBar
               checkInId={checkIn.id}
@@ -145,7 +145,7 @@ const answerHint = (editing: boolean, noteCount: number) => {
 }
 
 function AnswerBar(props: { checkInId: string; noteCount: number; onAnswered: () => void }) {
-  const editing = useNoteOpen()
+  const editing = useNoteOpen() !== "none"
   const runtime = useBackendRuntime()
   const [text, setText] = useState("")
   const [answering, setAnswering] = useState(false)

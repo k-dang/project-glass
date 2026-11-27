@@ -17,15 +17,16 @@ The search box opened with ⌘K or Ctrl+K from anywhere in Glass, for running an
 view offers, jumping to a PR or Thread by name, and starting a Thread from what was typed.
 _Avoid_: Command palette, quick open (a Command is something an Agent harness runs)
 
+**Inbox**:
+The Area listing the Threads, questions, Check-ins, Outside agent requests, and PRs waiting on the
+user now, grouped by why they wait.
+_Avoid_: Needs you
+
 ### Resuming work
 
 **Saved place**:
 The last piece of work the user was doing in an Area, with their place in it, kept on this device
 for them to continue.
-
-**Needs you**:
-The Threads, questions, Check-ins, and PRs waiting on the user now, listed in the Inbox and
-grouped by why they wait.
 
 ### Reviewing
 
@@ -87,8 +88,8 @@ _Avoid_: Default engine, runner (in UI copy), generator, provider
 
 **Agent review**:
 An agent-written critique of one Revision of a PR, kept on this device for the user alone and
-read beside the diff. Unlike a GitHub review, it is never published and never approves or
-requests changes.
+read in a side panel of the PR workspace. Unlike a GitHub review, it is never published and never
+approves or requests changes.
 _Avoid_: AI review, code review, critique
 
 **Agent review engine**:
@@ -107,8 +108,8 @@ bump.
 _Avoid_: Plumbing, noise, skippable file
 
 **Follow-up**:
-A message the user sends about an Agent review and the agent's answer, a Turn of the Agent
-review's own Thread.
+A message the user sends about an Agent review and the answer of the agent that wrote it, a later
+Turn of the Thread whose first Turn wrote the review.
 _Avoid_: Chat
 
 **Suggested draft**:
@@ -174,8 +175,9 @@ and a model and working in one place: a worktree on this device, a Sandbox, or a
 Agent review's Revision. The user starts one, or the Global chat or another
 Thread's agent does for them. Any Thread can create and message other Threads through Glass's
 tools, but never one that asks the user less than it does, and never itself; one in a Sandbox can
-reach only Threads in a Sandbox. A Thread is not a Session, which is one stretch of the Global
-chat.
+reach only Threads in a Sandbox. By the same rule, only a Thread on this device with no Permission
+mode can start an Agent review, which runs on this device and asks the user nothing. A Thread is
+not a Session, which is one stretch of the Global chat.
 _Avoid_: Conversation, chat, bot, box
 
 **Thread's PR**:
@@ -239,8 +241,8 @@ when background work reports back.
 _Avoid_: Run, execution, exchange
 
 **Agent status**:
-A short line about what a Thread's agent has going besides its Turn, such as background
-subagents or commands.
+A short line about what a Thread's agent has going besides its Turn, such as a background
+subagent or command, which the user can stop from that line.
 _Avoid_: Extension status, widget, banner
 
 **Diagram**:
@@ -248,10 +250,28 @@ A named Mermaid picture a Thread's agent draws beside the Thread when the user a
 one.
 _Avoid_: Artifact, chart, whiteboard
 
+**Visualization**:
+An HTML page a Thread's agent or the Global chat shows inline in its reply, such as a chart, table,
+or mockup, kept as it was when shown.
+_Avoid_: Artifact, render, HTML page, preview
+
 **File pane**:
 A file from a Thread's folder shown beside the Thread, opened from a path the agent
-named.
+named. An HTML file opens in the Browser pane instead.
 _Avoid_: Artifact, preview, viewer
+
+**Browser pane**:
+A web page shown beside a Thread, at an address the user or the Thread's agent opened. A Thread
+has at most one. What the user signs in to in one Browser pane stays signed in for every Thread on
+this device; Threads in a Sandbox share sign-ins only with each other, and their pages can't reach
+this device.
+_Avoid_: Preview, webview, browser tab
+
+**Taking over the browser**:
+The user clicking or typing in the page of a Thread's Browser pane while its agent uses it. Until
+the user hands it back or sends the Thread their next message, the agent can still read the page
+but can't open another or act on it.
+_Avoid_: Pausing the agent, locking the browser
 
 **Queued message**:
 A message sent while a Turn runs, waiting to start the next Turn.
@@ -276,7 +296,7 @@ _Avoid_: Draft (a Draft is a GitHub comment)
 
 **Feedback note**:
 An instruction the user leaves on a line or range of a Thread's or Check-in's changes, or on
-part of an HTML page in a File pane, sent to the agent and never published.
+part of a page in a Browser pane, sent to the agent and never published.
 _Avoid_: Draft, review comment
 
 **Permission mode**:
@@ -291,6 +311,10 @@ they answer.
 An agent Glass did not launch that the user has approved to use Glass's MCP tools on this
 computer.
 _Avoid_: Session, client, login
+
+**Outside agent request**:
+An app asking, from the Inbox, for the user to approve it as an Outside agent.
+_Avoid_: Consent request, login request
 
 **Check-in**:
 An Outside agent asking the user to read the changes in a folder on this computer and approve them

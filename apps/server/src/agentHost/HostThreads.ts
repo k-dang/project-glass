@@ -82,6 +82,10 @@ export class HostThreads extends Context.Service<
       message: DeliveredMessage,
     ) => Effect.Effect<void, HostThreadError>
     readonly stopTurn: (threadId: string, turnId: string) => Effect.Effect<SteersNotTakenIn | null>
+    readonly stopBackgroundTask: (
+      threadId: string,
+      taskId: string,
+    ) => Effect.Effect<void, HostThreadError>
     readonly answer: (
       threadId: string,
       requestId: string,
@@ -293,6 +297,12 @@ export class HostThreads extends Context.Service<
               () =>
                 running.get(threadId)?.session.stopTurn(turnId, TurnStopped.make({})) ??
                 Effect.succeed(null),
+            ),
+          stopBackgroundTask: (threadId, taskId) =>
+            Effect.suspend(
+              () =>
+                running.get(threadId)?.session.stopBackgroundTask(taskId) ??
+                Effect.fail(new HostThreadError({ message: "The Thread's agent isn't running." })),
             ),
           answer: (threadId, requestId, answer) =>
             Effect.suspend(() => {

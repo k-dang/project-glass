@@ -1,6 +1,6 @@
 # Feedback notes on a page
 
-A Thread's HTML file opens in a File pane beside the Chat. The user selects text in the page, or turns on Pick element and clicks part of it, and leaves a Feedback note in an editor over the page. Each note is pinned on the page, numbered, and attached to the next message at once. Sending the message delivers the notes with what each points at, and their pins leave the page.
+A Thread's HTML file, or any page the user opens by address, shows in the Browser pane beside the Chat. The user selects text in the page, or turns on Pick element and clicks part of it, and leaves a Feedback note in an editor over the page. Each note is pinned on the page, numbered, and attached to the next message at once. Sending the message delivers the notes with what each points at, and their pins leave the page.
 
 ## Sub-features
 
@@ -11,7 +11,7 @@ A Thread's HTML file opens in a File pane beside the Chat. The user selects text
 
 ## How to get to it (user POV)
 
-Open a Thread whose agent named an `.html` file in inline code, and click that path once the Turn ends. The File pane's toolbar reads "Select text, or pick an element, to leave a Feedback note." with a Pick element button.
+Open a Thread whose agent named an `.html` file in inline code, and click that path once the Turn ends; or open the Thread's Details, click Browser, and type an address. The Browser pane shows the page under its address bar and the line "Select text, or pick an element, to leave a Feedback note.", with a Pick element button.
 
 ## Driving it with glass-verify
 
@@ -24,5 +24,6 @@ Open a Thread whose agent named an `.html` file in inline code, and click that p
 
 ## Gotchas
 
-- The page runs in its own sandboxed frame, outside the window's accessibility tree, so `click` and `snapshot` can't reach inside it. Drive the page with raw CDP `Input.dispatchMouseEvent` (`mouseMoved`, `mousePressed`, `mouseReleased`) on the page target from `http://127.0.0.1:<port>/json/list`, at points read off a screenshot.
+- The page runs in a `<webview>`, outside the window's accessibility tree, so `click` and `snapshot` can't reach inside it. Drive it with raw CDP `Input.dispatchMouseEvent` (`mouseMoved`, `mousePressed`, `mouseReleased`) on the `webview` target from `http://127.0.0.1:<port>/json/list`; `Runtime.evaluate` on that target gives an element's rect to click at.
+- Pick element turns off when the page changes.
 - The note editor saves on ⌘Enter / Ctrl+Enter; plain Enter adds a line.

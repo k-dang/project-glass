@@ -5,7 +5,7 @@ import { RotateCw, SmilePlus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Popover, PopoverClose, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { problemText } from "./problems"
-import { type Reactions, useReactions } from "./useReactions"
+import type { Reactions } from "./workspaceFeedback"
 
 const emoji: Record<Reaction, { readonly symbol: string; readonly name: string }> = {
   "thumbs-up": { symbol: "👍", name: "thumbs up" },
@@ -20,7 +20,7 @@ const emoji: Record<Reaction, { readonly symbol: string; readonly name: string }
 
 export function CommentReactions(props: { store: Reactions; comment: PublishedComment }) {
   const { store, comment } = props
-  const view = useReactions(store, comment.id)
+  const view = useAtomValue(store.viewAtom(comment.id))
   const locked = useAtomValue(store.lockedAtom)
   const groups = view.confirmed ?? comment.reactions
   const failed = view.feedback?.type === "failed" ? view.feedback : null

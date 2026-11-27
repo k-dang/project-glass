@@ -81,7 +81,7 @@ it.live("a Thread in a Sandbox can't create or message one on this device", () =
     )
     assert.deepStrictEqual(
       (yield* f.threads).map(({ id }) => id),
-      [local.id, sandboxed.id],
+      [sandboxed.id, local.id],
     )
   }),
 )
@@ -162,6 +162,26 @@ it.effect(
           lastText(filledIn),
           TextPart.make({ text: "Reply to: hold:sandboxed" }),
         )
+      }),
+    ),
+)
+
+it.effect(
+  "warns unchecked without reconnecting when removing a Thread whose Sandbox is unreachable",
+  () =>
+    withSkippableWaits(QUICK_RETRY_SPACING, (skipQuickRetries) =>
+      Effect.gen(function* () {
+        const f = yield* threadsFixture
+        const thread = yield* f.startSandbox("hold:start")
+        yield* f.transcript(thread.id, holding)
+
+        yield* Effect.promise(() => f.sandboxes.dropConnections(thread.id))
+        yield* skipQuickRetries
+        yield* f.sandboxStatus(thread.id, ({ reach }) => reach === "unreachable")
+        f.sandboxes.reconnect(thread.id)
+
+        const warnings = yield* f.client.GetRemovalWarnings({ threadId: thread.id })
+        assert.equal(warnings.uncommittedChanges, "unchecked")
       }),
     ),
 )

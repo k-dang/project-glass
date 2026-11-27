@@ -3,6 +3,7 @@ import { Effect, Predicate } from "effect"
 import { ActivityLog } from "./ActivityLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
+import { BrowserPages } from "./BrowserPages"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Threads } from "./Threads"
 import { GitHubClient } from "./github/GitHubClient"
@@ -10,14 +11,16 @@ import { GlobalChat } from "./GlobalChat"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { LocalCheckouts } from "./LocalCheckouts"
-import { NeedsYou } from "./NeedsYou"
+import { Inbox } from "./Inbox"
 import { OutsideAgents } from "./OutsideAgents"
 import { OutsideQuestions } from "./OutsideQuestions"
 import { CheckIns } from "./CheckIns"
 import { McpCredentials } from "./mcp/McpCredentials"
+import { McpOAuth } from "./mcp/McpOAuth"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
+import { reportRendererEvents } from "./rendererEvents"
 import { engineSettingsOf, SettingsStore, withEngineSettings } from "./SettingsStore"
 import { Sandboxes } from "./Sandboxes"
 import { SavedPlaces } from "./SavedPlaces"
@@ -43,19 +46,34 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const settings = yield* SettingsStore
     const savedPlaces = yield* SavedPlaces
     const threads = yield* Threads
+    const browserPages = yield* BrowserPages
     const globalChat = yield* GlobalChat
     const sandboxes = yield* Sandboxes
     const checkouts = yield* LocalCheckouts
     const storage = yield* Storage
     const skillPacks = yield* SkillPacks
     const localSkills = yield* LocalSkills
-    const needsYou = yield* NeedsYou
+    const inbox = yield* Inbox
     const threadPullRequests = yield* ThreadPullRequests
     const settledThreads = yield* SettledThreads
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const outsideAgents = yield* OutsideAgents
+    const oauth = yield* McpOAuth
     const mcpCredentials = yield* McpCredentials
+
+    const handingBack =
+      (threadId: string) =>
+      <A, E, R>(sent: Effect.Effect<A, E, R>) =>
+        browserPages
+          .handBack(threadId)
+          .pipe(
+            Effect.flatMap((tookOver) =>
+              sent.pipe(
+                Effect.tapError(() => (tookOver ? browserPages.takeOver(threadId) : Effect.void)),
+              ),
+            ),
+          )
 
     return GlassRpcs.of({
       GetSavedPlaces: () => savedPlaces.list(),
@@ -64,8 +82,6 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       CancelTour: ({ pullRequest }) => tours.cancel(pullRequest),
       WatchTour: ({ pullRequest }) => tours.watch(pullRequest),
       StartAgentReview: ({ pullRequest, revision }) => agentReviews.start(pullRequest, revision),
-      FollowUpAgentReview: ({ pullRequest, revision, message }) =>
-        agentReviews.followUp(pullRequest, revision, message),
       CancelAgentReview: ({ pullRequest }) => agentReviews.cancel(pullRequest),
       MarkAgentReviewDone: ({ pullRequest, writtenAt }) =>
         agentReviews.markDone(pullRequest, writtenAt),
@@ -182,10 +198,15 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateThread: (input) => threads.create(input),
       WatchWorkingThreads: () => threads.watchWorking(),
+      WatchBrowserPageRequests: () => browserPages.requests,
+      AnswerBrowserPageRequest: ({ id, answer }) => browserPages.answer(id, answer),
+      WatchBrowserControl: () => browserPages.control,
+      TakeOverBrowser: ({ threadId }) => browserPages.takeOver(threadId),
+      HandBackBrowser: ({ threadId }) => browserPages.handBack(threadId).pipe(Effect.asVoid),
       WatchThreadPullRequests: () => threadPullRequests.watch(),
       WatchSettledThreads: () => settledThreads.watch(),
       BringBackThread: ({ threadId }) => threads.bringBack(threadId),
-      WatchNeedsYou: () => needsYou.watch(),
+      WatchInbox: () => inbox.watch(),
       MarkTurnSeen: ({ threadId, endedAt }) => threads.markTurnSeen(threadId, endedAt),
       AnswerOutsideQuestion: ({ id, answer }) => outsideQuestions.answer(id, answer),
       GetCheckInChanges: ({ checkInId }) => checkIns.changes(checkInId),
@@ -195,6 +216,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       AnswerCheckIn: ({ checkInId, answer }) => checkIns.answer(checkInId, answer),
       GetMcpEndpoint: () => mcpCredentials.endpoint.pipe(Effect.map((url) => ({ url }))),
       WatchOutsideAgents: () => outsideAgents.watch(),
+      AnswerOutsideAgentRequest: ({ id, decision }) => oauth.answer(id, decision),
       RevokeOutsideAgent: ({ id }) => outsideAgents.revoke(id),
       ChangeThreadModel: ({ threadId, model, effort }) =>
         threads.changeModel(threadId, { model, effort }),
@@ -203,24 +225,28 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       AnswerRequest: ({ threadId, requestId, answer }) =>
         threads.answer(threadId, requestId, answer),
       SendMessage: ({ threadId, message, images, feedback }) =>
-        threads.send(threadId, { message, images }, feedback).pipe(Effect.asVoid),
-      Steer: ({ threadId, message, images }) => threads.steer(threadId, { message, images }),
+        threads
+          .send(threadId, { message, images }, feedback)
+          .pipe(handingBack(threadId), Effect.asVoid),
+      Steer: ({ threadId, message, images }) =>
+        threads.steer(threadId, { message, images }).pipe(handingBack(threadId)),
       CancelQueuedMessage: ({ threadId, queuedMessageId }) =>
         threads.cancelQueued(threadId, queuedMessageId),
       SendQueuedMessage: ({ threadId, queuedMessageId }) =>
-        threads.sendQueued(threadId, queuedMessageId),
+        threads.sendQueued(threadId, queuedMessageId).pipe(handingBack(threadId)),
       StopTurn: ({ threadId }) => threads.stop(threadId),
+      StopBackgroundTask: ({ threadId, taskId }) => threads.stopBackgroundTask(threadId, taskId),
       ReachSandbox: ({ threadId }) => threads.reachSandbox(threadId),
       GetUnsentMessage: ({ threadId }) => threads.unsent(threadId),
       SaveUnsentMessage: ({ threadId, message, images }) =>
         threads.saveUnsent(threadId, { message, images }),
       GetThreadChanges: ({ threadId }) => threads.changes(threadId),
       ListFeedbackNotes: ({ threadId }) => threads.feedbackNotes(threadId),
-      StageFeedbackNotes: ({ threadId }) => threads.stageFeedbackNotes(threadId),
       SaveFeedbackNote: ({ threadId, note }) => threads.saveFeedbackNote(threadId, note),
       RemoveFeedbackNote: ({ threadId, noteId }) => threads.removeFeedbackNote(threadId, noteId),
       GetRemovalWarnings: ({ threadId }) => threads.removalWarnings(threadId),
       RemoveThread: ({ threadId }) => threads.remove(threadId),
+      ReportRendererEvents: ({ events }) => reportRendererEvents(events),
       GetGlobalChatModel: () => globalChat.model,
       ChangeGlobalChatModel: (choice) => globalChat.changeModel(choice),
       WatchGlobalTranscript: () => globalChat.transcript,

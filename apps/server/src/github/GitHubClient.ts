@@ -89,10 +89,10 @@ import {
 } from "./GitHubRequestPolicy"
 import {
   type Attention,
-  type CheckObservation,
+  type PullRequestObservation,
   type CandidatesPage,
   PULL_REQUEST_ATTENTION_QUERY,
-  PULL_REQUEST_CHECKS_QUERY,
+  PULL_REQUEST_OBSERVATIONS_QUERY,
   REPOSITORY_PULL_REQUESTS_QUERY,
   REVIEW_REQUESTS_QUERY,
   type ReviewRequestsPage,
@@ -100,7 +100,7 @@ import {
   updatedSinceSearch,
   toAttention,
   toCandidatesPage,
-  toChecks,
+  toObservations,
   toReviewRequestsPage,
 } from "./repositoryPullRequests"
 import { HEAD_MOVED, mergeOperation } from "./merging"
@@ -140,7 +140,7 @@ import {
   RepositoryPullRequestsResponse,
   SearchPullRequestsResponse,
   PullRequestAttentionResponse,
-  PullRequestChecksResponse,
+  PullRequestObservationsResponse,
   ReviewRequestsResponse,
   AddDraftResponse,
   DraftStateResponse,
@@ -198,7 +198,7 @@ const missingRepository = ({ type }: GraphQLError) =>
 const foundRepository = <A>({ repository }: { readonly repository: A | null }) =>
   repository === null ? Effect.fail(new RepositoryMissing()) : Effect.succeed(repository)
 
-const CHECKS_BATCH_SIZE = 100
+const OBSERVATIONS_BATCH_SIZE = 100
 
 const ATTENTION_BATCH_SIZE = 50
 
@@ -303,9 +303,9 @@ export class GitHubClient extends Context.Service<
       viewerLogin: string,
       after: string | null,
     ) => Effect.Effect<CandidatesPage, ConnectionError>
-    readonly pullRequestChecks: (
+    readonly pullRequestObservations: (
       pullRequestIds: ReadonlyArray<string>,
-    ) => Effect.Effect<ReadonlyMap<string, CheckObservation>, ConnectionError>
+    ) => Effect.Effect<ReadonlyMap<string, PullRequestObservation>, ConnectionError>
     readonly pullRequestAttention: (
       pullRequestIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyMap<string, Attention>, ConnectionError>
@@ -449,6 +449,8 @@ export class GitHubClient extends Context.Service<
                 .pipe(Effect.catch(unavailable("Check your internet connection, then try again.")))
 
               if (response.status === 401) {
+                yield* auth.forgetToken
+
                 return yield* new TokenRejected({ tokenSource: source })
               }
 
@@ -918,15 +920,15 @@ export class GitHubClient extends Context.Service<
         return new Map(batches.flatMap((batch) => [...batch]))
       })
 
-      const pullRequestChecks = Effect.fn("GitHubClient.pullRequestChecks")(
+      const pullRequestObservations = Effect.fn("GitHubClient.pullRequestObservations")(
         (pullRequestIds: ReadonlyArray<string>) =>
           nodesById(
             {
-              name: "PullRequestChecks",
-              query: PULL_REQUEST_CHECKS_QUERY,
-              response: PullRequestChecksResponse,
-              batchSize: CHECKS_BATCH_SIZE,
-              decode: toChecks,
+              name: "PullRequestObservations",
+              query: PULL_REQUEST_OBSERVATIONS_QUERY,
+              response: PullRequestObservationsResponse,
+              batchSize: OBSERVATIONS_BATCH_SIZE,
+              decode: toObservations,
             },
             pullRequestIds,
           ),
@@ -1404,7 +1406,7 @@ export class GitHubClient extends Context.Service<
         pullRequestStatus,
         repositoryPullRequests,
         pullRequestsUpdatedSince,
-        pullRequestChecks,
+        pullRequestObservations,
         pullRequestAttention,
         queuedPullRequests,
         endedBranchPullRequests,

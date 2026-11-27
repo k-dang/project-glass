@@ -8,8 +8,10 @@
         "rpc",
         "--session-id",
         "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
+        "--session-dir",
+        "<pi-home>/.pi/agent/sessions/glass-reviews",
         "--tools",
-        "read,grep,find,ls,bash,suggest_draft",
+        "read,grep,find,ls,bash,submit_review,suggest_draft",
         "--no-extensions",
         "--no-mcp",
         "--no-skills",
@@ -18,7 +20,7 @@
         "--no-context-files",
         "--no-approve",
         "--extension",
-        "<folder>.pi/suggest-draft.mjs",
+        "<folder>.pi/review-tools.mjs",
         "--append-system-prompt",
         "<folder>.pi/instructions.md"
       ],
@@ -59,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-37-13-906Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/glass-reviews/2026-11-26T06-52-46-044Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -103,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232234002,
+              "timestamp": 1795675966139,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -228,6 +230,103 @@
                   "constrainedSampling": {
                     "type": "json_schema",
                     "strict": "prefer"
+                  }
+                },
+                {
+                  "name": "submit_review",
+                  "description": "Hand in your Agent review. Glass refuses one that doesn't fit, saying why, so you can fix it and call again.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "markdown": {
+                        "type": "string",
+                        "description": "The review in Markdown."
+                      },
+                      "hotspots": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "data-access",
+                                "migration",
+                                "auth",
+                                "concurrency",
+                                "public-contract"
+                              ]
+                            },
+                            "place": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "path": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "side": {
+                                      "type": "string",
+                                      "enum": ["old", "new"]
+                                    },
+                                    "startLine": {
+                                      "type": "integer",
+                                      "maximum": 9007199254740991,
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "endLine": {
+                                      "type": "integer",
+                                      "maximum": 9007199254740991,
+                                      "exclusiveMinimum": 0
+                                    }
+                                  },
+                                  "required": ["path", "side", "startLine", "endLine"],
+                                  "additionalProperties": true
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "why": {
+                              "type": "string"
+                            },
+                            "evidence": {
+                              "type": "string"
+                            },
+                            "check": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["title", "kind", "place", "why", "evidence", "check"],
+                          "additionalProperties": true
+                        },
+                        "description": "The hotspots, most important first."
+                      },
+                      "lowAttention": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string"
+                            },
+                            "reason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["path", "reason"],
+                          "additionalProperties": true
+                        },
+                        "description": "The changed files that need little attention."
+                      }
+                    },
+                    "required": ["markdown", "hotspots", "lowAttention"],
+                    "additionalProperties": false
                   }
                 },
                 {
@@ -271,7 +370,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232234002,
+              "timestamp": 1795675966139,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -399,6 +498,103 @@
                   }
                 },
                 {
+                  "name": "submit_review",
+                  "description": "Hand in your Agent review. Glass refuses one that doesn't fit, saying why, so you can fix it and call again.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "markdown": {
+                        "type": "string",
+                        "description": "The review in Markdown."
+                      },
+                      "hotspots": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string"
+                            },
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "data-access",
+                                "migration",
+                                "auth",
+                                "concurrency",
+                                "public-contract"
+                              ]
+                            },
+                            "place": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "path": {
+                                      "type": "string",
+                                      "minLength": 1
+                                    },
+                                    "side": {
+                                      "type": "string",
+                                      "enum": ["old", "new"]
+                                    },
+                                    "startLine": {
+                                      "type": "integer",
+                                      "maximum": 9007199254740991,
+                                      "exclusiveMinimum": 0
+                                    },
+                                    "endLine": {
+                                      "type": "integer",
+                                      "maximum": 9007199254740991,
+                                      "exclusiveMinimum": 0
+                                    }
+                                  },
+                                  "required": ["path", "side", "startLine", "endLine"],
+                                  "additionalProperties": true
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "why": {
+                              "type": "string"
+                            },
+                            "evidence": {
+                              "type": "string"
+                            },
+                            "check": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["title", "kind", "place", "why", "evidence", "check"],
+                          "additionalProperties": true
+                        },
+                        "description": "The hotspots, most important first."
+                      },
+                      "lowAttention": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "path": {
+                              "type": "string"
+                            },
+                            "reason": {
+                              "type": "string"
+                            }
+                          },
+                          "required": ["path", "reason"],
+                          "additionalProperties": true
+                        },
+                        "description": "The changed files that need little attention."
+                      }
+                    },
+                    "required": ["markdown", "hotspots", "lowAttention"],
+                    "additionalProperties": false
+                  }
+                },
+                {
                   "name": "suggest_draft",
                   "description": "Propose a comment for the PR's author on one line of the diff, for the reviewer to edit and add as a Draft. Glass refuses a line outside the diff's hunks.",
                   "parameters": {
@@ -443,7 +639,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1795232234000
+              "timestamp": 1795675966137
             }
           }
         },
@@ -458,7 +654,7 @@
                   "text": "Draft comments on greet.ts."
                 }
               ],
-              "timestamp": 1795232234000
+              "timestamp": 1795675966137
             }
           }
         },
@@ -486,7 +682,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232234035
+              "timestamp": 1795675966166
             }
           }
         },
@@ -603,7 +799,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232234035,
+              "timestamp": 1795675966166,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 20,
@@ -673,7 +869,7 @@
               }
             },
             "isError": false,
-            "durationMs": 58
+            "durationMs": 69
           }
         },
         {
@@ -690,8 +886,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 58,
-              "timestamp": 1795232234115
+              "durationMs": 69,
+              "timestamp": 1795675966258
             }
           }
         },
@@ -709,8 +905,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 58,
-              "timestamp": 1795232234115
+              "durationMs": 69,
+              "timestamp": 1795675966258
             }
           }
         },
@@ -747,7 +943,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232234035,
+              "timestamp": 1795675966166,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 20,
@@ -765,8 +961,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 58,
-                "timestamp": 1795232234115
+                "durationMs": 69,
+                "timestamp": 1795675966258
               }
             ]
           }
@@ -800,7 +996,579 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232234118
+              "timestamp": 1795675966261
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 0,
+              "id": "submit-0",
+              "toolName": "submit_review"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "{\"markdown\":\" \",\"hotspots\":[],\"lowAttention\":[]}"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_end",
+              "contentIndex": 0,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "submit-0",
+                "name": "submit_review",
+                "arguments": {
+                  "markdown": " ",
+                  "hotspots": [],
+                  "lowAttention": []
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "submit-0",
+                  "name": "submit_review",
+                  "arguments": {
+                    "markdown": " ",
+                    "hotspots": [],
+                    "lowAttention": []
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1795675966261,
+              "responseId": "test-completion",
+              "rawStopReason": "tool_calls",
+              "durationMs": 3,
+              "thinkingLevel": "off"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "tool_execution_start",
+            "toolCallId": "submit-0",
+            "toolName": "submit_review",
+            "args": {
+              "markdown": " ",
+              "hotspots": [],
+              "lowAttention": []
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "tool_execution_end",
+            "toolCallId": "submit-0",
+            "toolName": "submit_review",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Expected a value with a length of at least 1\n  at [\"markdown\"]"
+                }
+              ],
+              "details": {}
+            },
+            "isError": true,
+            "durationMs": 1
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "toolResult",
+              "toolCallId": "submit-0",
+              "toolName": "submit_review",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Expected a value with a length of at least 1\n  at [\"markdown\"]"
+                }
+              ],
+              "details": {},
+              "isError": true,
+              "durationMs": 1,
+              "timestamp": 1795675966267
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "toolResult",
+              "toolCallId": "submit-0",
+              "toolName": "submit_review",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Expected a value with a length of at least 1\n  at [\"markdown\"]"
+                }
+              ],
+              "details": {},
+              "isError": true,
+              "durationMs": 1,
+              "timestamp": 1795675966267
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "submit-0",
+                  "name": "submit_review",
+                  "arguments": {
+                    "markdown": " ",
+                    "hotspots": [],
+                    "lowAttention": []
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1795675966261,
+              "responseId": "test-completion",
+              "rawStopReason": "tool_calls",
+              "durationMs": 3,
+              "thinkingLevel": "off"
+            },
+            "toolResults": [
+              {
+                "role": "toolResult",
+                "toolCallId": "submit-0",
+                "toolName": "submit_review",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Expected a value with a length of at least 1\n  at [\"markdown\"]"
+                  }
+                ],
+                "details": {},
+                "isError": true,
+                "durationMs": 1,
+                "timestamp": 1795675966267
+              }
+            ]
+          }
+        },
+        {
+          "in": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": [],
+              "api": "openai-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1795675966269
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_start",
+              "contentIndex": 0,
+              "id": "submit-1",
+              "toolName": "submit_review"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "{\"markdown\":\"**Nothing stands out.**\",\"hotspots\":[],\"lowAttention\":[]}"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0
+              }
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_end",
+              "contentIndex": 0,
+              "toolCall": {
+                "type": "toolCall",
+                "id": "submit-1",
+                "name": "submit_review",
+                "arguments": {
+                  "markdown": "**Nothing stands out.**",
+                  "hotspots": [],
+                  "lowAttention": []
+                }
+              }
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "submit-1",
+                  "name": "submit_review",
+                  "arguments": {
+                    "markdown": "**Nothing stands out.**",
+                    "hotspots": [],
+                    "lowAttention": []
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1795675966269,
+              "responseId": "test-completion",
+              "rawStopReason": "tool_calls",
+              "durationMs": 3,
+              "thinkingLevel": "off"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "tool_execution_start",
+            "toolCallId": "submit-1",
+            "toolName": "submit_review",
+            "args": {
+              "markdown": "**Nothing stands out.**",
+              "hotspots": [],
+              "lowAttention": []
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "tool_execution_end",
+            "toolCallId": "submit-1",
+            "toolName": "submit_review",
+            "result": {
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Glass has your Agent review. End your Turn now."
+                }
+              ]
+            },
+            "isError": false,
+            "durationMs": 0
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "toolResult",
+              "toolCallId": "submit-1",
+              "toolName": "submit_review",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Glass has your Agent review. End your Turn now."
+                }
+              ],
+              "isError": false,
+              "durationMs": 0,
+              "timestamp": 1795675966272
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_end",
+            "message": {
+              "role": "toolResult",
+              "toolCallId": "submit-1",
+              "toolName": "submit_review",
+              "content": [
+                {
+                  "type": "text",
+                  "text": "Glass has your Agent review. End your Turn now."
+                }
+              ],
+              "isError": false,
+              "durationMs": 0,
+              "timestamp": 1795675966272
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "turn_end",
+            "message": {
+              "role": "assistant",
+              "content": [
+                {
+                  "type": "toolCall",
+                  "id": "submit-1",
+                  "name": "submit_review",
+                  "arguments": {
+                    "markdown": "**Nothing stands out.**",
+                    "hotspots": [],
+                    "lowAttention": []
+                  }
+                }
+              ],
+              "api": "openai-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "toolUse",
+              "timestamp": 1795675966269,
+              "responseId": "test-completion",
+              "rawStopReason": "tool_calls",
+              "durationMs": 3,
+              "thinkingLevel": "off"
+            },
+            "toolResults": [
+              {
+                "role": "toolResult",
+                "toolCallId": "submit-1",
+                "toolName": "submit_review",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Glass has your Agent review. End your Turn now."
+                  }
+                ],
+                "isError": false,
+                "durationMs": 0,
+                "timestamp": 1795675966272
+              }
+            ]
+          }
+        },
+        {
+          "in": {
+            "type": "turn_start"
+          }
+        },
+        {
+          "in": {
+            "type": "message_start",
+            "message": {
+              "role": "assistant",
+              "content": [],
+              "api": "openai-completions",
+              "provider": "glass-test",
+              "model": "gpt-test",
+              "usage": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "totalTokens": 0,
+                "cost": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "total": 0
+                }
+              },
+              "stopReason": "pending",
+              "timestamp": 1795675966274
             }
           }
         },
@@ -923,10 +1691,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232234118,
+              "timestamp": 1795675966274,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 3,
+              "durationMs": 2,
               "thinkingLevel": "off"
             }
           }
@@ -958,7 +1726,7 @@
               ]
             },
             "isError": false,
-            "durationMs": 1
+            "durationMs": 0
           }
         },
         {
@@ -975,8 +1743,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 1,
-              "timestamp": 1795232234124
+              "durationMs": 0,
+              "timestamp": 1795675966277
             }
           }
         },
@@ -994,8 +1762,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 1,
-              "timestamp": 1795232234124
+              "durationMs": 0,
+              "timestamp": 1795675966277
             }
           }
         },
@@ -1035,10 +1803,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232234118,
+              "timestamp": 1795675966274,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 3,
+              "durationMs": 2,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1053,8 +1821,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 1,
-                "timestamp": 1795232234124
+                "durationMs": 0,
+                "timestamp": 1795675966277
               }
             ]
           }
@@ -1088,7 +1856,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232234127
+              "timestamp": 1795675966279
             }
           }
         },
@@ -1211,10 +1979,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232234127,
+              "timestamp": 1795675966279,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 4,
+              "durationMs": 2,
               "thinkingLevel": "off"
             }
           }
@@ -1266,7 +2034,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1795232234131
+              "timestamp": 1795675966282
             }
           }
         },
@@ -1286,7 +2054,7 @@
               "details": {},
               "isError": true,
               "durationMs": 0,
-              "timestamp": 1795232234131
+              "timestamp": 1795675966282
             }
           }
         },
@@ -1326,10 +2094,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232234127,
+              "timestamp": 1795675966279,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 4,
+              "durationMs": 2,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1346,7 +2114,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1795232234131
+                "timestamp": 1795675966282
               }
             ]
           }
@@ -1380,7 +2148,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232234133
+              "timestamp": 1795675966283
             }
           }
         },
@@ -1503,10 +2271,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232234133,
+              "timestamp": 1795675966283,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 2,
+              "durationMs": 1,
               "thinkingLevel": "off"
             }
           }
@@ -1539,7 +2307,7 @@
               "details": {}
             },
             "isError": true,
-            "durationMs": 1
+            "durationMs": 0
           }
         },
         {
@@ -1557,8 +2325,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 1,
-              "timestamp": 1795232234137
+              "durationMs": 0,
+              "timestamp": 1795675966285
             }
           }
         },
@@ -1577,8 +2345,8 @@
               ],
               "details": {},
               "isError": true,
-              "durationMs": 1,
-              "timestamp": 1795232234137
+              "durationMs": 0,
+              "timestamp": 1795675966285
             }
           }
         },
@@ -1618,10 +2386,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232234133,
+              "timestamp": 1795675966283,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 2,
+              "durationMs": 1,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1637,8 +2405,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 1,
-                "timestamp": 1795232234137
+                "durationMs": 0,
+                "timestamp": 1795675966285
               }
             ]
           }
@@ -1672,7 +2440,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232234139
+              "timestamp": 1795675966287
             }
           }
         },
@@ -1776,10 +2544,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795232234139,
+              "timestamp": 1795675966287,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 2,
+              "durationMs": 1,
               "thinkingLevel": "off"
             }
           }
@@ -1813,10 +2581,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795232234139,
+              "timestamp": 1795675966287,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 2,
+              "durationMs": 1,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -1830,7 +2598,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795232234002,
+                "timestamp": 1795675966139,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1958,6 +2726,103 @@
                     }
                   },
                   {
+                    "name": "submit_review",
+                    "description": "Hand in your Agent review. Glass refuses one that doesn't fit, saying why, so you can fix it and call again.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "markdown": {
+                          "type": "string",
+                          "description": "The review in Markdown."
+                        },
+                        "hotspots": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string"
+                              },
+                              "kind": {
+                                "type": "string",
+                                "enum": [
+                                  "data-access",
+                                  "migration",
+                                  "auth",
+                                  "concurrency",
+                                  "public-contract"
+                                ]
+                              },
+                              "place": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "path": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "side": {
+                                        "type": "string",
+                                        "enum": ["old", "new"]
+                                      },
+                                      "startLine": {
+                                        "type": "integer",
+                                        "maximum": 9007199254740991,
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "endLine": {
+                                        "type": "integer",
+                                        "maximum": 9007199254740991,
+                                        "exclusiveMinimum": 0
+                                      }
+                                    },
+                                    "required": ["path", "side", "startLine", "endLine"],
+                                    "additionalProperties": true
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "why": {
+                                "type": "string"
+                              },
+                              "evidence": {
+                                "type": "string"
+                              },
+                              "check": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["title", "kind", "place", "why", "evidence", "check"],
+                            "additionalProperties": true
+                          },
+                          "description": "The hotspots, most important first."
+                        },
+                        "lowAttention": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "path": {
+                                "type": "string"
+                              },
+                              "reason": {
+                                "type": "string"
+                              }
+                            },
+                            "required": ["path", "reason"],
+                            "additionalProperties": true
+                          },
+                          "description": "The changed files that need little attention."
+                        }
+                      },
+                      "required": ["markdown", "hotspots", "lowAttention"],
+                      "additionalProperties": false
+                    }
+                  },
+                  {
                     "name": "suggest_draft",
                     "description": "Propose a comment for the PR's author on one line of the diff, for the reviewer to edit and add as a Draft. Glass refuses a line outside the diff's hunks.",
                     "parameters": {
@@ -1997,7 +2862,7 @@
                     "text": "Draft comments on greet.ts."
                   }
                 ],
-                "timestamp": 1795232234000
+                "timestamp": 1795675966137
               },
               {
                 "role": "assistant",
@@ -2029,7 +2894,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795232234035,
+                "timestamp": 1795675966166,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 20,
@@ -2046,8 +2911,113 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 58,
-                "timestamp": 1795232234115
+                "durationMs": 69,
+                "timestamp": 1795675966258
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "submit-0",
+                    "name": "submit_review",
+                    "arguments": {
+                      "markdown": " ",
+                      "hotspots": [],
+                      "lowAttention": []
+                    }
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "glass-test",
+                "model": "gpt-test",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1795675966261,
+                "responseId": "test-completion",
+                "rawStopReason": "tool_calls",
+                "durationMs": 3,
+                "thinkingLevel": "off"
+              },
+              {
+                "role": "toolResult",
+                "toolCallId": "submit-0",
+                "toolName": "submit_review",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Expected a value with a length of at least 1\n  at [\"markdown\"]"
+                  }
+                ],
+                "details": {},
+                "isError": true,
+                "durationMs": 1,
+                "timestamp": 1795675966267
+              },
+              {
+                "role": "assistant",
+                "content": [
+                  {
+                    "type": "toolCall",
+                    "id": "submit-1",
+                    "name": "submit_review",
+                    "arguments": {
+                      "markdown": "**Nothing stands out.**",
+                      "hotspots": [],
+                      "lowAttention": []
+                    }
+                  }
+                ],
+                "api": "openai-completions",
+                "provider": "glass-test",
+                "model": "gpt-test",
+                "usage": {
+                  "input": 0,
+                  "output": 0,
+                  "cacheRead": 0,
+                  "cacheWrite": 0,
+                  "totalTokens": 0,
+                  "cost": {
+                    "input": 0,
+                    "output": 0,
+                    "cacheRead": 0,
+                    "cacheWrite": 0,
+                    "total": 0
+                  }
+                },
+                "stopReason": "toolUse",
+                "timestamp": 1795675966269,
+                "responseId": "test-completion",
+                "rawStopReason": "tool_calls",
+                "durationMs": 3,
+                "thinkingLevel": "off"
+              },
+              {
+                "role": "toolResult",
+                "toolCallId": "submit-1",
+                "toolName": "submit_review",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "Glass has your Agent review. End your Turn now."
+                  }
+                ],
+                "isError": false,
+                "durationMs": 0,
+                "timestamp": 1795675966272
               },
               {
                 "role": "assistant",
@@ -2082,10 +3052,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795232234118,
+                "timestamp": 1795675966274,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 3,
+                "durationMs": 2,
                 "thinkingLevel": "off"
               },
               {
@@ -2099,8 +3069,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 1,
-                "timestamp": 1795232234124
+                "durationMs": 0,
+                "timestamp": 1795675966277
               },
               {
                 "role": "assistant",
@@ -2135,10 +3105,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795232234127,
+                "timestamp": 1795675966279,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 4,
+                "durationMs": 2,
                 "thinkingLevel": "off"
               },
               {
@@ -2154,7 +3124,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 0,
-                "timestamp": 1795232234131
+                "timestamp": 1795675966282
               },
               {
                 "role": "assistant",
@@ -2189,10 +3159,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795232234133,
+                "timestamp": 1795675966283,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 2,
+                "durationMs": 1,
                 "thinkingLevel": "off"
               },
               {
@@ -2207,8 +3177,8 @@
                 ],
                 "details": {},
                 "isError": true,
-                "durationMs": 1,
-                "timestamp": 1795232234137
+                "durationMs": 0,
+                "timestamp": 1795675966285
               },
               {
                 "role": "assistant",
@@ -2236,10 +3206,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232234139,
+                "timestamp": 1795675966287,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 2,
+                "durationMs": 1,
                 "thinkingLevel": "off"
               }
             ],
@@ -2287,10 +3257,10 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-37-13-906Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/glass-reviews/2026-11-26T06-52-46-044Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
-              "messageCount": 11,
+              "messageCount": 15,
               "pendingMessageCount": 0
             }
           }

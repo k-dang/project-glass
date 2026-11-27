@@ -1,14 +1,16 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   type CheckIn,
-  type ThreadNeedsYou,
-  type GlobalChatNeedsYou,
-  type NeedsYouItem,
+  type InboxThread,
+  type InboxGlobalChat,
+  type InboxItem,
   OutsideChoice,
+  type OutsideAgentDecision,
+  type OutsideAgentRequest,
   type OutsideQuestion,
   type OutsideQuestionAnswer,
   OutsideText,
-  type PullRequestNeedsYou,
+  type InboxPullRequest,
   referenceKey,
 } from "@glass/contracts"
 import { Link } from "@tanstack/react-router"
@@ -21,6 +23,7 @@ import { Input } from "@/components/ui/input"
 import { Kbd } from "@/components/ui/kbd"
 import { Label } from "@/components/ui/label"
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
+import { useMountWatch } from "./rendererEvents"
 import { threadColumn } from "./threadColumn"
 import { AgentReviewMarkdown } from "./AgentReviewPanel"
 import { Backend, backendRuntime } from "./backend"
@@ -29,6 +32,8 @@ import { ThreadChat, TranscriptProblem } from "./ThreadView"
 import { globalChat, globalChatOpenAtom } from "./globalChat"
 import {
   contextOf,
+  failingChecksOf,
+  finishedAgentReviewOf,
   type InboxAction,
   ItemIcon,
   Reasons,
@@ -36,7 +41,6 @@ import {
   titleOf,
   Waited,
 } from "./inboxItem"
-import { failingChecksOf, finishedAgentReviewOf } from "./needsYou"
 import { settledProblem } from "./problems"
 import { ago } from "./PullRequestRow"
 import { CheckList } from "./PullRequestStatus"
@@ -50,7 +54,7 @@ interface DetailProps<Item> {
 }
 
 export function InboxDetail(
-  props: DetailProps<NeedsYouItem> & { onReadReview: (pullRequest: string) => void },
+  props: DetailProps<InboxItem> & { onReadReview: (pullRequest: string) => void },
 ) {
   const { now, actions } = props
 
@@ -60,6 +64,9 @@ export function InboxDetail(
       <OutsideQuestionDetail key={item.id} item={item} now={now} actions={actions} />
     ),
     CheckIn: (item) => <CheckInDetail key={item.id} item={item} now={now} actions={actions} />,
+    OutsideAgentRequest: (item) => (
+      <OutsideAgentRequestDetail key={item.id} item={item} now={now} actions={actions} />
+    ),
     PullRequest: (item) => (
       <PullRequestDetail
         item={item}
@@ -107,7 +114,7 @@ function DetailFooter(props: { buttons?: ReactNode; actions: ReadonlyArray<Inbox
   )
 }
 
-function DetailHeader(props: { item: NeedsYouItem; now: Date; meta?: string }) {
+function DetailHeader(props: { item: InboxItem; now: Date; meta?: string }) {
   return (
     <header className="flex items-start gap-3">
       <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-muted/50 text-muted-foreground">
@@ -211,6 +218,52 @@ function OutsideQuestionDetail(props: DetailProps<OutsideQuestion>) {
   )
 }
 
+const answerOutsideAgentRequestAtom = Atom.family((id: string) =>
+  backendRuntime.fn((decision: OutsideAgentDecision) =>
+    Backend.use((backend) => backend.AnswerOutsideAgentRequest({ id, decision })),
+  ),
+)
+
+function OutsideAgentRequestDetail(props: DetailProps<OutsideAgentRequest>) {
+  const { item } = props
+  const answering = answerOutsideAgentRequestAtom(item.id)
+  const sent = useAtomValue(answering)
+  const answer = useAtomSet(answering)
+  const problem = settledProblem(sent)
+
+  return (
+    <DetailShell
+      actions={props.actions}
+      buttons={
+        <>
+          <Button disabled={sent.waiting} onClick={() => answer("approve")}>
+            Approve
+          </Button>
+          <Button variant="outline" disabled={sent.waiting} onClick={() => answer("deny")}>
+            Deny
+          </Button>
+        </>
+      }
+    >
+      <DetailHeader item={item} now={props.now} />
+      <p className="text-sm text-pretty break-words">
+        {item.name} will be able to read your pull requests, to-dos, and agents, start and message
+        agents, start a review, and, in the Inbox, ask you a question or ask you to read the changes
+        in a folder on this computer. The connection lasts 30 days. You can disconnect it in
+        Settings.
+      </p>
+      <p className="text-sm text-pretty break-words text-muted-foreground">
+        Approve only a sign-in you just started.
+      </p>
+      {problem !== null && (
+        <p role="alert" className="text-xs text-destructive">
+          {problem.detail}
+        </p>
+      )}
+    </DetailShell>
+  )
+}
+
 function CheckInDetail(props: DetailProps<CheckIn>) {
   const { item } = props
   const details = summaryParts(item.summary)?.details ?? ""
@@ -236,10 +289,12 @@ function CheckInDetail(props: DetailProps<CheckIn>) {
   )
 }
 
-function ThreadDetail(props: DetailProps<ThreadNeedsYou>) {
+function ThreadDetail(props: DetailProps<InboxThread>) {
   const { thread } = props.item
   const atoms = useMemo(() => threadAtoms(thread.id), [thread.id])
   const done = props.actions.find(({ key }) => key === "E")
+
+  useMountWatch("InboxThreadDetail", thread.id)
 
   return (
     <ThreadAtomsContext value={atoms}>
@@ -273,7 +328,7 @@ function ThreadDetail(props: DetailProps<ThreadNeedsYou>) {
   )
 }
 
-function GlobalChatDetail(props: DetailProps<GlobalChatNeedsYou>) {
+function GlobalChatDetail(props: DetailProps<InboxGlobalChat>) {
   const open = useAtomSet(globalChatOpenAtom)
 
   return (
@@ -292,7 +347,7 @@ function GlobalChatDetail(props: DetailProps<GlobalChatNeedsYou>) {
 }
 
 function PullRequestDetail(
-  props: DetailProps<PullRequestNeedsYou> & { onReadReview: (pullRequest: string) => void },
+  props: DetailProps<InboxPullRequest> & { onReadReview: (pullRequest: string) => void },
 ) {
   const { pullRequest } = props.item
   const review = finishedAgentReviewOf(props.item)
@@ -349,7 +404,7 @@ function PullRequestDetail(
 
 const MAX_FAILING_SHOWN = 3
 
-function FailingChecks(props: { item: PullRequestNeedsYou }) {
+function FailingChecks(props: { item: InboxPullRequest }) {
   const headingId = useId()
   const failing = failingChecksOf(props.item)
 

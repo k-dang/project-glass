@@ -14,12 +14,12 @@ import {
 import { Option, Schema } from "effect"
 import { AsyncResult, type AtomRegistry } from "effect/reactivity"
 import type { ReactNode } from "react"
-import { ThreadSearch } from "./threadsArea"
 import { AppShell } from "./AppShell"
 import { Dashboard } from "./Dashboard"
 import { Connecting, ConnectionProblem } from "./ConnectionProblem"
 import { useConnection } from "./connection"
 import { Viewed, viewedAtom } from "./globalChat"
+import { answerBrowserPageRequests } from "./answerBrowserPageRequests"
 import { openNewCheckIns } from "./openNewCheckIns"
 import {
   closePullRequest,
@@ -35,8 +35,6 @@ const ActivityLogPage = lazyRouteComponent(() => import("./ActivityLogPage"), "A
 const CheckInPage = lazyRouteComponent(() => import("./CheckInPage"), "CheckInPage")
 
 const ThreadsLayout = lazyRouteComponent(() => import("./Threads"), "ThreadsLayout")
-
-const ThreadView = lazyRouteComponent(() => import("./ThreadView"), "ThreadView")
 
 const Inbox = lazyRouteComponent(() => import("./Inbox"), "Inbox")
 
@@ -186,9 +184,6 @@ const newThreadRoute = createRoute({
 const threadRoute = createRoute({
   getParentRoute: () => threadsRoute,
   path: "$threadId",
-  validateSearch: Schema.toStandardSchemaV1(ThreadSearch),
-  loader: preloadLazyPage(ThreadView),
-  component: ThreadPage,
 })
 
 const settingsRoute = createRoute({
@@ -234,6 +229,7 @@ export const createAppRouter = (registry: AtomRegistry.AtomRegistry) => {
   const router = makeRouter(registry)
 
   router.subscribe("onResolved", () => registry.set(viewedAtom, viewedIn(router)))
+  answerBrowserPageRequests(registry)
   openNewCheckIns(registry, (checkInId) => {
     void window.glass.bringToFront()
     void router.navigate({ to: "/inbox/check-ins/$checkInId", params: { checkInId } })
@@ -281,20 +277,6 @@ function NewThreadPage() {
   const { repository } = newThreadRoute.useSearch()
 
   return <NewThread repository={repository} />
-}
-
-function ThreadPage() {
-  const { threadId } = threadRoute.useParams()
-  const { view } = threadRoute.useSearch()
-  const navigate = threadRoute.useNavigate()
-
-  return (
-    <ThreadView
-      threadId={threadId}
-      tab={view ?? "chat"}
-      onTabChange={(tab) => void navigate({ search: tab === "changes" ? { view: tab } : {} })}
-    />
-  )
 }
 
 function ToDosPage() {

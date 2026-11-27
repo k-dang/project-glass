@@ -35,7 +35,7 @@ export class RelayedThread extends Context.Service<RelayedThread, { readonly thr
   )
 }
 
-export interface RelayCredential {
+interface RelayCredential {
   readonly threadId: string
   readonly ownedSessions: Set<string>
 }

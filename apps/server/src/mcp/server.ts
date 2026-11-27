@@ -12,6 +12,8 @@ import { OutsideAgents } from "../OutsideAgents"
 import { AskProgress } from "./AskProgress"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
 import { GlassToolRelay } from "./GlassToolRelay"
+import { BrowserMcpTools } from "./browserTools"
+import { VisualizationToolHandlers, VisualizationTools } from "./visualizationTools"
 import { McpCaller, McpCredentials, OutsideAgentCaller } from "./McpCredentials"
 import { claimOpenedSession, glassMcpHttp, MCP_PATH, ownsSession, SESSION_HEADER } from "./mcpHttp"
 import { requestUrls } from "./McpOAuth"
@@ -142,4 +144,10 @@ export const GlassMcpTools = Layer.effectDiscard(
   Effect.gen(function* () {
     yield* (yield* GlassToolRelay).toolsRegistered
   }),
-).pipe(Layer.provide(McpServer.toolkit(GlassTools)), Layer.provide(GlassToolHandlers))
+).pipe(
+  Layer.provide(BrowserMcpTools),
+  Layer.provide(McpServer.toolkit(VisualizationTools)),
+  Layer.provide(VisualizationToolHandlers),
+  Layer.provide(McpServer.toolkit(GlassTools)),
+  Layer.provide(GlassToolHandlers),
+)

@@ -1,11 +1,10 @@
-import { Duration, Effect, Fiber, Schema } from "effect"
+import { Duration, Effect, Fiber } from "effect"
 import { TestClock } from "effect/testing"
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises"
-import { createServer } from "node:http"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
 import { assert, describe, it } from "@effect/vitest"
-import { BackendError, keepRunning, openBackendLog, waitForBackend } from "./backendIo"
+import { BackendError, keepRunning, openBackendLog } from "./backendIo"
 
 const tempDirectory = Effect.acquireRelease(
   Effect.promise(() => mkdtemp(join(tmpdir(), "glass-backend-io-"))),
@@ -89,40 +88,6 @@ describe("backend log", () => {
     }),
   )
 })
-
-it.live("aborts the health request when startup is interrupted", () =>
-  Effect.gen(function* () {
-    const accepted = Promise.withResolvers<string>()
-    const disconnected = Promise.withResolvers<void>()
-
-    const server = createServer((request) => {
-      request.once("close", () => disconnected.resolve())
-      accepted.resolve(request.url ?? "")
-    })
-
-    yield* Effect.acquireRelease(
-      Effect.promise(() => new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))),
-      () =>
-        Effect.promise(
-          () =>
-            new Promise<void>((resolve) => {
-              server.closeAllConnections()
-              server.close(() => resolve())
-            }),
-        ),
-    )
-
-    const address = yield* Schema.decodeUnknownEffect(Schema.Struct({ port: Schema.Number }))(
-      server.address(),
-    )
-
-    const starting = yield* waitForBackend(address.port, "test-token").pipe(Effect.forkChild())
-    assert.strictEqual(yield* Effect.promise(() => accepted.promise), "/health?token=test-token")
-
-    yield* Fiber.interrupt(starting)
-    yield* Effect.promise(() => disconnected.promise)
-  }),
-)
 
 const supervise = (runFor: (run: number) => Duration.Input) =>
   Effect.gen(function* () {

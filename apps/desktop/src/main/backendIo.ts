@@ -1,5 +1,4 @@
-import { TOKEN_PARAM } from "@glass/contracts"
-import { Data, Deferred, Duration, Effect, Schedule } from "effect"
+import { Data, Deferred, Duration, Effect } from "effect"
 import { createWriteStream, mkdirSync, renameSync, statSync } from "node:fs"
 import { dirname } from "node:path"
 
@@ -63,27 +62,6 @@ export const openBackendLog = Effect.fn("openBackendLog")(function* (path: strin
 
   return { stream, failed: Deferred.await(failed) }
 })
-
-export const waitForBackend = Effect.fn("waitForBackend")((port: number, token: string) =>
-  Effect.tryPromise({
-    try: (signal) =>
-      fetch(`http://127.0.0.1:${port}/health?${TOKEN_PARAM}=${token}`, {
-        signal: AbortSignal.any([signal, AbortSignal.timeout(1000)]),
-      }),
-    catch: () => new BackendError({ message: "Backend is not answering" }),
-  }).pipe(
-    Effect.filterOrFail(
-      (response) => response.ok,
-      (response) => new BackendError({ message: `Backend answered HTTP ${response.status}` }),
-    ),
-    Effect.retry(Schedule.spaced("100 millis")),
-    Effect.timeoutOrElse({
-      duration: "20 seconds",
-      orElse: () => Effect.fail(new BackendError({ message: "Backend did not start in time" })),
-    }),
-    Effect.asVoid,
-  ),
-)
 
 export const keepRunning = Effect.fn("keepRunning")(function* (
   run: Effect.Effect<never, BackendError>,

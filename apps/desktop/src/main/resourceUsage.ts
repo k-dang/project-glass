@@ -5,34 +5,40 @@ interface Metric extends Pick<ProcessMetric, "type" | "name" | "cpu"> {
   readonly memory?: MemoryInfo
 }
 
+const processNames = ["Main", "Renderer", "Backend", "GPU", "Other"] as const
+
+function processName(metric: Metric): ResourceProcess {
+  if (metric.name === "Glass backend") return "Backend"
+
+  if (metric.type === "Browser") return "Main"
+
+  if (metric.type === "Tab") return "Renderer"
+
+  if (metric.type === "GPU") return "GPU"
+
+  return "Other"
+}
+
 export function summarizeResourceUsage(metrics: ReadonlyArray<Metric>): ResourceUsage {
   const groups: Record<ResourceProcess, { cpuPercent: number; memoryBytes: number | null }> = {
     Main: { cpuPercent: 0, memoryBytes: 0 },
     Renderer: { cpuPercent: 0, memoryBytes: 0 },
     Backend: { cpuPercent: 0, memoryBytes: 0 },
-    "GPU / other": { cpuPercent: 0, memoryBytes: 0 },
+    GPU: { cpuPercent: 0, memoryBytes: 0 },
+    Other: { cpuPercent: 0, memoryBytes: 0 },
   }
 
   for (const metric of metrics) {
-    let name: ResourceProcess = "GPU / other"
-
-    if (metric.name === "Glass backend") name = "Backend"
-    else if (metric.type === "Browser") name = "Main"
-    else if (metric.type === "Tab") name = "Renderer"
-
-    const group = groups[name]
+    const group = groups[processName(metric)]
 
     group.cpuPercent += metric.cpu.percentCPUUsage
     group.memoryBytes =
       metric.memory === undefined || group.memoryBytes === null
         ? null
-        : group.memoryBytes + metric.memory.workingSetSize * 1024
+        : group.memoryBytes + (metric.memory.privateBytes ?? metric.memory.workingSetSize) * 1024
   }
 
-  const processes = (["Main", "Renderer", "Backend", "GPU / other"] as const).map((name) => ({
-    name,
-    ...groups[name],
-  }))
+  const processes = processNames.map((name) => ({ name, ...groups[name] }))
 
   return {
     cpuPercent: processes.reduce((sum, process) => sum + process.cpuPercent, 0),

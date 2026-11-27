@@ -15,7 +15,7 @@ import { createRequire } from "node:module"
 import { connect } from "node:net"
 import { tmpdir } from "node:os"
 import { join } from "node:path"
-import { removeGlassHome } from "../apps/server/test/glassHome.ts"
+import { stopAgentHost } from "../apps/server/test/glassHome.ts"
 
 const root = join(import.meta.dirname, "..")
 
@@ -134,13 +134,7 @@ const shutdown = async (code: number) => {
     ),
   )
 
-  if (fakeHome) {
-    try {
-      await removeGlassHome(fakeHome)
-    } catch (error) {
-      console.warn(`[dev] Could not remove ${fakeHome}: ${String(error)}`)
-    }
-  }
+  if (fakeHome) await stopAgentHost(fakeHome)
 
   process.exit(code)
 }
@@ -196,15 +190,27 @@ start(process.execPath, [
   "dev:renderer",
   "--port",
   String(RENDERER_PORT),
+  "--logLevel",
+  "warn",
 ])
 
 start(
   process.execPath,
-  [pnpmPath, "--filter", "@glass/server", "dev", "--out-dir", serverBuild, "--no-clean"],
+  [
+    pnpmPath,
+    "--filter",
+    "@glass/server",
+    "dev",
+    "--out-dir",
+    serverBuild,
+    "--no-clean",
+    "--logLevel",
+    "warn",
+  ],
   { ...process.env, GLASS_PACK_BACKEND: fake ? "fake" : "real" },
 )
 
-start(process.execPath, [pnpmPath, "--filter", "@glass/desktop", "dev"])
+start(process.execPath, [pnpmPath, "--filter", "@glass/desktop", "dev", "--logLevel", "warn"])
 
 await waitFor("the Vite dev server", () => portIsOpen(RENDERER_PORT))
 
@@ -230,6 +236,14 @@ let electron: ChildProcess | undefined
 
 let launched: string | undefined
 
+let announced: string | undefined
+
+const announceReady = () => {
+  if (announced === launched) return
+  announced = launched
+  console.log("[dev] Ready: Electron is running the latest build")
+}
+
 const launchElectron = () => {
   if (shuttingDown) return
 
@@ -237,17 +251,18 @@ const launchElectron = () => {
   const child = start(electronPath, electronArgs, electronEnv)
   electron = child
   child.once("exit", (code) => {
-    if (electron === child) {
-      console.log(`[dev] Electron exited with code ${code}; stopping`)
-      void shutdown(code ?? 0)
-    }
+    if (electron !== child || shuttingDown) return
+    console.log(`[dev] Electron exited with code ${code}; stopping`)
+    void shutdown(code ?? 0)
   })
 }
 
 const scheduleRestart = () => {
   clearTimeout(restartTimer)
   restartTimer = setTimeout(() => {
-    if (!exist(built) || fingerprint(built) === launched) return
+    if (!exist(built)) return
+
+    if (fingerprint(built) === launched) return announceReady()
 
     console.log("[dev] Rebuilt; restarting Electron")
     const previous = electron
@@ -261,6 +276,7 @@ const scheduleRestart = () => {
     }
 
     launchElectron()
+    announceReady()
   }, 300)
 }
 

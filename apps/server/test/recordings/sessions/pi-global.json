@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-37-14-803Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T15-54-54-073Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232235025,
+              "timestamp": 1795535694264,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -179,8 +179,8 @@
                   }
                 },
                 {
-                  "name": "mcp__glass__list_needs_you",
-                  "description": "Lists what waits on the user in Glass now: Threads with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Threads and outside questions come first, then the longest waiting.",
+                  "name": "mcp__glass__list_inbox",
+                  "description": "Lists the user's Glass Inbox: what waits on them now, in four groups in this order. Stopped on you: Threads with a Permission request or Question waiting, questions from an agent outside Glass, Check-ins, and the Global chat's own waiting requests. Agent reviews to read: queued PRs whose Agent review is finished. Your pull requests: the user's own PRs with changes requested, failing checks, Review threads awaiting their reply, or ready to merge. Threads that finished: Threads whose latest Turn ended since the user last looked. Within a group, the longest waiting comes first.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
@@ -428,7 +428,7 @@
                 },
                 {
                   "name": "mcp__glass__create_thread",
-                  "description": "Creates a Thread: a named coding thread working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
+                  "description": "Creates a Thread: a named piece of work with a coding agent, on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -677,7 +677,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232235025,
+              "timestamp": 1795535694264,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -751,8 +751,8 @@
                   }
                 },
                 {
-                  "name": "mcp__glass__list_needs_you",
-                  "description": "Lists what waits on the user in Glass now: Threads with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Threads and outside questions come first, then the longest waiting.",
+                  "name": "mcp__glass__list_inbox",
+                  "description": "Lists the user's Glass Inbox: what waits on them now, in four groups in this order. Stopped on you: Threads with a Permission request or Question waiting, questions from an agent outside Glass, Check-ins, and the Global chat's own waiting requests. Agent reviews to read: queued PRs whose Agent review is finished. Your pull requests: the user's own PRs with changes requested, failing checks, Review threads awaiting their reply, or ready to merge. Threads that finished: Threads whose latest Turn ended since the user last looked. Within a group, the longest waiting comes first.",
                   "parameters": {
                     "type": "object",
                     "additionalProperties": false
@@ -1000,7 +1000,7 @@
                 },
                 {
                   "name": "mcp__glass__create_thread",
-                  "description": "Creates a Thread: a named coding thread working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
+                  "description": "Creates a Thread: a named piece of work with a coding agent, on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -1253,7 +1253,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1795232235024
+              "timestamp": 1795535694262
             }
           }
         },
@@ -1268,7 +1268,7 @@
                   "text": "Ask me which greeting I prefer."
                 }
               ],
-              "timestamp": 1795232235024
+              "timestamp": 1795535694262
             }
           }
         },
@@ -1296,7 +1296,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232235060
+              "timestamp": 1795535694289
             }
           }
         },
@@ -1415,10 +1415,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232235060,
+              "timestamp": 1795535694289,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 15,
+              "durationMs": 12,
               "thinkingLevel": "off"
             }
           }
@@ -1437,7 +1437,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "878aa302-fef6-4a52-b259-efdd93512ab8",
+            "id": "081b875b-3ef6-4113-a851-1b12e0337cb5",
             "method": "select",
             "title": "Which greeting?",
             "options": ["Hi", "Hello"]
@@ -1446,7 +1446,7 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "878aa302-fef6-4a52-b259-efdd93512ab8",
+            "id": "081b875b-3ef6-4113-a851-1b12e0337cb5",
             "value": "Hello"
           }
         },
@@ -1482,7 +1482,7 @@
               ],
               "isError": false,
               "durationMs": 1,
-              "timestamp": 1795232235079
+              "timestamp": 1795535694305
             }
           }
         },
@@ -1501,7 +1501,7 @@
               ],
               "isError": false,
               "durationMs": 1,
-              "timestamp": 1795232235079
+              "timestamp": 1795535694305
             }
           }
         },
@@ -1539,10 +1539,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232235060,
+              "timestamp": 1795535694289,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 15,
+              "durationMs": 12,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1558,7 +1558,7 @@
                 ],
                 "isError": false,
                 "durationMs": 1,
-                "timestamp": 1795232235079
+                "timestamp": 1795535694305
               }
             ]
           }
@@ -1592,7 +1592,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232235084
+              "timestamp": 1795535694308
             }
           }
         },
@@ -1696,10 +1696,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795232235084,
+              "timestamp": 1795535694308,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 4,
+              "durationMs": 2,
               "thinkingLevel": "off"
             }
           }
@@ -1733,10 +1733,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795232235084,
+              "timestamp": 1795535694308,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 4,
+              "durationMs": 2,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -1750,7 +1750,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795232235025,
+                "timestamp": 1795535694264,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -1824,8 +1824,8 @@
                     }
                   },
                   {
-                    "name": "mcp__glass__list_needs_you",
-                    "description": "Lists what waits on the user in Glass now: Threads with a Permission request or Question waiting, questions from an agent outside Glass, queued PRs whose Agent review is finished, and the user's own PRs with changes requested, failing checks, review threads awaiting their reply, or ready to merge. Threads and outside questions come first, then the longest waiting.",
+                    "name": "mcp__glass__list_inbox",
+                    "description": "Lists the user's Glass Inbox: what waits on them now, in four groups in this order. Stopped on you: Threads with a Permission request or Question waiting, questions from an agent outside Glass, Check-ins, and the Global chat's own waiting requests. Agent reviews to read: queued PRs whose Agent review is finished. Your pull requests: the user's own PRs with changes requested, failing checks, Review threads awaiting their reply, or ready to merge. Threads that finished: Threads whose latest Turn ended since the user last looked. Within a group, the longest waiting comes first.",
                     "parameters": {
                       "type": "object",
                       "additionalProperties": false
@@ -2073,7 +2073,7 @@
                   },
                   {
                     "name": "mcp__glass__create_thread",
-                    "description": "Creates a Thread: a named coding thread working on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
+                    "description": "Creates a Thread: a named piece of work with a coding agent, on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
                     "parameters": {
                       "type": "object",
                       "properties": {
@@ -2321,7 +2321,7 @@
                     "text": "Ask me which greeting I prefer."
                   }
                 ],
-                "timestamp": 1795232235024
+                "timestamp": 1795535694262
               },
               {
                 "role": "assistant",
@@ -2354,10 +2354,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795232235060,
+                "timestamp": 1795535694289,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 15,
+                "durationMs": 12,
                 "thinkingLevel": "off"
               },
               {
@@ -2372,7 +2372,7 @@
                 ],
                 "isError": false,
                 "durationMs": 1,
-                "timestamp": 1795232235079
+                "timestamp": 1795535694305
               },
               {
                 "role": "assistant",
@@ -2400,10 +2400,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232235084,
+                "timestamp": 1795535694308,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 4,
+                "durationMs": 2,
                 "thinkingLevel": "off"
               }
             ],
@@ -2451,7 +2451,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-37-14-803Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T15-54-54-073Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

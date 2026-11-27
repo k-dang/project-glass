@@ -52,7 +52,7 @@ export const lineInFiles = (
   return text === null ? null : { file, text }
 }
 
-export const rangeInPatch = (hunks: string, side: DiffSide, start: number, end: number) => {
+const rangeInPatch = (hunks: string, side: DiffSide, start: number, end: number) => {
   if (end < start) return false
 
   let count = 0

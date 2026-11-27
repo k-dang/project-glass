@@ -23,10 +23,16 @@ import {
   startDemoClaude,
   startDemoPi,
 } from "./demoThread"
-import { DEMO_GATEWAY_REPOSITORY, DEMO_REPOSITORY, seedDemoPullRequests } from "./demoPullRequests"
+import {
+  DEMO_GATEWAY_REPOSITORY,
+  DEMO_REPOSITORY,
+  seedDemoPullRequests,
+  seedMergedPullRequest,
+  settledPullRequests,
+} from "./demoPullRequests"
 import { startFakeGitHub } from "./fakeGitHub"
 import { VIEWER } from "./fakePullRequest"
-import { fakeAgentRunnersWith } from "./fakeAgentRunners"
+import { fakeAgentRunners } from "./fakeAgentRunners"
 import { seedDemoToDos } from "./demoToDos"
 import { seedTourOverviewPullRequests } from "./demoTourOverviews"
 import { FAKE_PI_MODEL } from "./fakeModelProvider"
@@ -128,7 +134,7 @@ const main = Effect.gen(function* () {
   const threadNames = demoThreadNames()
 
   const running = yield* Layer.build(
-    serve(fakeAgentRunnersWith(threadNames.branchFor), GlassMcpTools).pipe(
+    serve(fakeAgentRunners(threadNames.branchFor), GlassMcpTools).pipe(
       Layer.provide(ServerConfig.layer),
       Layer.provide(configured),
     ),
@@ -170,6 +176,9 @@ const main = Effect.gen(function* () {
     ).pipe(
       Effect.catchCause((cause) => Effect.logWarning("Couldn't start the demo Threads", cause)),
     )
+
+  // WARNING: Glass links a merged PR only when it was opened after its Thread, so these follow the demo Threads.
+  for (const pr of settledPullRequests) seedMergedPullRequest(github, pr)
 
   return yield* Effect.never
 })

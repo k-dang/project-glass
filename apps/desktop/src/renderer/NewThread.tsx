@@ -21,7 +21,7 @@ import { useNavigate } from "@tanstack/react-router"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { FolderGit2, FolderPlus, GitBranch, LoaderCircle } from "lucide-react"
-import { useCallback, useMemo, useState } from "react"
+import { useCallback, useMemo, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import { MessageGroup } from "@/components/ui/message"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
@@ -101,7 +101,7 @@ const inSandboxOf = ({ id, name, harnesses }: SandboxProviderInfo): PlaceOptions
   harnesses,
 })
 
-export const defaultPlace = (
+const defaultPlace = (
   newest: Thread | undefined,
   providers: ReadonlyArray<SandboxProviderInfo>,
   hasCheckouts: boolean,
@@ -155,7 +155,7 @@ export function NewThread(props: { repository: string | undefined }) {
         providers={providers}
         followed={followed}
         repository={props.repository}
-        newest={Option.getOrElse(AsyncResult.value(threads), () => []).findLast(
+        newest={Option.getOrElse(AsyncResult.value(threads), () => []).find(
           (thread) => !thread.forReview,
         )}
       />
@@ -379,6 +379,8 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
     (MessageInput & { readonly key: string; readonly baseBranch: string }) | null
   >(null)
 
+  const heading = useRef<HTMLHeadingElement>(null)
+
   const send = async (message: MessageInput) => {
     if (repository === undefined || key === undefined || baseBranch === null || awaitingModels)
       return false
@@ -398,12 +400,13 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       ...message,
     })
 
-    if (Exit.isSuccess(exit))
+    if (!Exit.isSuccess(exit)) setStarting(null)
+    else if (heading.current !== null)
       void navigate({
         to: "/threads/$threadId",
         params: { threadId: exit.value.id },
+        viewTransition: { types: ["start-thread"] },
       })
-    else setStarting(null)
 
     return Exit.isSuccess(exit)
   }
@@ -413,7 +416,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       label="New Thread"
       className="[&_[data-slot=input-group]]:bg-card [&_[data-slot=input-group]]:[view-transition-name:new-thread-composer]"
       heading={
-        <h1 className="truncate font-medium">
+        <h1 ref={heading} className="truncate font-medium">
           {starting === null ? "New Thread" : "Starting Thread…"}
         </h1>
       }

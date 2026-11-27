@@ -43,6 +43,7 @@ export interface ThreadHost {
   readonly AnswerRequest: HostCall<"AnswerRequest">
   readonly Steer: HostCall<"Steer">
   readonly StopTurn: HostCall<"StopTurn">
+  readonly StopBackgroundTask: HostCall<"StopBackgroundTask">
 }
 
 export interface ClaimedThread {
@@ -53,11 +54,9 @@ export interface ClaimedThread {
   readonly connectedHost: Effect.Effect<Option.Option<ThreadHost>>
 }
 
-export type ClaimThread = (
-  threadId: string,
-) => Effect.Effect<Option.Option<ClaimedThread>, ThreadError>
+type ClaimThread = (threadId: string) => Effect.Effect<Option.Option<ClaimedThread>, ThreadError>
 
-export interface Served {
+interface Served {
   readonly claim: ClaimThread
   readonly lost: Stream.Stream<ReadonlyArray<string>>
   readonly interrupted: Effect.Effect<ReadonlyArray<string>>
@@ -120,6 +119,10 @@ export class ThreadTurns extends Context.Service<
       queuedId: string,
     ) => Effect.Effect<void, ThreadBusy | ThreadError>
     readonly stop: (thread: ClaimedThread) => Effect.Effect<void, ThreadError>
+    readonly stopBackgroundTask: (
+      thread: ClaimedThread,
+      taskId: string,
+    ) => Effect.Effect<void, ThreadError>
     readonly answer: (
       thread: ClaimedThread,
       requestId: string,
@@ -143,6 +146,9 @@ export class ThreadTurns extends Context.Service<
         sent: SentMessage & { readonly context: Context | null },
         feedback: ReadonlyArray<FeedbackNote> = [],
       ) {
+        if (Predicate.isTagged(sent.context, "AgentReview"))
+          return { ...withContextOf(sent), mentionedImages: [], prompt: sent.message }
+
         const ids = mentionedToDoIds(sent.message)
 
         const listed =
@@ -360,6 +366,22 @@ export class ThreadTurns extends Context.Service<
         )
       })
 
+      const stopBackgroundTask = Effect.fn("ThreadTurns.stopBackgroundTask")(function* (
+        thread: ClaimedThread,
+        taskId: string,
+      ) {
+        const running = yield* thread.connectedHost
+
+        if (Option.isNone(running))
+          return yield* new ThreadError({
+            message: "Glass can't reach this Thread's agent to stop that task. Try again.",
+          })
+
+        return yield* boundHostCall(
+          running.value.StopBackgroundTask({ threadId: thread.id, taskId }),
+        ).pipe(Effect.mapError((error) => new ThreadError({ message: hostFailure(error) })))
+      })
+
       const answer = Effect.fn("ThreadTurns.answer")(function* (
         thread: ClaimedThread,
         requestId: string,
@@ -450,6 +472,7 @@ export class ThreadTurns extends Context.Service<
         sendQueued: (threadId, queuedId) =>
           withThread(threadId, transcripts.startQueued(threadId, queuedId)),
         stop,
+        stopBackgroundTask,
         answer,
         unsent,
         saveUnsent,

@@ -65,8 +65,6 @@ export const mountTourWorkspace = (
 
   const setViewed = vi.fn<Handlers["SetFileViewed"]>(() => Effect.void)
 
-  const followUp = vi.fn<Handlers["FollowUpAgentReview"]>(() => Effect.void)
-
   const sendMessage = vi.fn<Handlers["SendMessage"]>(() => Effect.void)
 
   const createDraft = vi.fn<Handlers["CreateDraft"]>(({ path, side, line, body }) =>
@@ -89,7 +87,6 @@ export const mountTourWorkspace = (
     WatchTour: () => SubscriptionRef.changes(state),
     WatchAgentReview: () =>
       Stream.make(options.agentReview ?? { review: null, job: { status: "idle" } }),
-    FollowUpAgentReview: followUp,
     WatchTranscript: () =>
       Stream.make(
         TranscriptSnapshot.make({
@@ -113,7 +110,6 @@ export const mountTourWorkspace = (
     write,
     cancel,
     setViewed,
-    followUp,
     sendMessage,
     createDraft,
     startedAt,

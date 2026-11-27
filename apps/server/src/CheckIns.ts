@@ -40,7 +40,7 @@ export const CHECK_IN_TIMEOUT_SECONDS = 60 * 60
 
 export const CHECK_IN_MAX_TIMEOUT_SECONDS = 2 * 60 * 60
 
-export class CheckInRefused extends Schema.TaggedError<CheckInRefused>()("CheckInRefused", {
+class CheckInRefused extends Schema.TaggedError<CheckInRefused>()("CheckInRefused", {
   message: Schema.String,
 }) {}
 
@@ -113,13 +113,11 @@ export class CheckIns extends Context.Service<
 
       const listedFor = (
         checkInId: string,
-        write: (
-          owner: NotesOwner,
-        ) => Effect.Effect<{ readonly notes: ReadonlyArray<FeedbackNote> }, ThreadError>,
+        write: (owner: NotesOwner) => Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>,
       ) =>
         waiting(checkInId).pipe(
           Effect.flatMap(({ checkIn }) => write(folderNotes(checkIn.folder)).pipe(asCheckInError)),
-          Effect.map(({ notes: listed }) => listed.filter(isLineNote)),
+          Effect.map((listed) => listed.filter(isLineNote)),
         )
 
       const read = Effect.fnUntraced(function* (folder: string, baseRef: string | null) {

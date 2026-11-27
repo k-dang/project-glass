@@ -44,7 +44,7 @@ export function HistoryNav() {
   }, [])
 
   return (
-    <nav aria-label="History" className="flex items-center gap-0.5 [app-region:no-drag]">
+    <nav aria-label="History" className="flex items-center gap-0.5">
       <TooltipHint content={`Back (${shortcutLabel("←")})`}>
         <Button
           variant="ghost"

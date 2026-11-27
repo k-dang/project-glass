@@ -11,12 +11,20 @@ import { Effect, Schema } from "effect"
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { fileURLToPath } from "node:url"
+import { SUBMIT_REVIEW_TOOL } from "../src/agentHost/submitReviewTool"
 import { GLASS_MCP_PREFIX } from "../src/agentHost/toolCalls"
 import { connectRpcClient } from "../src/rpcSocket"
 import { artifactsThread } from "./demoArtifacts"
+import { syntheticReview } from "./demoAgentReview"
 import { longThread } from "./demoLongThread"
 import type { ScriptedThread } from "./demoScript"
-import { DEMO_REPOSITORY } from "./demoPullRequests"
+import {
+  DEMO_REPOSITORY,
+  SLOW_QUERY_TITLE,
+  settledBranch,
+  settledPullRequests,
+} from "./demoPullRequests"
+import { decodeMaterial } from "./fakeAgentRunners"
 import { lastUserWords, replyTo, startFakeAnthropic } from "./fakeAnthropic"
 import { globalChatReply, isGlobalChat } from "./fakeGlobalChat"
 import {
@@ -48,6 +56,16 @@ const keepWorkingPrompt = "Keep working until I stop you."
 
 const keepsWorking = (input: FakeModelRequest) => lastUserText(input) === keepWorkingPrompt
 
+const reviewsUntilStopped = (input: FakeModelRequest) => {
+  const asked = lastUserText(input)
+
+  return (
+    asked.startsWith("PR material") &&
+    input.messages.at(-1)?.role === "user" &&
+    decodeMaterial(asked).title === SLOW_QUERY_TITLE
+  )
+}
+
 const answersFollowUp = (input: FakeModelRequest) =>
   !isGlobalChat(input) &&
   input.messages.at(-1)?.role === "user" &&
@@ -61,21 +79,44 @@ const slowReply = `Working through it one step at a time. ${Array.from(
 const decodeToolArguments = Schema.decodeUnknownSync(Schema.fromJsonString(Schema.JsonObject))
 
 const glassToolReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> | undefined => {
-  const called = /^call:(\S+) (.+)$/.exec(lastUserText(input))
+  const calls = [...lastUserText(input).matchAll(/^call:(\S+) (.+)$/gm)]
 
-  if (called === null) return undefined
+  if (calls.length === 0) return undefined
 
-  const last = input.messages.at(-1)
+  const asked = input.messages.findLastIndex(({ role }) => role === "user")
+  const results = input.messages.slice(asked + 1).filter(({ role }) => role === "tool")
+  const next = calls[results.length]
 
-  if (last?.role === "tool") return [{ text: `The fake model saw: ${textOf(last).slice(0, 200)}` }]
+  if (next === undefined)
+    return [
+      {
+        text: results
+          .map((result) => `The fake model saw: ${textOf(result).slice(0, 200)}`)
+          .join("\n\n"),
+      },
+    ]
 
   return [
     {
       toolCall: {
         id: `demo-glass-${input.messages.length}`,
-        name: `${GLASS_MCP_PREFIX}${called[1]}`,
-        arguments: decodeToolArguments(called[2]),
+        name: `${GLASS_MCP_PREFIX}${next[1]}`,
+        arguments: decodeToolArguments(next[2]),
       },
+    },
+  ]
+}
+
+const reviewReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> | undefined => {
+  const asked = lastUserText(input)
+
+  if (!asked.startsWith("PR material")) return undefined
+
+  if (input.messages.at(-1)?.role === "tool") return [{ text: "Handed in the Agent review." }]
+
+  return [
+    {
+      toolCall: { id: "demo-review", name: SUBMIT_REVIEW_TOOL, arguments: syntheticReview(asked) },
     },
   ]
 }
@@ -84,6 +125,10 @@ const scriptedThreads = [longThread, artifactsThread]
 
 const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
   if (isGlobalChat(input)) return globalChatReply(input)
+
+  const review = reviewReply(input)
+
+  if (review !== undefined) return review
 
   const glassTool = glassToolReply(input)
 
@@ -100,6 +145,9 @@ const demoReply = (input: FakeModelRequest): ReadonlyArray<FakeModelDelta> => {
     "Write another": "printf 'a second note\\n' > more.txt",
     "Pick up the README typo PR": "git switch -c fix-the-typo-in-the-readme",
     "Pick up the slow query PR": "git switch -c log-slow-database-queries",
+    ...Object.fromEntries(
+      settledPullRequests.map((pr) => [pr.title, `git switch -c ${settledBranch(pr)}`]),
+    ),
   }
 
   if (commandFor(changes, input) !== undefined) return runCommands(changes)(input)
@@ -146,7 +194,11 @@ export const startDemoPi = Effect.fnUntraced(function* (directory: string) {
   yield* fakeModelProvider(directory, {
     reply: demoReply,
     chunkDelay: (input) =>
-      workingSlowly(input) || answersFollowUp(input) ? 300 : keepsWorking(input) ? 3_600_000 : 0,
+      workingSlowly(input) || answersFollowUp(input)
+        ? 300
+        : keepsWorking(input) || reviewsUntilStopped(input)
+          ? 3_600_000
+          : 0,
   })
   process.env["PI_CODING_AGENT_DIR"] = join(directory, ".pi", "agent")
 })
@@ -224,6 +276,11 @@ export const seedDemoThreads = Effect.fnUntraced(function* (
   yield* Effect.forEach(scriptedThreads, scripted, { discard: true })
   yield* thread("demo/uncommitted-note", "pi", "Write a note")
   yield* thread("demo/linked-pr", "pi", "Pick up the README typo PR")
+  yield* Effect.forEach(
+    settledPullRequests,
+    (pr) => thread(`demo/${settledBranch(pr)}`, "pi", pr.title),
+    { discard: true },
+  )
   yield* thread("demo/keeps-working", "pi", keepWorkingPrompt)
   yield* thread("demo/claude-permission", "claude-code", "Run `pnpm test` and tell me what fails.")
   yield* thread(

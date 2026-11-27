@@ -84,9 +84,9 @@ it.live(
       assert.deepStrictEqual(
         threads.map(({ skillPacks }) => skillPacks),
         [
-          [{ name: "team", commit: first }],
-          [{ name: "team", commit: first }],
           [{ name: "team", commit: second }],
+          [{ name: "team", commit: first }],
+          [{ name: "team", commit: first }],
         ],
       )
       assert.deepStrictEqual(yield* commandsOf(local, relaunched), [
