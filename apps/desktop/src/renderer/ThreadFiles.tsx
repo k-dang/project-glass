@@ -230,29 +230,33 @@ function LoadedImage(props: { links: FileLinksValue; path: string; alt: string }
   const atom = threadFileAtom(new FileKey({ threadId: links.threadId, path }))
   const result = useAtomValue(atom)
   const file = AsyncResult.isFailure(result) ? null : Option.getOrNull(AsyncResult.value(result))
-  const [viewer] = useState(createImageViewer)
 
   useRereadWhenTurnEnds(atom, links.lastEnded)
 
   if (file?._tag !== "ImageFile") return <ImageAlt text={props.alt} />
 
   const src = imageSrc(file.mediaType, file.data)
-  const image = <img src={src} alt={props.alt} className="max-h-96 max-w-full rounded-md border" />
+  const className = "max-h-96 max-w-full rounded-md border"
 
   return insideLink ? (
-    image
+    <img src={src} alt={props.alt} className={className} />
   ) : (
+    <ZoomableImage src={src} name={props.alt} title={path} className={className} />
+  )
+}
+
+function ZoomableImage(props: { src: string; name: string; title: string; className: string }) {
+  const [viewer] = useState(createImageViewer)
+
+  return (
     <>
       <DialogTrigger
         controller={viewer}
-        payload={{
-          images: [{ src, name: props.alt }],
-          index: 0,
-        }}
-        title={path}
+        payload={{ images: [{ src: props.src, name: props.name }], index: 0 }}
+        title={props.title}
         className="block cursor-zoom-in"
       >
-        {image}
+        <img src={props.src} alt={props.name} className={props.className} />
       </DialogTrigger>
       <ImageViewer controller={viewer} />
     </>
@@ -325,7 +329,12 @@ function FileView(props: { path: string; file: ThreadFile }) {
     Match.tagsExhaustive({
       ImageFile: ({ mediaType, data }) => (
         <div className="min-h-0 flex-1 overflow-auto p-5">
-          <img src={imageSrc(mediaType, data)} alt={fileName(path)} className="max-w-full" />
+          <ZoomableImage
+            src={imageSrc(mediaType, data)}
+            name={fileName(path)}
+            title={path}
+            className="max-w-full"
+          />
         </div>
       ),
       TextFile: (text) =>
