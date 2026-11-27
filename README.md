@@ -6,7 +6,7 @@ Agents now write more code than anyone can read line by line. Glass is a desktop
 your pull requests and your coding agents in one place, and helps you spend your attention where
 it counts.
 
-![A PR workspace with its Agent review](docs/images/agent-review.png)
+![An Agent review Hotspot beside the lines it flags](docs/images/agent-review.png)
 
 - **Know where to look.** An Agent review ranks the few Hotspots worth your closest read and
   marks the files you can skim. It stays on your machine, never posts to GitHub, and never

@@ -6,7 +6,7 @@ const middleware = "src/server/middleware.ts"
 
 export const demoAgentReview: AgentReviewAnswer = {
   markdown: [
-    "**An unverified `x-api-key` lets any client skip the limit.** The PR puts a per-client token bucket in front of the public API and returns 429 with `retry-after` when a client runs out. The client key, the newly required config, and the in-memory buckets carry the risk; the rest is wiring. This is a curated synthetic Agent review, written without a model.",
+    "**An unverified `x-api-key` lets any client skip the limit.** The PR puts a per-client token bucket in front of the public API and returns 429 with `retry-after` when a client runs out. The client key, the newly required config, and the in-memory buckets carry the risk; the rest is wiring.",
     "## Minor",
     "- `retryAfter` rounds up from fractional tokens, so a client told to wait 1 second may still find the bucket empty after a refill race.\n- `bucket.test.ts` doesn't cover a refill that would pass capacity.",
   ].join("\n\n"),
