@@ -411,7 +411,7 @@ const removalWarning = (thread: Thread, warning: "some" | "unchecked") => {
 }
 
 const rowAction =
-  "opacity-0 transition-none group-hover/row:opacity-100 group-hover/row:disabled:opacity-100 focus-visible:opacity-100"
+  "opacity-0 transition-none disabled:opacity-0 group-hover/row:opacity-100 group-hover/row:disabled:opacity-100 focus-visible:opacity-100"
 
 function BringBackButton(props: { thread: Thread }) {
   const bringBack = useAtomSet(bringBackThreadAtom)
