@@ -31,16 +31,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -59,11 +54,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -79,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-58-368Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-46-631Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -129,7 +142,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232218714,
+              "timestamp": 1795762846910,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -272,7 +285,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232218714,
+              "timestamp": 1795762846910,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -424,7 +437,7 @@
                   "mimeType": "image/png"
                 }
               ],
-              "timestamp": 1795232218712
+              "timestamp": 1795762846909
             }
           }
         },
@@ -444,7 +457,7 @@
                   "mimeType": "image/png"
                 }
               ],
-              "timestamp": 1795232218712
+              "timestamp": 1795762846909
             }
           }
         },
@@ -454,7 +467,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -472,7 +485,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232218736
+              "timestamp": 1795762846936,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -523,7 +537,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "I'm loo"
+              "delta": "The image loo"
             }
           }
         },
@@ -549,7 +563,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "king at a t"
+              "delta": "ks t"
             }
           }
         },
@@ -575,7 +589,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "iny,"
+              "delta": "iny and like"
             }
           }
         },
@@ -601,7 +615,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " blurry image with a fa"
+              "delta": " a plain,"
             }
           }
         },
@@ -627,7 +641,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "int greenish g"
+              "delta": " solid light green square. I'"
             }
           }
         },
@@ -653,7 +667,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "radient and"
+              "delta": "ll answ"
             }
           }
         },
@@ -679,7 +693,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " can"
+              "delta": "er in one short sentence without"
             }
           }
         },
@@ -705,7 +719,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "'t make out any real"
+              "delta": " using"
             }
           }
         },
@@ -731,85 +745,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " detail. I'll ke"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "ep the answer to"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " one short sentence and sk"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "ip the"
+              "delta": " any"
             }
           }
         },
@@ -861,7 +797,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " saying pl"
+              "delta": " since it's h"
             }
           }
         },
@@ -887,7 +823,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "ainly that there"
+              "delta": "ard to make"
             }
           }
         },
@@ -913,7 +849,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "'s nothing disc"
+              "delta": " out an"
             }
           }
         },
@@ -939,7 +875,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "ernible in"
+              "delta": "ything more than"
             }
           }
         },
@@ -965,7 +901,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " it."
+              "delta": " that."
             }
           }
         },
@@ -1015,35 +951,9 @@
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": ""
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
               "type": "thinking_end",
               "contentIndex": 0,
-              "content": "I'm looking at a tiny, blurry image with a faint greenish gradient and can't make out any real detail. I'll keep the answer to one short sentence and skip the tools, saying plainly that there's nothing discernible in it.\n\n"
+              "content": "The image looks tiny and like a plain, solid light green square. I'll answer in one short sentence without using any tools, since it's hard to make out anything more than that.\n\n"
             }
           }
         },
@@ -1120,7 +1030,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": "'s a t"
+              "delta": " appears to be a small"
             }
           }
         },
@@ -1146,7 +1056,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": "iny, blurry"
+              "delta": ", plain light"
             }
           }
         },
@@ -1172,7 +1082,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " image that"
+              "delta": " green square with no disc"
             }
           }
         },
@@ -1198,137 +1108,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " looks like a pl"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 1,
-              "delta": "ain light-"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 1,
-              "delta": "green gradient with"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 1,
-              "delta": " no clear"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 1,
-              "delta": "ly rec"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 1,
-              "delta": "ognizable content."
+              "delta": "ernible content."
             }
           }
         },
@@ -1354,7 +1134,7 @@
             "assistantMessageEvent": {
               "type": "text_end",
               "contentIndex": 1,
-              "content": "It's a tiny, blurry image that looks like a plain light-green gradient with no clearly recognizable content."
+              "content": "It appears to be a small, plain light green square with no discernible content."
             }
           }
         },
@@ -1366,15 +1146,15 @@
               "content": [
                 {
                   "type": "thinking",
-                  "thinking": "I'm looking at a tiny, blurry image with a faint greenish gradient and can't make out any real detail. I'll keep the answer to one short sentence and skip the tools, saying plainly that there's nothing discernible in it.\n\n",
-                  "thinkingSignature": "CAQShQcKEAgUGAI4AUIIdGhpbmtpbmcSDAOlbUtM+9at1l/0shoMIDVVjbudPi5lVd6/IjD11CYDDt5vyoVgKEQ/rZdDFahpPTgfofWN4rLDg2UoeAJMF0xhys7pvQ0USX3JAh4qogYr0f+R2fDPJPIUzymFVZEmnADMgTs4Z1TFMQ7Yi1bBepDvx55kHUJIXTyadn0kr/xhfnra5OlX6Ez70EwOAsHG5+ss8O4pE7urbJn2VkS0LxeRq4Y7DcI034UFEWAZiL4WqaWZolULhV6ZrOF++5sfwB83JGMOrf+iurlJD/LNk9cgX1Y2n+U4aj1OAPBhN6+KajVdwtCt5sZ1qd3Vrdu2OVswcWvuFdFLxB05Y2onYbqKvWa+iab8qpGKFoLF1W09cRF3b86zUsQi75JKCRPoeA1cA/hjovYeK213gOp3ypVUQRCcDuwgCzP8E4EwnwMGiL8PW+3B2bUxA87O8RI8FSf4YiFNh9hJgb1yPzVUb8F8El+VXDsbPtAIkFBclKuRXyIkJN6YCP6TsKCXdaKWAyCX/VgkH/6X1PYZ7oWnWe8AaWaCSswSa8dtJdhhVeItdtd5e/sxqofVGh5hUeg5jeNI4Pa6Olu6PfZMjx6fisK1A01q259/nA8fSqcUBqQ8NgnHJnZOMLiMlzvbYIZfTN50NxrTTg3oHcSJ/sG0kp7As1lFdQSXb2bbkKjyFiiT1emT4h+Cjr+7IabM8iK924ZRpaw1DtNYw+QL714KB4UF8pQJ1u9vk+4ebEB6ztSgOW/VrIK9B7ngsSFiKh05ntTrM3TycS/ugOdNayhjzRweL2wJ9EowA1TX/M+B3Lbh7Zx3tgxGSSt16QBEkBXm3WpHXwchhATXY4PRdVHPnp7IqPQZszfVSW3bnQHnq0x9grNw8hyrKUChnXWFXLpg4m2eeYmNKMzAVEJ8d1MvvIIbCVEhPTmt18eRtZU/XNrtrpZjc2fyCfzVYZQaF4RL96hwU2TijDV+KMly08Chf5T0e9vxtB0cMS7yqWWyMgOHSY9LQZwBfX4dfoaW2H5nTexskOwy6QvFlKpgpg+bPNKjiJFR7PDdDyikMDdsyFoaep3x9Kp88nV2sGWczuJV7zBr/lqdOoeUn2RcFs2QH/J3uNV4ljpgijBr2YkCaLoLrOmygbZL/dCR7J6kzNnMtHBbPuFaUaUiQDZJVmAS+MFqGAE="
+                  "thinking": "The image looks tiny and like a plain, solid light green square. I'll answer in one short sentence without using any tools, since it's hard to make out anything more than that.\n\n",
+                  "thinkingSignature": "CAQSoAYKEAgUGAI4AUIIdGhpbmtpbmcSDAeRZxXk69S4smMh6hoM4a2n4m44+DShxh9bIjBpoQjufeHt/j3mr05KU3YrxTGzpdgSqeFAo6Uj9Ucx/ArEqCMPol5DAKNWWvkFgYMqvQWQekMouD0n8pYyjdKXeUJ/kpNGcVThybg45fzZHAxXlMv3P0Lw7GpRDuO3FrANof1siZ1hJcCOdNww4frtCJ+RvNqf3cL5I4oGsz7Q2bVaOerbHiZrZNIjJVo3K359nkEUEHWrcywSkfT9rFKjekvHC0CIl12mbZoweTXnfwhJnBCjewmrRg/Of+nHx6m2qXHip+6wy4Rr4XAHGmjvMTTanfMgBrITAAUQNbJNfuzllQAzgYOJuwGB7GgowYI/yi1kyqozFlP/oWS4ZnfPWm8zrWmpJfq3FG9o27eQG8WLPlx9BXlD2+IqYfmlkMiZ687UCN4Ly5VBrqAi4co35AWxxXWlDOqz4HKkg5PDhV9zrK6W2zFqaydh/Di6dcAHCAs98BR6NLZDj4xp4eT9c4egG1vTPguuxsQKn+ENuZAZDq3BZ9kbCynYuzrYZ7qEYWI+LOeIf0XUZMSmD9r+Duq5LcrzwTC2jvoBaH5Y1fYDvCvbZjc4biRbrIgZguNIsz8BOizmuz3iiJ4/Syph1zaVn8W/f8FIk342zmKPkJlrQeGxW7+cwPEzn2MRDbJyccmaFjoN6/1JBpqH9MCvscYat+IU7AXXz/QrK/Q+hRf+iKu0I+80TN5QRVXF17JfdXkDeVCOrvB+/kP4X2BJ/yKyY+dpmKMLohe5AhQOr6f30ZPQhXKh5/JFhaN0849sTdCbw+MIGhWo/JtRvpve+yY4WZfAM9LSocP589keZ9ncm+NVrHNUqo1p7RPhD6dn99FifpcAwhT7FJ0Y1yE4+hM3Au7CnP8zC4zeYRtwtGEf/r6sjEt4TpvoyWhjHW712w6Eh9+QLBmjAVDI2mvj+GYlbDS2x/ig+P/5C3GcBtwFb8gvBMdSBLDUSqpxRhyxeHDOhx/nJ/RuvhCRO4NwaIwNNpCpGgv4hhyLJl/ySxgB"
                 },
                 {
                   "type": "text",
-                  "text": "It's a tiny, blurry image that looks like a plain light-green gradient with no clearly recognizable content."
+                  "text": "It appears to be a small, plain light green square with no discernible content."
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1395,10 +1175,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232218736,
-              "responseId": "gen_01M7Y2VFPK4XKP8H5W8T5Z9ZQK",
+              "timestamp": 1795762846936,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT15MgEfvfLcqMNtbUvR",
               "rawStopReason": "end_turn",
-              "durationMs": 1448,
+              "durationMs": 3072,
               "thinkingLevel": "medium"
             }
           }
@@ -1411,15 +1192,15 @@
               "content": [
                 {
                   "type": "thinking",
-                  "thinking": "I'm looking at a tiny, blurry image with a faint greenish gradient and can't make out any real detail. I'll keep the answer to one short sentence and skip the tools, saying plainly that there's nothing discernible in it.\n\n",
-                  "thinkingSignature": "CAQShQcKEAgUGAI4AUIIdGhpbmtpbmcSDAOlbUtM+9at1l/0shoMIDVVjbudPi5lVd6/IjD11CYDDt5vyoVgKEQ/rZdDFahpPTgfofWN4rLDg2UoeAJMF0xhys7pvQ0USX3JAh4qogYr0f+R2fDPJPIUzymFVZEmnADMgTs4Z1TFMQ7Yi1bBepDvx55kHUJIXTyadn0kr/xhfnra5OlX6Ez70EwOAsHG5+ss8O4pE7urbJn2VkS0LxeRq4Y7DcI034UFEWAZiL4WqaWZolULhV6ZrOF++5sfwB83JGMOrf+iurlJD/LNk9cgX1Y2n+U4aj1OAPBhN6+KajVdwtCt5sZ1qd3Vrdu2OVswcWvuFdFLxB05Y2onYbqKvWa+iab8qpGKFoLF1W09cRF3b86zUsQi75JKCRPoeA1cA/hjovYeK213gOp3ypVUQRCcDuwgCzP8E4EwnwMGiL8PW+3B2bUxA87O8RI8FSf4YiFNh9hJgb1yPzVUb8F8El+VXDsbPtAIkFBclKuRXyIkJN6YCP6TsKCXdaKWAyCX/VgkH/6X1PYZ7oWnWe8AaWaCSswSa8dtJdhhVeItdtd5e/sxqofVGh5hUeg5jeNI4Pa6Olu6PfZMjx6fisK1A01q259/nA8fSqcUBqQ8NgnHJnZOMLiMlzvbYIZfTN50NxrTTg3oHcSJ/sG0kp7As1lFdQSXb2bbkKjyFiiT1emT4h+Cjr+7IabM8iK924ZRpaw1DtNYw+QL714KB4UF8pQJ1u9vk+4ebEB6ztSgOW/VrIK9B7ngsSFiKh05ntTrM3TycS/ugOdNayhjzRweL2wJ9EowA1TX/M+B3Lbh7Zx3tgxGSSt16QBEkBXm3WpHXwchhATXY4PRdVHPnp7IqPQZszfVSW3bnQHnq0x9grNw8hyrKUChnXWFXLpg4m2eeYmNKMzAVEJ8d1MvvIIbCVEhPTmt18eRtZU/XNrtrpZjc2fyCfzVYZQaF4RL96hwU2TijDV+KMly08Chf5T0e9vxtB0cMS7yqWWyMgOHSY9LQZwBfX4dfoaW2H5nTexskOwy6QvFlKpgpg+bPNKjiJFR7PDdDyikMDdsyFoaep3x9Kp88nV2sGWczuJV7zBr/lqdOoeUn2RcFs2QH/J3uNV4ljpgijBr2YkCaLoLrOmygbZL/dCR7J6kzNnMtHBbPuFaUaUiQDZJVmAS+MFqGAE="
+                  "thinking": "The image looks tiny and like a plain, solid light green square. I'll answer in one short sentence without using any tools, since it's hard to make out anything more than that.\n\n",
+                  "thinkingSignature": "CAQSoAYKEAgUGAI4AUIIdGhpbmtpbmcSDAeRZxXk69S4smMh6hoM4a2n4m44+DShxh9bIjBpoQjufeHt/j3mr05KU3YrxTGzpdgSqeFAo6Uj9Ucx/ArEqCMPol5DAKNWWvkFgYMqvQWQekMouD0n8pYyjdKXeUJ/kpNGcVThybg45fzZHAxXlMv3P0Lw7GpRDuO3FrANof1siZ1hJcCOdNww4frtCJ+RvNqf3cL5I4oGsz7Q2bVaOerbHiZrZNIjJVo3K359nkEUEHWrcywSkfT9rFKjekvHC0CIl12mbZoweTXnfwhJnBCjewmrRg/Of+nHx6m2qXHip+6wy4Rr4XAHGmjvMTTanfMgBrITAAUQNbJNfuzllQAzgYOJuwGB7GgowYI/yi1kyqozFlP/oWS4ZnfPWm8zrWmpJfq3FG9o27eQG8WLPlx9BXlD2+IqYfmlkMiZ687UCN4Ly5VBrqAi4co35AWxxXWlDOqz4HKkg5PDhV9zrK6W2zFqaydh/Di6dcAHCAs98BR6NLZDj4xp4eT9c4egG1vTPguuxsQKn+ENuZAZDq3BZ9kbCynYuzrYZ7qEYWI+LOeIf0XUZMSmD9r+Duq5LcrzwTC2jvoBaH5Y1fYDvCvbZjc4biRbrIgZguNIsz8BOizmuz3iiJ4/Syph1zaVn8W/f8FIk342zmKPkJlrQeGxW7+cwPEzn2MRDbJyccmaFjoN6/1JBpqH9MCvscYat+IU7AXXz/QrK/Q+hRf+iKu0I+80TN5QRVXF17JfdXkDeVCOrvB+/kP4X2BJ/yKyY+dpmKMLohe5AhQOr6f30ZPQhXKh5/JFhaN0849sTdCbw+MIGhWo/JtRvpve+yY4WZfAM9LSocP589keZ9ncm+NVrHNUqo1p7RPhD6dn99FifpcAwhT7FJ0Y1yE4+hM3Au7CnP8zC4zeYRtwtGEf/r6sjEt4TpvoyWhjHW712w6Eh9+QLBmjAVDI2mvj+GYlbDS2x/ig+P/5C3GcBtwFb8gvBMdSBLDUSqpxRhyxeHDOhx/nJ/RuvhCRO4NwaIwNNpCpGgv4hhyLJl/ySxgB"
                 },
                 {
                   "type": "text",
-                  "text": "It's a tiny, blurry image that looks like a plain light-green gradient with no clearly recognizable content."
+                  "text": "It appears to be a small, plain light green square with no discernible content."
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1440,10 +1221,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232218736,
-              "responseId": "gen_01M7Y2VFPK4XKP8H5W8T5Z9ZQK",
+              "timestamp": 1795762846936,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT15MgEfvfLcqMNtbUvR",
               "rawStopReason": "end_turn",
-              "durationMs": 1448,
+              "durationMs": 3072,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1457,7 +1239,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795232218714,
+                "timestamp": 1795762846910,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1604,22 +1386,22 @@
                     "mimeType": "image/png"
                   }
                 ],
-                "timestamp": 1795232218712
+                "timestamp": 1795762846909
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "thinking",
-                    "thinking": "I'm looking at a tiny, blurry image with a faint greenish gradient and can't make out any real detail. I'll keep the answer to one short sentence and skip the tools, saying plainly that there's nothing discernible in it.\n\n",
-                    "thinkingSignature": "CAQShQcKEAgUGAI4AUIIdGhpbmtpbmcSDAOlbUtM+9at1l/0shoMIDVVjbudPi5lVd6/IjD11CYDDt5vyoVgKEQ/rZdDFahpPTgfofWN4rLDg2UoeAJMF0xhys7pvQ0USX3JAh4qogYr0f+R2fDPJPIUzymFVZEmnADMgTs4Z1TFMQ7Yi1bBepDvx55kHUJIXTyadn0kr/xhfnra5OlX6Ez70EwOAsHG5+ss8O4pE7urbJn2VkS0LxeRq4Y7DcI034UFEWAZiL4WqaWZolULhV6ZrOF++5sfwB83JGMOrf+iurlJD/LNk9cgX1Y2n+U4aj1OAPBhN6+KajVdwtCt5sZ1qd3Vrdu2OVswcWvuFdFLxB05Y2onYbqKvWa+iab8qpGKFoLF1W09cRF3b86zUsQi75JKCRPoeA1cA/hjovYeK213gOp3ypVUQRCcDuwgCzP8E4EwnwMGiL8PW+3B2bUxA87O8RI8FSf4YiFNh9hJgb1yPzVUb8F8El+VXDsbPtAIkFBclKuRXyIkJN6YCP6TsKCXdaKWAyCX/VgkH/6X1PYZ7oWnWe8AaWaCSswSa8dtJdhhVeItdtd5e/sxqofVGh5hUeg5jeNI4Pa6Olu6PfZMjx6fisK1A01q259/nA8fSqcUBqQ8NgnHJnZOMLiMlzvbYIZfTN50NxrTTg3oHcSJ/sG0kp7As1lFdQSXb2bbkKjyFiiT1emT4h+Cjr+7IabM8iK924ZRpaw1DtNYw+QL714KB4UF8pQJ1u9vk+4ebEB6ztSgOW/VrIK9B7ngsSFiKh05ntTrM3TycS/ugOdNayhjzRweL2wJ9EowA1TX/M+B3Lbh7Zx3tgxGSSt16QBEkBXm3WpHXwchhATXY4PRdVHPnp7IqPQZszfVSW3bnQHnq0x9grNw8hyrKUChnXWFXLpg4m2eeYmNKMzAVEJ8d1MvvIIbCVEhPTmt18eRtZU/XNrtrpZjc2fyCfzVYZQaF4RL96hwU2TijDV+KMly08Chf5T0e9vxtB0cMS7yqWWyMgOHSY9LQZwBfX4dfoaW2H5nTexskOwy6QvFlKpgpg+bPNKjiJFR7PDdDyikMDdsyFoaep3x9Kp88nV2sGWczuJV7zBr/lqdOoeUn2RcFs2QH/J3uNV4ljpgijBr2YkCaLoLrOmygbZL/dCR7J6kzNnMtHBbPuFaUaUiQDZJVmAS+MFqGAE="
+                    "thinking": "The image looks tiny and like a plain, solid light green square. I'll answer in one short sentence without using any tools, since it's hard to make out anything more than that.\n\n",
+                    "thinkingSignature": "CAQSoAYKEAgUGAI4AUIIdGhpbmtpbmcSDAeRZxXk69S4smMh6hoM4a2n4m44+DShxh9bIjBpoQjufeHt/j3mr05KU3YrxTGzpdgSqeFAo6Uj9Ucx/ArEqCMPol5DAKNWWvkFgYMqvQWQekMouD0n8pYyjdKXeUJ/kpNGcVThybg45fzZHAxXlMv3P0Lw7GpRDuO3FrANof1siZ1hJcCOdNww4frtCJ+RvNqf3cL5I4oGsz7Q2bVaOerbHiZrZNIjJVo3K359nkEUEHWrcywSkfT9rFKjekvHC0CIl12mbZoweTXnfwhJnBCjewmrRg/Of+nHx6m2qXHip+6wy4Rr4XAHGmjvMTTanfMgBrITAAUQNbJNfuzllQAzgYOJuwGB7GgowYI/yi1kyqozFlP/oWS4ZnfPWm8zrWmpJfq3FG9o27eQG8WLPlx9BXlD2+IqYfmlkMiZ687UCN4Ly5VBrqAi4co35AWxxXWlDOqz4HKkg5PDhV9zrK6W2zFqaydh/Di6dcAHCAs98BR6NLZDj4xp4eT9c4egG1vTPguuxsQKn+ENuZAZDq3BZ9kbCynYuzrYZ7qEYWI+LOeIf0XUZMSmD9r+Duq5LcrzwTC2jvoBaH5Y1fYDvCvbZjc4biRbrIgZguNIsz8BOizmuz3iiJ4/Syph1zaVn8W/f8FIk342zmKPkJlrQeGxW7+cwPEzn2MRDbJyccmaFjoN6/1JBpqH9MCvscYat+IU7AXXz/QrK/Q+hRf+iKu0I+80TN5QRVXF17JfdXkDeVCOrvB+/kP4X2BJ/yKyY+dpmKMLohe5AhQOr6f30ZPQhXKh5/JFhaN0849sTdCbw+MIGhWo/JtRvpve+yY4WZfAM9LSocP589keZ9ncm+NVrHNUqo1p7RPhD6dn99FifpcAwhT7FJ0Y1yE4+hM3Au7CnP8zC4zeYRtwtGEf/r6sjEt4TpvoyWhjHW712w6Eh9+QLBmjAVDI2mvj+GYlbDS2x/ig+P/5C3GcBtwFb8gvBMdSBLDUSqpxRhyxeHDOhx/nJ/RuvhCRO4NwaIwNNpCpGgv4hhyLJl/ySxgB"
                   },
                   {
                     "type": "text",
-                    "text": "It's a tiny, blurry image that looks like a plain light-green gradient with no clearly recognizable content."
+                    "text": "It appears to be a small, plain light green square with no discernible content."
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1640,10 +1422,11 @@
                   "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232218736,
-                "responseId": "gen_01M7Y2VFPK4XKP8H5W8T5Z9ZQK",
+                "timestamp": 1795762846936,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011ChT15MgEfvfLcqMNtbUvR",
                 "rawStopReason": "end_turn",
-                "durationMs": 1448,
+                "durationMs": 3072,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1672,16 +1455,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -1700,11 +1478,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1720,7 +1516,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-58-368Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-46-631Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,

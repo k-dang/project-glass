@@ -50,7 +50,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-46-264Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-22-008Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -69,7 +69,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "59355e3f-184c-4ea5-a172-03bfbfb08272",
+            "id": "d7ba34ed-a0e6-4edb-afdd-339e2347495e",
             "method": "setStatus",
             "statusKey": "glass-subagents",
             "statusText": "Running a subagent: Explore: Trace composer to harness"
@@ -97,7 +97,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "96fd693e-bc9d-4e93-a626-db008ebf3ed9",
+            "id": "3b6c124e-e09f-4371-9f28-5332982050a3",
             "method": "setStatus",
             "statusKey": "glass-subagents"
           }

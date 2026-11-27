@@ -29,16 +29,11 @@
                 {
                   "id": "<pi-model>",
                   "name": "Claude Haiku 5.5",
-                  "api": "anthropic-messages",
-                  "baseUrl": "<redacted>",
+                  "api": "<pi-provider>-messages",
                   "provider": "<pi-provider>",
+                  "baseUrl": "<redacted>",
                   "reasoning": true,
                   "input": ["text", "image"],
-                  "compat": {
-                    "allowEmptySignature": true,
-                    "forceAdaptiveThinking": true,
-                    "supportsTemperature": false
-                  },
                   "cost": {
                     "input": 0.1,
                     "output": 0.5,
@@ -57,11 +52,29 @@
                   "contextWindow": 1000000,
                   "maxTokens": 128000,
                   "thinkingLevelMap": {
+                    "minimal": null,
+                    "low": "low",
+                    "medium": "medium",
+                    "high": "high",
                     "xhigh": "xhigh",
                     "max": "max"
                   },
+                  "compat": {
+                    "forceAdaptiveThinking": true,
+                    "supportsTemperature": false,
+                    "supportsMidConvoEffort": true,
+                    "supportsMidConvoSystemMessages": true,
+                    "supportsMidConvoToolChanges": true,
+                    "supportsStrictTools": true
+                  },
+                  "promptCache": {
+                    "short": 300,
+                    "long": 3600
+                  },
                   "inputLimits": {
+                    "maxRequestBytes": 33554432,
                     "images": {
+                      "maxPerRequest": 600,
                       "resize": {
                         "maxWidth": 2000,
                         "maxHeight": 2000,
@@ -86,16 +99,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -114,11 +122,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -134,8 +160,8 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<pi-home>--/2026-11-21T03-37-00-750Z_01a1fc2d-c64e-7203-869b-e3af5b5c6988.jsonl",
-              "sessionId": "01a1fc2d-c64e-7203-869b-e3af5b5c6988",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<pi-home>--/2026-11-27T07-00-31-738Z_01a21bce-417a-76d4-aaf7-8e42eee75d20.jsonl",
+              "sessionId": "01a21bce-417a-76d4-aaf7-8e42eee75d20",
               "autoCompactionEnabled": true,
               "messageCount": 0,
               "pendingMessageCount": 0

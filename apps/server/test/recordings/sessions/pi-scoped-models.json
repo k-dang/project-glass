@@ -29,16 +29,11 @@
                 {
                   "id": "<pi-model>",
                   "name": "Claude Haiku 5.5",
-                  "api": "anthropic-messages",
-                  "baseUrl": "<redacted>",
+                  "api": "<pi-provider>-messages",
                   "provider": "<pi-provider>",
+                  "baseUrl": "<redacted>",
                   "reasoning": true,
                   "input": ["text", "image"],
-                  "compat": {
-                    "allowEmptySignature": true,
-                    "forceAdaptiveThinking": true,
-                    "supportsTemperature": false
-                  },
                   "cost": {
                     "input": 0.1,
                     "output": 0.5,
@@ -57,11 +52,29 @@
                   "contextWindow": 1000000,
                   "maxTokens": 128000,
                   "thinkingLevelMap": {
+                    "minimal": null,
+                    "low": "low",
+                    "medium": "medium",
+                    "high": "high",
                     "xhigh": "xhigh",
                     "max": "max"
                   },
+                  "compat": {
+                    "forceAdaptiveThinking": true,
+                    "supportsTemperature": false,
+                    "supportsMidConvoEffort": true,
+                    "supportsMidConvoSystemMessages": true,
+                    "supportsMidConvoToolChanges": true,
+                    "supportsStrictTools": true
+                  },
+                  "promptCache": {
+                    "short": 300,
+                    "long": 3600
+                  },
                   "inputLimits": {
+                    "maxRequestBytes": 33554432,
                     "images": {
+                      "maxPerRequest": 600,
                       "resize": {
                         "maxWidth": 2000,
                         "maxHeight": 2000,
@@ -120,8 +133,8 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<pi-home>--/2026-11-21T03-37-03-234Z_01a1fc2d-d002-71f2-a485-666832ccdc53.jsonl",
-              "sessionId": "01a1fc2d-d002-71f2-a485-666832ccdc53",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<pi-home>--/2026-11-27T07-00-23-574Z_01a21bce-2196-731f-a94a-6b58df72d2e1.jsonl",
+              "sessionId": "01a21bce-2196-731f-a94a-6b58df72d2e1",
               "autoCompactionEnabled": true,
               "messageCount": 0,
               "pendingMessageCount": 0

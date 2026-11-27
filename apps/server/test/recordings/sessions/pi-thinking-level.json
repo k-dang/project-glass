@@ -31,16 +31,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -59,11 +54,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -79,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-37-06-019Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-42-142Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -104,16 +117,11 @@
             "data": {
               "id": "<pi-model>",
               "name": "Claude Haiku 5.5",
-              "api": "anthropic-messages",
-              "baseUrl": "<redacted>",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
+              "baseUrl": "<redacted>",
               "reasoning": true,
               "input": ["text", "image"],
-              "compat": {
-                "allowEmptySignature": true,
-                "forceAdaptiveThinking": true,
-                "supportsTemperature": false
-              },
               "cost": {
                 "input": 0.1,
                 "output": 0.5,
@@ -132,11 +140,29 @@
               "contextWindow": 1000000,
               "maxTokens": 128000,
               "thinkingLevelMap": {
+                "minimal": null,
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
                 "xhigh": "xhigh",
                 "max": "max"
               },
+              "compat": {
+                "forceAdaptiveThinking": true,
+                "supportsTemperature": false,
+                "supportsMidConvoEffort": true,
+                "supportsMidConvoSystemMessages": true,
+                "supportsMidConvoToolChanges": true,
+                "supportsStrictTools": true
+              },
+              "promptCache": {
+                "short": 300,
+                "long": 3600
+              },
               "inputLimits": {
+                "maxRequestBytes": 33554432,
                 "images": {
+                  "maxPerRequest": 600,
                   "resize": {
                     "maxWidth": 2000,
                     "maxHeight": 2000,
@@ -206,7 +232,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232226270,
+              "timestamp": 1795762842356,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -349,7 +375,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232226270,
+              "timestamp": 1795762842356,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -496,7 +522,7 @@
                   "text": "Reply with exactly: FIRST"
                 }
               ],
-              "timestamp": 1795232226268
+              "timestamp": 1795762842355
             }
           }
         },
@@ -511,7 +537,7 @@
                   "text": "Reply with exactly: FIRST"
                 }
               ],
-              "timestamp": 1795232226268
+              "timestamp": 1795762842355
             }
           }
         },
@@ -521,7 +547,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -539,7 +565,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232226293
+              "timestamp": 1795762842382,
+              "providerThinkingLevel": "high"
             }
           }
         },
@@ -611,8 +638,7 @@
                 "total": 0,
                 "totalFromProvider": false
               },
-              "cacheWrite1h": 0,
-              "reasoning": 0
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "text_end",
@@ -632,7 +658,7 @@
                   "text": "FIRST"
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -653,10 +679,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232226293,
-              "responseId": "gen_01M7Y2VQ2SHXKEMPMJRFK1HM0R",
+              "timestamp": 1795762842382,
+              "providerThinkingLevel": "high",
+              "responseId": "msg_011ChT152DT4t66xEJuPdhLy",
               "rawStopReason": "end_turn",
-              "durationMs": 631,
+              "durationMs": 644,
               "thinkingLevel": "high"
             }
           }
@@ -672,7 +699,7 @@
                   "text": "FIRST"
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -693,10 +720,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232226293,
-              "responseId": "gen_01M7Y2VQ2SHXKEMPMJRFK1HM0R",
+              "timestamp": 1795762842382,
+              "providerThinkingLevel": "high",
+              "responseId": "msg_011ChT152DT4t66xEJuPdhLy",
               "rawStopReason": "end_turn",
-              "durationMs": 631,
+              "durationMs": 644,
               "thinkingLevel": "high"
             },
             "toolResults": []
@@ -710,7 +738,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795232226270,
+                "timestamp": 1795762842356,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -852,7 +880,7 @@
                     "text": "Reply with exactly: FIRST"
                   }
                 ],
-                "timestamp": 1795232226268
+                "timestamp": 1795762842355
               },
               {
                 "role": "assistant",
@@ -862,7 +890,7 @@
                     "text": "FIRST"
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -883,10 +911,11 @@
                   "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232226293,
-                "responseId": "gen_01M7Y2VQ2SHXKEMPMJRFK1HM0R",
+                "timestamp": 1795762842382,
+                "providerThinkingLevel": "high",
+                "responseId": "msg_011ChT152DT4t66xEJuPdhLy",
                 "rawStopReason": "end_turn",
-                "durationMs": 631,
+                "durationMs": 644,
                 "thinkingLevel": "high"
               }
             ],
@@ -915,16 +944,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -943,11 +967,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -963,7 +1005,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-37-06-019Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-42-142Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
@@ -988,16 +1030,11 @@
             "data": {
               "id": "<pi-model>",
               "name": "Claude Haiku 5.5",
-              "api": "anthropic-messages",
-              "baseUrl": "<redacted>",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
+              "baseUrl": "<redacted>",
               "reasoning": true,
               "input": ["text", "image"],
-              "compat": {
-                "allowEmptySignature": true,
-                "forceAdaptiveThinking": true,
-                "supportsTemperature": false
-              },
               "cost": {
                 "input": 0.1,
                 "output": 0.5,
@@ -1016,11 +1053,29 @@
               "contextWindow": 1000000,
               "maxTokens": 128000,
               "thinkingLevelMap": {
+                "minimal": null,
+                "low": "low",
+                "medium": "medium",
+                "high": "high",
                 "xhigh": "xhigh",
                 "max": "max"
               },
+              "compat": {
+                "forceAdaptiveThinking": true,
+                "supportsTemperature": false,
+                "supportsMidConvoEffort": true,
+                "supportsMidConvoSystemMessages": true,
+                "supportsMidConvoToolChanges": true,
+                "supportsStrictTools": true
+              },
+              "promptCache": {
+                "short": 300,
+                "long": 3600
+              },
               "inputLimits": {
+                "maxRequestBytes": 33554432,
                 "images": {
+                  "maxPerRequest": 600,
                   "resize": {
                     "maxWidth": 2000,
                     "maxHeight": 2000,
@@ -1094,7 +1149,7 @@
                   "text": "Reply with exactly: SECOND"
                 }
               ],
-              "timestamp": 1795232226929
+              "timestamp": 1795762843032
             }
           }
         },
@@ -1109,7 +1164,7 @@
                   "text": "Reply with exactly: SECOND"
                 }
               ],
-              "timestamp": 1795232226929
+              "timestamp": 1795762843032
             }
           }
         },
@@ -1119,7 +1174,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1137,7 +1192,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232226931
+              "timestamp": 1795762843034,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -1229,7 +1285,7 @@
                   "text": "SECOND"
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1250,10 +1306,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232226931,
-              "responseId": "gen_01M7Y2VQMSV12J0QW33057CEJM",
+              "timestamp": 1795762843034,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT154svv5z7Se4DJvS9o",
               "rawStopReason": "end_turn",
-              "durationMs": 606,
+              "durationMs": 563,
               "thinkingLevel": "medium"
             }
           }
@@ -1269,7 +1326,7 @@
                   "text": "SECOND"
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1290,10 +1347,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232226931,
-              "responseId": "gen_01M7Y2VQMSV12J0QW33057CEJM",
+              "timestamp": 1795762843034,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT154svv5z7Se4DJvS9o",
               "rawStopReason": "end_turn",
-              "durationMs": 606,
+              "durationMs": 563,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1311,7 +1369,7 @@
                     "text": "Reply with exactly: SECOND"
                   }
                 ],
-                "timestamp": 1795232226929
+                "timestamp": 1795762843032
               },
               {
                 "role": "assistant",
@@ -1321,7 +1379,7 @@
                     "text": "SECOND"
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1342,10 +1400,11 @@
                   "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232226931,
-                "responseId": "gen_01M7Y2VQMSV12J0QW33057CEJM",
+                "timestamp": 1795762843034,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011ChT154svv5z7Se4DJvS9o",
                 "rawStopReason": "end_turn",
-                "durationMs": 606,
+                "durationMs": 563,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1374,16 +1433,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -1402,11 +1456,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1422,7 +1494,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-37-06-019Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-42-142Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

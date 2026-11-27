@@ -61,7 +61,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T15-54-53-220Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-41-494Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -105,7 +105,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795535693411,
+              "timestamp": 1795762841664,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -308,7 +308,7 @@
                 },
                 {
                   "name": "mcp__glass__start_agent_review",
-                  "description": "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
+                  "description": "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one. A review runs on this device and asks the user nothing, so a Thread can start one only when it is on this device and has no Permission mode.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -428,7 +428,7 @@
                 },
                 {
                   "name": "mcp__glass__create_thread",
-                  "description": "Creates a Thread: a named piece of work with a coding agent, on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
+                  "description": "Creates a Thread: a named piece of work with a coding agent, on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. To have it look after its PR, such as keeping it green, say so in the message: its agent subscribes its own Thread. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -655,6 +655,102 @@
                       }
                     },
                     "required": ["folder"],
+                    "additionalProperties": true
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_recent_events",
+                  "description": "Lists recent Events, newest first: what happened to the subjects of Subscriptions that the user didn't do in Glass, such as a PR's checks failing or passing, review feedback waiting, changes requested, a merge conflict appearing or clearing, and the PR merging or closing. Glass keeps Events for 30 days.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "description": "How many Events to list, at most 100."
+                      },
+                      "pullRequest": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/PullRequestRefEncoded"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "since": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["limit"],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "PullRequestRefEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "integer",
+                            "maximum": 2147483647,
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": ["owner", "repo", "number"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__show_visualization",
+                  "description": "Shows a finished HTML page, such as a chart, diagram, table, or mockup, inline in your Thread above your reply. Pass exactly one of html or path. Use it when a picture answers better than text, such as data with a trend or comparison, or when the user asks to see something. Don't describe or restate the page in your reply. The page shows inline at the reply's width, on the transcript's own background, with an 8px gutter. Leave html and body with no background, border, banner title, or side padding. A box that needs its own background gets 16px padding and var(--radius) corners. Let content set the height: vh units are refused, and height:100% on html or body loops. Give charts fixed pixel heights. Use the theme's CSS variables, not fixed colors: --background, --foreground, --card, --card-foreground, --popover, --popover-foreground, --primary, --primary-foreground, --secondary, --secondary-foreground, --muted, --muted-foreground, --accent, --accent-foreground, --destructive, --border, --input, --ring, --added, --modified, --deleted, --radius, --font-ui, --font-code, and --chart-1 to --chart-5. Inline <style> and <script>. Scripts, styles, and images may load from https, but the page can't make requests. Local images given as absolute paths in the Thread's folder are inlined.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "html": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512000,
+                            "description": "The page's HTML, starting with <!doctype html>."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "path": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "An .html file in your Thread's folder. Glass shows the file as it is now; call again after you change it."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["title"],
                     "additionalProperties": true
                   }
                 },
@@ -677,7 +773,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795535693411,
+              "timestamp": 1795762841664,
               "toolsAdded": [
                 {
                   "name": "ask_user",
@@ -880,7 +976,7 @@
                 },
                 {
                   "name": "mcp__glass__start_agent_review",
-                  "description": "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
+                  "description": "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one. A review runs on this device and asks the user nothing, so a Thread can start one only when it is on this device and has no Permission mode.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -1000,7 +1096,7 @@
                 },
                 {
                   "name": "mcp__glass__create_thread",
-                  "description": "Creates a Thread: a named piece of work with a coding agent, on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
+                  "description": "Creates a Thread: a named piece of work with a coding agent, on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. To have it look after its PR, such as keeping it green, say so in the message: its agent subscribes its own Thread. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
                   "parameters": {
                     "type": "object",
                     "properties": {
@@ -1227,6 +1323,102 @@
                       }
                     },
                     "required": ["folder"],
+                    "additionalProperties": true
+                  }
+                },
+                {
+                  "name": "mcp__glass__list_recent_events",
+                  "description": "Lists recent Events, newest first: what happened to the subjects of Subscriptions that the user didn't do in Glass, such as a PR's checks failing or passing, review feedback waiting, changes requested, a merge conflict appearing or clearing, and the PR merging or closing. Glass keeps Events for 30 days.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "limit": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 100,
+                        "description": "How many Events to list, at most 100."
+                      },
+                      "pullRequest": {
+                        "anyOf": [
+                          {
+                            "$ref": "#/$defs/PullRequestRefEncoded"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "since": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["limit"],
+                    "additionalProperties": true,
+                    "$defs": {
+                      "PullRequestRefEncoded": {
+                        "type": "object",
+                        "properties": {
+                          "owner": {
+                            "type": "string"
+                          },
+                          "repo": {
+                            "type": "string"
+                          },
+                          "number": {
+                            "type": "integer",
+                            "maximum": 2147483647,
+                            "exclusiveMinimum": 0
+                          }
+                        },
+                        "required": ["owner", "repo", "number"],
+                        "additionalProperties": true
+                      }
+                    }
+                  }
+                },
+                {
+                  "name": "mcp__glass__show_visualization",
+                  "description": "Shows a finished HTML page, such as a chart, diagram, table, or mockup, inline in your Thread above your reply. Pass exactly one of html or path. Use it when a picture answers better than text, such as data with a trend or comparison, or when the user asks to see something. Don't describe or restate the page in your reply. The page shows inline at the reply's width, on the transcript's own background, with an 8px gutter. Leave html and body with no background, border, banner title, or side padding. A box that needs its own background gets 16px padding and var(--radius) corners. Let content set the height: vh units are refused, and height:100% on html or body loops. Give charts fixed pixel heights. Use the theme's CSS variables, not fixed colors: --background, --foreground, --card, --card-foreground, --popover, --popover-foreground, --primary, --primary-foreground, --secondary, --secondary-foreground, --muted, --muted-foreground, --accent, --accent-foreground, --destructive, --border, --input, --ring, --added, --modified, --deleted, --radius, --font-ui, --font-code, and --chart-1 to --chart-5. Inline <style> and <script>. Scripts, styles, and images may load from https, but the page can't make requests. Local images given as absolute paths in the Thread's folder are inlined.",
+                  "parameters": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string"
+                      },
+                      "html": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 512000,
+                            "description": "The page's HTML, starting with <!doctype html>."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "path": {
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "minLength": 1,
+                            "description": "An .html file in your Thread's folder. Glass shows the file as it is now; call again after you change it."
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    },
+                    "required": ["title"],
                     "additionalProperties": true
                   }
                 },
@@ -1253,7 +1445,7 @@
                   "text": "What are my To-dos?"
                 }
               ],
-              "timestamp": 1795535693409
+              "timestamp": 1795762841662
             }
           }
         },
@@ -1268,7 +1460,7 @@
                   "text": "What are my To-dos?"
                 }
               ],
-              "timestamp": 1795535693409
+              "timestamp": 1795762841662
             }
           }
         },
@@ -1296,7 +1488,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795535693435
+              "timestamp": 1795762841688
             }
           }
         },
@@ -1409,10 +1601,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795535693435,
+              "timestamp": 1795762841688,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 11,
+              "durationMs": 9,
               "thinkingLevel": "off"
             }
           }
@@ -1439,7 +1631,7 @@
               ]
             },
             "isError": false,
-            "durationMs": 4
+            "durationMs": 3
           }
         },
         {
@@ -1456,8 +1648,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 4,
-              "timestamp": 1795535693452
+              "durationMs": 3,
+              "timestamp": 1795762841702
             }
           }
         },
@@ -1475,8 +1667,8 @@
                 }
               ],
               "isError": false,
-              "durationMs": 4,
-              "timestamp": 1795535693452
+              "durationMs": 3,
+              "timestamp": 1795762841702
             }
           }
         },
@@ -1511,10 +1703,10 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795535693435,
+              "timestamp": 1795762841688,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
-              "durationMs": 11,
+              "durationMs": 9,
               "thinkingLevel": "off"
             },
             "toolResults": [
@@ -1529,8 +1721,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 4,
-                "timestamp": 1795535693452
+                "durationMs": 3,
+                "timestamp": 1795762841702
               }
             ]
           }
@@ -1564,7 +1756,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795535693455
+              "timestamp": 1795762841705
             }
           }
         },
@@ -1668,7 +1860,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795535693455,
+              "timestamp": 1795762841705,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1705,7 +1897,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795535693455,
+              "timestamp": 1795762841705,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -1722,7 +1914,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795535693411,
+                "timestamp": 1795762841664,
                 "toolsAdded": [
                   {
                     "name": "ask_user",
@@ -1925,7 +2117,7 @@
                   },
                   {
                     "name": "mcp__glass__start_agent_review",
-                    "description": "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one.",
+                    "description": "Starts an Agent review of a PR at a Revision, as the user would from the PR. It appears beside the PR's diff once written. This returns once the review started, not when it is written, which takes minutes: read_agent_review shows its progress and result, or why it failed, such as the PR having changed since that Revision. Starting one replaces any review being written for the PR, so read_agent_review first and ask the user before replacing one. A review runs on this device and asks the user nothing, so a Thread can start one only when it is on this device and has no Permission mode.",
                     "parameters": {
                       "type": "object",
                       "properties": {
@@ -2045,7 +2237,7 @@
                   },
                   {
                     "name": "mcp__glass__create_thread",
-                    "description": "Creates a Thread: a named piece of work with a coding agent, on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
+                    "description": "Creates a Thread: a named piece of work with a coding agent, on a branch of its own, made from a base branch of a repository. It starts its first Turn with the message, and appears in the user's Threads. To have it look after its PR, such as keeping it green, say so in the message: its agent subscribes its own Thread. This returns once Glass created the Thread, not when it finishes its Turn. When you are the Global chat or a Thread, Glass sends you an update when it finishes, fails, or waits on the user, so end your Turn rather than reading its transcript to wait; otherwise read_thread_transcript shows its progress. A Thread that creates one gives it its own Permission mode, and can't create one that asks the user less than it does, such as one in a Sandbox, unless it never asks either. A Thread in a Sandbox can only create Threads in a Sandbox. Choose the place, harness, base branch, and model from list_thread_places and list_thread_options, never from guesses. If this call fails without saying why, or is cut off, call list_threads before trying again rather than creating a second Thread.",
                     "parameters": {
                       "type": "object",
                       "properties": {
@@ -2276,6 +2468,102 @@
                     }
                   },
                   {
+                    "name": "mcp__glass__list_recent_events",
+                    "description": "Lists recent Events, newest first: what happened to the subjects of Subscriptions that the user didn't do in Glass, such as a PR's checks failing or passing, review feedback waiting, changes requested, a merge conflict appearing or clearing, and the PR merging or closing. Glass keeps Events for 30 days.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "limit": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 100,
+                          "description": "How many Events to list, at most 100."
+                        },
+                        "pullRequest": {
+                          "anyOf": [
+                            {
+                              "$ref": "#/$defs/PullRequestRefEncoded"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "since": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["limit"],
+                      "additionalProperties": true,
+                      "$defs": {
+                        "PullRequestRefEncoded": {
+                          "type": "object",
+                          "properties": {
+                            "owner": {
+                              "type": "string"
+                            },
+                            "repo": {
+                              "type": "string"
+                            },
+                            "number": {
+                              "type": "integer",
+                              "maximum": 2147483647,
+                              "exclusiveMinimum": 0
+                            }
+                          },
+                          "required": ["owner", "repo", "number"],
+                          "additionalProperties": true
+                        }
+                      }
+                    }
+                  },
+                  {
+                    "name": "mcp__glass__show_visualization",
+                    "description": "Shows a finished HTML page, such as a chart, diagram, table, or mockup, inline in your Thread above your reply. Pass exactly one of html or path. Use it when a picture answers better than text, such as data with a trend or comparison, or when the user asks to see something. Don't describe or restate the page in your reply. The page shows inline at the reply's width, on the transcript's own background, with an 8px gutter. Leave html and body with no background, border, banner title, or side padding. A box that needs its own background gets 16px padding and var(--radius) corners. Let content set the height: vh units are refused, and height:100% on html or body loops. Give charts fixed pixel heights. Use the theme's CSS variables, not fixed colors: --background, --foreground, --card, --card-foreground, --popover, --popover-foreground, --primary, --primary-foreground, --secondary, --secondary-foreground, --muted, --muted-foreground, --accent, --accent-foreground, --destructive, --border, --input, --ring, --added, --modified, --deleted, --radius, --font-ui, --font-code, and --chart-1 to --chart-5. Inline <style> and <script>. Scripts, styles, and images may load from https, but the page can't make requests. Local images given as absolute paths in the Thread's folder are inlined.",
+                    "parameters": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "html": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "maxLength": 512000,
+                              "description": "The page's HTML, starting with <!doctype html>."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "path": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "minLength": 1,
+                              "description": "An .html file in your Thread's folder. Glass shows the file as it is now; call again after you change it."
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": ["title"],
+                      "additionalProperties": true
+                    }
+                  },
+                  {
                     "name": "mcp__glass__wait_for_release",
                     "description": "Waits until Glass releases it. Call it only when the user asks you to.",
                     "parameters": {
@@ -2293,7 +2581,7 @@
                     "text": "What are my To-dos?"
                   }
                 ],
-                "timestamp": 1795535693409
+                "timestamp": 1795762841662
               },
               {
                 "role": "assistant",
@@ -2323,10 +2611,10 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795535693435,
+                "timestamp": 1795762841688,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
-                "durationMs": 11,
+                "durationMs": 9,
                 "thinkingLevel": "off"
               },
               {
@@ -2340,8 +2628,8 @@
                   }
                 ],
                 "isError": false,
-                "durationMs": 4,
-                "timestamp": 1795535693452
+                "durationMs": 3,
+                "timestamp": 1795762841702
               },
               {
                 "role": "assistant",
@@ -2369,7 +2657,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1795535693455,
+                "timestamp": 1795762841705,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -2420,7 +2708,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T15-54-53-220Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-41-494Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,
@@ -2468,7 +2756,7 @@
                   "text": "Read acme/api#42 at a stale Revision."
                 }
               ],
-              "timestamp": 1795535693460
+              "timestamp": 1795762841711
             }
           }
         },
@@ -2483,7 +2771,7 @@
                   "text": "Read acme/api#42 at a stale Revision."
                 }
               ],
-              "timestamp": 1795535693460
+              "timestamp": 1795762841711
             }
           }
         },
@@ -2511,7 +2799,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795535693463
+              "timestamp": 1795762841714
             }
           }
         },
@@ -2644,7 +2932,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795535693463,
+              "timestamp": 1795762841714,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -2704,7 +2992,7 @@
               "details": {},
               "isError": true,
               "durationMs": 22,
-              "timestamp": 1795535693488
+              "timestamp": 1795762841741
             }
           }
         },
@@ -2724,7 +3012,7 @@
               "details": {},
               "isError": true,
               "durationMs": 22,
-              "timestamp": 1795535693488
+              "timestamp": 1795762841741
             }
           }
         },
@@ -2769,7 +3057,7 @@
                 }
               },
               "stopReason": "toolUse",
-              "timestamp": 1795535693463,
+              "timestamp": 1795762841714,
               "responseId": "test-completion",
               "rawStopReason": "tool_calls",
               "durationMs": 2,
@@ -2789,7 +3077,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 22,
-                "timestamp": 1795535693488
+                "timestamp": 1795762841741
               }
             ]
           }
@@ -2823,7 +3111,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795535693491
+              "timestamp": 1795762841743
             }
           }
         },
@@ -2927,7 +3215,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795535693491,
+              "timestamp": 1795762841743,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -2964,7 +3252,7 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795535693491,
+              "timestamp": 1795762841743,
               "responseId": "test-completion",
               "rawStopReason": "stop",
               "durationMs": 2,
@@ -2985,7 +3273,7 @@
                     "text": "Read acme/api#42 at a stale Revision."
                   }
                 ],
-                "timestamp": 1795535693460
+                "timestamp": 1795762841711
               },
               {
                 "role": "assistant",
@@ -3025,7 +3313,7 @@
                   }
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795535693463,
+                "timestamp": 1795762841714,
                 "responseId": "test-completion",
                 "rawStopReason": "tool_calls",
                 "durationMs": 2,
@@ -3044,7 +3332,7 @@
                 "details": {},
                 "isError": true,
                 "durationMs": 22,
-                "timestamp": 1795535693488
+                "timestamp": 1795762841741
               },
               {
                 "role": "assistant",
@@ -3072,7 +3360,7 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1795535693491,
+                "timestamp": 1795762841743,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
                 "durationMs": 2,
@@ -3123,7 +3411,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-24T15-54-53-220Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-41-494Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 9,

@@ -31,16 +31,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -59,11 +54,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -79,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-37-08-074Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-50-407Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -123,7 +136,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232228348,
+              "timestamp": 1795762850643,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -266,7 +279,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232228348,
+              "timestamp": 1795762850643,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -413,7 +426,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` once. If it is blocked, don't try again; reply with exactly: Blocked."
                 }
               ],
-              "timestamp": 1795232228346
+              "timestamp": 1795762850641
             }
           }
         },
@@ -428,7 +441,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` once. If it is blocked, don't try again; reply with exactly: Blocked."
                 }
               ],
-              "timestamp": 1795232228346
+              "timestamp": 1795762850641
             }
           }
         },
@@ -438,7 +451,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -456,7 +469,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232228378
+              "timestamp": 1795762850678,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -482,8 +496,34 @@
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+              "id": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
               "toolName": "bash"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": ""
             }
           }
         },
@@ -530,13 +570,12 @@
                 "total": 0,
                 "totalFromProvider": false
               },
-              "cacheWrite1h": 0,
-              "reasoning": 0
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 0,
-              "delta": "\"}"
+              "delta": "\", \"timeout\": null"
             }
           }
         },
@@ -557,18 +596,44 @@
                 "total": 0,
                 "totalFromProvider": false
               },
-              "cacheWrite1h": 0,
-              "reasoning": 0
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "}"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
               "type": "toolcall_end",
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+                "id": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
                 "name": "bash",
                 "arguments": {
-                  "command": "echo hi"
+                  "command": "echo hi",
+                  "timeout": null
                 }
               }
             }
@@ -582,14 +647,15 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+                  "id": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
                   "name": "bash",
                   "arguments": {
-                    "command": "echo hi"
+                    "command": "echo hi",
+                    "timeout": null
                   }
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -610,10 +676,11 @@
                 "reasoning": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232228378,
-              "responseId": "gen_01M7Y2VS3HQCAB412G85EWXP3F",
+              "timestamp": 1795762850678,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT15dkcX9mNba7GrYNsU",
               "rawStopReason": "tool_use",
-              "durationMs": 786,
+              "durationMs": 1870,
               "thinkingLevel": "medium"
             }
           }
@@ -621,17 +688,18 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+            "toolCallId": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
             "toolName": "bash",
             "args": {
-              "command": "echo hi"
+              "command": "echo hi",
+              "timeout": null
             }
           }
         },
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "60ca7cf7-e260-4533-92fb-b6c3dfce254d",
+            "id": "f3c4894d-055b-47e8-b82a-0d0aa700944f",
             "method": "select",
             "title": "Which greeting?",
             "options": ["Hi", "Hello"]
@@ -640,14 +708,14 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "60ca7cf7-e260-4533-92fb-b6c3dfce254d",
+            "id": "f3c4894d-055b-47e8-b82a-0d0aa700944f",
             "value": "Hello"
           }
         },
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "09fd5232-c9da-4d71-81f6-8f2faf009b88",
+            "id": "c982e390-9d0c-4484-bf0b-d4b265aae0dc",
             "method": "input",
             "title": "Who to greet?",
             "placeholder": "a name"
@@ -656,14 +724,14 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "09fd5232-c9da-4d71-81f6-8f2faf009b88",
+            "id": "c982e390-9d0c-4484-bf0b-d4b265aae0dc",
             "value": "Ada"
           }
         },
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "b2984bef-1230-4464-8e65-0d1b9a998bcd",
+            "id": "db20bdf0-2dc5-4ae8-9c73-a3b44852ec0a",
             "method": "confirm",
             "title": "Greet them?",
             "message": "It prints to the terminal."
@@ -672,14 +740,14 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "b2984bef-1230-4464-8e65-0d1b9a998bcd",
+            "id": "db20bdf0-2dc5-4ae8-9c73-a3b44852ec0a",
             "confirmed": true
           }
         },
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+            "toolCallId": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
             "toolName": "bash",
             "result": {
               "content": [
@@ -698,7 +766,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+              "toolCallId": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
               "toolName": "bash",
               "content": [
                 {
@@ -708,7 +776,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1795232229169
+              "timestamp": 1795762852553
             }
           }
         },
@@ -717,7 +785,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+              "toolCallId": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
               "toolName": "bash",
               "content": [
                 {
@@ -727,7 +795,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1795232229169
+              "timestamp": 1795762852553
             }
           }
         },
@@ -739,14 +807,15 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+                  "id": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
                   "name": "bash",
                   "arguments": {
-                    "command": "echo hi"
+                    "command": "echo hi",
+                    "timeout": null
                   }
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -767,16 +836,17 @@
                 "reasoning": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232228378,
-              "responseId": "gen_01M7Y2VS3HQCAB412G85EWXP3F",
+              "timestamp": 1795762850678,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT15dkcX9mNba7GrYNsU",
               "rawStopReason": "tool_use",
-              "durationMs": 786,
+              "durationMs": 1870,
               "thinkingLevel": "medium"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+                "toolCallId": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
                 "toolName": "bash",
                 "content": [
                   {
@@ -786,7 +856,7 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1795232229169
+                "timestamp": 1795762852553
               }
             ]
           }
@@ -802,7 +872,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -820,7 +890,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232229172
+              "timestamp": 1795762852555,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -897,7 +968,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " back with an error-tagged"
+              "delta": " back with an error w"
             }
           }
         },
@@ -923,7 +994,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " result re"
+              "delta": "rapper, but the"
             }
           }
         },
@@ -949,7 +1020,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "ading \"Hello Ada"
+              "delta": " content"
             }
           }
         },
@@ -975,7 +1046,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " true\", which"
+              "delta": " in"
             }
           }
         },
@@ -1001,7 +1072,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " do"
+              "delta": "side was"
             }
           }
         },
@@ -1027,7 +1098,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": "esn't look like a block message"
+              "delta": " just \""
             }
           }
         },
@@ -1053,7 +1124,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": ", just"
+              "delta": "Hello Ada true\""
             }
           }
         },
@@ -1079,631 +1150,7 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " od"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "d output. The"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " user's inst"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "ruction to reply \"Bl"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "ocked.\" only applies if"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " it was"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " actually blocked, and this"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " doesn't clearly say"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " that"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": ". I'll report the"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " output"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " as"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " it is"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " rather than retry"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "."
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "\n\n"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "Ke"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "eping it conc"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "ise and"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " not ret"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "rying."
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " It's wor"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "th noting the error output"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": " do"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": "esn't line up with the"
+              "delta": " rather than a"
             }
           }
         },
@@ -1755,7 +1202,267 @@
             "assistantMessageEvent": {
               "type": "thinking_delta",
               "contentIndex": 0,
-              "delta": " condition."
+              "delta": "."
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " Since the"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " user only"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " asked for"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " \""
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "Blocked\" if"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " I"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " was act"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "ually blocked, I"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": "'ll report this output"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "thinking_delta",
+              "contentIndex": 0,
+              "delta": " as it is."
             }
           }
         },
@@ -1805,35 +1512,9 @@
               "cacheWrite1h": 0
             },
             "assistantMessageEvent": {
-              "type": "thinking_delta",
-              "contentIndex": 0,
-              "delta": ""
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
               "type": "thinking_end",
               "contentIndex": 0,
-              "content": "The tool came back with an error-tagged result reading \"Hello Ada true\", which doesn't look like a block message, just odd output. The user's instruction to reply \"Blocked.\" only applies if it was actually blocked, and this doesn't clearly say that. I'll report the output as it is rather than retry.\n\nKeeping it concise and not retrying. It's worth noting the error output doesn't line up with the block condition.\n\n"
+              "content": "The tool came back with an error wrapper, but the content inside was just \"Hello Ada true\" rather than a block. Since the user only asked for \"Blocked\" if I was actually blocked, I'll report this output as it is.\n\n"
             }
           }
         },
@@ -1884,7 +1565,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": "The command"
+              "delta": "The"
             }
           }
         },
@@ -1910,7 +1591,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " ran once and returned an error"
+              "delta": " command"
             }
           }
         },
@@ -1936,7 +1617,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": "-"
+              "delta": " ran once,"
             }
           }
         },
@@ -1962,7 +1643,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": "tagged result:"
+              "delta": " but it did"
             }
           }
         },
@@ -1988,7 +1669,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " `Hello Ada true"
+              "delta": "n't print"
             }
           }
         },
@@ -2014,7 +1695,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": "`. That"
+              "delta": " `hi`. It returned"
             }
           }
         },
@@ -2040,7 +1721,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " do"
+              "delta": " an error contain"
             }
           }
         },
@@ -2066,7 +1747,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": "esn't look like a block,"
+              "delta": "ing the"
             }
           }
         },
@@ -2092,7 +1773,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " and"
+              "delta": " text `Hello Ada"
             }
           }
         },
@@ -2118,7 +1799,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " I didn't retry. The"
+              "delta": " true`, so I can"
             }
           }
         },
@@ -2144,7 +1825,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " output is unexpected for"
+              "delta": "'t confirm the command "
             }
           }
         },
@@ -2170,7 +1851,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " `echo hi`, so"
+              "delta": "ran as expected. I didn"
             }
           }
         },
@@ -2196,85 +1877,7 @@
             "assistantMessageEvent": {
               "type": "text_delta",
               "contentIndex": 1,
-              "delta": " the"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 1,
-              "delta": " t"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 1,
-              "delta": "ool result"
-            }
-          }
-        },
-        {
-          "in": {
-            "type": "message_update",
-            "usage": {
-              "input": 0,
-              "output": 0,
-              "cacheRead": 0,
-              "cacheWrite": 0,
-              "totalTokens": 0,
-              "cost": {
-                "input": 0,
-                "output": 0,
-                "cacheRead": 0,
-                "cacheWrite": 0,
-                "total": 0,
-                "totalFromProvider": false
-              },
-              "cacheWrite1h": 0
-            },
-            "assistantMessageEvent": {
-              "type": "text_delta",
-              "contentIndex": 1,
-              "delta": " may be unreliable."
+              "delta": "'t retry."
             }
           }
         },
@@ -2300,7 +1903,7 @@
             "assistantMessageEvent": {
               "type": "text_end",
               "contentIndex": 1,
-              "content": "The command ran once and returned an error-tagged result: `Hello Ada true`. That doesn't look like a block, and I didn't retry. The output is unexpected for `echo hi`, so the tool result may be unreliable."
+              "content": "The command ran once, but it didn't print `hi`. It returned an error containing the text `Hello Ada true`, so I can't confirm the command ran as expected. I didn't retry."
             }
           }
         },
@@ -2312,15 +1915,15 @@
               "content": [
                 {
                   "type": "thinking",
-                  "thinking": "The tool came back with an error-tagged result reading \"Hello Ada true\", which doesn't look like a block message, just odd output. The user's instruction to reply \"Blocked.\" only applies if it was actually blocked, and this doesn't clearly say that. I'll report the output as it is rather than retry.\n\nKeeping it concise and not retrying. It's worth noting the error output doesn't line up with the block condition.\n\n",
-                  "thinkingSignature": "CAQSlQkKEAgUGAI4AUIIdGhpbmtpbmcSDNYT4j46OiibymbYQxoMhJoxPyyBXM93WFEoIjBhGaZKfFHGHeW/b1Nt/Ft+i/VIHjam27yPr9huYGdIorE86YYKznLbLQTeiKeFrBAqsgijRLHYkKZaIPG+1f80PMWHDbNgWZhpTg4aFnhV6krhtI1AHDCwnsrn/RB0Y0oJEFlmzoLDLWnr5ZYwESbKt2oQ96+5wIwm0HTLJHLkkFvtp36i3DhBc/X7csLurAvesOpGJr//8vSThUHZT79igkf0lT4hRH6CTFfv+je7YxIjHQ5Vl5aoYlzs+VNz2l51A0iFhDeRWL4zVXKjEYQi+mi98Arlybzxeyve1Xa1bIyUcrllei65mu5vzwFP1F88hFvIRgf5QEqMIAbKWEJTxptx5cS7+bPcfqIbOQnaZJ3GMIU3KEnqWCodQC9Slit8MN82A8eQaMYsXgNNWv+6T11K1RhHUuKTRzqNfRGN3HPmz1tH70SaRlzxRN76tSYVcddNQaXVkxj/wZBMEEUEIOTlIKJ5Orcfrb6Jrz6utVSp73ioymEyng4qgs/EQVu300vOvXEWFz0cjehLaoHDG9wl2uOtTgNpFcBTUhv6nHj0mDr9YSH/crGiz+dnwRyOWAkugLJeX1rc78Jj1urQkeI5Q+GDdxDnrYINySzcnTmV5okj7Yt8ylfNFkCLYpTl2XWt1+TBln+TJFgELbWRdDV3VlWarAFjepaz9oXj6mAIuzA6lv6zZZPePgEEdfvVFWqwNTXd8F4izhXDxQkSfXDiV8Lm2rbBzEwHG/v0oEiyFj6Yfc/r1es48NjFpGzgT0iCvTvTiGXP/TOcvmlwczOjyVi+O3N6PbANcgLme0NILr+Y+odDF2cJfOU2jrTP+DQBTyx0kd5HuL0J0QzPOiWrzmM63GzEQpyDnctqdF+ToSkUIVvLzPYbvvvbzzUG41ZtUxYuiaQ74JL0AiaHcKuKo6mgzeSILuO2FCfK1cfsL73dPh7QjqaefMTPZKoj19AODKpSh6W/0/BRG58UA6xNI9aFsj1n9o2/bCA9iiiWlMOC7z/w2GSWRO5s1KrZXhvoAS+bbZCFPPeUL73dhmjMgSTSq1J2OXtLA0vYykw5ZEqRtLL0+HYoOOHpKXuBAoSm6RKxzL2VgOy+o/JI0NGLZv+y6NHo0+WVH0iZN2ycIRPR/xawLyf/FUeqCQSf+NPGhBqAqNJ90ZpxBV+byHPSw30sjlHb0yNFNvY1sYezQ1+WgS/D6M29WuKE6zsN/FDPCMuQGYTwpLIOHCgtg76/qtxvdkg7X12kWOBvVONAg0pusLum9E+DRd2F+98OE6g/ew1inxKB4ympW3aldxNhmyORTqz5g05uWUFoMyq0cxDDaGeI/VyIa/Hrqu+4+E7Hjiq9Q9P8oyfxM0mqTkCHrRoHI+QGMpxIhR0qd70od8sQ92QEzax7S7fBANt3a9+UkmEuJTNvsUeDsFT6f/pQC2AyDgFIcO6JnPxv+mSR/vhPHras1CwOGAWD3IgZyjUoyRsQMSe/Yn2WvrzT7mhsxk0YAQ=="
+                  "thinking": "The tool came back with an error wrapper, but the content inside was just \"Hello Ada true\" rather than a block. Since the user only asked for \"Blocked\" if I was actually blocked, I'll report this output as it is.\n\n",
+                  "thinkingSignature": "CAQS/wYKEAgUGAI4AUIIdGhpbmtpbmcSDNo0tXB7aCQ2v9eKyRoMXSnPZdAc23yV3+7gIjBpmRXSNwRdWVX/TTK9lZESfUvaEc5FlFif1xt6YRecJ4uF3p8Sryzq2rxOIFXiMZ0qnAboVMaAnyUunDAggp6UzshAn1tMkX1ZMYyIMBCN0NGYZYfFzoQ1Tx/NMZ6KaE1esLoBRl4Y5e+9mXsc8YspNv5umo6KJ6AbKTUB2GZfJ8ZyPi7Qpl+FfpHHpA/SZ3BAjDCczIhGkxKSvzXZ//3Uoj7JxWP9Z9Oqm8cqORElaJD2NBtkFS+B1UCU3hb4bSkZ7vnYYWKSRI0fY9TxiDwAZmuTfTQcJKieC/FipfHESBOmOWONWelaKJcCbkAhtyKNcUzqD5th5EYRa2LQLVKpSWeXNdM0PSkLCZLWLuNwi35/MQctq4YbDuQrJqO6KkEruJLpicdhBvD0Y3QVMS3xaMs1VbBz9bGSkLd7xwXtqFpDFAOQNIXAVcHB4oHowf4xvVV4rAO/ZmXxFYdtHiwhe+Ne3lSgTQjoTxmd010UG0etBqRFyvpYktgUQ9MK7c0+7tus4t+DQURy3fxjuqYxzXFHoEEUkVQ1Cun2Rmhv/C/+WuOnNofd+3zyJzTIAoGtR3+He0ETMtf61mp6LeZbmGF5HPdEWAglxU+gdmCFvpVa0to5O7n88GCda/Bu/CEubdg6wyybqi9XQSMP08b4FExolkrj2Xax54v3joUI2dyUdEDoNGz5VqOzc+i48b0/N+KYfcusTitS+qGJsS0ydpxSqAQYG8R6p2lHfMpKu+Qr3mOcY8R84g3nRi9N9Q6UocpIgHf7+1+PwHJLDLyLIHshEjZZ8J1GZ27HA6t6D5PGYvCP+5IOUbhn1ryk/Oqp00YJkfbmpMcciqxoCymnYt7BHnSHN8d/sbTA190gJVqWHD1gmKegfUy3IkDe3ZNNTzyhtMukQ3ZzJlLxD2wjp/N8nErOlphvDjriQEFIMa+c+4oiE+QrGFGPG6LIv29yF8005mS/8NY5LARRKENB6TEv2cQskllOZrttFcJw4CQTN/fV+hnfGq6su3W4unOYFrwSEd1IoI2Th5VPq+dlf2UdspqLmh9JKq9wQaxWlZNxnxaIX/dPeXj8jcVxkOUoh3TBuuZUH+YTWXuw5LGjEAsXf0Ubep0M7Axs6N9JGAE="
                 },
                 {
                   "type": "text",
-                  "text": "The command ran once and returned an error-tagged result: `Hello Ada true`. That doesn't look like a block, and I didn't retry. The output is unexpected for `echo hi`, so the tool result may be unreliable."
+                  "text": "The command ran once, but it didn't print `hi`. It returned an error containing the text `Hello Ada true`, so I can't confirm the command ran as expected. I didn't retry."
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -2341,10 +1944,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232229172,
-              "responseId": "gen_01M7Y2VSTQP33SK0Q552E06WS6",
+              "timestamp": 1795762852555,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT15maQVoTZ8AtPgUBn5",
               "rawStopReason": "end_turn",
-              "durationMs": 2779,
+              "durationMs": 2394,
               "thinkingLevel": "medium"
             }
           }
@@ -2357,15 +1961,15 @@
               "content": [
                 {
                   "type": "thinking",
-                  "thinking": "The tool came back with an error-tagged result reading \"Hello Ada true\", which doesn't look like a block message, just odd output. The user's instruction to reply \"Blocked.\" only applies if it was actually blocked, and this doesn't clearly say that. I'll report the output as it is rather than retry.\n\nKeeping it concise and not retrying. It's worth noting the error output doesn't line up with the block condition.\n\n",
-                  "thinkingSignature": "CAQSlQkKEAgUGAI4AUIIdGhpbmtpbmcSDNYT4j46OiibymbYQxoMhJoxPyyBXM93WFEoIjBhGaZKfFHGHeW/b1Nt/Ft+i/VIHjam27yPr9huYGdIorE86YYKznLbLQTeiKeFrBAqsgijRLHYkKZaIPG+1f80PMWHDbNgWZhpTg4aFnhV6krhtI1AHDCwnsrn/RB0Y0oJEFlmzoLDLWnr5ZYwESbKt2oQ96+5wIwm0HTLJHLkkFvtp36i3DhBc/X7csLurAvesOpGJr//8vSThUHZT79igkf0lT4hRH6CTFfv+je7YxIjHQ5Vl5aoYlzs+VNz2l51A0iFhDeRWL4zVXKjEYQi+mi98Arlybzxeyve1Xa1bIyUcrllei65mu5vzwFP1F88hFvIRgf5QEqMIAbKWEJTxptx5cS7+bPcfqIbOQnaZJ3GMIU3KEnqWCodQC9Slit8MN82A8eQaMYsXgNNWv+6T11K1RhHUuKTRzqNfRGN3HPmz1tH70SaRlzxRN76tSYVcddNQaXVkxj/wZBMEEUEIOTlIKJ5Orcfrb6Jrz6utVSp73ioymEyng4qgs/EQVu300vOvXEWFz0cjehLaoHDG9wl2uOtTgNpFcBTUhv6nHj0mDr9YSH/crGiz+dnwRyOWAkugLJeX1rc78Jj1urQkeI5Q+GDdxDnrYINySzcnTmV5okj7Yt8ylfNFkCLYpTl2XWt1+TBln+TJFgELbWRdDV3VlWarAFjepaz9oXj6mAIuzA6lv6zZZPePgEEdfvVFWqwNTXd8F4izhXDxQkSfXDiV8Lm2rbBzEwHG/v0oEiyFj6Yfc/r1es48NjFpGzgT0iCvTvTiGXP/TOcvmlwczOjyVi+O3N6PbANcgLme0NILr+Y+odDF2cJfOU2jrTP+DQBTyx0kd5HuL0J0QzPOiWrzmM63GzEQpyDnctqdF+ToSkUIVvLzPYbvvvbzzUG41ZtUxYuiaQ74JL0AiaHcKuKo6mgzeSILuO2FCfK1cfsL73dPh7QjqaefMTPZKoj19AODKpSh6W/0/BRG58UA6xNI9aFsj1n9o2/bCA9iiiWlMOC7z/w2GSWRO5s1KrZXhvoAS+bbZCFPPeUL73dhmjMgSTSq1J2OXtLA0vYykw5ZEqRtLL0+HYoOOHpKXuBAoSm6RKxzL2VgOy+o/JI0NGLZv+y6NHo0+WVH0iZN2ycIRPR/xawLyf/FUeqCQSf+NPGhBqAqNJ90ZpxBV+byHPSw30sjlHb0yNFNvY1sYezQ1+WgS/D6M29WuKE6zsN/FDPCMuQGYTwpLIOHCgtg76/qtxvdkg7X12kWOBvVONAg0pusLum9E+DRd2F+98OE6g/ew1inxKB4ympW3aldxNhmyORTqz5g05uWUFoMyq0cxDDaGeI/VyIa/Hrqu+4+E7Hjiq9Q9P8oyfxM0mqTkCHrRoHI+QGMpxIhR0qd70od8sQ92QEzax7S7fBANt3a9+UkmEuJTNvsUeDsFT6f/pQC2AyDgFIcO6JnPxv+mSR/vhPHras1CwOGAWD3IgZyjUoyRsQMSe/Yn2WvrzT7mhsxk0YAQ=="
+                  "thinking": "The tool came back with an error wrapper, but the content inside was just \"Hello Ada true\" rather than a block. Since the user only asked for \"Blocked\" if I was actually blocked, I'll report this output as it is.\n\n",
+                  "thinkingSignature": "CAQS/wYKEAgUGAI4AUIIdGhpbmtpbmcSDNo0tXB7aCQ2v9eKyRoMXSnPZdAc23yV3+7gIjBpmRXSNwRdWVX/TTK9lZESfUvaEc5FlFif1xt6YRecJ4uF3p8Sryzq2rxOIFXiMZ0qnAboVMaAnyUunDAggp6UzshAn1tMkX1ZMYyIMBCN0NGYZYfFzoQ1Tx/NMZ6KaE1esLoBRl4Y5e+9mXsc8YspNv5umo6KJ6AbKTUB2GZfJ8ZyPi7Qpl+FfpHHpA/SZ3BAjDCczIhGkxKSvzXZ//3Uoj7JxWP9Z9Oqm8cqORElaJD2NBtkFS+B1UCU3hb4bSkZ7vnYYWKSRI0fY9TxiDwAZmuTfTQcJKieC/FipfHESBOmOWONWelaKJcCbkAhtyKNcUzqD5th5EYRa2LQLVKpSWeXNdM0PSkLCZLWLuNwi35/MQctq4YbDuQrJqO6KkEruJLpicdhBvD0Y3QVMS3xaMs1VbBz9bGSkLd7xwXtqFpDFAOQNIXAVcHB4oHowf4xvVV4rAO/ZmXxFYdtHiwhe+Ne3lSgTQjoTxmd010UG0etBqRFyvpYktgUQ9MK7c0+7tus4t+DQURy3fxjuqYxzXFHoEEUkVQ1Cun2Rmhv/C/+WuOnNofd+3zyJzTIAoGtR3+He0ETMtf61mp6LeZbmGF5HPdEWAglxU+gdmCFvpVa0to5O7n88GCda/Bu/CEubdg6wyybqi9XQSMP08b4FExolkrj2Xax54v3joUI2dyUdEDoNGz5VqOzc+i48b0/N+KYfcusTitS+qGJsS0ydpxSqAQYG8R6p2lHfMpKu+Qr3mOcY8R84g3nRi9N9Q6UocpIgHf7+1+PwHJLDLyLIHshEjZZ8J1GZ27HA6t6D5PGYvCP+5IOUbhn1ryk/Oqp00YJkfbmpMcciqxoCymnYt7BHnSHN8d/sbTA190gJVqWHD1gmKegfUy3IkDe3ZNNTzyhtMukQ3ZzJlLxD2wjp/N8nErOlphvDjriQEFIMa+c+4oiE+QrGFGPG6LIv29yF8005mS/8NY5LARRKENB6TEv2cQskllOZrttFcJw4CQTN/fV+hnfGq6su3W4unOYFrwSEd1IoI2Th5VPq+dlf2UdspqLmh9JKq9wQaxWlZNxnxaIX/dPeXj8jcVxkOUoh3TBuuZUH+YTWXuw5LGjEAsXf0Ubep0M7Axs6N9JGAE="
                 },
                 {
                   "type": "text",
-                  "text": "The command ran once and returned an error-tagged result: `Hello Ada true`. That doesn't look like a block, and I didn't retry. The output is unexpected for `echo hi`, so the tool result may be unreliable."
+                  "text": "The command ran once, but it didn't print `hi`. It returned an error containing the text `Hello Ada true`, so I can't confirm the command ran as expected. I didn't retry."
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -2386,10 +1990,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232229172,
-              "responseId": "gen_01M7Y2VSTQP33SK0Q552E06WS6",
+              "timestamp": 1795762852555,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT15maQVoTZ8AtPgUBn5",
               "rawStopReason": "end_turn",
-              "durationMs": 2779,
+              "durationMs": 2394,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -2403,7 +2008,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795232228348,
+                "timestamp": 1795762850643,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -2545,21 +2150,22 @@
                     "text": "Use the bash tool to run exactly `echo hi` once. If it is blocked, don't try again; reply with exactly: Blocked."
                   }
                 ],
-                "timestamp": 1795232228346
+                "timestamp": 1795762850641
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+                    "id": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
                     "name": "bash",
                     "arguments": {
-                      "command": "echo hi"
+                      "command": "echo hi",
+                      "timeout": null
                     }
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -2580,15 +2186,16 @@
                   "reasoning": 0
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795232228378,
-                "responseId": "gen_01M7Y2VS3HQCAB412G85EWXP3F",
+                "timestamp": 1795762850678,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011ChT15dkcX9mNba7GrYNsU",
                 "rawStopReason": "tool_use",
-                "durationMs": 786,
+                "durationMs": 1870,
                 "thinkingLevel": "medium"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_01UwzLkzkN3KZsQCnTBucDr6",
+                "toolCallId": "toolu_01FD6EiHKCQWDcVGZLRwfw3W",
                 "toolName": "bash",
                 "content": [
                   {
@@ -2598,22 +2205,22 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1795232229169
+                "timestamp": 1795762852553
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "thinking",
-                    "thinking": "The tool came back with an error-tagged result reading \"Hello Ada true\", which doesn't look like a block message, just odd output. The user's instruction to reply \"Blocked.\" only applies if it was actually blocked, and this doesn't clearly say that. I'll report the output as it is rather than retry.\n\nKeeping it concise and not retrying. It's worth noting the error output doesn't line up with the block condition.\n\n",
-                    "thinkingSignature": "CAQSlQkKEAgUGAI4AUIIdGhpbmtpbmcSDNYT4j46OiibymbYQxoMhJoxPyyBXM93WFEoIjBhGaZKfFHGHeW/b1Nt/Ft+i/VIHjam27yPr9huYGdIorE86YYKznLbLQTeiKeFrBAqsgijRLHYkKZaIPG+1f80PMWHDbNgWZhpTg4aFnhV6krhtI1AHDCwnsrn/RB0Y0oJEFlmzoLDLWnr5ZYwESbKt2oQ96+5wIwm0HTLJHLkkFvtp36i3DhBc/X7csLurAvesOpGJr//8vSThUHZT79igkf0lT4hRH6CTFfv+je7YxIjHQ5Vl5aoYlzs+VNz2l51A0iFhDeRWL4zVXKjEYQi+mi98Arlybzxeyve1Xa1bIyUcrllei65mu5vzwFP1F88hFvIRgf5QEqMIAbKWEJTxptx5cS7+bPcfqIbOQnaZJ3GMIU3KEnqWCodQC9Slit8MN82A8eQaMYsXgNNWv+6T11K1RhHUuKTRzqNfRGN3HPmz1tH70SaRlzxRN76tSYVcddNQaXVkxj/wZBMEEUEIOTlIKJ5Orcfrb6Jrz6utVSp73ioymEyng4qgs/EQVu300vOvXEWFz0cjehLaoHDG9wl2uOtTgNpFcBTUhv6nHj0mDr9YSH/crGiz+dnwRyOWAkugLJeX1rc78Jj1urQkeI5Q+GDdxDnrYINySzcnTmV5okj7Yt8ylfNFkCLYpTl2XWt1+TBln+TJFgELbWRdDV3VlWarAFjepaz9oXj6mAIuzA6lv6zZZPePgEEdfvVFWqwNTXd8F4izhXDxQkSfXDiV8Lm2rbBzEwHG/v0oEiyFj6Yfc/r1es48NjFpGzgT0iCvTvTiGXP/TOcvmlwczOjyVi+O3N6PbANcgLme0NILr+Y+odDF2cJfOU2jrTP+DQBTyx0kd5HuL0J0QzPOiWrzmM63GzEQpyDnctqdF+ToSkUIVvLzPYbvvvbzzUG41ZtUxYuiaQ74JL0AiaHcKuKo6mgzeSILuO2FCfK1cfsL73dPh7QjqaefMTPZKoj19AODKpSh6W/0/BRG58UA6xNI9aFsj1n9o2/bCA9iiiWlMOC7z/w2GSWRO5s1KrZXhvoAS+bbZCFPPeUL73dhmjMgSTSq1J2OXtLA0vYykw5ZEqRtLL0+HYoOOHpKXuBAoSm6RKxzL2VgOy+o/JI0NGLZv+y6NHo0+WVH0iZN2ycIRPR/xawLyf/FUeqCQSf+NPGhBqAqNJ90ZpxBV+byHPSw30sjlHb0yNFNvY1sYezQ1+WgS/D6M29WuKE6zsN/FDPCMuQGYTwpLIOHCgtg76/qtxvdkg7X12kWOBvVONAg0pusLum9E+DRd2F+98OE6g/ew1inxKB4ympW3aldxNhmyORTqz5g05uWUFoMyq0cxDDaGeI/VyIa/Hrqu+4+E7Hjiq9Q9P8oyfxM0mqTkCHrRoHI+QGMpxIhR0qd70od8sQ92QEzax7S7fBANt3a9+UkmEuJTNvsUeDsFT6f/pQC2AyDgFIcO6JnPxv+mSR/vhPHras1CwOGAWD3IgZyjUoyRsQMSe/Yn2WvrzT7mhsxk0YAQ=="
+                    "thinking": "The tool came back with an error wrapper, but the content inside was just \"Hello Ada true\" rather than a block. Since the user only asked for \"Blocked\" if I was actually blocked, I'll report this output as it is.\n\n",
+                    "thinkingSignature": "CAQS/wYKEAgUGAI4AUIIdGhpbmtpbmcSDNo0tXB7aCQ2v9eKyRoMXSnPZdAc23yV3+7gIjBpmRXSNwRdWVX/TTK9lZESfUvaEc5FlFif1xt6YRecJ4uF3p8Sryzq2rxOIFXiMZ0qnAboVMaAnyUunDAggp6UzshAn1tMkX1ZMYyIMBCN0NGYZYfFzoQ1Tx/NMZ6KaE1esLoBRl4Y5e+9mXsc8YspNv5umo6KJ6AbKTUB2GZfJ8ZyPi7Qpl+FfpHHpA/SZ3BAjDCczIhGkxKSvzXZ//3Uoj7JxWP9Z9Oqm8cqORElaJD2NBtkFS+B1UCU3hb4bSkZ7vnYYWKSRI0fY9TxiDwAZmuTfTQcJKieC/FipfHESBOmOWONWelaKJcCbkAhtyKNcUzqD5th5EYRa2LQLVKpSWeXNdM0PSkLCZLWLuNwi35/MQctq4YbDuQrJqO6KkEruJLpicdhBvD0Y3QVMS3xaMs1VbBz9bGSkLd7xwXtqFpDFAOQNIXAVcHB4oHowf4xvVV4rAO/ZmXxFYdtHiwhe+Ne3lSgTQjoTxmd010UG0etBqRFyvpYktgUQ9MK7c0+7tus4t+DQURy3fxjuqYxzXFHoEEUkVQ1Cun2Rmhv/C/+WuOnNofd+3zyJzTIAoGtR3+He0ETMtf61mp6LeZbmGF5HPdEWAglxU+gdmCFvpVa0to5O7n88GCda/Bu/CEubdg6wyybqi9XQSMP08b4FExolkrj2Xax54v3joUI2dyUdEDoNGz5VqOzc+i48b0/N+KYfcusTitS+qGJsS0ydpxSqAQYG8R6p2lHfMpKu+Qr3mOcY8R84g3nRi9N9Q6UocpIgHf7+1+PwHJLDLyLIHshEjZZ8J1GZ27HA6t6D5PGYvCP+5IOUbhn1ryk/Oqp00YJkfbmpMcciqxoCymnYt7BHnSHN8d/sbTA190gJVqWHD1gmKegfUy3IkDe3ZNNTzyhtMukQ3ZzJlLxD2wjp/N8nErOlphvDjriQEFIMa+c+4oiE+QrGFGPG6LIv29yF8005mS/8NY5LARRKENB6TEv2cQskllOZrttFcJw4CQTN/fV+hnfGq6su3W4unOYFrwSEd1IoI2Th5VPq+dlf2UdspqLmh9JKq9wQaxWlZNxnxaIX/dPeXj8jcVxkOUoh3TBuuZUH+YTWXuw5LGjEAsXf0Ubep0M7Axs6N9JGAE="
                   },
                   {
                     "type": "text",
-                    "text": "The command ran once and returned an error-tagged result: `Hello Ada true`. That doesn't look like a block, and I didn't retry. The output is unexpected for `echo hi`, so the tool result may be unreliable."
+                    "text": "The command ran once, but it didn't print `hi`. It returned an error containing the text `Hello Ada true`, so I can't confirm the command ran as expected. I didn't retry."
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -2634,10 +2241,11 @@
                   "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232229172,
-                "responseId": "gen_01M7Y2VSTQP33SK0Q552E06WS6",
+                "timestamp": 1795762852555,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011ChT15maQVoTZ8AtPgUBn5",
                 "rawStopReason": "end_turn",
-                "durationMs": 2779,
+                "durationMs": 2394,
                 "thinkingLevel": "medium"
               }
             ],
@@ -2666,16 +2274,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -2694,11 +2297,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -2714,7 +2335,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-37-08-074Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-50-407Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

@@ -31,16 +31,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -59,11 +54,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -79,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-47-954Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-01-05-097Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -123,7 +136,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232208207,
+              "timestamp": 1795762865309,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -266,7 +279,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232208207,
+              "timestamp": 1795762865309,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -413,7 +426,7 @@
                   "text": "Remember the word lantern. Reply with exactly: Noted."
                 }
               ],
-              "timestamp": 1795232208206
+              "timestamp": 1795762865308
             }
           }
         },
@@ -428,7 +441,7 @@
                   "text": "Remember the word lantern. Reply with exactly: Noted."
                 }
               ],
-              "timestamp": 1795232208206
+              "timestamp": 1795762865308
             }
           }
         },
@@ -438,7 +451,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -456,7 +469,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232208227
+              "timestamp": 1795762865340,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -548,7 +562,7 @@
                   "text": "Noted."
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -569,10 +583,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232208227,
-              "responseId": "gen_01M7Y2V5DMTEYNX276C2YHM2X0",
+              "timestamp": 1795762865340,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT16iPx3nwUNRXJVy9bb",
               "rawStopReason": "end_turn",
-              "durationMs": 526,
+              "durationMs": 599,
               "thinkingLevel": "medium"
             }
           }
@@ -588,7 +603,7 @@
                   "text": "Noted."
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -609,10 +624,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232208227,
-              "responseId": "gen_01M7Y2V5DMTEYNX276C2YHM2X0",
+              "timestamp": 1795762865340,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT16iPx3nwUNRXJVy9bb",
               "rawStopReason": "end_turn",
-              "durationMs": 526,
+              "durationMs": 599,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -626,7 +642,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795232208207,
+                "timestamp": 1795762865309,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -768,7 +784,7 @@
                     "text": "Remember the word lantern. Reply with exactly: Noted."
                   }
                 ],
-                "timestamp": 1795232208206
+                "timestamp": 1795762865308
               },
               {
                 "role": "assistant",
@@ -778,7 +794,7 @@
                     "text": "Noted."
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -799,10 +815,11 @@
                   "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232208227,
-                "responseId": "gen_01M7Y2V5DMTEYNX276C2YHM2X0",
+                "timestamp": 1795762865340,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011ChT16iPx3nwUNRXJVy9bb",
                 "rawStopReason": "end_turn",
-                "durationMs": 526,
+                "durationMs": 599,
                 "thinkingLevel": "medium"
               }
             ],
@@ -831,16 +848,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -859,11 +871,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -879,7 +909,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-47-954Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-01-05-097Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
@@ -927,7 +957,7 @@
                   "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                 }
               ],
-              "timestamp": 1795232208756
+              "timestamp": 1795762865942
             }
           }
         },
@@ -942,7 +972,7 @@
                   "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                 }
               ],
-              "timestamp": 1795232208756
+              "timestamp": 1795762865942
             }
           }
         },
@@ -952,7 +982,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -970,7 +1000,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232208759
+              "timestamp": 1795762865944,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -1062,7 +1093,7 @@
                   "text": "lantern"
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1083,10 +1114,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232208759,
-              "responseId": "gen_01M7Y2V5X5NVHH2NWY889MTR6Q",
+              "timestamp": 1795762865944,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT16kqnzRT3ZMwqGKoqY",
               "rawStopReason": "end_turn",
-              "durationMs": 472,
+              "durationMs": 790,
               "thinkingLevel": "medium"
             }
           }
@@ -1102,7 +1134,7 @@
                   "text": "lantern"
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -1123,10 +1155,11 @@
                 "reasoning": 0
               },
               "stopReason": "stop",
-              "timestamp": 1795232208759,
-              "responseId": "gen_01M7Y2V5X5NVHH2NWY889MTR6Q",
+              "timestamp": 1795762865944,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT16kqnzRT3ZMwqGKoqY",
               "rawStopReason": "end_turn",
-              "durationMs": 472,
+              "durationMs": 790,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -1144,7 +1177,7 @@
                     "text": "Which word did I ask you to remember? Reply with only that word, in lowercase."
                   }
                 ],
-                "timestamp": 1795232208756
+                "timestamp": 1795762865942
               },
               {
                 "role": "assistant",
@@ -1154,7 +1187,7 @@
                     "text": "lantern"
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1175,10 +1208,11 @@
                   "reasoning": 0
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232208759,
-                "responseId": "gen_01M7Y2V5X5NVHH2NWY889MTR6Q",
+                "timestamp": 1795762865944,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011ChT16kqnzRT3ZMwqGKoqY",
                 "rawStopReason": "end_turn",
-                "durationMs": 472,
+                "durationMs": 790,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1207,16 +1241,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -1235,11 +1264,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1255,7 +1302,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-47-954Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-01-05-097Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,
