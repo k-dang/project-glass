@@ -425,7 +425,11 @@ export const states: ReadonlyArray<State> = [
         const question = window.getByRole("radiogroup")
         await allow.or(question).first().waitFor()
 
-        if (await allow.isVisible()) return
+        if (await allow.isVisible()) {
+          await window.getByRole("button", { name: "Hide details" }).click()
+
+          return
+        }
       }
 
       throw new Error("No Thread is waiting on a Permission request")

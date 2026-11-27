@@ -17,12 +17,18 @@ _An Agent review flags an unchecked API key, right beside the lines that trust i
   diagram or a Before / after, then walks you from the part that matters most down to the glue.
 - **Ask, don't guess.** Ask about any line of the diff and get a private answer beside it. Keep
   the agent's suggested comments you agree with, and post them as your own GitHub review.
-- **Run agents without losing track.** Start Claude Code or pi in Threads, each in its own
-  worktree or Sandbox. Glass names the branch, links the PR, and brings their questions and
-  permission requests to you.
 - **One Inbox for everything waiting on you.** Reviews, agent questions, permission requests, and
   Check-ins from agents running in your terminal ([outside agents](docs/user/outside-agents.md)),
   grouped by why they wait.
+
+## Run your agents in the same place
+
+![A Claude Code Thread asking permission to run a command](docs/images/threads.png)
+
+Start Claude Code or pi in a Thread, each in its own worktree or Sandbox, and run as many as you
+like. Glass names each branch and links the PR, so an agent's work stays tied to its review. When
+one needs you to answer a question or allow a command, it waits in your Inbox while the rest keep
+working.
 
 ## Layout
 
