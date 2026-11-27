@@ -1,4 +1,4 @@
-import { Schema } from "effect"
+import { Match, Schema } from "effect"
 import { EventKind, EventSource } from "./event"
 import { PullRequestRef, referenceKey } from "./pullRequest"
 
@@ -17,7 +17,8 @@ export const SubscriptionSubject = Schema.Union([PullRequestSubject])
 
 export type SubscriptionSubject = typeof SubscriptionSubject.Type
 
-export const subjectSource = (_subject: SubscriptionSubject): EventSource => "github"
+export const subjectSource = (subject: SubscriptionSubject): EventSource =>
+  Match.valueTags(subject, { PullRequest: () => "github" as const })
 
 export const subjectKey = ({ pullRequest }: SubscriptionSubject) => referenceKey(pullRequest)
 
