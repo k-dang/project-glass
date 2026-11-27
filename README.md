@@ -2,17 +2,19 @@
 
 **Review code at the speed agents write it.**
 
-Agents now write more code than anyone can read line by line. Glass is a desktop app that puts
-your pull requests and your coding agents in one place, and helps you spend your attention where
-it counts.
+Your agents open pull requests faster than you can read them. Glass points you to the few lines
+that could hurt you, explains the rest, and tells you what's safe to skim. Your PRs and your coding
+agents, in one desktop app.
 
 ![An Agent review Hotspot beside the lines it flags](docs/images/agent-review.png)
 
-- **Know where to look.** An Agent review ranks the few Hotspots worth your closest read and
-  marks the files you can skim. It stays on your machine, never posts to GitHub, and never
+_An Agent review flags an unchecked API key, right beside the lines that trust it._
+
+- **Know where to look.** An Agent review ranks the few Hotspots that deserve your closest read
+  and marks the files you can skim. It's yours alone: it never posts to GitHub, and it never
   approves anything for you.
-- **Read a PR in the right order.** A Tour explains why the change exists, draws it as a diagram
-  or a Before / after, then walks you through it from the part that matters most to the glue.
+- **Read a PR in the order it makes sense.** A Tour says why the change exists, draws it as a
+  diagram or a Before / after, then walks you from the part that matters most down to the glue.
 - **Ask, don't guess.** Ask about any line of the diff and get a private answer beside it. Keep
   the agent's suggested comments you agree with, and post them as your own GitHub review.
 - **Run agents without losing track.** Start Claude Code or pi in Threads, each in its own
