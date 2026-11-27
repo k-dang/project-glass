@@ -2134,6 +2134,35 @@ it("shows a Turn's Markdown images and links to Windows paths in the Thread's fo
   ])
 })
 
+it("opens an image in the File pane at full size in the image viewer", async () => {
+  const user = mount({
+    FindThreadFiles: ({ paths }) => Effect.succeed(paths),
+    GetThreadFile: () => Effect.succeed(ImageFile.make({ mediaType: "image/png", data: "shot" })),
+    WatchTranscript: () =>
+      Stream.make(
+        TranscriptSnapshot.make({
+          turns: [
+            {
+              ...runningTurn,
+              parts: [TextPart.make({ text: "Screenshot: `.verify/after.png`." })],
+              ended: { at: sentAt, ending: TurnDone.make({}) },
+            },
+          ],
+          queued: [],
+          status: null,
+        }),
+      ),
+  })
+
+  await user.click(await screen.findByRole("button", { name: ".verify/after.png" }))
+
+  const pane = await screen.findByRole("complementary", { name: "File" })
+  await user.click(await within(pane).findByRole("button", { name: "after.png" }))
+
+  const viewer = await screen.findByRole("dialog", { name: "after.png" })
+  expect(within(viewer).getByRole("img").getAttribute("src")).toBe("data:image/png;base64,shot")
+})
+
 it("reloads an HTML file in the Browser pane when the next Turn ends, as the agent may have changed it", async () => {
   const nextEnded = Deferred.makeUnsafe<void>()
   const nextTurn = { ...runningTurn, id: "turn-2" }
