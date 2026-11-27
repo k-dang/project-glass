@@ -103,6 +103,9 @@ const changesOf = (was: Detailed | undefined, now: Detailed) => [
   ...mergeConflictEvents(was, now),
 ]
 
+export const standingEvents = (pr: MirroredPullRequest): ReadonlyArray<Event> | null =>
+  isDetailed(pr) ? changesOf(undefined, pr) : null
+
 const pullRequestsOf = (mirror: Mirror) =>
   mirror.repositories.flatMap(({ pullRequests }) => pullRequests)
 

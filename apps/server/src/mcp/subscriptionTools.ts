@@ -1,5 +1,6 @@
 import {
   defaultSubscriptionKinds,
+  Event,
   EventKind,
   eventKindWords,
   Subscription,
@@ -18,7 +19,7 @@ const MAX_NOTE_CHARS = 2_000
 const kindList = EventKind.literals.map((kind) => `${kind}: ${eventKindWords[kind]}`).join(", ")
 
 const Subscribe = Tool.make("subscribe", {
-  description: `Subscribes your Thread to a subject, so Glass tells it about the Events that happen to it after your Turn ends. A PR is the only subject so far: use it when the user asks you to look after a PR, such as keeping it green or handling its review feedback, or to be told when a PR you depend on merges. The PR must be open, in a repository the user follows in Glass. When Glass first reads the PR for a Subscription it reports what already stands on it, then what changes. When your Thread is idle, it gets one Update with every new Event since the last one, if at least one is of a kind you asked for. Subscribing again to the same subject replaces its kinds and note, and tells only the Events from then on. A Subscription to a PR ends when the PR merges or closes. Glass allows this only in a Turn a message started, not in one with a glass_update or glass_started_work_update block, nor in one that began by itself.`,
+  description: `Subscribes your Thread to a subject, so Glass tells it about the Events that happen to it after your Turn ends. A PR is the only subject so far: use it when the user asks you to look after a PR, such as keeping it green or handling its review feedback, or to be told when a PR you depend on merges. The PR must be open, in a repository the user follows in Glass. Glass replies with what already stands on the PR as Events in standing, or with null there when it hasn't read the PR in detail yet; then its first read sends what stands in an Update. After that, Glass tells what changes. When your Thread is idle, it gets one Update with every new Event since the last one, if at least one is of a kind you asked for. Subscribing again to the same subject replaces its kinds and note, and tells only the Events from then on. A Subscription to a PR ends when the PR merges or closes. Glass allows this only in a Turn a message started, not in one with a glass_update or glass_started_work_update block, nor in one that began by itself.`,
   parameters: Schema.Struct({
     subject: SubscriptionSubject.annotate({
       description:
@@ -36,7 +37,10 @@ const Subscribe = Tool.make("subscribe", {
         "In your own words, what the user asked you to do about it. Glass gives it back to your Thread with what happened.",
     }),
   }),
-  success: Schema.Struct({ subscription: Subscription }),
+  success: Schema.Struct({
+    subscription: Subscription,
+    standing: Schema.NullOr(Schema.Array(Event)),
+  }),
   failure: GlassToolFailure,
 }).annotateMerge(acting.pipe(Context.merge(forThreads)))
 
@@ -89,7 +93,11 @@ export const SubscriptionToolHandlers = SubscriptionTools.toLayer(
               })
               .pipe(Effect.mapError(explained)),
           ),
-          Effect.map((subscription) => ({ subscription })),
+          Effect.flatMap((subscription) =>
+            Match.valueTags(subscription.subject, {
+              PullRequest: ({ pullRequest }) => gitHub.standing(pullRequest),
+            }).pipe(Effect.map((standing) => ({ subscription, standing }))),
+          ),
         ),
       list_subscriptions: () =>
         callingThread.pipe(

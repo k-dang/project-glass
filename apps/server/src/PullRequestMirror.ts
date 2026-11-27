@@ -134,6 +134,7 @@ export class PullRequestMirror extends Context.Service<
   PullRequestMirror,
   {
     readonly saved: Effect.Effect<Mirror | undefined>
+    readonly afterSync: Effect.Effect<Mirror | undefined>
     readonly changes: Stream.Stream<Mirror | undefined>
     readonly forgetRepositories: Effect.Effect<void>
     readonly readInDetail: (which: InDetail) => Effect.Effect<void>
@@ -475,6 +476,7 @@ export class PullRequestMirror extends Context.Service<
 
       return PullRequestMirror.of({
         saved: SubscriptionRef.get(state),
+        afterSync: SubscriptionRef.get(state).pipe(lock.withPermits(1)),
         changes: SubscriptionRef.changes(state),
         forgetRepositories,
         readInDetail: (which) => Ref.set(detailed, which),

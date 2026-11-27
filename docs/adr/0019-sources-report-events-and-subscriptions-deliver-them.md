@@ -17,8 +17,10 @@ A Source only reports Events with a schema and checks what a Subscription may be
 who may subscribe, giving up after three Updates in a row, and running three at once know nothing
 about where Events come from. GitHub is the only Source, and it reports Events only for PRs a
 Subscription covers, by comparing each read of the PR mirror with the one before; the first read
-for a Subscription reports what already stands. The mirror is already polled, and a desktop app has
-no public address for webhooks.
+for a Subscription reports what already stands. A Thread that subscribes to a PR Glass already
+reads hears what stands in the reply to its subscribing instead, since that read reported it before
+the Subscription began. The mirror is already polled, and a desktop app has no public address for
+webhooks.
 
 ## Considered options
 

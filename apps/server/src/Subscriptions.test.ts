@@ -1,6 +1,7 @@
 import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
 import {
+  Event,
   localPlace,
   PullRequestClosedEvent,
   PullRequestRef,
@@ -9,7 +10,7 @@ import {
 } from "@glass/contracts"
 import { Context, DateTime, Effect, Layer, Option, Schema, Stream } from "effect"
 import { SqlClient } from "effect/sql"
-import { subscribe, subscribeArguments } from "../test/pullRequestUpdates"
+import { fail, failed, subscribe, subscribeArguments } from "../test/pullRequestUpdates"
 import { calledBy, glassCall, repository, settled, threadsFixture } from "../test/threadsFixture"
 import { greeterPullRequest } from "../test/threadWithPullRequest"
 import { EventLog } from "./EventLog"
@@ -109,6 +110,32 @@ it.live(
       ])
       assert.deepStrictEqual(yield* subscriptionsOf(f, thread.id, () => true), [])
     }),
+)
+
+const decodeSubscribed = Schema.decodeUnknownSync(
+  Schema.fromJsonString(Schema.Struct({ standing: Schema.NullOr(Schema.Array(Event)) })),
+)
+
+it.live("replies with what already stands on a PR that Glass already reads in detail", () =>
+  Effect.gen(function* () {
+    const f = yield* threadsFixture
+    yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
+    fail(f.github.seedPullRequest(greeterPullRequest(7, "feature/greet")), failed("lint"))
+
+    const first = yield* f.start(subscribe("Keep it green", greeter(7)))
+    const [firstSubscribed] = yield* f.transcript(first.id, settled(1))
+    yield* f.client.ListPullRequests()
+    yield* f.transcript(first.id, settled(2))
+
+    const second = yield* f.start(subscribe("Keep it green too", greeter(7)))
+    const [secondSubscribed] = yield* f.transcript(second.id, settled(1))
+
+    assert.isNull(decodeSubscribed(calledBy(firstSubscribed).text).standing)
+    assert.deepStrictEqual(
+      decodeSubscribed(calledBy(secondSubscribed).text).standing?.map(({ _tag }) => _tag),
+      ["ChecksFailed"],
+    )
+  }),
 )
 
 const decodeListed = Schema.decodeUnknownSync(

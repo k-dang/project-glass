@@ -1,5 +1,6 @@
 import {
   type ConnectionError,
+  type Event,
   type PullRequestRef,
   PullRequestSubject,
   referenceKey,
@@ -10,7 +11,7 @@ import {
 import { Array as Arr, Context, Effect, Layer, Ref, Stream } from "effect"
 import { EventLog } from "./EventLog"
 import { FollowedRepositories } from "./FollowedRepositories"
-import { endedEvent, recorded } from "./gitHubEvents"
+import { endedEvent, recorded, standingEvents } from "./gitHubEvents"
 import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import {
@@ -33,6 +34,7 @@ export class GitHubSource extends Context.Service<
       typeof PullRequestSubject.Type,
       ThreadError | SettingsError | ConnectionError
     >
+    readonly standing: (pullRequest: PullRequestRef) => Effect.Effect<ReadonlyArray<Event> | null>
   }
 >()("@glass/server/GitHubSource") {
   static readonly layer = Layer.effect(
@@ -130,6 +132,15 @@ export class GitHubSource extends Context.Service<
 
           return PullRequestSubject.make({ pullRequest: found.summary.ref })
         }),
+        standing: (pullRequest) =>
+          mirror.afterSync.pipe(
+            Effect.map((mirrored) => {
+              const pr =
+                mirrored === undefined ? undefined : mirroredPullRequest(mirrored, pullRequest)
+
+              return pr === undefined ? null : standingEvents(pr)
+            }),
+          ),
       })
     }),
   )
