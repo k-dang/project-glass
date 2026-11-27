@@ -1,6 +1,6 @@
 import type { EventSource, ThreadError } from "@glass/contracts"
 import { Array as Arr, DateTime, Effect, Exit, Layer, Ref, Stream } from "effect"
-import { changed, Sources, type SubscriptionDecision, telling } from "./Source"
+import { changed, Sources, type SubscriptionDecision } from "./Source"
 import { Subscriptions, type ToldSubscription } from "./Subscriptions"
 import { Threads } from "./Threads"
 import { Transcripts } from "./Transcripts"
@@ -32,12 +32,6 @@ export const Updates = Layer.effectDiscard(
     const transcripts = yield* Transcripts
     const sources = yield* Sources
     const since = yield* DateTime.now
-
-    const runningUpdates = transcripts.runningContexts.pipe(
-      Effect.map(
-        (running) => running.filter(({ context }) => telling(context) !== undefined).length,
-      ),
-    )
 
     const asUnitOfWork = <E, R>(
       threadId: string,
@@ -78,31 +72,31 @@ export const Updates = Layer.effectDiscard(
     const sendUpdate = (threadId: string, waits: Effect.Effect<void>) =>
       threads.whenIdle(threadId, (start) =>
         Effect.gen(function* () {
-          const states = yield* subscriptions.states(threadId)
           const lastMessageTurn = yield* transcripts.lastMessageTurn(threadId)
 
           for (const source of sources) {
             const { decisions, update } = yield* source.decide(
               threadId,
-              states.filter(({ subscription }) => subscription.source === source.name),
+              yield* subscriptions.states(threadId, source.name),
               lastMessageTurn,
               since,
             )
 
-            const full = update !== undefined && (yield* runningUpdates) >= RUN_AT_ONCE
-            const record = toRecord(decisions, update !== undefined && !full)
+            if (update === undefined) {
+              yield* subscriptions.recordTold(toRecord(decisions, true), lastMessageTurn)
 
-            if (update === undefined || full) {
-              yield* subscriptions.recordTold(record, lastMessageTurn)
+              continue
+            }
 
-              if (!full) continue
-
+            if ((yield* transcripts.runningUpdates).length >= RUN_AT_ONCE) {
+              yield* subscriptions.recordTold(toRecord(decisions, false), lastMessageTurn)
               yield* waits
 
               return
             }
 
             const context = yield* update
+            const record = toRecord(decisions, true)
 
             yield* asUnitOfWork(threadId, source.name, decisions.filter(tells), (started) =>
               start({ message: "", images: [], context, retriesDelivery: false }, (turnId) =>

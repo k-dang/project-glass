@@ -1,14 +1,23 @@
-import {
-  type EventSource,
-  type SubscriptionReason,
-  subscriptionReasonOf,
-  type ThreadError,
-  type TurnContext,
-  type Update,
-} from "@glass/contracts"
-import { Context, type DateTime, Effect, Predicate, Stream } from "effect"
+import type { EventSource, SubscriptionReason, ThreadError, Update } from "@glass/contracts"
+import { Array as Arr, Context, type DateTime, Effect, Stream } from "effect"
 import type { SubscriptionState } from "./Subscriptions"
-import type { Standing, Told } from "./updateDecision"
+import { decide, type SubjectNow, type Told } from "./updateDecision"
+
+export interface Subscribed<Detail> {
+  readonly state: SubscriptionState
+  readonly subject: string
+  readonly now: SubjectNow<Detail>
+}
+
+export const decided = <Detail, Extra>(
+  subscribed: ReadonlyArray<Subscribed<Detail> & Extra>,
+  lastMessageTurn: string | null,
+) =>
+  subscribed.map((one) => {
+    const before = one.state.toldAbout(one.subject, lastMessageTurn)
+
+    return { ...one, before, decision: decide(one.state.subscription.reasons, one.now, before) }
+  })
 
 export interface SubscriptionDecision {
   readonly state: SubscriptionState
@@ -16,21 +25,7 @@ export interface SubscriptionDecision {
   readonly before: Told
   readonly told: Told
   readonly due: ReadonlyArray<SubscriptionReason>
-  readonly standing: Readonly<Partial<Record<SubscriptionReason, Standing>>>
 }
-
-export interface Telling {
-  readonly subscriptionId: string
-  readonly reasons: ReadonlyArray<SubscriptionReason>
-}
-
-export const telling = (context: TurnContext | null): ReadonlyArray<Telling> | undefined =>
-  Predicate.isTagged(context, "Update")
-    ? context.subjects.map(({ subscriptionId, reasons }) => ({
-        subscriptionId,
-        reasons: reasons.map(({ _tag }) => subscriptionReasonOf[_tag]),
-      }))
-    : undefined
 
 export interface Decided {
   readonly decisions: ReadonlyArray<SubscriptionDecision>
@@ -44,9 +39,52 @@ export interface Source {
     threadId: string,
     states: ReadonlyArray<SubscriptionState>,
     lastMessageTurn: string | null,
-    readSince?: DateTime.Utc,
+    readSince: DateTime.Utc,
   ) => Effect.Effect<Decided, ThreadError>
 }
+
+export const sourceOf = <Detail, Extra>(source: {
+  readonly name: EventSource
+  readonly changes: ReadonlyArray<Stream.Stream<unknown, unknown>>
+  readonly now: (
+    threadId: string,
+    states: ReadonlyArray<SubscriptionState>,
+    readSince: DateTime.Utc,
+  ) => Effect.Effect<ReadonlyArray<Subscribed<Detail> & Extra>, ThreadError>
+  readonly update: (
+    due: Arr.NonEmptyReadonlyArray<
+      NoInfer<Subscribed<Detail> & Extra> & {
+        readonly reasons: Arr.NonEmptyReadonlyArray<NoInfer<Detail>>
+      }
+    >,
+  ) => Effect.Effect<Update, ThreadError>
+}): Source => ({
+  name: source.name,
+  changes: source.changes,
+  decide: (threadId, states, lastMessageTurn, readSince) =>
+    source.now(threadId, states, readSince).pipe(
+      Effect.map((subscribed) => {
+        const all = decided(subscribed, lastMessageTurn)
+
+        const due = all.flatMap((one) => {
+          const reasons = one.decision.due.map(({ detail }) => detail)
+
+          return Arr.isReadonlyArrayNonEmpty(reasons) ? [{ ...one, reasons }] : []
+        })
+
+        return {
+          decisions: all.map(({ state, subject, before, decision }) => ({
+            state,
+            subject,
+            before,
+            told: decision.told,
+            due: decision.due.map(({ reason }) => reason),
+          })),
+          update: Arr.isReadonlyArrayNonEmpty(due) ? source.update(due) : undefined,
+        }
+      }),
+    ),
+})
 
 export class Sources extends Context.Service<Sources, ReadonlyArray<Source>>()(
   "@glass/server/Sources",

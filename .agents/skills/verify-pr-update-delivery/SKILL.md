@@ -33,9 +33,9 @@ Synced with the code at commit `78bc95ed82127353a448c25e6350693e21d9a24f`. Befor
 | Model | Code |
 | --- | --- |
 | `ChecksFail`, `ChecksRunAgain`, `NewPushHasNoChecksYet`, `ChecksPass` | What a read of the PR mirror shows: `subscribedNow` in `apps/server/src/GitHubSource.ts`, which gives the sender nothing for a repository not read since Glass started |
-| `Decide` | One `threads.whenIdle` transaction in `sendUpdate` in `apps/server/src/Updates.ts`, which asks each Source's `decide` what to send and plans what to record in `toRecord`; `whenIdle` in `apps/server/src/ThreadTurns.ts`; `idle` in `apps/server/src/Transcripts.ts` |
+| `Decide` | One `threads.whenIdle` transaction in `sendUpdate` in `apps/server/src/Updates.ts`, which asks each Source what holds, decides in `sourceOf` in `apps/server/src/Source.ts`, and plans what to record in `toRecord`; `whenIdle` in `apps/server/src/ThreadTurns.ts`; `idle` in `apps/server/src/Transcripts.ts` |
 | `IsNew`, `DecideNothingHolds`, `Count(t) < GivesUpAfter` | `decide` in `apps/server/src/updateDecision.ts` and `failingChecks` in `apps/server/src/pullRequestNow.ts` (`cleared` returns the count to zero; `unsettled` keeps it, both while checks run again and while a new push has none yet) |
-| `SlotFree` | `runningUpdates` in `Updates.ts`, which counts the running Turns `runningContexts` in `Transcripts.ts` reads, compared with `RUN_AT_ONCE` |
+| `SlotFree` | `runningUpdates` in `Transcripts.ts`, counted in `sendUpdate` in `Updates.ts` against `RUN_AT_ONCE` |
 | `StartUpdate` | `startIfIdle` in `Transcripts.ts`, with `recordTold` in `apps/server/src/Subscriptions.ts` in the same transaction |
 | `afterNewMessage`, `MessageReaches` | `lastMessageTurn` in `Transcripts.ts`, which reads the Turns your message started (`started_by = 'user'`) and your Steers, against `afterMessage` in `last_told`; `toldAbout` in `Subscriptions.ts` and `countedAfresh` in `updateDecision.ts` |
 | `YouSendMessage`, `YouQueueMessage`, `AgentSendsMessage`, `AgentQueuesMessage`, `QueuedMessageStarts`, `TurnEnds`, `StoppedQueueStarts` | `stepThread` in `apps/server/src/threadState.ts`, which gives the Turn a message starts that message's sender |

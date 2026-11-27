@@ -3,11 +3,13 @@ import {
   type OpenReason,
   openReasons,
   type PullRequestRef,
+  subscriptionReasonOf,
   type Thread,
+  type UpdatedPullRequest,
 } from "@glass/contracts"
 import { Array as Arr, Context, Effect, Layer, Option, Stream } from "effect"
 import { GitHubSource } from "./GitHubSource"
-import { changed, type Telling, telling } from "./Source"
+import { changed } from "./Source"
 import { Subscriptions } from "./Subscriptions"
 import { Threads } from "./Threads"
 import { Transcripts } from "./Transcripts"
@@ -35,7 +37,7 @@ export class PullRequestStandings extends Context.Service<
 
       const standingsOf = Effect.fnUntraced(function* (
         thread: Thread,
-        running: ReadonlyArray<Telling>,
+        running: ReadonlyArray<UpdatedPullRequest>,
       ) {
         const all = yield* gitHub.decisions(thread.id)
 
@@ -47,7 +49,8 @@ export class PullRequestStandings extends Context.Service<
 
             const beingTold = running.some(
               ({ subscriptionId, reasons }) =>
-                subscriptionId === subscription.id && reasons.includes(reason),
+                subscriptionId === subscription.id &&
+                reasons.some(({ _tag }) => subscriptionReasonOf[_tag] === reason),
             )
 
             return [
@@ -69,7 +72,7 @@ export class PullRequestStandings extends Context.Service<
           (): ReadonlyArray<Thread> => [],
         )
 
-        const running = yield* transcripts.runningContexts
+        const running = yield* transcripts.runningUpdates
 
         return yield* Effect.forEach(yield* subscriptions.subscribedThreads, (threadId) => {
           const thread = listed.find(({ id }) => id === threadId)
@@ -78,9 +81,7 @@ export class PullRequestStandings extends Context.Service<
             ? Effect.succeed([])
             : standingsOf(
                 thread,
-                running.flatMap((turn) =>
-                  turn.threadId === threadId ? (telling(turn.context) ?? []) : [],
-                ),
+                running.flatMap((turn) => (turn.threadId === threadId ? turn.update.subjects : [])),
               )
         }).pipe(Effect.map(Arr.flatten))
       }).pipe(

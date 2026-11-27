@@ -32,6 +32,7 @@ import {
   type MessageWithContext,
   TurnPart,
   TurnStarted,
+  type Update,
 } from "@glass/contracts"
 import {
   Array as Arr,
@@ -177,9 +178,9 @@ const decodeRunningContexts = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ threadId: Schema.String, context: ContextJson })),
 )
 
-export interface RunningContext {
+export interface RunningUpdate {
   readonly threadId: string
-  readonly context: TurnContext | null
+  readonly update: Update
 }
 
 const decodePositions = Schema.decodeUnknownEffect(
@@ -321,7 +322,7 @@ export class Transcripts extends Context.Service<
       turnId: string | null,
     ) => Effect.Effect<TurnStarter | null, ThreadError>
     readonly lastMessageTurn: (threadId: string) => Effect.Effect<string | null, ThreadError>
-    readonly runningContexts: Effect.Effect<ReadonlyArray<RunningContext>, ThreadError>
+    readonly runningUpdates: Effect.Effect<ReadonlyArray<RunningUpdate>, ThreadError>
     readonly startOrQueue: (
       threadId: string,
       input: MessageWithContext,
@@ -595,6 +596,15 @@ export class Transcripts extends Context.Service<
         sql`SELECT id FROM thread_turn WHERE thread_id = ${threadId} AND ended IS NULL`.pipe(
           Effect.flatMap(decodeTurnIds),
           Effect.map(([turn]) => turn?.id ?? null),
+        )
+
+      const starterOf = (turn: Statement.Fragment) =>
+        withStorageFailure(
+          "read who started a Turn",
+          sql`SELECT started_by AS startedBy FROM thread_turn WHERE ${turn}`.pipe(
+            Effect.flatMap(decodeStarters),
+            Effect.map(([found]) => found?.startedBy ?? null),
+          ),
         )
 
       const queued = (threadId: string) =>
@@ -1052,30 +1062,11 @@ export class Transcripts extends Context.Service<
               Effect.map(([turn]) => turn?.message ?? null),
             ),
           ),
-        runningTurnStarter: (threadId) =>
-          withStorageFailure(
-            "read a running Turn",
-            sql`
-              SELECT started_by AS startedBy
-              FROM thread_turn WHERE thread_id = ${threadId} AND ended IS NULL
-            `.pipe(
-              Effect.flatMap(decodeStarters),
-              Effect.map(([turn]) => turn?.startedBy ?? null),
-            ),
-          ),
+        runningTurnStarter: (threadId) => starterOf(sql`thread_id = ${threadId} AND ended IS NULL`),
         turnStarter: (threadId, turnId) =>
           turnId === null
             ? Effect.succeed(null)
-            : withStorageFailure(
-                "read who started a Turn",
-                sql`
-                  SELECT started_by AS startedBy
-                  FROM thread_turn WHERE id = ${turnId} AND thread_id = ${threadId}
-                `.pipe(
-                  Effect.flatMap(decodeStarters),
-                  Effect.map(([turn]) => turn?.startedBy ?? null),
-                ),
-              ),
+            : starterOf(sql`id = ${turnId} AND thread_id = ${threadId}`),
         lastMessageTurn: (threadId) =>
           withStorageFailure(
             "read the last Turn a message of the user's reached",
@@ -1094,10 +1085,15 @@ export class Transcripts extends Context.Service<
               Effect.map(([turn]) => turn?.id ?? null),
             ),
           ),
-        runningContexts: withStorageFailure(
-          "read what the running Turns were started with",
+        runningUpdates: withStorageFailure(
+          "read the running Updates",
           sql`SELECT thread_id AS threadId, context FROM thread_turn WHERE ended IS NULL`.pipe(
             Effect.flatMap(decodeRunningContexts),
+            Effect.map((running) =>
+              running.flatMap(({ threadId, context }) =>
+                Predicate.isTagged(context, "Update") ? [{ threadId, update: context }] : [],
+              ),
+            ),
           ),
         ),
         settleUndelivered: Effect.fnUntraced(function* (threadId, turnId, reason) {

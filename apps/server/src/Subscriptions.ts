@@ -1,5 +1,5 @@
 import {
-  EventSource,
+  type EventSource,
   Subscription,
   SubscriptionEnding,
   SubscriptionReason,
@@ -39,12 +39,9 @@ const encodeTold = Schema.encodeSync(Schema.fromJsonString(LastTold))
 const encodeEnding = Schema.encodeSync(Schema.fromJsonString(SubscriptionEnding))
 
 const StoredSubscription = Schema.Struct({
-  id: Schema.String,
-  threadId: Schema.String,
-  source: EventSource,
+  ...Subscription.fields,
   subject: SubjectJson,
   reasons: ReasonsJson,
-  note: Schema.String,
   lastTold: Schema.NullOr(Schema.fromJsonString(LastTold)),
   ended: Schema.NullOr(Schema.fromJsonString(SubscriptionEnding)),
 })
@@ -116,6 +113,7 @@ export class Subscriptions extends Context.Service<
     readonly subscribedThreads: Effect.Effect<ReadonlyArray<string>, ThreadError>
     readonly states: (
       threadId: string,
+      source: EventSource,
     ) => Effect.Effect<ReadonlyArray<SubscriptionState>, ThreadError>
     readonly notEnded: (
       source: EventSource,
@@ -148,10 +146,8 @@ export class Subscriptions extends Context.Service<
           FROM subscription WHERE ${matching} ORDER BY created_at, id
         `.pipe(Effect.flatMap(decodeStored), Effect.catch(storageFailure))
 
-      const storedOf = (threadId: string) => stored(sql`thread_id = ${threadId}`)
-
       const list = (threadId: string) =>
-        storedOf(threadId).pipe(Effect.map((found) => found.map(subscriptionOf)))
+        stored(sql`thread_id = ${threadId}`).pipe(Effect.map((found) => found.map(subscriptionOf)))
 
       const subscribe = Effect.fn("Subscriptions.subscribe")(function* <E>(
         threadId: string,
@@ -258,7 +254,10 @@ export class Subscriptions extends Context.Service<
           Effect.map((found) => found.map(({ threadId }) => threadId)),
           Effect.catch(storageFailure),
         ),
-        states: (threadId) => storedOf(threadId).pipe(Effect.map((found) => found.map(stateOf))),
+        states: (threadId, source) =>
+          stored(sql`thread_id = ${threadId} AND source = ${source}`).pipe(
+            Effect.map((found) => found.map(stateOf)),
+          ),
         notEnded: (source) =>
           stored(sql`source = ${source} AND ended IS NULL`).pipe(
             Effect.map((found) => found.map(subscriptionOf)),

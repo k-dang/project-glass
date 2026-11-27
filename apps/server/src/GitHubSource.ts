@@ -29,13 +29,13 @@ import {
   mirroredRepositoryOf,
   PullRequestMirror,
 } from "./PullRequestMirror"
-import { type EndedState, ENDING_TOLD_BY, PullRequestNow, standingOf } from "./pullRequestNow"
+import { type EndedState, endedNow, ENDING_TOLD_BY, openNow } from "./pullRequestNow"
 import { SettingsStore } from "./SettingsStore"
-import type { Source } from "./Source"
+import { decided, sourceOf, type Source } from "./Source"
 import { Subscriptions, type SubscriptionState } from "./Subscriptions"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Transcripts } from "./Transcripts"
-import { decide, type Decision, type Told } from "./updateDecision"
+import type { Decision } from "./updateDecision"
 
 const EVENTS_READ = 50
 
@@ -48,7 +48,6 @@ export interface NewPullRequestSubscription {
 export interface PullRequestDecision {
   readonly state: SubscriptionState
   readonly pullRequest: PullRequestRef
-  readonly before: Told
   readonly decision: Decision<PullRequestUpdateReason>
 }
 
@@ -58,8 +57,7 @@ const subscribedNow = (
   own: ThreadPullRequest | undefined,
   readSince: DateTime.Utc | undefined,
 ) => {
-  if (ended !== null)
-    return { pullRequest: ended.pullRequest, now: PullRequestNow.Ended({ state: ended.state }) }
+  if (ended !== null) return { pullRequest: ended.pullRequest, now: endedNow(ended.state) }
 
   const pullRequest = subscription.subject.pullRequest ?? own?.ref
 
@@ -76,7 +74,7 @@ const subscribedNow = (
     ? undefined
     : {
         pullRequest: mirrored.ref,
-        now: PullRequestNow.Open({
+        now: openNow({
           checks: mirrored.checks,
           failingChecks: mirrored.attention.failingChecks,
           mergeConflict: mirrored.attention.mergeConflict,
@@ -101,7 +99,7 @@ const eventsBehind = (
 ) => reasons.flatMap((reason) => recent.find(({ event }) => isBehind(reason, event)) ?? [])
 
 interface Due {
-  readonly subscription: Subscription
+  readonly state: SubscriptionState
   readonly pullRequest: PullRequestRef
   readonly reasons: Arr.NonEmptyReadonlyArray<PullRequestUpdateReason>
 }
@@ -150,10 +148,12 @@ export class GitHubSource extends Context.Service<
 
       const refuseOwnEnded = Effect.fnUntraced(function* (threadId: string) {
         const own = yield* threadPullRequests.ofThread(threadId)
-        const ended = own === undefined ? null : endedStateOf(own)
 
-        if (own !== undefined && ended !== null)
-          yield* refuseEnded(`Your Thread's PR #${own.ref.number}`, ended)
+        if (own === undefined) return
+
+        const ended = endedStateOf(own)
+
+        if (ended !== null) yield* refuseEnded(`Your Thread's PR #${own.ref.number}`, ended)
       })
 
       const followedPullRequest = Effect.fnUntraced(function* (pullRequest: PullRequestRef) {
@@ -292,35 +292,24 @@ export class GitHubSource extends Context.Service<
       yield* endingMergedOrClosed(threadPullRequests.watch(), endOwn)
       yield* endingMergedOrClosed(mirror.changes, endNamed)
 
-      const decisionsOf = Effect.fnUntraced(function* (
+      const subscribedOf = Effect.fnUntraced(function* (
         threadId: string,
         states: ReadonlyArray<SubscriptionState>,
-        lastMessageTurn: string | null,
         readSince?: DateTime.Utc,
       ) {
         const mirrored = yield* mirror.saved
         const own = yield* threadPullRequests.ofThread(threadId)
 
-        return states.flatMap((state): ReadonlyArray<PullRequestDecision> => {
+        return states.flatMap((state) => {
           const subscribed = subscribedNow(state, mirrored, own, readSince)
 
-          if (subscribed === undefined) return []
-
-          const { pullRequest, now } = subscribed
-          const before = state.toldAbout(referenceKey(pullRequest), lastMessageTurn)
-
-          return [
-            {
-              state,
-              pullRequest,
-              before,
-              decision: decide(state.subscription.reasons, standingOf(now), before),
-            },
-          ]
+          return subscribed === undefined
+            ? []
+            : [{ state, subject: referenceKey(subscribed.pullRequest), ...subscribed }]
         })
       })
 
-      const updatedPullRequest = ({ subscription, pullRequest, reasons }: Due) =>
+      const updatedPullRequest = ({ state: { subscription }, pullRequest, reasons }: Due) =>
         events
           .list({
             limit: EVENTS_READ,
@@ -347,39 +336,13 @@ export class GitHubSource extends Context.Service<
           return PullRequestUpdate.make({ source: "github", subjects, note })
         }).pipe(Effect.mapError(({ message }) => new ThreadError({ message })))
 
-      const source: Source = {
-        name: "github",
-        changes: [mirror.changes, threadPullRequests.watch()],
-        decide: (threadId, states, lastMessageTurn, readSince) =>
-          decisionsOf(threadId, states, lastMessageTurn, readSince).pipe(
-            Effect.map((decided) => {
-              const due = decided.flatMap(
-                ({ state: { subscription }, pullRequest, decision }): ReadonlyArray<Due> => {
-                  const reasons = decision.due.map(({ detail }) => detail)
-
-                  return Arr.isReadonlyArrayNonEmpty(reasons)
-                    ? [{ subscription, pullRequest, reasons }]
-                    : []
-                },
-              )
-
-              return {
-                decisions: decided.map(({ state, pullRequest, before, decision }) => ({
-                  state,
-                  subject: referenceKey(pullRequest),
-                  before,
-                  told: decision.told,
-                  due: decision.due.map(({ reason }) => reason),
-                  standing: decision.standing,
-                })),
-                update: Arr.isReadonlyArrayNonEmpty(due) ? update(due) : undefined,
-              }
-            }),
-          ),
-      }
-
       return GitHubSource.of({
-        source,
+        source: sourceOf({
+          name: "github",
+          changes: [mirror.changes, threadPullRequests.watch()],
+          now: subscribedOf,
+          update,
+        }),
         subscribe: (threadId, turnId, { pullRequest, reasons, note }) =>
           subscriptions.subscribe(threadId, turnId, {
             source: "github",
@@ -389,11 +352,10 @@ export class GitHubSource extends Context.Service<
           }),
         decisions: (threadId) =>
           Effect.gen(function* () {
-            const states = yield* subscriptions.states(threadId)
+            const states = yield* subscriptions.states(threadId, "github")
 
-            return yield* decisionsOf(
-              threadId,
-              states.filter(({ subscription }) => subscription.source === "github"),
+            return decided(
+              yield* subscribedOf(threadId, states),
               yield* transcripts.lastMessageTurn(threadId),
             )
           }),

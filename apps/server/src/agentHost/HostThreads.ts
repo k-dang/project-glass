@@ -121,6 +121,9 @@ export class HostThreads extends Context.Service<
             return next
           })
 
+        const runningTurn = (threadId: string) =>
+          SubscriptionRef.get(runningTurns).pipe(Effect.map((turns) => turns.get(threadId) ?? null))
+
         const withThread = keyedLock().withLock
 
         const retire = (threadId: string, thread: Running | undefined) =>
@@ -182,9 +185,9 @@ export class HostThreads extends Context.Service<
                 return
               }
 
-              const turnId = (yield* SubscriptionRef.get(runningTurns)).get(threadId)
+              const turnId = yield* runningTurn(threadId)
 
-              if (!full || overBudgetStop !== null || thread === undefined || turnId === undefined)
+              if (!full || overBudgetStop !== null || thread === undefined || turnId === null)
                 return
 
               const stop: OverBudgetStop = {
@@ -210,13 +213,7 @@ export class HostThreads extends Context.Service<
               const tools = yield* Match.value(starting.role).pipe(
                 Match.tagsExhaustive({
                   Global: (role) => Effect.succeed(role.tools),
-                  Work: () =>
-                    glassTools.access(
-                      threadId,
-                      SubscriptionRef.get(runningTurns).pipe(
-                        Effect.map((turns) => turns.get(threadId) ?? null),
-                      ),
-                    ),
+                  Work: () => glassTools.access(threadId, runningTurn(threadId)),
                   Review: () => Effect.succeed(undefined),
                 }),
               )

@@ -387,9 +387,7 @@ it.effect(
         "user",
       )
 
-      const [usersTurn] = yield* sql<{ readonly id: string }>`
-        SELECT id FROM thread_turn WHERE thread_id = 'thread' AND ended IS NULL
-      `
+      const usersTurn = yield* Context.get(context, Transcripts).runningTurn("thread")
 
       const subscriptions = Context.get(context, Subscriptions)
 
@@ -405,7 +403,7 @@ it.effect(
         .pipe(Effect.flip)
 
       const betweenTurns = yield* subscriptions.subscribe("thread", null, asked).pipe(Effect.flip)
-      const onTheUsersWord = yield* subscriptions.subscribe("thread", usersTurn!.id, asked)
+      const onTheUsersWord = yield* subscriptions.subscribe("thread", usersTurn, asked)
 
       assert.include(unheardOf.message, "Glass has no record of the Turn asking")
       assert.include(betweenTurns.message, "Glass has no record of the Turn asking")

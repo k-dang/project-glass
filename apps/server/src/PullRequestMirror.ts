@@ -4,6 +4,7 @@ import {
   FollowedRepository,
   GitHubUnavailable,
   PullRequestRef,
+  PullRequestSubject,
   PullRequestSummary,
   repositoryKey,
 } from "@glass/contracts"
@@ -126,9 +127,7 @@ export const openPullRequestOf = (
 ) => mirrorOf(mirror, repository)?.pullRequests.find((pr) => pr.headBranch === branch)
 
 const SubscribedTo = Schema.Struct({
-  owner: Schema.NullOr(Schema.String),
-  repo: Schema.NullOr(Schema.String),
-  number: Schema.NullOr(Schema.Int),
+  subject: Schema.fromJsonString(PullRequestSubject),
   threadOwner: Schema.String,
   threadRepo: Schema.String,
   branch: Schema.NullOr(Schema.String),
@@ -137,10 +136,9 @@ const SubscribedTo = Schema.Struct({
 const decodeSubscribedTo = Schema.decodeUnknownEffect(Schema.Array(SubscribedTo))
 
 const mirroredFor = (mirror: Mirror, subscription: typeof SubscribedTo.Type) => {
-  const { owner, repo, number, threadOwner, threadRepo, branch } = subscription
+  const { subject, threadOwner, threadRepo, branch } = subscription
 
-  if (owner !== null && repo !== null && number !== null)
-    return mirroredPullRequest(mirror, new PullRequestRef({ owner, repo, number }))
+  if (subject.pullRequest !== null) return mirroredPullRequest(mirror, subject.pullRequest)
 
   return branch === null
     ? undefined
@@ -302,10 +300,7 @@ export class PullRequestMirror extends Context.Service<
 
       const subscribedIn = (mirror: Mirror) =>
         sql`
-          SELECT json_extract(s.subject, '$.pullRequest.owner') AS owner,
-            json_extract(s.subject, '$.pullRequest.repo') AS repo,
-            json_extract(s.subject, '$.pullRequest.number') AS number,
-            t.owner AS threadOwner, t.repo AS threadRepo, t.branch
+          SELECT s.subject, t.owner AS threadOwner, t.repo AS threadRepo, t.branch
           FROM subscription s JOIN thread t ON t.id = s.thread_id
           WHERE s.source = 'github' AND s.ended IS NULL
         `.pipe(

@@ -11,25 +11,18 @@ import {
   ReviewFeedbackReason,
   type WaitingReviewThread,
 } from "@glass/contracts"
-import { Array as Arr, Data, Predicate, Result } from "effect"
+import { Array as Arr, Result } from "effect"
 import type { SubscribedDetails } from "./github/repositoryPullRequests"
 import type { ReasonNow, SubjectNow } from "./updateDecision"
 
 export type EndedState = PullRequestEnding["state"]
 
-export type PullRequestNow = Data.TaggedEnum<{
-  Open: {
-    readonly checks: Checks
-    readonly failingChecks: ReadonlyArray<Check>
-    readonly mergeConflict: boolean | null
-    readonly details: SubscribedDetails
-  }
-  Ended: { readonly state: EndedState }
-}>
-
-export const PullRequestNow = Data.taggedEnum<PullRequestNow>()
-
-type Open = Extract<PullRequestNow, { _tag: "Open" }>
+interface Open {
+  readonly checks: Checks
+  readonly failingChecks: ReadonlyArray<Check>
+  readonly mergeConflict: boolean | null
+  readonly details: SubscribedDetails
+}
 
 type Stands = ReasonNow<PullRequestUpdateReason>
 
@@ -123,19 +116,18 @@ const mergeConflict = (
 
 export const ENDING_TOLD_BY = "merged-or-closed"
 
-export const standingOf = (now: PullRequestNow): SubjectNow<PullRequestUpdateReason> =>
-  Predicate.isTagged(now, "Ended")
-    ? {
-        state: "ended",
-        toldBy: ENDING_TOLD_BY,
-        detail: now.state === "merged" ? MergedReason.make({}) : ClosedReason.make({}),
-      }
-    : {
-        state: "open",
-        reasons: [
-          { reason: "failing-checks", stands: () => failingChecks(now) },
-          { reason: "review-feedback", stands: () => reviewFeedback(now) },
-          { reason: "changes-requested", stands: () => changesRequested(now) },
-          { reason: "merge-conflict", stands: (seen) => mergeConflict(now, seen) },
-        ],
-      }
+export const endedNow = (state: EndedState): SubjectNow<PullRequestUpdateReason> => ({
+  state: "ended",
+  toldBy: ENDING_TOLD_BY,
+  detail: state === "merged" ? MergedReason.make({}) : ClosedReason.make({}),
+})
+
+export const openNow = (open: Open): SubjectNow<PullRequestUpdateReason> => ({
+  state: "open",
+  reasons: [
+    { reason: "failing-checks", stands: () => failingChecks(open) },
+    { reason: "review-feedback", stands: () => reviewFeedback(open) },
+    { reason: "changes-requested", stands: () => changesRequested(open) },
+    { reason: "merge-conflict", stands: (seen) => mergeConflict(open, seen) },
+  ],
+})
