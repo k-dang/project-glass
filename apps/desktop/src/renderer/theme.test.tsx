@@ -63,15 +63,13 @@ it("keeps native appearance and mounted consumers aligned with the saved appeara
 
   expect(observer.result.current.theme).toBe("charcoal")
   expect(document.documentElement.dataset.theme).toBe("charcoal")
-  expect(savedAppearance()).toEqual({ theme: "charcoal", colorScheme: "system", layout: "classic" })
+  expect(savedAppearance()).toEqual({ theme: "charcoal", colorScheme: "system" })
 
   act(() => settings.result.current.setColorScheme("dark"))
-  act(() => settings.result.current.setLayout("inset"))
 
   expect(observer.result.current).toMatchObject({
     theme: "charcoal",
     colorScheme: "dark",
-    layout: "inset",
   })
 
   settings.unmount()
@@ -79,12 +77,10 @@ it("keeps native appearance and mounted consumers aligned with the saved appeara
   expect(reopened.result.current).toMatchObject({
     theme: "charcoal",
     colorScheme: "dark",
-    layout: "inset",
   })
   expect(nativeAppearances).toEqual([
-    { theme: "charcoal", colorScheme: "system", layout: "classic" },
-    { theme: "charcoal", colorScheme: "dark", layout: "classic" },
-    { theme: "charcoal", colorScheme: "dark", layout: "inset" },
+    { theme: "charcoal", colorScheme: "system" },
+    { theme: "charcoal", colorScheme: "dark" },
   ])
 })
 
@@ -108,12 +104,11 @@ it("finishes an appearance transition only once the window's color scheme follow
   expect(finished).toBe(true)
 })
 
-it("uses the Glass theme, the system color scheme and the classic layout when nothing valid is saved", () => {
-  const defaults = { theme: "glass", colorScheme: "system", layout: "classic" }
+it("uses the Glass theme and the system color scheme when nothing valid is saved", () => {
+  const defaults = { theme: "glass", colorScheme: "system" }
 
   expect(savedAppearance()).toEqual(defaults)
   localStorage.setItem("glass.theme", "catppuccin-mocha")
   localStorage.setItem("glass.colorScheme", "sepia")
-  localStorage.setItem("glass.layout", "floating")
   expect(savedAppearance()).toEqual(defaults)
 })

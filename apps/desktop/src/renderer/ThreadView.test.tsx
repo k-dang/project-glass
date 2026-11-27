@@ -833,9 +833,7 @@ it("keeps a Thread as the user left it when they come back to it from another Th
   expect(composer.textContent).toBe("Half a thought")
 })
 
-it("names the shown Thread in the Inset title strip, never one kept in the background", async () => {
-  localStorage.setItem("glass.layout", "inset")
-  onTestFinished(() => localStorage.removeItem("glass.layout"))
+it("names the shown Thread in the title strip, never one kept in the background", async () => {
   const other = new Thread({ ...threadFields, id: "agent-2", name: "agent/calm-heron" })
   const user = mount({ WatchThreads: () => Stream.make([thread, other]) })
   await screen.findByRole("heading", { name: thread.name })
