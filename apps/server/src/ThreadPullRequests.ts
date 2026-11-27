@@ -1,30 +1,11 @@
-import {
-  type Thread,
-  type ThreadError,
-  ThreadPullRequest,
-  PullRequestOpen,
-  repositoryKey,
-} from "@glass/contracts"
-import {
-  Context,
-  DateTime,
-  Effect,
-  Layer,
-  Option,
-  Predicate,
-  Ref,
-  Schema,
-  Stream,
-  SubscriptionRef,
-} from "effect"
-import { EventLog } from "./EventLog"
-import { endedEvents, recorded } from "./gitHubEvents"
+import { type Thread, ThreadPullRequest, PullRequestOpen, repositoryKey } from "@glass/contracts"
+import { Context, DateTime, Effect, Layer, Ref, Schema, Stream, SubscriptionRef } from "effect"
 import type { Branch, EndedPullRequest } from "./github/branchPullRequests"
 import { GitHubClient } from "./github/GitHubClient"
 import { BackgroundGitHubRequest } from "./github/GitHubRequestPolicy"
 import { Threads } from "./Threads"
 import { PullRequestLists } from "./PullRequestLists"
-import { type Mirror, mirrorOf, openPullRequestOf, PullRequestMirror } from "./PullRequestMirror"
+import { type Mirror, mirrorOf, PullRequestMirror } from "./PullRequestMirror"
 import { Transcripts } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
 
@@ -36,6 +17,9 @@ const branchKey = ({ repository, branch }: Branch) => `${repositoryKey(repositor
 
 const branchOf = ({ repository, branch }: Thread): Branch | undefined =>
   branch === null ? undefined : { repository, branch }
+
+const openPullRequestOf = (mirror: Mirror, { repository, branch }: Branch) =>
+  mirrorOf(mirror, repository)?.pullRequests.find((pr) => pr.headBranch === branch)
 
 interface Lookup extends Branch {
   readonly since: DateTime.Utc
@@ -107,8 +91,6 @@ export class ThreadPullRequests extends Context.Service<
   ThreadPullRequests,
   {
     readonly watch: () => Stream.Stream<ReadonlyArray<ThreadPullRequest>>
-    readonly ofThread: (threadId: string) => Effect.Effect<ThreadPullRequest | undefined>
-    readonly ownIn: (mirror: Mirror) => Effect.Effect<ReadonlyArray<ThreadPullRequest>, ThreadError>
   }
 >()("@glass/server/ThreadPullRequests") {
   static readonly layer = Layer.effect(
@@ -119,14 +101,12 @@ export class ThreadPullRequests extends Context.Service<
       const lists = yield* PullRequestLists
       const transcripts = yield* Transcripts
       const github = yield* GitHubClient
-      const events = yield* EventLog
       const listed = yield* SubscriptionRef.make<ReadonlyArray<ThreadPullRequest>>([])
       const ended = yield* Ref.make<Ended>(new Map())
 
-      const asked = yield* Ref.make<{
-        readonly mirrored: Mirror | undefined
-        readonly keys: string
-      }>({ mirrored: yield* mirror.saved, keys: "" })
+      const asked = yield* Ref.make<{ readonly mirrored: Mirror; readonly keys: string } | null>(
+        null,
+      )
 
       const afterTurn = (threadId: string) =>
         threads.followBranch(threadId).pipe(
@@ -141,10 +121,7 @@ export class ThreadPullRequests extends Context.Service<
         Effect.forkScoped,
       )
 
-      const lookUpEnded = Effect.fnUntraced(function* (
-        branches: ReadonlyArray<Lookup>,
-        before: Mirror | undefined,
-      ) {
+      const lookUpEnded = Effect.fnUntraced(function* (branches: ReadonlyArray<Lookup>) {
         const known = yield* Ref.get(ended)
 
         const cached = (lookup: Lookup) => endedSince(lookup.since, known.get(branchKey(lookup)))
@@ -154,7 +131,7 @@ export class ThreadPullRequests extends Context.Service<
         const answers = yield* github.endedBranchPullRequests(unknown)
         const found = new Map(unknown.map((branch, index) => [branchKey(branch), answers[index]]))
 
-        const remembered = Ref.set(
+        yield* Ref.set(
           ended,
           new Map(
             branches.flatMap((branch) => {
@@ -165,10 +142,6 @@ export class ThreadPullRequests extends Context.Service<
             }),
           ),
         )
-
-        yield* events
-          .record("github", recorded(endedEvents(before, answers.filter(Predicate.isNotNull))))
-          .pipe(Effect.andThen(remembered), Effect.uninterruptible)
       })
 
       const publish = Effect.fnUntraced(function* (
@@ -183,8 +156,8 @@ export class ThreadPullRequests extends Context.Service<
 
         const last = yield* Ref.get(asked)
 
-        if (mirrored !== undefined && (last.mirrored !== mirrored || last.keys !== keys)) {
-          yield* lookUpEnded(branches, last.mirrored).pipe(
+        if (mirrored !== undefined && (last?.mirrored !== mirrored || last.keys !== keys)) {
+          yield* lookUpEnded(branches).pipe(
             Effect.andThen(Ref.set(asked, { mirrored, keys })),
             Effect.provideService(BackgroundGitHubRequest, true),
             Effect.catch((error) =>
@@ -208,19 +181,6 @@ export class ThreadPullRequests extends Context.Service<
 
       return ThreadPullRequests.of({
         watch: () => SubscriptionRef.changes(listed).pipe(Stream.changesWith(sameList)),
-        ofThread: (threadId) =>
-          SubscriptionRef.get(listed).pipe(
-            Effect.map((current) => current.find((own) => own.threadId === threadId)),
-          ),
-        ownIn: (mirrored) =>
-          Effect.gen(function* () {
-            const current = Option.getOrElse(
-              yield* threads.watch().pipe(Stream.runHead),
-              (): ReadonlyArray<Thread> => [],
-            )
-
-            return pullRequestsOf(current, mirrored, yield* Ref.get(ended))
-          }),
       })
     }),
   )

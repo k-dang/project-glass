@@ -50,7 +50,7 @@ export * from "./pullRequest"
 
 export * from "./pullRequestList"
 
-export * from "./pullRequestUpdate"
+export * from "./update"
 
 export * from "./pullRequestUrl"
 

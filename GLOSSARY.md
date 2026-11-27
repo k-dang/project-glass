@@ -171,18 +171,18 @@ Somewhere Events come from, such as GitHub.
 _Avoid_: Integration, feed, provider (a Sandbox provider makes Sandboxes)
 
 **Subscription**:
-A standing instruction that a Thread or the Global chat be told about certain Events, with a note
-in plain words on what to do about them. A Thread's agent makes one for its own Thread.
+A standing instruction that a Thread be told about the Events on one subject, such as a PR, with a
+note in plain words on what to do about them. A Thread's agent makes one for its own Thread.
 _Avoid_: Watch, trigger, rule, hook
 
 **Update**:
-A Turn Glass starts in a Thread or the Global chat to tell it about Events it has a Subscription
-to.
+A Turn Glass starts in a Thread or the Global chat to tell it about Events, or about work it
+started.
 _Avoid_: Notification, wake-up
 
 **PR update**:
-An Update telling a Thread that a PR it has a Subscription to has failing checks, review feedback
-waiting, changes requested, or a merge conflict, or has merged or closed.
+An Update carrying the Events on a PR a Thread has a Subscription to, such as checks failing,
+review feedback, changes requested, a merge conflict, or the PR merging.
 _Avoid_: Babysitting, PR watch
 
 **PR update note**:

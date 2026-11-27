@@ -243,7 +243,7 @@ it.live("ends a Turn stopped before its harness starts without ever dispatching 
     const gate = yield* Deferred.make<void>()
     const h = yield* harness(() => Deferred.await(gate))
 
-    yield* h.turns.send("agent-1", sent("Build it"), "user")
+    yield* h.turns.send("agent-1", sent("Build it"))
     yield* h.turns.stop(h.thread)
     yield* Deferred.succeed(gate, undefined)
 
@@ -263,8 +263,8 @@ it.live("fails a Turn whose harness won't start, then starts the next queued mes
       ++starts === 1 ? Effect.fail(new ThreadError({ message: "No such folder" })) : Effect.void,
     )
 
-    yield* h.turns.send("agent-1", sent("First"), "user")
-    yield* h.turns.send("agent-1", sent("Second"), "user")
+    yield* h.turns.send("agent-1", sent("First"))
+    yield* h.turns.send("agent-1", sent("Second"))
 
     assert.deepStrictEqual(yield* h.delivered(2), ["failed", "dispatched"])
     assert.lengthOf(h.dispatched, 1)
@@ -288,7 +288,7 @@ it.live(
           savedId = turnId
         }),
       )
-      yield* transcripts.startOrQueue("agent-1", sent("After"), "user")
+      yield* transcripts.startOrQueue("agent-1", sent("After"))
       const firstScope = yield* Scope.make()
       const first = yield* harness(() => Effect.void).pipe(Scope.provide(firstScope))
 
@@ -321,7 +321,7 @@ it.live(
       const transcripts = yield* Transcripts
       yield* transcripts.startIfIdle("agent-1", startedWorkUpdateTurn, () => Effect.void)
       const savedId = yield* transcripts.runningTurn("agent-1")
-      yield* transcripts.startOrQueue("agent-1", sent("After"), "user")
+      yield* transcripts.startOrQueue("agent-1", sent("After"))
       const firstScope = yield* Scope.make()
       const reason = "Couldn't recover pi's Started work update. Restart Glass to try again."
 
@@ -382,13 +382,9 @@ const acceptsWhileStartIsHeld = (otherId: string) =>
       [otherId]: { started: otherStarted },
     })
 
-    const held = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Hold the host"), "user"))
+    const held = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Hold the host")))
     yield* Deferred.await(entered)
-
-    const other = yield* Effect.forkChild(
-      desk.turns.send(otherId, sent("Hello from elsewhere"), "user"),
-    )
-
+    const other = yield* Effect.forkChild(desk.turns.send(otherId, sent("Hello from elsewhere")))
     yield* Deferred.await(otherStarted)
     assert.equal(yield* Fiber.join(other), "started")
     assert.lengthOf(desk.started("agent-a"), 0)
@@ -422,13 +418,13 @@ it.live("accepts and dispatches another Thread's message while StopTurn is still
     const thread = desk.threads.get("agent-a")
     assert.isDefined(thread)
 
-    assert.equal(yield* desk.turns.send("agent-a", sent("Working"), "user"), "started")
+    assert.equal(yield* desk.turns.send("agent-a", sent("Working")), "started")
     yield* Deferred.await(heldStarted)
 
     const stopping = yield* Effect.forkChild(desk.turns.stop(thread))
     yield* Deferred.await(entered)
 
-    const other = yield* Effect.forkChild(desk.turns.send("agent-b", sent("Hello from B"), "user"))
+    const other = yield* Effect.forkChild(desk.turns.send("agent-b", sent("Hello from B")))
     yield* Deferred.await(otherStarted)
     assert.equal(yield* Fiber.join(other), "started")
     assert.lengthOf(desk.started("agent-b"), 1)
@@ -454,10 +450,7 @@ it.live(
         "global-session": {},
       })
 
-      const held = yield* Effect.forkChild(
-        desk.turns.send("agent-a", sent("Hold the host"), "user"),
-      )
-
+      const held = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Hold the host")))
       yield* Deferred.await(entered)
       yield* Fiber.join(
         yield* Effect.forkChild(
@@ -503,9 +496,9 @@ it.live("dispatches a Queued message sent after the running Turn stops", () =>
   Effect.gen(function* () {
     const h = yield* harness(() => Effect.void)
 
-    yield* h.turns.send("agent-1", sent("First"), "user")
+    yield* h.turns.send("agent-1", sent("First"))
     assert.deepStrictEqual(yield* h.delivered(1), ["dispatched"])
-    yield* h.turns.send("agent-1", sent("Second"), "user")
+    yield* h.turns.send("agent-1", sent("Second"))
 
     const queued = (yield* h.transcript).queued[0]
     assert.isDefined(queued)
@@ -693,12 +686,12 @@ it.effect(
           },
         })
 
-        const first = yield* Effect.forkChild(desk.turns.send("agent-a", sent("First"), "user"))
+        const first = yield* Effect.forkChild(desk.turns.send("agent-a", sent("First")))
         yield* Deferred.await(entered)
         yield* deadlineSet
         assert.equal(yield* Fiber.join(first), "started")
 
-        const second = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Second"), "user"), {
+        const second = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Second")), {
           startImmediately: true,
         })
 
@@ -750,7 +743,7 @@ it.effect("stops a Turn when StopTurn never answers, then accepts the next messa
       const thread = desk.threads.get("agent-a")
       assert.isDefined(thread)
 
-      assert.equal(yield* desk.turns.send("agent-a", sent("Working"), "user"), "started")
+      assert.equal(yield* desk.turns.send("agent-a", sent("Working")), "started")
       const stopping = yield* Effect.forkChild(desk.turns.stop(thread))
       yield* Deferred.await(entered)
       yield* deadlineSet
@@ -759,7 +752,7 @@ it.effect("stops a Turn when StopTurn never answers, then accepts the next messa
       yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
       yield* Fiber.join(stopping)
 
-      const next = yield* desk.turns.send("agent-a", sent("After"), "user")
+      const next = yield* desk.turns.send("agent-a", sent("After"))
       assert.equal(next, "started")
       yield* Deferred.await(nextAccepted)
 
@@ -1015,7 +1008,7 @@ it.effect("fails the Turn at 30 seconds, and not a millisecond sooner", () =>
         "agent-a": { startTurn: hold(entered, release) },
       })
 
-      yield* Effect.forkChild(desk.turns.send("agent-a", sent("Build it"), "user"))
+      yield* Effect.forkChild(desk.turns.send("agent-a", sent("Build it")))
       yield* Deferred.await(entered)
       yield* deadlineSet
       yield* TestClock.adjust(Duration.millis(29_999))
@@ -1061,7 +1054,7 @@ it.effect("fails a timed-out Turn before a waiting Stop can end it as Stopped", 
         { startImmediately: false },
       ).pipe(Effect.asVoid)
 
-      yield* Effect.forkChild(desk.turns.send("agent-a", sent("Build it"), "user"))
+      yield* Effect.forkChild(desk.turns.send("agent-a", sent("Build it")))
       yield* Deferred.await(entered)
       yield* deadlineSet
       yield* TestClock.adjust(Duration.millis(30_000))
@@ -1091,7 +1084,7 @@ it.effect("queues a message sent during a stalled StartTurn, and Stop stops that
       const thread = desk.threads.get("agent-a")
       assert.isDefined(thread)
 
-      const first = yield* Effect.forkChild(desk.turns.send("agent-a", sent("First"), "user"), {
+      const first = yield* Effect.forkChild(desk.turns.send("agent-a", sent("First")), {
         startImmediately: true,
       })
 
@@ -1099,7 +1092,7 @@ it.effect("queues a message sent during a stalled StartTurn, and Stop stops that
       yield* deadlineSet
       assert.equal(yield* Fiber.join(first), "started")
 
-      assert.equal(yield* desk.turns.send("agent-a", sent("Second"), "user"), "queued")
+      assert.equal(yield* desk.turns.send("agent-a", sent("Second")), "queued")
 
       yield* desk.turns.stop(thread)
 
@@ -1152,12 +1145,12 @@ it.effect("tells the host to stop when StartTurn times out so the next message c
         },
       })
 
-      yield* Effect.forkChild(desk.turns.send("agent-a", sent("First"), "user"))
+      yield* Effect.forkChild(desk.turns.send("agent-a", sent("First")))
       yield* Deferred.await(entered)
       yield* deadlineSet
       yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
 
-      const second = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Second"), "user"))
+      const second = yield* Effect.forkChild(desk.turns.send("agent-a", sent("Second")))
       assert.equal(yield* Deferred.await(outcome), "accepted")
       assert.equal(yield* Fiber.join(second), "started")
     }),
@@ -1174,7 +1167,7 @@ it.effect("drops a late reply on a Turn the host never accepted", () =>
         "agent-a": { startTurn: hold(entered, release) },
       })
 
-      yield* Effect.forkChild(desk.turns.send("agent-a", sent("First"), "user"))
+      yield* Effect.forkChild(desk.turns.send("agent-a", sent("First")))
       yield* Deferred.await(entered)
       yield* deadlineSet
       yield* TestClock.adjust(HOST_CONTROL_DEADLINE)
@@ -1243,10 +1236,10 @@ it.effect("does not stop the next Turn when an earlier StartTurn answers late", 
     const thread = desk.threads.get("agent-a")
     assert.isDefined(thread)
 
-    yield* Effect.forkChild(desk.turns.send("agent-a", sent("First"), "user"))
+    yield* Effect.forkChild(desk.turns.send("agent-a", sent("First")))
     yield* Deferred.await(entered)
     yield* desk.turns.stop(thread)
-    yield* desk.turns.send("agent-a", sent("Second"), "user")
+    yield* desk.turns.send("agent-a", sent("Second"))
     yield* Deferred.await(secondBegun)
     yield* Deferred.succeed(gate, undefined)
     yield* Deferred.await(cleaned)
@@ -1303,11 +1296,11 @@ it.effect("does not stop the next Turn when an earlier StartTurn times out", () 
       const thread = desk.threads.get("agent-a")
       assert.isDefined(thread)
 
-      yield* Effect.forkChild(desk.turns.send("agent-a", sent("First"), "user"))
+      yield* Effect.forkChild(desk.turns.send("agent-a", sent("First")))
       yield* Deferred.await(entered)
       yield* deadlineSet
       yield* desk.turns.stop(thread)
-      yield* desk.turns.send("agent-a", sent("Second"), "user")
+      yield* desk.turns.send("agent-a", sent("Second"))
       yield* Deferred.await(secondBegun)
       yield* TestClock.adjust(Duration.millis(30_000))
       yield* Deferred.await(cleaned)
@@ -1345,7 +1338,7 @@ it.effect("fails a Steer the host never acknowledges instead of sending it again
       const thread = desk.threads.get("agent-a")
       assert.isDefined(thread)
 
-      yield* desk.turns.send("agent-a", sent("Build it"), "user")
+      yield* desk.turns.send("agent-a", sent("Build it"))
       yield* Deferred.await(begun)
 
       const steered = yield* Effect.forkChild(desk.turns.steer(thread, sent("nudge")))
@@ -1377,7 +1370,7 @@ it.effect("keeps a late reply on a Stopped Turn and one on the next Turn", () =>
     const thread = desk.threads.get("agent-a")
     assert.isDefined(thread)
 
-    yield* desk.turns.send("agent-a", sent("First"), "user")
+    yield* desk.turns.send("agent-a", sent("First"))
     yield* desk.turns.stop(thread)
 
     const stopped = yield* desk.transcripts.read("agent-a")
@@ -1393,7 +1386,7 @@ it.effect("keeps a late reply on a Stopped Turn and one on the next Turn", () =>
       }),
     ])
 
-    yield* desk.turns.send("agent-a", sent("Second"), "user")
+    yield* desk.turns.send("agent-a", sent("Second"))
     const running = yield* desk.transcripts.read("agent-a")
     const second = running.turns[1]
     assert.isDefined(second)
@@ -1430,7 +1423,7 @@ it.effect("keeps a part that arrives after StopTurn times out", () =>
       const thread = desk.threads.get("agent-a")
       assert.isDefined(thread)
 
-      yield* desk.turns.send("agent-a", sent("Work"), "user")
+      yield* desk.turns.send("agent-a", sent("Work"))
       yield* Deferred.await(begun)
 
       const running = yield* desk.transcripts.read("agent-a")
@@ -1478,7 +1471,7 @@ it.effect("queues a Steer the host refuses, as it does once the Turn is stopping
     const thread = desk.threads.get("agent-a")
     assert.isDefined(thread)
 
-    yield* desk.turns.send("agent-a", sent("Build it"), "user")
+    yield* desk.turns.send("agent-a", sent("Build it"))
     yield* desk.turns.steer(thread, sent("nudge"))
 
     const { queued } = yield* desk.transcripts.read("agent-a")

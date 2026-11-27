@@ -29,7 +29,6 @@ import { boundHostCall } from "./hostControl"
 import { keyedLock } from "./keyedLock"
 import { type HostCallError, type HostClient, hostFailure } from "./Placement"
 import { prompt } from "./prompt"
-import type { MessageSender } from "./threadState"
 import { ToDos } from "./ToDos"
 import { encodeImages, type IdleTurn, StoredMessage, Transcripts } from "./Transcripts"
 import { annotateUnit } from "./wideEvents"
@@ -105,7 +104,6 @@ export class ThreadTurns extends Context.Service<
     readonly send: (
       threadId: string,
       message: MessageWithContext,
-      sentBy: MessageSender,
       feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>,
     ) => Effect.Effect<MessageDelivery, RequestWaiting | ThreadError>
     readonly steer: (
@@ -437,9 +435,8 @@ export class ThreadTurns extends Context.Service<
       const startOrQueue = (
         threadId: string,
         sent: MessageWithContext,
-        sentBy: MessageSender,
         feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>,
-      ) => withThread(threadId, transcripts.startOrQueue(threadId, sent, sentBy, feedback))
+      ) => withThread(threadId, transcripts.startOrQueue(threadId, sent, feedback))
 
       const turns = ThreadTurns.of({
         serve,
@@ -453,15 +450,15 @@ export class ThreadTurns extends Context.Service<
               return yield* effect
             }),
           ),
-        send: Effect.fn("ThreadTurns.send")(function* (threadId, sent, sentBy, feedback) {
+        send: Effect.fn("ThreadTurns.send")(function* (threadId, sent, feedback) {
           yield* refuseWhileWaiting(threadId)
 
-          return yield* startOrQueue(threadId, sent, sentBy, feedback)
+          return yield* startOrQueue(threadId, sent, feedback)
         }),
         steer: Effect.fn("ThreadTurns.steer")(function* (thread, sent) {
           yield* refuseWhileWaiting(thread.id)
 
-          if (!(yield* trySteer(thread, sent))) yield* startOrQueue(thread.id, sent, "user")
+          if (!(yield* trySteer(thread, sent))) yield* startOrQueue(thread.id, sent)
         }),
         whenIdle: (threadId, effect) =>
           withThread(

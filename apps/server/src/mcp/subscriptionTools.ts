@@ -1,10 +1,11 @@
 import {
-  defaultSubscriptionReasons,
-  PullRequestRef,
+  defaultSubscriptionKinds,
+  EventKind,
+  eventKindWords,
   Subscription,
-  SubscriptionReason,
+  SubscriptionSubject,
 } from "@glass/contracts"
-import { Context, Effect, Predicate, Schema } from "effect"
+import { Context, Effect, Match, Predicate, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { GitHubSource } from "../GitHubSource"
 import { Subscriptions } from "../Subscriptions"
@@ -14,23 +15,25 @@ import { forThreads } from "./toolAudience"
 
 const MAX_NOTE_CHARS = 2_000
 
-const SubscribeToPullRequest = Tool.make("subscribe_to_pull_request", {
-  description:
-    "Subscribes your Thread to a PR, so Glass tells it what happens to that PR after your Turn ends. Use it when the user asks you to look after a PR, such as keeping it green or handling its review feedback, or to be told when a PR you depend on merges. Leave pullRequest out for your Thread's own PR: the PR of the branch your folder has checked out, which you can subscribe to before you open it. A named PR must be in a repository the user follows in Glass. Subscribing again to the same PR replaces its reasons and note. A Subscription ends when its PR merges or closes, after telling your Thread if you asked for merged-or-closed. Glass allows this only in a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread. It refuses in a Turn with a glass_pull_request_update or glass_started_work_update block, in one that began by itself when background work reported back, and in one another agent's message started.",
+const kindList = EventKind.literals.map((kind) => `${kind}: ${eventKindWords[kind]}`).join(", ")
+
+const Subscribe = Tool.make("subscribe", {
+  description: `Subscribes your Thread to a subject, so Glass tells it about the Events that happen to it after your Turn ends. A PR is the only subject so far: use it when the user asks you to look after a PR, such as keeping it green or handling its review feedback, or to be told when a PR you depend on merges. The PR must be open, in a repository the user follows in Glass. When Glass first reads the PR for a Subscription it reports what already stands on it, then what changes. When your Thread is idle, it gets one Update with every new Event since the last one, if at least one is of a kind you asked for. Subscribing again to the same subject replaces its kinds and note, and tells only the Events from then on. A Subscription to a PR ends when the PR merges or closes. Glass allows this only in a Turn a message started, not in one with a glass_update or glass_started_work_update block, nor in one that began by itself.`,
   parameters: Schema.Struct({
-    pullRequest: Schema.optional(
-      PullRequestRef.annotate({ description: "The PR. Leave it out for your Thread's own PR." }),
-    ),
-    reasons: Schema.optional(
-      Schema.Array(SubscriptionReason)
+    subject: SubscriptionSubject.annotate({
+      description:
+        'What to subscribe to, such as {"_tag":"PullRequest","pullRequest":{"owner":"octo-org","repo":"hello-world","number":6}}.',
+    }),
+    kinds: Schema.optional(
+      Schema.Array(EventKind)
         .check(Schema.isMinLength(1), Schema.isUnique())
         .annotate({
-          description: `What your Thread is told about. failing-checks: a check failed. review-feedback: a Review thread waits for a reply. changes-requested: a reviewer requested changes. merge-conflict: the PR conflicts with its base. merged-or-closed: the PR merged or closed. Defaults to ${defaultSubscriptionReasons.join(", ")}.`,
+          description: `The kinds of Event that start an Update. ${kindList}. Defaults to ${defaultSubscriptionKinds.join(", ")}.`,
         }),
     ),
     note: Schema.Trimmed.check(Schema.isNonEmpty(), Schema.isMaxLength(MAX_NOTE_CHARS)).annotate({
       description:
-        "In your own words, what the user asked you to do about this PR. Glass gives it back to your Thread with what happened.",
+        "In your own words, what the user asked you to do about it. Glass gives it back to your Thread with what happened.",
     }),
   }),
   success: Schema.Struct({ subscription: Subscription }),
@@ -39,14 +42,14 @@ const SubscribeToPullRequest = Tool.make("subscribe_to_pull_request", {
 
 const ListSubscriptions = Tool.make("list_subscriptions", {
   description:
-    "Lists your Thread's Subscriptions: what each is about, for which reasons your Thread is told, and the note you left. A PR subject with a null pullRequest is your Thread's own PR.",
+    "Lists your Thread's Subscriptions: what each is about, which kinds of Event start an Update, and the note you left.",
   success: Schema.Struct({ subscriptions: Schema.Array(Subscription) }),
   failure: GlassToolFailure,
 }).annotateMerge(readOnly.pipe(Context.merge(forThreads)))
 
 const EndSubscription = Tool.make("end_subscription", {
   description:
-    "Ends one of your Thread's Subscriptions, so Glass stops telling it about what that one covers. Use it when the user asks you to stop looking after a PR.",
+    "Ends one of your Thread's Subscriptions, so Glass stops telling it about that subject. Use it when the user asks you to stop looking after it.",
   parameters: Schema.Struct({
     subscriptionId: Schema.String.annotate({
       description: "The Subscription's id, from list_subscriptions.",
@@ -56,11 +59,7 @@ const EndSubscription = Tool.make("end_subscription", {
   failure: GlassToolFailure,
 }).annotateMerge(acting.pipe(Context.merge(forThreads)))
 
-export const SubscriptionTools = Toolkit.make(
-  SubscribeToPullRequest,
-  ListSubscriptions,
-  EndSubscription,
-)
+export const SubscriptionTools = Toolkit.make(Subscribe, ListSubscriptions, EndSubscription)
 
 const callingThread = McpCaller.current.pipe(
   Effect.flatMap((caller) =>
@@ -75,14 +74,17 @@ export const SubscriptionToolHandlers = SubscriptionTools.toLayer(
     const subscriptions = yield* Subscriptions
     const gitHub = yield* GitHubSource
 
+    const admitted = (subject: SubscriptionSubject) =>
+      Match.valueTags(subject, { PullRequest: ({ pullRequest }) => gitHub.subject(pullRequest) })
+
     return SubscriptionTools.of({
-      subscribe_to_pull_request: ({ pullRequest, reasons, note }) =>
+      subscribe: ({ subject, kinds, note }) =>
         callingThread.pipe(
           Effect.flatMap(({ threadId, turnId }) =>
-            gitHub
+            subscriptions
               .subscribe(threadId, turnId, {
-                pullRequest: pullRequest ?? null,
-                reasons: reasons ?? defaultSubscriptionReasons,
+                subject: admitted(subject),
+                kinds: kinds ?? defaultSubscriptionKinds,
                 note,
               })
               .pipe(Effect.mapError(explained)),

@@ -1,46 +1,46 @@
 import {
-  type EventSource,
+  EventKind,
+  EventSource,
   Subscription,
-  SubscriptionEnding,
-  SubscriptionReason,
   SubscriptionSubject,
+  subjectKey,
+  subjectSource,
   ThreadError,
 } from "@glass/contracts"
 import { Context, DateTime, Effect, Layer, Schema, Stream, SubscriptionRef } from "effect"
 import { SqlClient, type SqlError, type Statement } from "effect/sql"
 import { randomUUID } from "node:crypto"
-import { isOnTheUsersWord } from "./threadState"
+import { EventLog } from "./EventLog"
 import { Transcripts } from "./Transcripts"
-import { LastTold, type Told } from "./updateDecision"
 
 export interface NewSubscription<E> {
-  readonly source: EventSource
   readonly subject: Effect.Effect<SubscriptionSubject, E>
-  readonly reasons: ReadonlyArray<SubscriptionReason>
+  readonly kinds: ReadonlyArray<EventKind>
   readonly note: string
 }
 
-const ReasonsJson = Schema.fromJsonString(Schema.Array(SubscriptionReason))
+const KindsJson = Schema.fromJsonString(Schema.Array(EventKind))
 
-const encodeReasons = Schema.encodeSync(ReasonsJson)
+const encodeKinds = Schema.encodeSync(KindsJson)
 
 const SubjectJson = Schema.fromJsonString(SubscriptionSubject)
 
 const encodeSubject = Schema.encodeSync(SubjectJson)
 
-const encodeTold = Schema.encodeSync(Schema.fromJsonString(LastTold))
-
-const encodeEnding = Schema.encodeSync(Schema.fromJsonString(SubscriptionEnding))
-
 const StoredSubscription = Schema.Struct({
-  ...Subscription.fields,
+  id: Schema.String,
+  threadId: Schema.String,
+  source: EventSource,
   subject: SubjectJson,
-  reasons: ReasonsJson,
-  lastTold: Schema.NullOr(Schema.fromJsonString(LastTold)),
-  ended: Schema.NullOr(Schema.fromJsonString(SubscriptionEnding)),
+  subjectKey: Schema.String,
+  kinds: KindsJson,
+  note: Schema.String,
+  deliveredThrough: Schema.Int,
+  updatesInARow: Schema.Int,
+  afterMessage: Schema.NullOr(Schema.String),
 })
 
-type StoredSubscription = typeof StoredSubscription.Type
+export type SubscriptionState = typeof StoredSubscription.Type
 
 const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredSubscription))
 
@@ -50,38 +50,22 @@ const decodeThreadIds = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ threadId: Schema.String })),
 )
 
-const subscriptionOf = ({ id, threadId, source, subject, reasons, note }: StoredSubscription) =>
-  new Subscription({ id, threadId, source, subject, reasons, note })
+export const subscriptionOf = ({ id, threadId, source, subject, kinds, note }: SubscriptionState) =>
+  new Subscription({ id, threadId, source, subject, kinds, note })
 
-export interface SubscriptionState {
-  readonly subscription: Subscription
-  readonly lastTold: LastTold | null
-  readonly ended: SubscriptionEnding | null
-}
-
-export interface ToldSubscription {
+export interface Delivered {
   readonly subscriptionId: string
-  readonly subject: string
-  readonly told: Told
+  readonly deliveredThrough: number
+  readonly updatesInARow: number
+  readonly afterMessage: string | null
   readonly ends: boolean
-}
-
-const stateOf = (stored: StoredSubscription): SubscriptionState => ({
-  subscription: subscriptionOf(stored),
-  lastTold: stored.lastTold,
-  ended: stored.ended,
-})
-
-const refusedStarters = {
-  glass: "Glass started this Turn",
-  harness: "The agent started this Turn by itself",
-  agent: "A message from another agent started this Turn",
-  none: "Glass has no record of the Turn asking",
 }
 
 const sameSubscriptions = Schema.toEquivalence(Schema.Array(Subscription))
 
-const storageFailure = (cause: SqlError.SqlError | Schema.SchemaError) =>
+const storageFailure = (
+  cause: SqlError.SqlError | Schema.SchemaError | { readonly _tag: "EventLogError" },
+) =>
   Effect.logWarning("Couldn't read or save a Subscription", cause).pipe(
     Effect.andThen(
       Effect.fail(new ThreadError({ message: "Couldn't read or save the Subscription." })),
@@ -103,20 +87,11 @@ export class Subscriptions extends Context.Service<
     readonly subscribedThreads: Effect.Effect<ReadonlyArray<string>, ThreadError>
     readonly states: (
       threadId: string,
+    ) => Effect.Effect<ReadonlyArray<SubscriptionState>, ThreadError>
+    readonly about: (
       source: EventSource,
     ) => Effect.Effect<ReadonlyArray<SubscriptionState>, ThreadError>
-    readonly notEnded: (
-      source: EventSource,
-    ) => Effect.Effect<ReadonlyArray<Subscription>, ThreadError>
-    readonly endAbout: (
-      subscriptions: ReadonlyArray<Subscription>,
-      ended: SubscriptionEnding,
-      toldBy: SubscriptionReason,
-    ) => Effect.Effect<void, ThreadError>
-    readonly recordTold: (
-      told: ReadonlyArray<ToldSubscription>,
-      lastMessageTurn: string | null,
-    ) => Effect.Effect<void, ThreadError>
+    readonly deliver: (delivered: ReadonlyArray<Delivered>) => Effect.Effect<void, ThreadError>
   }
 >()("@glass/server/Subscriptions") {
   static readonly layer = Layer.effect(
@@ -124,14 +99,16 @@ export class Subscriptions extends Context.Service<
     Effect.gen(function* () {
       const sql = yield* SqlClient.SqlClient
       const transcripts = yield* Transcripts
+      const eventLog = yield* EventLog
       const writes = yield* SubscriptionRef.make(0)
 
       const wrote = SubscriptionRef.update(writes, (count) => count + 1)
 
       const stored = (matching: Statement.Fragment) =>
         sql`
-          SELECT id, thread_id AS threadId, source, subject, reasons, note,
-            last_told AS lastTold, ended
+          SELECT id, thread_id AS threadId, source, subject, subject_key AS subjectKey, kinds,
+            note, delivered_through AS deliveredThrough, updates_in_a_row AS updatesInARow,
+            after_message AS afterMessage
           FROM subscription WHERE ${matching} ORDER BY created_at, id
         `.pipe(Effect.flatMap(decodeStored), Effect.catch(storageFailure))
 
@@ -143,27 +120,31 @@ export class Subscriptions extends Context.Service<
         turnId: string | null,
         input: NewSubscription<E>,
       ) {
-        const starter = yield* transcripts.turnStarter(threadId, turnId)
-
-        if (!isOnTheUsersWord(starter))
+        if (!(yield* transcripts.startedByMessage(threadId, turnId)))
           return yield* new ThreadError({
-            message: `${refusedStarters[starter ?? "none"]}, so it can't subscribe your Thread. Only a Turn started by the user's message, or by a message from the Thread or Global chat that created your Thread, can.`,
+            message:
+              "Only a Turn a message started can subscribe your Thread. Glass started this one, or it began by itself.",
           })
 
         const subject = yield* input.subject
+        const source = subjectSource(subject)
+        const deliveredThrough = yield* eventLog.latestId.pipe(Effect.catch(storageFailure))
 
         const [{ id }] = yield* sql`
           INSERT INTO subscription ${sql.insert({
             id: randomUUID(),
             thread_id: threadId,
-            source: input.source,
+            source,
             subject: encodeSubject(subject),
-            reasons: encodeReasons(input.reasons),
+            subject_key: subjectKey(subject),
+            kinds: encodeKinds(input.kinds),
             note: input.note,
+            delivered_through: deliveredThrough,
             created_at: DateTime.formatIso(yield* DateTime.now),
           })}
-          ON CONFLICT (thread_id, source, subject) WHERE ended IS NULL
-          DO UPDATE SET reasons = excluded.reasons, note = excluded.note
+          ON CONFLICT (thread_id, source, subject_key)
+          DO UPDATE SET kinds = excluded.kinds, note = excluded.note,
+            delivered_through = excluded.delivered_through
           RETURNING id
         `.pipe(Effect.flatMap(decodeSaved), Effect.catch(storageFailure))
 
@@ -172,9 +153,9 @@ export class Subscriptions extends Context.Service<
         return new Subscription({
           id,
           threadId,
-          source: input.source,
+          source,
           subject,
-          reasons: input.reasons,
+          kinds: input.kinds,
           note: input.note,
         })
       })
@@ -193,27 +174,35 @@ export class Subscriptions extends Context.Service<
         return ended.length > 0
       })
 
-      const endAbout = Effect.fnUntraced(function* (
-        subscriptions: ReadonlyArray<Subscription>,
-        ended: SubscriptionEnding,
-        toldBy: SubscriptionReason,
-      ) {
-        yield* Effect.forEach(
-          subscriptions,
-          ({ id, reasons }) =>
-            reasons.includes(toldBy)
-              ? sql`UPDATE subscription SET ended = ${encodeEnding(ended)} WHERE id = ${id}`
-              : sql`DELETE FROM subscription WHERE id = ${id}`,
-          { discard: true },
-        ).pipe(Effect.catch(storageFailure))
-
-        if (subscriptions.length > 0) yield* wrote
-      })
+      const deliver = (delivered: ReadonlyArray<Delivered>) =>
+        Effect.forEach(delivered, (one) =>
+          one.ends
+            ? sql`DELETE FROM subscription WHERE id = ${one.subscriptionId} RETURNING id`
+            : sql`
+                UPDATE subscription
+                SET delivered_through = ${one.deliveredThrough},
+                  updates_in_a_row = ${one.updatesInARow},
+                  after_message = ${one.afterMessage}
+                WHERE id = ${one.subscriptionId}
+                RETURNING id
+              `,
+        ).pipe(
+          Effect.catch(storageFailure),
+          Effect.flatMap((rows) =>
+            rows.every((row) => row.length > 0)
+              ? Effect.void
+              : Effect.fail(
+                  new ThreadError({ message: "A Subscription ended before it was told." }),
+                ),
+          ),
+          Effect.andThen(delivered.length > 0 ? wrote : Effect.void),
+        )
 
       return Subscriptions.of({
         subscribe,
         list,
         end,
+        deliver,
         watch: (threadId) =>
           SubscriptionRef.changes(writes).pipe(
             Stream.mapEffect(() => list(threadId)),
@@ -228,36 +217,8 @@ export class Subscriptions extends Context.Service<
           Effect.map((found) => found.map(({ threadId }) => threadId)),
           Effect.catch(storageFailure),
         ),
-        states: (threadId, source) =>
-          stored(sql`thread_id = ${threadId} AND source = ${source}`).pipe(
-            Effect.map((found) => found.map(stateOf)),
-          ),
-        notEnded: (source) =>
-          stored(sql`source = ${source} AND ended IS NULL`).pipe(
-            Effect.map((found) => found.map(subscriptionOf)),
-          ),
-        endAbout,
-        recordTold: (told, lastMessageTurn) =>
-          Effect.forEach(told, ({ subscriptionId, subject, told: state, ends }) =>
-            ends
-              ? sql`DELETE FROM subscription WHERE id = ${subscriptionId} RETURNING id`
-              : sql`
-                  UPDATE subscription
-                  SET last_told = ${encodeTold({ subject, told: state, afterMessage: lastMessageTurn })}
-                  WHERE id = ${subscriptionId}
-                  RETURNING id
-                `,
-          ).pipe(
-            Effect.catch(storageFailure),
-            Effect.flatMap((recorded) =>
-              recorded.every((rows) => rows.length > 0)
-                ? Effect.void
-                : Effect.fail(
-                    new ThreadError({ message: "A Subscription ended before it was told." }),
-                  ),
-            ),
-            Effect.andThen(told.length > 0 ? wrote : Effect.void),
-          ),
+        states: (threadId) => stored(sql`thread_id = ${threadId}`),
+        about: (source) => stored(sql`source = ${source}`),
       })
     }),
   )

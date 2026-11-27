@@ -52,9 +52,7 @@ import { ActivityLog } from "../ActivityLog"
 import { AgentReviews } from "../AgentReviews"
 import { PullRequestMaterial, pullRequestMaterial } from "../agentReviewPrompt"
 import type { FileMaterial } from "../tourPrompt"
-import { AgentSender, Threads } from "../Threads"
-import { Transcripts } from "../Transcripts"
-import { isOnTheUsersWord } from "../threadState"
+import { Threads } from "../Threads"
 import { GitHubClient } from "../github/GitHubClient"
 import { BackgroundGitHubRequest } from "../github/GitHubRequestPolicy"
 import { FollowedRepositories } from "../FollowedRepositories"
@@ -539,7 +537,6 @@ export const GlassToolHandlers = GlassTools.toLayer(
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const startedWork = yield* StartedWork
-    const transcripts = yield* Transcripts
 
     const refuseUnofferedModel = Effect.fnUntraced(function* ({
       harness,
@@ -560,31 +557,6 @@ export const GlassToolHandlers = GlassTools.toLayer(
           message: `That model has no Effort "${effort}". list_thread_options lists each model's Efforts.`,
         })
     })
-
-    const sender = McpCaller.current.pipe(
-      Effect.flatMap(
-        Match.valueTags({
-          OutsideAgent: () => Effect.succeed(AgentSender.OutsideAgent()),
-          Thread: ({ threadId, turnId }) =>
-            transcripts
-              .turnStarter(threadId, turnId)
-              .pipe(
-                Effect.map((starter) =>
-                  AgentSender.Thread({ id: threadId, turnForUser: isOnTheUsersWord(starter) }),
-                ),
-              ),
-          GlobalChat: ({ globalChatId, sessionId }) =>
-            transcripts.runningTurnStarter(sessionId).pipe(
-              Effect.map((starter) =>
-                AgentSender.GlobalChat({
-                  id: globalChatId,
-                  turnForUser: isOnTheUsersWord(starter),
-                }),
-              ),
-            ),
-        }),
-      ),
-    )
 
     return GlassTools.of({
       list_pull_requests: () =>
@@ -696,19 +668,24 @@ export const GlassToolHandlers = GlassTools.toLayer(
           yield* refuseUnofferedModel(input)
 
           const created = { ...input, skillPacks: [], localSkills: false, images: [] }
+          const parent = yield* callingThreadId
 
           const thread = yield* recordedFor(
-            threads.createFrom(yield* sender, created),
+            Option.isSome(parent)
+              ? threads.createFrom(parent.value, created)
+              : threads.create({ ...created, permissionMode: null }),
             (starter, since, { id }) => startedWork.linkThread(starter, id, since),
           )
 
           return { thread }
         }).pipe(Effect.mapError(explained)),
       send_thread_message: ({ threadId, message }) =>
-        sender.pipe(
-          Effect.flatMap((from) =>
+        callingThreadId.pipe(
+          Effect.flatMap((sender) =>
             recordedFor(
-              threads.sendFrom(from, threadId, { message, images: [] }),
+              Option.isSome(sender)
+                ? threads.sendFrom(sender.value, threadId, { message, images: [] })
+                : threads.send(threadId, { message, images: [] }),
               (starter, since) => startedWork.linkThread(starter, threadId, since),
             ),
           ),

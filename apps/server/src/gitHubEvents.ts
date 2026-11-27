@@ -3,60 +3,129 @@ import {
   ChecksFailedEvent,
   ChecksPassedEvent,
   type Event,
-  MergeConflictAppearedEvent,
   MergeConflictClearedEvent,
+  MergeConflictEvent,
   PullRequestClosedEvent,
   PullRequestMergedEvent,
   type PullRequestRef,
   referenceKey,
-  ReviewFeedbackWaitingEvent,
+  ReviewFeedbackEvent,
+  type WaitingReviewThread,
 } from "@glass/contracts"
-import { DateTime, Match, Predicate } from "effect"
+import { Array as Arr, DateTime, Predicate } from "effect"
 import type { NewEvent } from "./EventLog"
-import type { EndedPullRequest } from "./github/branchPullRequests"
+import type { SubscribedDetails } from "./github/repositoryPullRequests"
 import type { Mirror, MirroredPullRequest } from "./PullRequestMirror"
-import type { EndedState } from "./pullRequestNow"
 
-const changesOf = (before: MirroredPullRequest, after: MirroredPullRequest): Array<Event> => {
-  const pullRequest = after.ref
-  const events: Array<Event> = []
+export type EndedState = "merged" | "closed"
 
-  const checksChanged =
-    before.head !== after.head ||
-    (before.checks !== "unavailable" && before.checks !== after.checks)
+type Detailed = MirroredPullRequest & { readonly details: SubscribedDetails }
 
-  if (checksChanged && after.checks === "failing")
-    events.push(ChecksFailedEvent.make({ pullRequest, head: after.head }))
+const isDetailed = (pr: MirroredPullRequest): pr is Detailed => pr.details !== null
 
-  if (checksChanged && after.checks === "passing")
-    events.push(ChecksPassedEvent.make({ pullRequest, head: after.head }))
+export const heldBackFeedback = ({ reviewThreads, changesRequested }: SubscribedDetails) => ({
+  reviewThreads: reviewThreads.filter(({ comments }) => comments.at(-1)?.hasWriteAccess !== true),
+  changesRequested: changesRequested.filter(({ hasWriteAccess }) => !hasWriteAccess),
+})
 
-  if (before.attention === null || after.attention === null) return events
+const checksEvents = (was: Detailed | undefined, now: Detailed): ReadonlyArray<Event> => {
+  const pullRequest = now.ref
+  const moved = was === undefined || was.head !== now.head || was.checks !== now.checks
 
-  if (after.attention.awaitingReply > before.attention.awaitingReply)
-    events.push(
-      ReviewFeedbackWaitingEvent.make({
-        pullRequest,
-        reviewThreads: after.attention.awaitingReply,
-      }),
-    )
+  if (!moved) return []
 
-  if (after.attention.changesRequested && !before.attention.changesRequested)
-    events.push(ChangesRequestedEvent.make({ pullRequest }))
+  const checks = (now.attention?.failingChecks ?? []).map(({ name, url }) => ({ name, url }))
 
-  if (
-    before.attention.mergeConflict !== null &&
-    after.attention.mergeConflict !== null &&
-    before.attention.mergeConflict !== after.attention.mergeConflict
-  )
-    events.push(
-      after.attention.mergeConflict
-        ? MergeConflictAppearedEvent.make({ pullRequest })
-        : MergeConflictClearedEvent.make({ pullRequest }),
-    )
+  if (now.checks === "failing" && Arr.isReadonlyArrayNonEmpty(checks))
+    return [ChecksFailedEvent.make({ pullRequest, head: now.head, checks })]
 
-  return events
+  return was !== undefined && now.checks === "passing"
+    ? [ChecksPassedEvent.make({ pullRequest, head: now.head })]
+    : []
 }
+
+const reviewFeedbackEvents = (was: Detailed | undefined, now: Detailed): ReadonlyArray<Event> => {
+  const waitedBefore = new Set(
+    (was?.details.reviewThreads ?? []).flatMap(({ comments }) => comments.at(-1)?.id ?? []),
+  )
+
+  const reviewThreads = now.details.reviewThreads.flatMap(
+    ({ id, path, line, comments }): ReadonlyArray<WaitingReviewThread> => {
+      const waiting = comments.at(-1)
+
+      if (waiting?.hasWriteAccess !== true || waitedBefore.has(waiting.id)) return []
+
+      const written = comments.flatMap(({ hasWriteAccess, ...comment }) =>
+        hasWriteAccess ? [comment] : [],
+      )
+
+      return Arr.isReadonlyArrayNonEmpty(written) ? [{ id, path, line, comments: written }] : []
+    },
+  )
+
+  return Arr.isReadonlyArrayNonEmpty(reviewThreads)
+    ? [ReviewFeedbackEvent.make({ pullRequest: now.ref, reviewThreads })]
+    : []
+}
+
+const changesRequestedEvents = (was: Detailed | undefined, now: Detailed): ReadonlyArray<Event> => {
+  const requestedBefore = new Set(
+    (was?.details.changesRequested ?? []).map(({ reviewId }) => reviewId),
+  )
+
+  const reviewers = Arr.dedupe(
+    now.details.changesRequested.flatMap(({ reviewId, author, hasWriteAccess }) =>
+      hasWriteAccess && !requestedBefore.has(reviewId) ? [author] : [],
+    ),
+  )
+
+  return Arr.isReadonlyArrayNonEmpty(reviewers)
+    ? [ChangesRequestedEvent.make({ pullRequest: now.ref, reviewers })]
+    : []
+}
+
+const mergeConflictEvents = (was: Detailed | undefined, now: Detailed): ReadonlyArray<Event> => {
+  const before = was?.details.mergeConflict ?? null
+  const after = now.details.mergeConflict
+
+  if (after === true && before !== true)
+    return [MergeConflictEvent.make({ pullRequest: now.ref, base: now.details.base })]
+
+  return after === false && before === true
+    ? [MergeConflictClearedEvent.make({ pullRequest: now.ref })]
+    : []
+}
+
+const changesOf = (was: Detailed | undefined, now: Detailed) => [
+  ...checksEvents(was, now),
+  ...reviewFeedbackEvents(was, now),
+  ...changesRequestedEvents(was, now),
+  ...mergeConflictEvents(was, now),
+]
+
+const pullRequestsOf = (mirror: Mirror) =>
+  mirror.repositories.flatMap(({ pullRequests }) => pullRequests)
+
+export const eventsBetween = (before: Mirror | undefined, after: Mirror): ReadonlyArray<Event> => {
+  const known = new Map(
+    (before === undefined ? [] : pullRequestsOf(before)).flatMap((pr) =>
+      isDetailed(pr) ? [[pr.id, pr] as const] : [],
+    ),
+  )
+
+  return pullRequestsOf(after).flatMap((pr) =>
+    isDetailed(pr) ? changesOf(known.get(pr.id), pr) : [],
+  )
+}
+
+export const endedEvent = (
+  pullRequest: PullRequestRef,
+  state: EndedState,
+  at: DateTime.Utc,
+): Event =>
+  state === "merged"
+    ? PullRequestMergedEvent.make({ pullRequest, mergedAt: at })
+    : PullRequestClosedEvent.make({ pullRequest, closedAt: at })
 
 const endedAt = (event: Event) => {
   if (Predicate.isTagged(event, "PullRequestMerged")) return event.mergedAt
@@ -73,47 +142,3 @@ export const recorded = (events: ReadonlyArray<Event>) =>
       ? { event, subject }
       : { event, subject, once: `${event._tag} ${subject} ${DateTime.formatIso(at)}` }
   })
-
-const pullRequestsOf = (mirror: Mirror) =>
-  mirror.repositories.flatMap(({ pullRequests }) => pullRequests)
-
-export const eventsBetween = (before: Mirror | undefined, after: Mirror): ReadonlyArray<Event> => {
-  if (before === undefined) return []
-
-  const known = new Map(pullRequestsOf(before).map((pr) => [pr.id, pr]))
-
-  return pullRequestsOf(after).flatMap((pr) => {
-    const was = known.get(pr.id)
-
-    return was === undefined ? [] : changesOf(was, pr)
-  })
-}
-
-export const endedEvent = (
-  pullRequest: PullRequestRef,
-  state: EndedState,
-  at: DateTime.Utc,
-): Event =>
-  state === "merged"
-    ? PullRequestMergedEvent.make({ pullRequest, mergedAt: at })
-    : PullRequestClosedEvent.make({ pullRequest, closedAt: at })
-
-export const endedEvents = (
-  before: Mirror | undefined,
-  ended: ReadonlyArray<EndedPullRequest>,
-): ReadonlyArray<Event> => {
-  if (before === undefined) return []
-
-  const open = new Set(pullRequestsOf(before).map((pr) => referenceKey(pr.ref)))
-
-  return ended.flatMap(({ ref: pullRequest, state, closedAt }) => {
-    if (!open.has(referenceKey(pullRequest))) return []
-
-    return [
-      Match.valueTags(state, {
-        Merged: ({ mergedAt }) => endedEvent(pullRequest, "merged", mergedAt),
-        Closed: () => endedEvent(pullRequest, "closed", closedAt),
-      }),
-    ]
-  })
-}

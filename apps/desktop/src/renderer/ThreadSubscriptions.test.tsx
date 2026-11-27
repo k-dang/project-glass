@@ -1,20 +1,20 @@
 // @vitest-environment happy-dom
 import {
-  ChangesRequestedReason,
-  ClosedReason,
-  FailingChecksReason,
-  MergeConflictReason,
-  MergedReason,
-  PullRequestOpen,
+  ChangesRequestedEvent,
+  ChecksFailedEvent,
+  ChecksPassedEvent,
+  type Event,
+  LoggedEvent,
+  MergeConflictEvent,
+  PullRequestMergedEvent,
   PullRequestRef,
   PullRequestSubject,
-  PullRequestUpdate,
-  ReviewFeedbackReason,
+  ReviewFeedbackEvent,
   Subscription,
   TextPart,
-  ThreadPullRequest,
   TranscriptSnapshot,
   TurnDone,
+  Update,
 } from "@glass/contracts"
 import { screen, waitFor, within } from "@testing-library/react"
 import { DateTime, Effect, Stream, SubscriptionRef } from "effect"
@@ -22,20 +22,16 @@ import { expect, it } from "vite-plus/test"
 import { thread } from "../../test/thread"
 import { mount } from "../../test/threadApp"
 
-const ownPullRequest = new ThreadPullRequest({
-  threadId: thread.id,
-  ref: new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 264 }),
-  url: "https://github.com/glass-demo/greeter/pull/264",
-  title: "Greet by name",
-  state: PullRequestOpen.make({ checks: "passing" }),
-})
+const own = new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 264 })
 
-const own = new Subscription({
+const dependencyRef = new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 7 })
+
+const ownSubscription = new Subscription({
   id: "own",
   threadId: thread.id,
   source: "github",
-  subject: PullRequestSubject.make({ pullRequest: null }),
-  reasons: ["failing-checks", "review-feedback", "changes-requested", "merge-conflict"],
+  subject: PullRequestSubject.make({ pullRequest: own }),
+  kinds: ["ChecksFailed", "ReviewFeedback", "ChangesRequested", "MergeConflict"],
   note: "Keep it green",
 })
 
@@ -43,18 +39,15 @@ const dependency = new Subscription({
   id: "dependency",
   threadId: thread.id,
   source: "github",
-  subject: PullRequestSubject.make({
-    pullRequest: new PullRequestRef({ owner: "glass-demo", repo: "greeter", number: 7 }),
-  }),
-  reasons: ["merged-or-closed"],
+  subject: PullRequestSubject.make({ pullRequest: dependencyRef }),
+  kinds: ["PullRequestMerged"],
   note: "Go on once it merges",
 })
 
-const mountSubscribed = (pullRequests: ReadonlyArray<ThreadPullRequest>) => {
-  const subscriptions = Effect.runSync(SubscriptionRef.make([own, dependency]))
+const mountSubscribed = () => {
+  const subscriptions = Effect.runSync(SubscriptionRef.make([ownSubscription, dependency]))
 
-  const user = mount({
-    WatchThreadPullRequests: () => Stream.make(pullRequests),
+  return mount({
     WatchTranscript: () =>
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
     WatchSubscriptions: ({ threadId }) =>
@@ -64,8 +57,6 @@ const mountSubscribed = (pullRequests: ReadonlyArray<ThreadPullRequest>) => {
     EndSubscription: ({ subscriptionId }) =>
       SubscriptionRef.update(subscriptions, (all) => all.filter(({ id }) => id !== subscriptionId)),
   })
-
-  return user
 }
 
 const shownSubscriptions = async () => {
@@ -76,27 +67,19 @@ const shownSubscriptions = async () => {
     .map((item) => item.textContent)
 }
 
-it("shows a Thread's Subscriptions in its details, each with its PR and what it covers", async () => {
-  const user = mountSubscribed([ownPullRequest])
+it("shows a Thread's Subscriptions in its details, each with its PR and the kinds it asks for", async () => {
+  const user = mountSubscribed()
 
   await user.click(await screen.findByRole("button", { name: "Details" }))
 
   expect(await shownSubscriptions()).toEqual([
-    "This Thread's PR #264failing checks, review feedback, changes requested, a merge conflict",
-    "glass-demo/greeter#7merged or closed",
+    "glass-demo/greeter#264failing checks, review feedback, changes requested, a merge conflict",
+    "glass-demo/greeter#7merged",
   ])
 })
 
-it("shows a Subscription to the Thread's own PR before that PR exists", async () => {
-  const user = mountSubscribed([])
-
-  await user.click(await screen.findByRole("button", { name: "Details" }))
-
-  expect((await shownSubscriptions())[0]).toContain("This Thread's PR, once it has one")
-})
-
 it("ends a Subscription from the Thread's details", async () => {
-  const user = mountSubscribed([ownPullRequest])
+  const user = mountSubscribed()
   await user.click(await screen.findByRole("button", { name: "Details" }))
 
   await user.click(
@@ -104,12 +87,15 @@ it("ends a Subscription from the Thread's details", async () => {
   )
 
   await waitFor(async () => expect(await shownSubscriptions()).toHaveLength(1))
-  expect((await shownSubscriptions())[0]).toContain("This Thread's PR #264")
+  expect((await shownSubscriptions())[0]).toContain("glass-demo/greeter#264")
 })
 
-it("shows a PR update as a Turn Glass started, listing each PR and its reasons", async () => {
+it("shows an Update as a Turn Glass started, listing each PR and its Events", async () => {
   const at = DateTime.makeUnsafe("2026-11-25T12:00:00Z")
   const comment = { id: "PRRC_1", author: "alice", body: "Rename this." }
+
+  const logged = (id: number, event: Event) =>
+    new LoggedEvent({ id, source: "github", occurredAt: at, event })
 
   mount({
     WatchTranscript: () =>
@@ -120,49 +106,52 @@ it("shows a PR update as a Turn Glass started, listing each PR and its reasons",
               id: "update-1",
               message: "",
               images: [],
-              context: PullRequestUpdate.make({
-                source: "github",
+              context: Update.make({
                 note: "Never merge a PR.",
-                subjects: [
+                subscriptions: [
                   {
-                    subscriptionId: own.id,
-                    pullRequest: ownPullRequest.ref,
-                    own: true,
-                    note: own.note,
-                    reasons: [
-                      FailingChecksReason.make({
-                        head: "h1",
-                        checks: [
-                          { name: "lint", url: "https://ci.test/lint/1" },
-                          { name: "test", url: null },
-                        ],
-                      }),
-                      ReviewFeedbackReason.make({
-                        reviewThreads: [
-                          { id: "PRRT_1", path: "src/greet.ts", line: 12, comments: [comment] },
-                        ],
-                      }),
-                      ChangesRequestedReason.make({ reviewers: ["alice"] }),
-                      MergeConflictReason.make({ base: "b0" }),
+                    subscriptionId: ownSubscription.id,
+                    subject: ownSubscription.subject,
+                    note: ownSubscription.note,
+                    events: [
+                      logged(
+                        1,
+                        ChecksFailedEvent.make({
+                          pullRequest: own,
+                          head: "h1",
+                          checks: [
+                            { name: "lint", url: "https://ci.test/lint/1" },
+                            { name: "test", url: null },
+                          ],
+                        }),
+                      ),
+                      logged(2, ChecksPassedEvent.make({ pullRequest: own, head: "h1" })),
+                      logged(
+                        3,
+                        ReviewFeedbackEvent.make({
+                          pullRequest: own,
+                          reviewThreads: [
+                            { id: "PRRT_1", path: "src/greet.ts", line: 12, comments: [comment] },
+                          ],
+                        }),
+                      ),
+                      logged(
+                        4,
+                        ChangesRequestedEvent.make({ pullRequest: own, reviewers: ["alice"] }),
+                      ),
+                      logged(5, MergeConflictEvent.make({ pullRequest: own, base: "b0" })),
                     ],
                   },
                   {
                     subscriptionId: dependency.id,
-                    pullRequest: dependency.subject.pullRequest!,
-                    own: false,
+                    subject: dependency.subject,
                     note: dependency.note,
-                    reasons: [MergedReason.make({})],
-                  },
-                  {
-                    subscriptionId: "other",
-                    pullRequest: new PullRequestRef({
-                      owner: "glass-demo",
-                      repo: "greeter",
-                      number: 9,
-                    }),
-                    own: false,
-                    note: "Stop once it closes",
-                    reasons: [ClosedReason.make({})],
+                    events: [
+                      logged(
+                        6,
+                        PullRequestMergedEvent.make({ pullRequest: dependencyRef, mergedAt: at }),
+                      ),
+                    ],
                   },
                 ],
               }),
@@ -182,9 +171,8 @@ it("shows a PR update as a Turn Glass started, listing each PR and its reasons",
   const update = within(screen.getByRole("list", { name: "PR update from Glass" }))
 
   expect(update.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
-    "glass-demo/greeter#264: 2 checks failed, 1 Review thread waits for a reply, alice requested changes, a merge conflict",
+    "glass-demo/greeter#264: 2 checks failed, checks passed, 1 Review thread waits for a reply, alice requested changes, a merge conflict",
     "glass-demo/greeter#7: merged",
-    "glass-demo/greeter#9: closed",
   ])
   expect(screen.queryByText("Rename this.")).toBeNull()
 })

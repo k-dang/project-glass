@@ -1,16 +1,15 @@
 import { assert, it } from "@effect/vitest"
-import type { TurnEnding } from "@glass/contracts"
+import type { QueuedMessage, TurnEnding } from "@glass/contracts"
 import { TurnCutOff, TurnDone, TurnFailed, TurnInterrupted, TurnStopped } from "@glass/contracts"
-import {
-  type SentQueuedMessage,
-  type ThreadState,
-  type ThreadStep,
-  stepThread,
-} from "./threadState"
+import { type ThreadState, type ThreadStep, stepThread } from "./threadState"
 
-const sent = (id: string) => ({ id, message: id, images: [], context: null, feedback: [] })
-
-const message = (id: string): SentQueuedMessage => ({ ...sent(id), sentBy: "agent" })
+const message = (id: string): QueuedMessage => ({
+  id,
+  message: id,
+  images: [],
+  context: null,
+  feedback: [],
+})
 
 const idle: ThreadState = { running: null, queued: [message("a"), message("b")] }
 
@@ -22,10 +21,7 @@ const startsQueued = (id: string): ThreadStep => ({
   outcome: { type: "started" },
   writes: [
     { type: "dequeue", queuedId: id },
-    {
-      type: "startTurn",
-      message: { ...sent(id), retriesDelivery: false, startedBy: "agent" },
-    },
+    { type: "startTurn", message: { ...message(id), retriesDelivery: false } },
   ],
 })
 
@@ -47,7 +43,7 @@ it("advances the queue head only after Done and Failed", () => {
 })
 
 it("starts an idle-only Turn only after the running Turn and all Queued messages", () => {
-  const idleOnly = { ...sent("idleOnly"), retriesDelivery: true, startedBy: "glass" as const }
+  const idleOnly = { ...message("idleOnly"), retriesDelivery: true }
 
   for (const state of [busy, idle])
     assert.deepStrictEqual(stepThread(state, { type: "startIfIdle", message: idleOnly }), {

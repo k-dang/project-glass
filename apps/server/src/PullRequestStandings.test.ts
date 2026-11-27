@@ -54,19 +54,20 @@ const allowed = (pullRequest: FakePullRequest) =>
     comments: [{ author: "alice", authorAssociation: "MEMBER", bodyHtml: "<p>Rename this.</p>" }],
   })
 
-const ownPullRequest = (note: string, reasons?: Parameters<typeof subscribe>[1]) =>
+const ownPullRequest = (note: string, kinds?: Parameters<typeof subscribe>[2]) =>
   Effect.gen(function* () {
     const f = yield* threadsFixture
     yield* f.client.FollowRepository({ input: "glass-demo/greeter" })
     const own = yield* pullRequestFor(f, 7, undefined, { author: VIEWER.login })
-    yield* f.send(own.thread.id, subscribe(note, reasons))
+    yield* f.send(own.thread.id, subscribe(note, own.pullRequest, kinds))
     yield* f.transcript(own.thread.id, settled(2))
+    yield* f.client.ListPullRequests()
 
     return { ...f, ...own }
   })
 
 it.live(
-  "leaves failing checks out of the Inbox while a PR update for them runs, then lists the PR with the Thread that tried once it ends without fixing them",
+  "leaves failing checks out of the Inbox while an Update for them runs, then lists the PR with the Thread that tried once it ends without fixing them",
   () =>
     Effect.gen(function* () {
       const f = yield* ownPullRequest("Keep it green\nduring-update:hold:fixing")
@@ -92,7 +93,7 @@ it.live(
 )
 
 it.live(
-  "leaves what a busy Thread's PR update is due for out of the Inbox, and still lists feedback from people without write access",
+  "leaves what a busy Thread's Update is due for out of the Inbox, and still lists feedback from people without write access",
   () =>
     Effect.gen(function* () {
       const f = yield* ownPullRequest("Keep it green")
@@ -121,7 +122,7 @@ it.live(
 
 it.live("lists a reason no Subscription covers", () =>
   Effect.gen(function* () {
-    const f = yield* ownPullRequest("Answer the reviews", ["review-feedback"])
+    const f = yield* ownPullRequest("Answer the reviews", ["ReviewFeedback"])
     yield* f.send(f.thread.id, "hold:busy")
     yield* f.transcript(f.thread.id, holding)
 
@@ -167,7 +168,7 @@ it.live("lists a reason on a PR when the subscribed Thread's Sandbox is gone", (
       author: VIEWER.login,
     })
 
-    const thread = yield* f.startSandbox(subscribe("Keep it green", undefined, pullRequest))
+    const thread = yield* f.startSandbox(subscribe("Keep it green", pullRequest))
     yield* f.transcript(thread.id, settled(1))
 
     yield* Effect.promise(() => f.sandboxes.remove(thread.id))
@@ -196,7 +197,7 @@ const unseenTurn = (f: Pick<Fixture, "client">, threadId: string, ended: TurnEnd
   )
 
 it.live(
-  "keeps a Thread out of the Inbox when its PR update finishes, and still lists its Turn as finished and unseen",
+  "keeps a Thread out of the Inbox when its Update finishes, and still lists its Turn as finished and unseen",
   () =>
     Effect.gen(function* () {
       const f = yield* ownPullRequest("Keep it green")
@@ -222,7 +223,7 @@ const unfinished = (items: InboxItems, threadId: string) =>
       : [],
   ) ?? []
 
-it.effect("lists a Thread whose PR update was cut off when its Sandbox host was lost", () =>
+it.effect("lists a Thread whose Update was cut off when its Sandbox host was lost", () =>
   withSkippableWaits(QUICK_RETRY_SPACING, (skipQuickRetries) =>
     Effect.gen(function* () {
       const f = yield* threadsFixture
@@ -230,7 +231,7 @@ it.effect("lists a Thread whose PR update was cut off when its Sandbox host was 
       const pullRequest = f.github.seedPullRequest(greeterPullRequest(8, "feature/mine"))
 
       const thread = yield* f.startSandbox(
-        subscribe("Keep it green\nduring-update:hold:fixing", undefined, pullRequest),
+        subscribe("Keep it green\nduring-update:hold:fixing", pullRequest),
       )
 
       yield* f.transcript(thread.id, settled(1))
@@ -248,14 +249,11 @@ it.effect("lists a Thread whose PR update was cut off when its Sandbox host was 
   ),
 )
 
-it.live("lists a Thread whose PR update stopped at a Permission request", () =>
+it.live("lists a Thread whose Update stopped at a Permission request", () =>
   Effect.gen(function* () {
     const f = yield* ownPullRequest("Keep it green")
-
-    yield* f.send(
-      f.thread.id,
-      subscribe("Keep it green\nduring-update:ask permission").replace("ask", "\\u0061sk"),
-    )
+    const asking = subscribe("Keep it green\nduring-update:ask permission", f.pullRequest)
+    yield* f.send(f.thread.id, asking.replace("ask", "\\u0061sk"))
     yield* f.transcript(f.thread.id, settled(3))
 
     fail(f.pullRequest, failed("lint"))

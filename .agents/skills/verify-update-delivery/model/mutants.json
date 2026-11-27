@@ -1,13 +1,12 @@
 {
   "SkipIdleCheck": "NeverCutsIn",
-  "RecordToldAfterStart": "ToldOnce",
-  "SendWhatWaited": "TellsWhatIsStillTrue",
+  "RecordCursorAfterStart": "ToldOnce",
+  "PassOverWhileWaiting": "NoneLost",
+  "PassOverWhileGivenUp": "NoneLost",
   "IgnoreLimit": "RunsAtMostTheLimit",
   "CountRunningInMemory": "RunsAtMostTheLimit",
   "NeverCount": "StopsAtTheLimit",
-  "RerunResetsCount": "StopsAtTheLimit",
-  "NewPushResetsCount": "StopsAtTheLimit",
-  "AgentMessageCounts": "StopsAtTheLimit",
+  "UnpromptedCounts": "StopsAtTheLimit",
   "RestartForgetsCount": "StopsAtTheLimit",
   "IgnoreMessages": "MessageLetsItTryAgain"
 }

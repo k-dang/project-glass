@@ -1,44 +1,28 @@
 import type { FeedbackNote, QueuedMessage, TurnEnding, TurnMessage } from "@glass/contracts"
-import { Match, Predicate, Schema } from "effect"
-
-export const MessageSender = Schema.Literals(["user", "creator", "agent"])
-
-export type MessageSender = typeof MessageSender.Type
-
-export const TurnStarter = Schema.Literals([...MessageSender.literals, "glass", "harness"])
-
-export type TurnStarter = typeof TurnStarter.Type
-
-export const isOnTheUsersWord = (starter: TurnStarter | null): starter is "user" | "creator" =>
-  starter === "user" || starter === "creator"
-
-export type SentQueuedMessage = QueuedMessage & { readonly sentBy: MessageSender }
+import { Match, Predicate } from "effect"
 
 export interface ThreadState {
   readonly running: string | null
-  readonly queued: ReadonlyArray<SentQueuedMessage>
+  readonly queued: ReadonlyArray<QueuedMessage>
 }
 
 export type ThreadEvent =
-  | { readonly type: "send"; readonly message: SentQueuedMessage }
+  | { readonly type: "send"; readonly message: QueuedMessage }
   | { readonly type: "startIfIdle"; readonly message: StartingTurn }
   | { readonly type: "sendQueued" | "cancelQueued"; readonly queuedId: string }
   | {
       readonly type: "turnEnded"
       readonly ending: TurnEnding
-      readonly requeued: ReadonlyArray<SentQueuedMessage>
+      readonly requeued: ReadonlyArray<QueuedMessage>
     }
 
 export type StartingTurn = Omit<QueuedMessage, "context"> &
-  Pick<TurnMessage, "context"> & {
-    readonly retriesDelivery: boolean
-    readonly startedBy: TurnStarter
-  }
+  Pick<TurnMessage, "context"> & { readonly retriesDelivery: boolean }
 
 export type ThreadWrite =
   | { readonly type: "startTurn"; readonly message: StartingTurn }
-  | { readonly type: "enqueue"; readonly message: SentQueuedMessage }
-  | { readonly type: "prepend"; readonly messages: ReadonlyArray<SentQueuedMessage> }
+  | { readonly type: "enqueue"; readonly message: QueuedMessage }
+  | { readonly type: "prepend"; readonly messages: ReadonlyArray<QueuedMessage> }
   | { readonly type: "dequeue"; readonly queuedId: string }
 
 type StepOutcome =
@@ -52,12 +36,12 @@ export interface ThreadStep {
 
 const unchanged: ThreadStep = { outcome: { type: "unchanged" }, writes: [] }
 
-const startSent = ({ sentBy, ...message }: SentQueuedMessage): ThreadWrite => ({
+const startSent = (message: QueuedMessage): ThreadWrite => ({
   type: "startTurn",
-  message: { ...message, retriesDelivery: false, startedBy: sentBy },
+  message: { ...message, retriesDelivery: false },
 })
 
-const startQueued = (queued: SentQueuedMessage): ThreadStep => ({
+const startQueued = (queued: QueuedMessage): ThreadStep => ({
   outcome: { type: "started" },
   writes: [{ type: "dequeue", queuedId: queued.id }, startSent(queued)],
 })

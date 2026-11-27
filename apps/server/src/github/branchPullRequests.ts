@@ -19,7 +19,6 @@ export interface EndedPullRequest {
   readonly title: string
   readonly state: PullRequestEnded
   readonly createdAt: DateTime.Utc
-  readonly closedAt: DateTime.Utc
 }
 
 const endedFields = {
@@ -28,7 +27,6 @@ const endedFields = {
   title: Schema.String,
   isCrossRepository: Schema.Boolean,
   createdAt: Schema.DateTimeUtcFromString,
-  closedAt: Schema.DateTimeUtcFromString,
 }
 
 const GitHubEndedPullRequest = Schema.Union([
@@ -48,7 +46,7 @@ export const EndedBranchPullRequests = aliasedLookup({
   selection: (index) =>
     `repository(owner: $owner${index}, name: $name${index}) { pullRequests(headRefName: $branch${index}, states: [MERGED, CLOSED], first: 10, orderBy: {field: CREATED_AT, direction: DESC}) { nodes { ...EndedPullRequest } } }`,
   fragment: `fragment EndedPullRequest on PullRequest {
-  number url title state isCrossRepository createdAt mergedAt closedAt
+  number url title state isCrossRepository createdAt mergedAt
 }`,
   variables: ({ repository, branch }: Branch, index) => [
     [`owner${index}`, repository.owner],
@@ -72,7 +70,6 @@ export const EndedBranchPullRequests = aliasedLookup({
           url: node.url,
           title: node.title,
           createdAt: node.createdAt,
-          closedAt: node.closedAt,
           state:
             node.state === "MERGED"
               ? PullRequestMerged.make({ mergedAt: node.mergedAt })

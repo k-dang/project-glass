@@ -2,27 +2,18 @@ import { EventPage, PullRequestRef, referenceKey } from "@glass/contracts"
 import { Duration, Effect, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
 import { EventLog, KEPT_FOR } from "../EventLog"
-import { Subscriptions } from "../Subscriptions"
-import { ThreadPullRequests } from "../ThreadPullRequests"
-import { Threads } from "../Threads"
 import { GlassToolFailure, readOnly } from "./glassTools"
 
 const MAX_EVENTS = 100
 
 const ListRecentEvents = Tool.make("list_recent_events", {
-  description: `Lists recent Events, newest first: what happened to PRs in the user's followed repositories that the user didn't do in Glass, such as a PR's checks failing or passing, review feedback waiting, changes requested, a merge conflict appearing or clearing, and a Thread's PR or a PR with a Subscription merging or closing. Glass keeps Events for ${Duration.toDays(KEPT_FOR)} days.`,
+  description: `Lists recent Events, newest first: what happened to the subjects of Subscriptions that the user didn't do in Glass, such as a PR's checks failing or passing, review feedback waiting, changes requested, a merge conflict appearing or clearing, and the PR merging or closing. Glass keeps Events for ${Duration.toDays(KEPT_FOR)} days.`,
   parameters: Schema.Struct({
     limit: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: MAX_EVENTS })).annotate({
       description: `How many Events to list, at most ${MAX_EVENTS}.`,
     }),
     pullRequest: Schema.optional(
       PullRequestRef.annotate({ description: "List only this PR's Events." }),
-    ),
-    threadId: Schema.optional(
-      Schema.String.annotate({
-        description:
-          "List only the Events of this Thread's PR and of every PR it has a Subscription to. The Thread's id, from list_threads.",
-      }),
     ),
     since: Schema.optional(
       Schema.DateTimeUtcFromString.annotate({
@@ -36,67 +27,22 @@ const ListRecentEvents = Tool.make("list_recent_events", {
 
 export const EventTools = Toolkit.make(ListRecentEvents)
 
-const about = (pullRequests: ReadonlyArray<PullRequestRef>) => ({
-  source: "github" as const,
-  subjects: pullRequests.map(referenceKey),
-})
-
 export const EventToolHandlers = EventTools.toLayer(
   Effect.gen(function* () {
     const eventLog = yield* EventLog
-    const threads = yield* Threads
-    const threadPullRequests = yield* ThreadPullRequests
-    const subscriptions = yield* Subscriptions
-
-    const pullRequestsOf = Effect.fnUntraced(function* (threadId: string) {
-      yield* threads.placeOf(threadId).pipe(
-        Effect.mapError(
-          () =>
-            new GlassToolFailure({
-              message: "There's no Thread with that id. list_threads names the Threads there are.",
-            }),
-        ),
-      )
-
-      const own = (yield* threadPullRequests.ofThread(threadId))?.ref
-
-      const subscribed = yield* subscriptions
-        .list(threadId)
-        .pipe(Effect.mapError(({ message }) => new GlassToolFailure({ message })))
-
-      return [
-        ...(own === undefined ? [] : [own]),
-        ...subscribed.flatMap(({ subject: { pullRequest } }) =>
-          pullRequest === null ? [] : [pullRequest],
-        ),
-      ]
-    })
 
     return EventTools.of({
-      list_recent_events: ({ limit, pullRequest, threadId, since }) =>
-        Effect.gen(function* () {
-          if (threadId === undefined)
-            return yield* eventLog.list({
-              limit,
-              about: pullRequest === undefined ? undefined : about([pullRequest]),
-              since,
-            })
-
-          if (pullRequest !== undefined)
-            return yield* new GlassToolFailure({
-              message: "Pass pullRequest or threadId, not both.",
-            })
-
-          const pullRequests = yield* pullRequestsOf(threadId)
-
-          return pullRequests.length === 0
-            ? new EventPage({ events: [], hasMore: false })
-            : yield* eventLog.list({ limit, about: about(pullRequests), since })
-        }).pipe(
-          Effect.catchTag("EventLogError", ({ message }) =>
-            Effect.fail(new GlassToolFailure({ message })),
-          ),
-        ),
+      list_recent_events: ({ limit, pullRequest, since }) =>
+        eventLog
+          .list({
+            limit,
+            about:
+              pullRequest === undefined
+                ? undefined
+                : { source: "github", subjects: [referenceKey(pullRequest)] },
+            since,
+          })
+          .pipe(Effect.mapError(({ message }) => new GlassToolFailure({ message }))),
     })
   }),
 )

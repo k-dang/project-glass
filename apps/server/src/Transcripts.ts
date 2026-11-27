@@ -54,13 +54,10 @@ import {
 import { SqlClient, type SqlError, type Statement } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import {
-  MessageSender,
-  type SentQueuedMessage,
   type ThreadEvent,
   type ThreadState,
   type ThreadWrite,
   type StartingTurn,
-  TurnStarter,
   stepThread,
 } from "./threadState"
 import type { HostEvent } from "./agentHost/protocol"
@@ -143,7 +140,6 @@ const decodeQueued = Schema.decodeUnknownEffect(
       ...StoredMessage.fields,
       context: Schema.NullOr(Schema.fromJsonString(CapturedContext)),
       feedback: FeedbackJson,
-      sentBy: MessageSender,
     }),
   ),
 )
@@ -170,8 +166,12 @@ const decodeMessages = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ message: Schema.String })),
 )
 
-const decodeStarters = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ startedBy: TurnStarter })),
+const isCapturedContext = Schema.is(CapturedContext)
+
+const capturedContextTags: ReadonlyArray<CapturedContext["_tag"]> = ["PullRequest", "Thread"]
+
+const decodeContexts = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ context: ContextJson })),
 )
 
 const decodeRunningContexts = Schema.decodeUnknownEffect(
@@ -213,7 +213,7 @@ type UnseenByThread = ReadonlyMap<string, UnseenEnd>
 
 export type StartedTurn = typeof TurnStarted.Type & { readonly threadId: string }
 
-export type IdleTurn = Omit<StartingTurn, "id" | "feedback" | "startedBy">
+export type IdleTurn = Omit<StartingTurn, "id" | "feedback">
 
 const joinConsecutiveAppends = (events: ReadonlyArray<SavedEvent>) => {
   const joined: Array<SavedEvent> = []
@@ -264,16 +264,8 @@ const storageFailure = () =>
     message: "Couldn't read or save the Thread's transcript. Try again.",
   })
 
-const queuedAgain = (inputs: ReadonlyArray<MessageWithContext>): ReadonlyArray<SentQueuedMessage> =>
-  inputs.map((input) => ({ ...input, feedback: [], id: randomUUID(), sentBy: "user" }))
-
-const withoutSender = ({
-  id,
-  message,
-  images,
-  context,
-  feedback,
-}: SentQueuedMessage): QueuedMessage => ({ id, message, images, context, feedback })
+const queuedAgain = (inputs: ReadonlyArray<MessageWithContext>): ReadonlyArray<QueuedMessage> =>
+  inputs.map((input) => ({ ...input, feedback: [], id: randomUUID() }))
 
 type SavedEvent = Exclude<HostEvent, AgentStatusesChanged>
 
@@ -314,19 +306,15 @@ export class Transcripts extends Context.Service<
       threadIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<StartedTurn>, ThreadError>
     readonly runningMessage: (threadId: string) => Effect.Effect<string | null, ThreadError>
-    readonly runningTurnStarter: (
-      threadId: string,
-    ) => Effect.Effect<TurnStarter | null, ThreadError>
-    readonly turnStarter: (
+    readonly startedByMessage: (
       threadId: string,
       turnId: string | null,
-    ) => Effect.Effect<TurnStarter | null, ThreadError>
+    ) => Effect.Effect<boolean, ThreadError>
     readonly lastMessageTurn: (threadId: string) => Effect.Effect<string | null, ThreadError>
     readonly runningUpdates: Effect.Effect<ReadonlyArray<RunningUpdate>, ThreadError>
     readonly startOrQueue: (
       threadId: string,
       input: MessageWithContext,
-      sentBy: MessageSender,
       feedback?: Effect.Effect<ReadonlyArray<FeedbackNote>, ThreadError>,
     ) => Effect.Effect<MessageDelivery, ThreadError>
     readonly prependQueued: (
@@ -526,7 +514,8 @@ export class Transcripts extends Context.Service<
       const insertTurn = (
         threadId: string,
         { turnId, message, images, context, feedback, sentAt }: typeof TurnStarted.Type,
-        start: Pick<StartingTurn, "retriesDelivery" | "startedBy">,
+        retriesDelivery: boolean,
+        unprompted = false,
       ) =>
         sql`INSERT INTO thread_turn ${sql.insert({
           id: turnId,
@@ -536,15 +525,14 @@ export class Transcripts extends Context.Service<
           context: encodeContext(context),
           feedback: encodeFeedback(feedback),
           sent_at: DateTime.formatIso(sentAt),
-          retries_delivery: start.retriesDelivery ? 1 : 0,
-          started_by: start.startedBy,
+          retries_delivery: retriesDelivery ? 1 : 0,
+          unprompted: unprompted ? 1 : 0,
         })}`.pipe(Effect.as(true))
 
       const writeApplied = (threadId: string, event: AgentEvent) =>
         Match.value(event).pipe(
           Match.tagsExhaustive({
-            TurnStarted: (started) =>
-              insertTurn(threadId, started, { retriesDelivery: false, startedBy: "harness" }),
+            TurnStarted: (started) => insertTurn(threadId, started, false, true),
             PartSet: ({ turnId, index, part }) =>
               sql`
                 INSERT INTO thread_turn_part (turn_id, position, part)
@@ -598,29 +586,18 @@ export class Transcripts extends Context.Service<
           Effect.map(([turn]) => turn?.id ?? null),
         )
 
-      const starterOf = (turn: Statement.Fragment) =>
-        withStorageFailure(
-          "read who started a Turn",
-          sql`SELECT started_by AS startedBy FROM thread_turn WHERE ${turn}`.pipe(
-            Effect.flatMap(decodeStarters),
-            Effect.map(([found]) => found?.startedBy ?? null),
-          ),
-        )
-
       const queued = (threadId: string) =>
         sql`
-          SELECT id, message, images, context, feedback, sent_by AS sentBy
-          FROM thread_queued_message WHERE thread_id = ${threadId} ORDER BY position
+          SELECT id, message, images, context, feedback FROM thread_queued_message
+          WHERE thread_id = ${threadId} ORDER BY position
         `.pipe(Effect.flatMap(decodeQueued))
 
       const queuedChanged = (threadId: string) =>
         queued(threadId).pipe(
-          Effect.map((current) =>
-            QueuedMessagesChanged.make({ queued: current.map(withoutSender) }),
-          ),
+          Effect.map((current) => QueuedMessagesChanged.make({ queued: current })),
         )
 
-      const insertQueued = (threadId: string, position: number, input: SentQueuedMessage) =>
+      const insertQueued = (threadId: string, position: number, input: QueuedMessage) =>
         sql`INSERT INTO thread_queued_message ${sql.insert({
           id: input.id,
           thread_id: threadId,
@@ -629,7 +606,6 @@ export class Transcripts extends Context.Service<
           images: encodeImages(input.images),
           context: encodeContext(input.context),
           feedback: encodeFeedback(input.feedback),
-          sent_by: input.sentBy,
         })}`
 
       const queuedPositions = (threadId: string) =>
@@ -659,7 +635,7 @@ export class Transcripts extends Context.Service<
                 sentAt: yield* DateTime.now,
               })
 
-              yield* insertTurn(threadId, event, write.message)
+              yield* insertTurn(threadId, event, write.message.retriesDelivery)
               started.push(event)
               break
             }
@@ -1062,18 +1038,35 @@ export class Transcripts extends Context.Service<
               Effect.map(([turn]) => turn?.message ?? null),
             ),
           ),
-        runningTurnStarter: (threadId) => starterOf(sql`thread_id = ${threadId} AND ended IS NULL`),
-        turnStarter: (threadId, turnId) =>
+        startedByMessage: (threadId, turnId) =>
           turnId === null
-            ? Effect.succeed(null)
-            : starterOf(sql`id = ${turnId} AND thread_id = ${threadId}`),
+            ? Effect.succeed(false)
+            : withStorageFailure(
+                "read what started a Turn",
+                sql`
+                  SELECT context FROM thread_turn
+                  WHERE id = ${turnId} AND thread_id = ${threadId} AND unprompted = 0
+                `.pipe(
+                  Effect.flatMap(decodeContexts),
+                  Effect.map(
+                    ([turn]) =>
+                      turn !== undefined &&
+                      (turn.context === null || isCapturedContext(turn.context)),
+                  ),
+                ),
+              ),
         lastMessageTurn: (threadId) =>
           withStorageFailure(
-            "read the last Turn a message of the user's reached",
+            "read the last Turn a message reached",
             sql`
               SELECT t.id FROM thread_turn t
               WHERE t.thread_id = ${threadId} AND (
-                t.started_by = 'user'
+                (
+                  t.unprompted = 0 AND (
+                    t.context IS NULL
+                    OR json_extract(t.context, '$._tag') IN ${sql.in(capturedContextTags)}
+                  )
+                )
                 OR EXISTS (
                   SELECT 1 FROM thread_turn_part p
                   WHERE p.turn_id = t.id AND json_extract(p.part, '$._tag') = 'Steer'
@@ -1157,12 +1150,7 @@ export class Transcripts extends Context.Service<
             changeWith(
               threadId,
               Effect.gen(function* () {
-                const message = {
-                  ...turn,
-                  feedback: [],
-                  id: randomUUID(),
-                  startedBy: "glass" as const,
-                }
+                const message = { ...turn, feedback: [], id: randomUUID() }
 
                 const { outcome, updates } = yield* step(threadId, {
                   type: "startIfIdle",
@@ -1175,13 +1163,13 @@ export class Transcripts extends Context.Service<
               }),
             ),
           ),
-        startOrQueue: (threadId, sent, sentBy, feedback = Effect.succeed([])) =>
+        startOrQueue: (threadId, sent, feedback = Effect.succeed([])) =>
           withStorageFailure(
             "send a message",
             changeWith(
               threadId,
               Effect.gen(function* () {
-                const message = { ...sent, feedback: yield* feedback, id: randomUUID(), sentBy }
+                const message = { ...sent, feedback: yield* feedback, id: randomUUID() }
                 const { outcome, updates } = yield* step(threadId, { type: "send", message })
 
                 return [outcome.type === "started" ? "started" : "queued", updates] as const

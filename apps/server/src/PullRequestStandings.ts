@@ -1,22 +1,15 @@
-import {
-  isGone,
-  type OpenReason,
-  openReasons,
-  type PullRequestRef,
-  subscriptionReasonOf,
-  type Thread,
-  type UpdatedPullRequest,
-} from "@glass/contracts"
+import { type EventKind, isGone, type PullRequestRef, type Thread } from "@glass/contracts"
 import { Array as Arr, Context, Effect, Layer, Option, Stream } from "effect"
-import { GitHubSource } from "./GitHubSource"
-import { changed } from "./Source"
+import { EventLog } from "./EventLog"
 import { Subscriptions } from "./Subscriptions"
 import { Threads } from "./Threads"
 import { Transcripts } from "./Transcripts"
+import { tells } from "./updateDelivery"
+import { changed, pendingOf } from "./Updates"
 
 export interface PullRequestStanding {
   readonly pullRequest: PullRequestRef
-  readonly reason: OpenReason
+  readonly kinds: ReadonlyArray<EventKind>
   readonly thread: Thread
   readonly state: "handling" | "tried"
 }
@@ -33,37 +26,27 @@ export class PullRequestStandings extends Context.Service<
       const threads = yield* Threads
       const subscriptions = yield* Subscriptions
       const transcripts = yield* Transcripts
-      const gitHub = yield* GitHubSource
+      const eventLog = yield* EventLog
 
       const standingsOf = Effect.fnUntraced(function* (
         thread: Thread,
-        running: ReadonlyArray<UpdatedPullRequest>,
+        beingTold: ReadonlySet<string>,
       ) {
-        const all = yield* gitHub.decisions(thread.id)
-
-        return all.flatMap(({ state: { subscription }, pullRequest, decision }) =>
-          openReasons.flatMap((reason): ReadonlyArray<PullRequestStanding> => {
-            const standing = decision.standing[reason]
-
-            if (standing === undefined) return []
-
-            const beingTold = running.some(
-              ({ subscriptionId, reasons }) =>
-                subscriptionId === subscription.id &&
-                reasons.some(({ _tag }) => subscriptionReasonOf[_tag] === reason),
-            )
-
-            return [
-              {
-                pullRequest,
-                reason,
-                thread,
-                state:
-                  standing === "due" || (standing === "told" && beingTold) ? "handling" : "tried",
-              },
-            ]
-          }),
+        const pending = yield* pendingOf(
+          eventLog,
+          yield* subscriptions.states(thread.id),
+          yield* transcripts.lastMessageTurn(thread.id),
         )
+
+        return pending.map((one): PullRequestStanding => ({
+          pullRequest: one.state.subject.pullRequest,
+          kinds: one.state.kinds,
+          thread,
+          state:
+            beingTold.has(one.state.id) || tells(one) || one.updatesInARow === 0
+              ? "handling"
+              : "tried",
+        }))
       })
 
       const standings = Effect.gen(function* () {
@@ -72,17 +55,18 @@ export class PullRequestStandings extends Context.Service<
           (): ReadonlyArray<Thread> => [],
         )
 
-        const running = yield* transcripts.runningUpdates
+        const beingTold = new Set(
+          (yield* transcripts.runningUpdates).flatMap(({ update }) =>
+            update.subscriptions.map(({ subscriptionId }) => subscriptionId),
+          ),
+        )
 
         return yield* Effect.forEach(yield* subscriptions.subscribedThreads, (threadId) => {
           const thread = listed.find(({ id }) => id === threadId)
 
           return thread === undefined || (thread.sandbox !== null && isGone(thread.sandbox.reach))
             ? Effect.succeed([])
-            : standingsOf(
-                thread,
-                running.flatMap((turn) => (turn.threadId === threadId ? turn.update.subjects : [])),
-              )
+            : standingsOf(thread, beingTold)
         }).pipe(Effect.map(Arr.flatten))
       }).pipe(
         Effect.catch((cause) =>
@@ -96,7 +80,7 @@ export class PullRequestStandings extends Context.Service<
         watch: () =>
           changed([
             subscriptions.changes,
-            ...gitHub.source.changes,
+            eventLog.changes,
             threads.watch(),
             threads.keptGoing,
             transcripts.running,

@@ -1,11 +1,11 @@
 import {
   type WorkOutcome,
   type BackgroundWork,
-  type PullRequestUpdateReason,
+  type Event,
   type Turn,
   type TurnEnd,
   type TurnPart,
-  type UpdatedPullRequest,
+  type UpdatedSubscription,
   referenceText,
 } from "@glass/contracts"
 import { cn } from "cn"
@@ -145,9 +145,10 @@ function StartedWorkUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
   )
 }
 
-const reasonText = (reason: PullRequestUpdateReason) =>
-  Match.valueTags(reason, {
-    FailingChecks: ({ checks }) => plural(checks.length, "check failed", "checks failed"),
+const eventText = (event: Event) =>
+  Match.valueTags(event, {
+    ChecksFailed: ({ checks }) => plural(checks.length, "check failed", "checks failed"),
+    ChecksPassed: () => "checks passed",
     ReviewFeedback: ({ reviewThreads }) =>
       plural(
         reviewThreads.length,
@@ -156,11 +157,12 @@ const reasonText = (reason: PullRequestUpdateReason) =>
       ),
     ChangesRequested: ({ reviewers }) => `${reviewers.join(", ")} requested changes`,
     MergeConflict: () => "a merge conflict",
-    Merged: () => "merged",
-    Closed: () => "closed",
+    MergeConflictCleared: () => "merge conflict cleared",
+    PullRequestMerged: () => "merged",
+    PullRequestClosed: () => "closed",
   })
 
-function PullRequestUpdateMessage(props: { pullRequests: ReadonlyArray<UpdatedPullRequest> }) {
+function UpdateMessage(props: { subscriptions: ReadonlyArray<UpdatedSubscription> }) {
   const id = useId()
 
   return (
@@ -173,9 +175,10 @@ function PullRequestUpdateMessage(props: { pullRequests: ReadonlyArray<UpdatedPu
           aria-labelledby={id}
           className="flex flex-col gap-1 self-end text-sm text-muted-foreground"
         >
-          {props.pullRequests.map(({ subscriptionId, pullRequest, reasons }) => (
+          {props.subscriptions.map(({ subscriptionId, subject, events }) => (
             <li key={subscriptionId}>
-              {referenceText(pullRequest)}: {reasons.map(reasonText).join(", ")}
+              {referenceText(subject.pullRequest)}:{" "}
+              {events.map(({ event }) => eventText(event)).join(", ")}
             </li>
           ))}
         </ul>
@@ -218,7 +221,7 @@ function TurnMessage(props: { turn: Turn }) {
     return <StartedWorkUpdateMessage work={turn.context.work} />
 
   if (Predicate.isTagged(turn.context, "Update"))
-    return <PullRequestUpdateMessage pullRequests={turn.context.subjects} />
+    return <UpdateMessage subscriptions={turn.context.subscriptions} />
 
   if (Predicate.isTagged(turn.context, "BackgroundWorkEnded")) return null
 

@@ -80,7 +80,7 @@ import {
   LatestPullRequestListings,
   PullRequestListings,
 } from "./pullRequestList"
-import { PullRequestUpdateNote } from "./pullRequestUpdate"
+import { PullRequestUpdateNote } from "./update"
 import { Queue, QueueAddition, QueueError, QueuedPullRequest } from "./queue"
 import { FileContents, GetFileContentsError, RepositoryFiles } from "./repository"
 import { ReviewDecision, SubmitReviewError } from "./review"

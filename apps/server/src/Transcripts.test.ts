@@ -36,20 +36,12 @@ it.live(
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
-      yield* transcripts.startOrQueue(
-        "agent-1",
-        { message: "Build it", images: [], context: null },
-        "user",
-      )
-      yield* transcripts.startOrQueue(
-        "agent-1",
-        {
-          message: "Then docs",
-          images: [],
-          context: null,
-        },
-        "user",
-      )
+      yield* transcripts.startOrQueue("agent-1", { message: "Build it", images: [], context: null })
+      yield* transcripts.startOrQueue("agent-1", {
+        message: "Then docs",
+        images: [],
+        context: null,
+      })
       const turnId = yield* transcripts.runningTurn("agent-1")
 
       yield* transcripts.endRunning(TurnStopped.make({}), ["agent-1"])
@@ -89,11 +81,7 @@ it.live("hands its harness only the Turns Glass started, not one the Thread star
         sentAt: at,
       }),
     ])
-    yield* transcripts.startOrQueue(
-      "agent-1",
-      { message: "Next", images: [], context: null },
-      "user",
-    )
+    yield* transcripts.startOrQueue("agent-1", { message: "Next", images: [], context: null })
     yield* transcripts.save("agent-1", [
       TurnEnded.make({ turnId: "woke", ended: { at, ending: TurnDone.make({}) } }),
     ])
@@ -112,11 +100,7 @@ it.live("hands its harness only the Turns Glass started, not one the Thread star
 it.live("writes nothing through a Turn another Thread owns", () =>
   Effect.gen(function* () {
     const transcripts = yield* Transcripts
-    yield* transcripts.startOrQueue(
-      "agent-1",
-      { message: "Build it", images: [], context: null },
-      "user",
-    )
+    yield* transcripts.startOrQueue("agent-1", { message: "Build it", images: [], context: null })
     const turnId = (yield* transcripts.runningTurn("agent-1")) ?? ""
     yield* transcripts.save("agent-1", [
       PartSet.make({ turnId, index: 0, part: TextPart.make({ text: "Mine" }) }),
@@ -168,11 +152,7 @@ it.effect("records a Turn as a unit of work when it ends", () =>
   Effect.gen(function* () {
     const lines: Array<typeof TurnUnit.Type> = []
     const transcripts = yield* Transcripts
-    yield* transcripts.startOrQueue(
-      "agent-1",
-      { message: "Build it", images: [], context: null },
-      "user",
-    )
+    yield* transcripts.startOrQueue("agent-1", { message: "Build it", images: [], context: null })
     const turnId = (yield* transcripts.runningTurn("agent-1")) ?? ""
 
     const toolCall = (index: number, status: "done" | "failed") =>
@@ -224,11 +204,7 @@ it.effect("records a cut-off Turn again when its real end arrives", () =>
   Effect.gen(function* () {
     const lines: Array<typeof TurnUnit.Type> = []
     const transcripts = yield* Transcripts
-    yield* transcripts.startOrQueue(
-      "agent-1",
-      { message: "Build it", images: [], context: null },
-      "user",
-    )
+    yield* transcripts.startOrQueue("agent-1", { message: "Build it", images: [], context: null })
     const turnId = (yield* transcripts.runningTurn("agent-1")) ?? ""
 
     yield* Effect.gen(function* () {

@@ -57,9 +57,7 @@ const MirroredPullRequest = Schema.Struct({
   ),
   checks: Checks,
   attention: Schema.NullOr(Attention),
-  details: Schema.NullOr(
-    Schema.Struct({ ...SubscribedDetails.fields, readAt: Schema.DateTimeUtcFromString }),
-  ),
+  details: Schema.NullOr(SubscribedDetails),
   viewerIsAuthor: Schema.Boolean,
   viewerHasDrafts: Schema.Boolean,
   viewerHasSubmittedReview: Schema.Boolean,
@@ -121,11 +119,6 @@ export const mirroredPullRequest = (mirror: Mirror, pullRequest: PullRequestRef)
   mirroredRepositoryOf(mirror, pullRequest)?.pullRequests.find(
     ({ ref }) => ref.number === pullRequest.number,
   )
-
-export const openPullRequestOf = (
-  mirror: Mirror,
-  { repository, branch }: { readonly repository: FollowedRepository; readonly branch: string },
-) => mirrorOf(mirror, repository)?.pullRequests.find((pr) => pr.headBranch === branch)
 
 const newestFirst = (pullRequests: ReadonlyArray<MirroredPullRequest>) =>
   Arr.sortWith(pullRequests, (pr) => pr.updatedAt, Order.flip(DateTime.Order))
@@ -319,7 +312,6 @@ export class PullRequestMirror extends Context.Service<
       const withLatestStatus = Effect.fnUntraced(function* (
         mirror: Mirror,
         shown: ReadonlyArray<MirroredPullRequest>,
-        now: DateTime.Utc,
       ) {
         const subscribed = yield* subscribedIn(mirror)
         const subscribedIds = new Set(subscribed.map((pr) => pr.id))
@@ -362,7 +354,15 @@ export class PullRequestMirror extends Context.Service<
 
                 const read = ofSubscribed.get(pr.id)
                 const latest = read?.attention ?? attention.get(pr.id)
-                const details = read === undefined ? pr.details : { ...read.details, readAt: now }
+
+                const details =
+                  read === undefined
+                    ? pr.details
+                    : {
+                        ...read.details,
+                        mergeConflict:
+                          read.details.mergeConflict ?? pr.details?.mergeConflict ?? null,
+                      }
 
                 return [
                   {
@@ -450,7 +450,7 @@ export class PullRequestMirror extends Context.Service<
           ),
         }
 
-        const { mirror, failures } = yield* withLatestStatus(synced, shown(synced), now)
+        const { mirror, failures } = yield* withLatestStatus(synced, shown(synced))
         yield* events.record("github", recorded(eventsBetween(previous, mirror)))
         yield* commit(mirror)
 

@@ -1,31 +1,12 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
-import {
-  type Subscription,
-  subscriptionReasonWords,
-  type ThreadPullRequest as OwnPullRequest,
-  referenceText,
-} from "@glass/contracts"
+import { eventKindWords, referenceText } from "@glass/contracts"
 import { Option } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { BellRing, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { endSubscriptionAtom, subscriptionsAtom } from "./threadsArea"
 
-const subjectLabel = (
-  { subject: { pullRequest } }: Subscription,
-  own: OwnPullRequest | undefined,
-) => {
-  if (pullRequest !== null) return referenceText(pullRequest)
-
-  return own === undefined
-    ? "This Thread's PR, once it has one"
-    : `This Thread's PR #${own.ref.number}`
-}
-
-export function ThreadSubscriptions(props: {
-  threadId: string
-  pullRequest: OwnPullRequest | undefined
-}) {
+export function ThreadSubscriptions(props: { threadId: string }) {
   const subscriptions = Option.getOrUndefined(
     AsyncResult.value(useAtomValue(subscriptionsAtom(props.threadId))),
   )
@@ -39,7 +20,7 @@ export function ThreadSubscriptions(props: {
       <div className="-mx-1 my-1 border-t" />
       <ul aria-label="Subscriptions">
         {subscriptions.map((subscription) => {
-          const label = subjectLabel(subscription, props.pullRequest)
+          const label = referenceText(subscription.subject.pullRequest)
 
           return (
             <li key={subscription.id} className="flex items-start gap-2 px-2 py-1 text-xs">
@@ -47,7 +28,7 @@ export function ThreadSubscriptions(props: {
               <div className="min-w-0 flex-1">
                 <div className="truncate">{label}</div>
                 <div className="text-muted-foreground">
-                  {subscription.reasons.map((reason) => subscriptionReasonWords[reason]).join(", ")}
+                  {subscription.kinds.map((kind) => eventKindWords[kind]).join(", ")}
                 </div>
               </div>
               <Button

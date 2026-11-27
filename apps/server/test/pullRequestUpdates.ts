@@ -1,7 +1,10 @@
 import {
-  defaultSubscriptionReasons,
+  defaultSubscriptionKinds,
   EventPage,
-  type SubscriptionReason,
+  type EventKind,
+  PullRequestRef,
+  PullRequestSubject,
+  SubscriptionSubject,
   type Turn,
 } from "@glass/contracts"
 import { Effect, Predicate, Schema } from "effect"
@@ -17,7 +20,6 @@ const decodePage = Schema.decodeUnknownSync(EventPage)
 
 interface EventFilter {
   readonly pullRequest?: { readonly owner: string; readonly repo: string; readonly number: number }
-  readonly threadId?: string
   readonly since?: string
 }
 
@@ -32,47 +34,42 @@ export const eventsTool = Effect.fnUntraced(function* ({
     ),
   )
 
-  const call = (filter: EventFilter = {}) =>
-    mcp.call("list_recent_events", { limit: 50, ...filter })
-
-  const page = (filter?: EventFilter) =>
-    call(filter).pipe(Effect.map((result) => decodePage(result.structuredContent)))
+  const page = (filter: EventFilter = {}) =>
+    mcp
+      .call("list_recent_events", { limit: 50, ...filter })
+      .pipe(Effect.map((result) => decodePage(result.structuredContent)))
 
   return {
-    call,
     page,
     events: (filter?: EventFilter) =>
       page(filter).pipe(Effect.map(({ events }) => events.map(({ event }) => event))),
   }
 })
 
+const encodeSubject = Schema.encodeSync(SubscriptionSubject)
+
+export const subscribeArguments = (
+  note: string,
+  { owner, repo, number }: Pick<FakePullRequest, "owner" | "repo" | "number">,
+  kinds: ReadonlyArray<EventKind> = defaultSubscriptionKinds,
+) => ({
+  subject: encodeSubject(
+    PullRequestSubject.make({ pullRequest: new PullRequestRef({ owner, repo, number }) }),
+  ),
+  note,
+  kinds,
+})
+
 export const subscribe = (
   note: string,
-  reasons: ReadonlyArray<SubscriptionReason> = defaultSubscriptionReasons,
-  pullRequest?: FakePullRequest,
-) =>
-  glassCall(
-    "subscribe_to_pull_request",
-    pullRequest === undefined
-      ? { note, reasons }
-      : {
-          note,
-          reasons,
-          pullRequest: {
-            owner: pullRequest.owner,
-            repo: pullRequest.repo,
-            number: pullRequest.number,
-          },
-        },
-  )
+  pullRequest: Pick<FakePullRequest, "owner" | "repo" | "number">,
+  kinds?: ReadonlyArray<EventKind>,
+) => glassCall("subscribe", subscribeArguments(note, pullRequest, kinds))
 
-export const subscribedThread = (
-  note = "Keep it green",
-  reasons?: ReadonlyArray<SubscriptionReason>,
-) =>
+export const subscribedThread = (note = "Keep it green", kinds?: ReadonlyArray<EventKind>) =>
   Effect.gen(function* () {
     const f = yield* threadWithPullRequest
-    yield* f.send(f.thread.id, subscribe(note, reasons))
+    yield* f.send(f.thread.id, subscribe(note, f.pullRequest, kinds))
     yield* f.transcript(f.thread.id, settled(2))
 
     return f
@@ -101,38 +98,29 @@ export const pass = (pullRequest: FakePullRequest) => {
   pullRequest.checkContexts = []
 }
 
-export const told = (turn: Turn | undefined) =>
-  Predicate.isTagged(turn?.context, "Update")
-    ? turn.context.subjects.map(({ pullRequest, own, note, reasons }) => ({
-        pullRequest: `${pullRequest.repo}#${pullRequest.number}`,
-        own,
-        note,
-        reasons,
-      }))
-    : undefined
-
-export const reasonsTold = (turn: Turn | undefined) =>
-  told(turn)?.map(({ pullRequest, reasons }) => [
-    pullRequest,
-    reasons.map(({ _tag }) => _tag).join(),
-  ])
-
-export const failedRuns = (turn: Turn | undefined) =>
-  told(turn)?.flatMap(({ reasons }) =>
-    reasons.flatMap((reason) =>
-      Predicate.isTagged(reason, "FailingChecks") ? reason.checks.map(({ url }) => url) : [],
-    ),
-  )
-
 export const rerun = (pullRequest: FakePullRequest) => {
   pullRequest.checks = "PENDING"
   pullRequest.checkContexts = [running("lint")]
 }
 
-export const pushAgain = (pullRequest: FakePullRequest) => {
-  pullRequest.checks = null
-  pullRequest.checkContexts = []
-}
+export const told = (turn: Turn | undefined) =>
+  Predicate.isTagged(turn?.context, "Update")
+    ? turn.context.subscriptions.map(({ subject: { pullRequest }, note, events }) => ({
+        pullRequest: `${pullRequest.repo}#${pullRequest.number}`,
+        note,
+        events: events.map(({ event }) => event),
+      }))
+    : undefined
+
+export const kindsTold = (turn: Turn | undefined) =>
+  told(turn)?.map(({ pullRequest, events }) => [pullRequest, events.map(({ _tag }) => _tag).join()])
+
+export const failedRuns = (turn: Turn | undefined) =>
+  told(turn)?.flatMap(({ events }) =>
+    events.flatMap((event) =>
+      Predicate.isTagged(event, "ChecksFailed") ? event.checks.map(({ url }) => url) : [],
+    ),
+  )
 
 export const failThreeTimes = Effect.fnUntraced(function* (
   f: Pick<Fixture, "client" | "transcript"> & {

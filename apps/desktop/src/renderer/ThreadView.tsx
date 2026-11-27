@@ -332,7 +332,7 @@ const OpenThread = memo(function OpenThread(props: { thread: Thread }) {
             branch: thread.branch ?? undefined,
             baseBranch: thread.baseBranch,
             pullRequest,
-            subscriptions: <ThreadSubscriptions threadId={thread.id} pullRequest={pullRequest} />,
+            subscriptions: <ThreadSubscriptions threadId={thread.id} />,
             skillPacks: thread.skillPacks,
             localSkills: thread.localSkills,
             actions: paneChoices.map(({ id, label, icon: Icon, open }) => (

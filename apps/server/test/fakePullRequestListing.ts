@@ -316,7 +316,6 @@ const endedBranchPullRequests = (
             isCrossRepository: pr.isCrossRepository,
             createdAt: pr.createdAt,
             mergedAt: pr.mergedAt,
-            closedAt: pr.closedAt,
           }))
 
         return [`lookup${index}`, { pullRequests: { nodes } }]

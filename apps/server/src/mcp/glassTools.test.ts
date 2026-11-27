@@ -6,6 +6,7 @@ import { type FakeGitHubRequest, startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
 import { connectMcp, listedTools, toolText } from "../../test/mcpClient"
+import { subscribeArguments } from "../../test/pullRequestUpdates"
 
 const startGlass = Effect.gen(function* () {
   const requests: Array<FakeGitHubRequest> = []
@@ -252,12 +253,15 @@ describe("Glass tools over MCP", () => {
             ),
           )
 
-        const result = yield* posing.call("subscribe_to_pull_request", { note: "Keep it green" })
+        const result = yield* posing.call(
+          "subscribe",
+          subscribeArguments("Keep it green", { owner: "octo-org", repo: "glass", number: 7 }),
+        )
 
         assert.deepStrictEqual(yield* offered(mcp), [])
         assert.deepStrictEqual(yield* offered(outsideAgent), [])
         assert.deepStrictEqual(yield* offered(posing), [
-          "subscribe_to_pull_request",
+          "subscribe",
           "list_subscriptions",
           "end_subscription",
         ])

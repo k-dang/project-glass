@@ -21,7 +21,7 @@ import {
   referenceKey,
   inboxGroupOf,
   inboxGroups,
-  type OpenReason,
+  type EventKind,
   type TriedThread,
   TurnFinished,
   WaitingRequests,
@@ -50,7 +50,7 @@ import {
   summaryOf,
 } from "./PullRequestMirror"
 import { type PullRequestStanding, PullRequestStandings } from "./PullRequestStandings"
-import { partitionFeedback } from "./pullRequestNow"
+import { heldBackFeedback } from "./gitHubEvents"
 import { Queue } from "./Queue"
 import type { WaitingRequest } from "./Transcripts"
 
@@ -159,10 +159,10 @@ const reasonsOf = ({
   return reasons
 }
 
-const openReasonOf: Partial<Record<PullRequestReason["_tag"], OpenReason>> = {
-  ChangesRequested: "changes-requested",
-  ChecksFailing: "failing-checks",
-  AwaitingReply: "review-feedback",
+const kindOf: Partial<Record<PullRequestReason["_tag"], EventKind>> = {
+  ChangesRequested: "ChangesRequested",
+  ChecksFailing: "ChecksFailed",
+  AwaitingReply: "ReviewFeedback",
 }
 
 const heldBackOf = (
@@ -171,7 +171,7 @@ const heldBackOf = (
 ): ReadonlyArray<PullRequestReason> => {
   if (details === null) return []
 
-  const { changesRequested, reviewThreads } = partitionFeedback(details).heldBack
+  const { changesRequested, reviewThreads } = heldBackFeedback(details)
 
   if (Predicate.isTagged(reason, "ChangesRequested"))
     return changesRequested.length > 0 ? [reason] : []
@@ -183,7 +183,8 @@ const heldBackOf = (
 
 const leftToYou = (pr: MirroredPullRequest, standings: ReadonlyArray<PullRequestStanding>) => {
   const left = reasonsOf(pr).map((reason) => {
-    const standing = standings.filter((candidate) => candidate.reason === openReasonOf[reason._tag])
+    const kind = kindOf[reason._tag]
+    const standing = standings.filter(({ kinds }) => kind !== undefined && kinds.includes(kind))
 
     return standing.some(({ state }) => state === "handling")
       ? { reasons: heldBackOf(reason, pr), triedBy: [] }

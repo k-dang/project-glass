@@ -63,7 +63,6 @@ import { AgentRunners } from "./agentRunners"
 import { BranchNames } from "./BranchNames"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
-import { Sources } from "./Source"
 import { StartedWorkUpdates } from "./StartedWorkUpdates"
 import { Subscriptions } from "./Subscriptions"
 import { Updates } from "./Updates"
@@ -125,13 +124,6 @@ const ThreadsLive = followReattachedHost.pipe(
   Layer.provideMerge(LocalCheckouts.layer),
 )
 
-const SourcesLive = Layer.effect(
-  Sources,
-  Effect.gen(function* () {
-    return [(yield* GitHubSource).source]
-  }),
-)
-
 type McpToolsLayer = Layer.Layer<never, never, Layer.Services<typeof GlassMcpTools>>
 
 type AgentCommandsLayer = Layer.Layer<AgentCommands, never, SettingsStore>
@@ -146,7 +138,6 @@ const services = (
       Layer.provide(
         Inbox.layer.pipe(
           Layer.provide(PullRequestStandings.layer),
-          Layer.provideMerge(SourcesLive),
           Layer.provideMerge(GitHubSource.layer),
           Layer.provideMerge(Subscriptions.layer),
         ),
