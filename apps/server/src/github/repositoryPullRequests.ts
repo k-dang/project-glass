@@ -284,6 +284,9 @@ const awaitsReply = ({
 }: (typeof AttentionNode.Type)["reviewThreads"]["nodes"][number]) =>
   !isResolved && comments.nodes.at(-1)?.viewerDidAuthor === false
 
+const mergeConflictOf = ({ mergeable }: typeof AttentionNode.Type) =>
+  mergeable === "UNKNOWN" ? null : mergeable === "CONFLICTING"
+
 const attentionOf = (node: typeof AttentionNode.Type): Attention => {
   const states = node.latestOpinionatedReviews.nodes.map(({ state }) => state)
 
@@ -291,7 +294,7 @@ const attentionOf = (node: typeof AttentionNode.Type): Attention => {
     changesRequested: states.includes("CHANGES_REQUESTED"),
     approved: states.includes("APPROVED"),
     mergeClean: cleanMergeStates.has(node.mergeStateStatus),
-    mergeConflict: node.mergeable === "UNKNOWN" ? null : node.mergeable === "CONFLICTING",
+    mergeConflict: mergeConflictOf(node),
     awaitingReply: node.reviewThreads.nodes.filter(awaitsReply).length,
     failingChecks: checksOfCommits(node.commits).filter((check) => check.state === "failed"),
   }
@@ -369,6 +372,7 @@ const authorFields = { author: Schema.String, hasWriteAccess: Schema.Boolean }
 export const SubscribedDetails = Schema.Struct({
   head: Schema.String,
   base: Schema.String,
+  mergeConflict: Schema.NullOr(Schema.Boolean),
   reviewThreads: Schema.Array(
     Schema.Struct({
       id: Schema.String,
@@ -418,6 +422,7 @@ export const toSubscribedPullRequests = (
                 details: {
                   head: node.headRefOid,
                   base: node.baseRefOid,
+                  mergeConflict: mergeConflictOf(node),
                   reviewThreads: node.reviewThreads.nodes.filter(awaitsReply).map((thread) => ({
                     id: thread.id,
                     path: thread.path,

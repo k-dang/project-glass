@@ -353,60 +353,90 @@ it.live("ends a Subscription the user ends from the Thread", () =>
   }),
 )
 
+const storeInAUsersTurn = Effect.gen(function* () {
+  const context = yield* Layer.build(
+    Subscriptions.layer.pipe(
+      Layer.provideMerge(Transcripts.layer),
+      Layer.provideMerge(
+        SqliteMigrator.layer({ loader: migrationLoader }).pipe(
+          Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
+        ),
+      ),
+    ),
+  )
+
+  const sql = Context.get(context, SqlClient.SqlClient)
+
+  yield* sql`INSERT INTO thread ${sql.insert({
+    id: "thread",
+    name: "thread",
+    owner: "glass-demo",
+    repo: "greeter",
+    base_branch: "main",
+    harness: "pi",
+    folder: "thread",
+    created_at: "2026-11-20T00:00:00.000Z",
+  })}`
+
+  yield* Context.get(context, Transcripts).startOrQueue(
+    "thread",
+    { message: "Look after the PR", images: [], context: null },
+    "user",
+  )
+
+  return {
+    subscriptions: Context.get(context, Subscriptions),
+    usersTurn: yield* Context.get(context, Transcripts).runningTurn("thread"),
+  }
+})
+
+const ownPullRequest = {
+  source: "github" as const,
+  subject: Effect.succeed(PullRequestSubject.make({ pullRequest: null })),
+  reasons: ["failing-checks" as const],
+  note: "Keep it green",
+}
+
 it.effect(
   "refuses a Subscription asked for by a Turn Glass has no record of yet, though the user's Turn still shows as running",
   () =>
     Effect.gen(function* () {
-      const context = yield* Layer.build(
-        Subscriptions.layer.pipe(
-          Layer.provideMerge(Transcripts.layer),
-          Layer.provideMerge(
-            SqliteMigrator.layer({ loader: migrationLoader }).pipe(
-              Layer.provideMerge(SqliteClient.layer({ filename: ":memory:" })),
-            ),
-          ),
-        ),
-      )
-
-      const sql = Context.get(context, SqlClient.SqlClient)
-
-      yield* sql`INSERT INTO thread ${sql.insert({
-        id: "thread",
-        name: "thread",
-        owner: "glass-demo",
-        repo: "greeter",
-        base_branch: "main",
-        harness: "pi",
-        folder: "thread",
-        created_at: "2026-11-20T00:00:00.000Z",
-      })}`
-
-      yield* Context.get(context, Transcripts).startOrQueue(
-        "thread",
-        { message: "Look after the PR", images: [], context: null },
-        "user",
-      )
-
-      const usersTurn = yield* Context.get(context, Transcripts).runningTurn("thread")
-
-      const subscriptions = Context.get(context, Subscriptions)
-
-      const asked = {
-        source: "github" as const,
-        subject: Effect.succeed(PullRequestSubject.make({ pullRequest: null })),
-        reasons: ["failing-checks" as const],
-        note: "Keep it green",
-      }
+      const { subscriptions, usersTurn } = yield* storeInAUsersTurn
 
       const unheardOf = yield* subscriptions
-        .subscribe("thread", "a-turn-the-journal-has-not-brought", asked)
+        .subscribe("thread", "a-turn-the-journal-has-not-brought", ownPullRequest)
         .pipe(Effect.flip)
 
-      const betweenTurns = yield* subscriptions.subscribe("thread", null, asked).pipe(Effect.flip)
-      const onTheUsersWord = yield* subscriptions.subscribe("thread", usersTurn, asked)
+      const betweenTurns = yield* subscriptions
+        .subscribe("thread", null, ownPullRequest)
+        .pipe(Effect.flip)
+
+      const onTheUsersWord = yield* subscriptions.subscribe("thread", usersTurn, ownPullRequest)
 
       assert.include(unheardOf.message, "Glass has no record of the Turn asking")
       assert.include(betweenTurns.message, "Glass has no record of the Turn asking")
       assert.strictEqual(onTheUsersWord.note, "Keep it green")
     }),
+)
+
+it.effect("refuses to record what a Subscription was told once the user has ended it", () =>
+  Effect.gen(function* () {
+    const { subscriptions, usersTurn } = yield* storeInAUsersTurn
+    const { id } = yield* subscriptions.subscribe("thread", usersTurn, ownPullRequest)
+
+    const told = [
+      {
+        subscriptionId: id,
+        subject: "glass-demo/greeter#7",
+        told: { "failing-checks": { seen: ["lint"], updates: 1 } },
+        ends: false,
+      },
+    ]
+
+    yield* subscriptions.recordTold(told, null)
+    yield* subscriptions.end("thread", id)
+    const refused = yield* subscriptions.recordTold(told, null).pipe(Effect.flip)
+
+    assert.strictEqual(refused.message, "A Subscription ended before it was told.")
+  }),
 )

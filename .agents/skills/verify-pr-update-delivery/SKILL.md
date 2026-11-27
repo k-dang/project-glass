@@ -32,7 +32,7 @@ Synced with the code at commit `54d4a0a3280722e755027556afcd53de2450cef2`. Befor
 
 | Model | Code |
 | --- | --- |
-| `ChecksFail`, `ChecksRunAgain`, `NewPushHasNoChecksYet`, `ChecksPass` | What a read of the PR mirror shows: `subscribedNow` in `apps/server/src/GitHubSource.ts`, which gives the sender nothing for a repository not read since Glass started |
+| `ChecksFail`, `ChecksRunAgain`, `NewPushHasNoChecksYet`, `ChecksPass` | What a read of the PR mirror shows: `subscribedNow` in `apps/server/src/GitHubSource.ts`, which gives the sender nothing until one refresh since Glass started has read both the PR's repository and the PR's details |
 | `Decide` | One `threads.whenIdle` transaction in `sendUpdate` in `apps/server/src/Updates.ts`, which asks each Source what holds, decides in `sourceOf` in `apps/server/src/Source.ts`, and plans what to record in `toRecord`; `whenIdle` in `apps/server/src/ThreadTurns.ts`; `idle` in `apps/server/src/Transcripts.ts` |
 | `IsNew`, `DecideNothingHolds`, `Count(t) < GivesUpAfter` | `decide` in `apps/server/src/updateDecision.ts` and `failingChecks` in `apps/server/src/pullRequestNow.ts` (`cleared` returns the count to zero; `unsettled` keeps it, both while checks run again and while a new push has none yet) |
 | `SlotFree` | `runningUpdates` in `Transcripts.ts`, counted in `sendUpdate` in `Updates.ts` against `RUN_AT_ONCE` |

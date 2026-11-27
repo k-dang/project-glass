@@ -20,7 +20,6 @@ export type EndedState = PullRequestEnding["state"]
 interface Open {
   readonly checks: Checks
   readonly failingChecks: ReadonlyArray<Check>
-  readonly mergeConflict: boolean | null
   readonly details: SubscribedDetails
 }
 
@@ -99,13 +98,10 @@ const changesRequested = ({ details }: Open): Stands => {
     : { state: "cleared" }
 }
 
-const mergeConflict = (
-  { mergeConflict: conflict, details }: Open,
-  seen: ReadonlyArray<string>,
-): Stands => {
-  if (conflict === null) return { state: "unsettled", seen }
+const mergeConflict = ({ details }: Open, seen: ReadonlyArray<string>): Stands => {
+  if (details.mergeConflict === null) return { state: "unsettled", seen }
 
-  return conflict
+  return details.mergeConflict
     ? {
         state: "holds",
         seen: [details.base],

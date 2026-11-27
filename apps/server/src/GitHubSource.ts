@@ -58,24 +58,29 @@ const subscribedNow = (
 
   if (mirror === undefined || pullRequest === undefined) return undefined
 
-  const readAt = mirroredRepositoryOf(mirror, pullRequest)?.syncedAt
-
-  if (readSince !== undefined && (readAt === undefined || DateTime.isLessThan(readAt, readSince)))
-    return undefined
-
   const mirrored = mirroredPullRequest(mirror, pullRequest)
 
-  return mirrored?.attention == null || mirrored.details === null
-    ? undefined
-    : {
-        pullRequest: mirrored.ref,
-        now: openNow({
-          checks: mirrored.checks,
-          failingChecks: mirrored.attention.failingChecks,
-          mergeConflict: mirrored.attention.mergeConflict,
-          details: mirrored.details,
-        }),
-      }
+  if (mirrored?.attention == null || mirrored.details === null) return undefined
+
+  const { readAt } = mirrored.details
+  const listedAt = mirroredRepositoryOf(mirror, pullRequest)?.syncedAt
+
+  if (
+    readSince !== undefined &&
+    (listedAt === undefined ||
+      !DateTime.Equivalence(listedAt, readAt) ||
+      DateTime.isLessThan(readAt, readSince))
+  )
+    return undefined
+
+  return {
+    pullRequest: mirrored.ref,
+    now: openNow({
+      checks: mirrored.checks,
+      failingChecks: mirrored.attention.failingChecks,
+      details: mirrored.details,
+    }),
+  }
 }
 
 const refuse = (message: string) => Effect.fail(new ThreadError({ message }))

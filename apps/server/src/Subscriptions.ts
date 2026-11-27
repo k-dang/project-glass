@@ -238,19 +238,24 @@ export class Subscriptions extends Context.Service<
           ),
         endAbout,
         recordTold: (told, lastMessageTurn) =>
-          Effect.forEach(
-            told,
-            ({ subscriptionId, subject, told: state, ends }) =>
-              ends
-                ? sql`DELETE FROM subscription WHERE id = ${subscriptionId}`
-                : sql`
-                    UPDATE subscription
-                    SET last_told = ${encodeTold({ subject, told: state, afterMessage: lastMessageTurn })}
-                    WHERE id = ${subscriptionId}
-                  `,
-            { discard: true },
+          Effect.forEach(told, ({ subscriptionId, subject, told: state, ends }) =>
+            ends
+              ? sql`DELETE FROM subscription WHERE id = ${subscriptionId} RETURNING id`
+              : sql`
+                  UPDATE subscription
+                  SET last_told = ${encodeTold({ subject, told: state, afterMessage: lastMessageTurn })}
+                  WHERE id = ${subscriptionId}
+                  RETURNING id
+                `,
           ).pipe(
             Effect.catch(storageFailure),
+            Effect.flatMap((recorded) =>
+              recorded.every((rows) => rows.length > 0)
+                ? Effect.void
+                : Effect.fail(
+                    new ThreadError({ message: "A Subscription ended before it was told." }),
+                  ),
+            ),
             Effect.andThen(told.length > 0 ? wrote : Effect.void),
           ),
       })

@@ -57,7 +57,9 @@ const MirroredPullRequest = Schema.Struct({
   ),
   checks: Checks,
   attention: Schema.NullOr(Attention),
-  details: Schema.NullOr(SubscribedDetails),
+  details: Schema.NullOr(
+    Schema.Struct({ ...SubscribedDetails.fields, readAt: Schema.DateTimeUtcFromString }),
+  ),
   viewerIsAuthor: Schema.Boolean,
   viewerHasDrafts: Schema.Boolean,
   viewerHasSubmittedReview: Schema.Boolean,
@@ -317,6 +319,7 @@ export class PullRequestMirror extends Context.Service<
       const withLatestStatus = Effect.fnUntraced(function* (
         mirror: Mirror,
         shown: ReadonlyArray<MirroredPullRequest>,
+        now: DateTime.Utc,
       ) {
         const subscribed = yield* subscribedIn(mirror)
         const subscribedIds = new Set(subscribed.map((pr) => pr.id))
@@ -357,7 +360,9 @@ export class PullRequestMirror extends Context.Service<
 
                 if (observed?.isOpen === false) return []
 
-                const latest = ofSubscribed.get(pr.id)?.attention ?? attention.get(pr.id)
+                const read = ofSubscribed.get(pr.id)
+                const latest = read?.attention ?? attention.get(pr.id)
+                const details = read === undefined ? pr.details : { ...read.details, readAt: now }
 
                 return [
                   {
@@ -372,9 +377,7 @@ export class PullRequestMirror extends Context.Service<
                             mergeConflict:
                               latest.mergeConflict ?? pr.attention?.mergeConflict ?? null,
                           },
-                    details: subscribedIds.has(pr.id)
-                      ? (ofSubscribed.get(pr.id)?.details ?? pr.details)
-                      : null,
+                    details: subscribedIds.has(pr.id) ? details : null,
                   },
                 ]
               }),
@@ -447,7 +450,7 @@ export class PullRequestMirror extends Context.Service<
           ),
         }
 
-        const { mirror, failures } = yield* withLatestStatus(synced, shown(synced))
+        const { mirror, failures } = yield* withLatestStatus(synced, shown(synced), now)
         yield* events.record("github", recorded(eventsBetween(previous, mirror)))
         yield* commit(mirror)
 

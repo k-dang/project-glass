@@ -293,6 +293,30 @@ it.live(
     }),
 )
 
+it.live("says nothing of a conflict GitHub hasn't checked against a new base", () =>
+  Effect.gen(function* () {
+    const f = yield* subscribedThread()
+    f.pullRequest.mergeable = "CONFLICTING"
+    yield* f.client.ListPullRequests()
+    yield* f.transcript(f.thread.id, settled(3))
+
+    f.pullRequest.mergeable = "UNKNOWN"
+    f.pullRequest.push({ base: { sha: "b1", files: {} } })
+    yield* f.client.ListPullRequests()
+    f.pullRequest.mergeable = "MERGEABLE"
+    yield* f.client.ListPullRequests()
+    yield* f.send(f.thread.id, "Carry on")
+    const turns = yield* f.transcript(f.thread.id, lastSettled("Carry on"))
+
+    assert.deepStrictEqual(turns.map(reasonsTold), [
+      undefined,
+      undefined,
+      [["greeter#7", "MergeConflict"]],
+      undefined,
+    ])
+  }),
+)
+
 it.live(
   "waits until the Thread is idle, lets a Queued message go first, and never steers the running Turn",
   () =>
