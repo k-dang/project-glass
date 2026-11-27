@@ -15,6 +15,7 @@ import {
   GitPullRequest,
   History,
   Inbox,
+  ListOrdered,
   ListTodo,
   LoaderCircle,
   type LucideIcon,
@@ -114,6 +115,9 @@ export function AppShell() {
 
   const toggleChatting = () => setChatting((open) => !open)
 
+  const viewQueue = () =>
+    void navigate({ to: "/reviews", search: { ...registry.get(listSearchAtom), list: "queue" } })
+
   useActions([
     ...areas.map(({ label, icon, link }, index): Action => ({
       id: `go-to-${label}`,
@@ -123,6 +127,14 @@ export function AppShell() {
       shortcut: { key: `${index + 1}`, mod: true, allowInEditable: true },
       run: () => void navigate(link),
     })),
+    {
+      id: "go-to-queue",
+      title: "Queue",
+      group: "Go to",
+      icon: ListOrdered,
+      keywords: ["reviews"],
+      run: viewQueue,
+    },
     {
       id: "new-thread",
       title: "New Thread",
@@ -160,12 +172,7 @@ export function AppShell() {
           void navigate({ to: "/threads/$threadId", params: { threadId } })
         }
         onStartThread={startThread}
-        onViewQueue={() =>
-          void navigate({
-            to: "/reviews",
-            search: { ...registry.get(listSearchAtom), list: "queue" },
-          })
-        }
+        onViewQueue={viewQueue}
       />
       <DiscardDialog />
       <ShortcutsDialog />
