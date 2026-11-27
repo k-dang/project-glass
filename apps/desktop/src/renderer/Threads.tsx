@@ -23,6 +23,7 @@ import {
   CircleHelp,
   FolderGit2,
   GitBranch,
+  LoaderCircle,
   type LucideIcon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -384,18 +385,23 @@ function SettledSection(props: { threads: ReadonlyArray<Thread>; now: Date }) {
             />
           </CollapsibleTrigger>
         </h2>
-        <TooltipHint content="Remove all">
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            aria-label="Remove Settled Threads"
-            disabled={removing}
-            onClick={() => setConfirming(true)}
-            className="opacity-0 group-hover/settled:opacity-100 focus-visible:opacity-100"
-          >
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          aria-label={removing ? "Removing Settled Threads" : "Remove Settled Threads"}
+          disabled={removing}
+          onClick={() => setConfirming(true)}
+          className={cn(
+            "group-hover/settled:opacity-100 focus-visible:opacity-100",
+            removing ? "disabled:opacity-100" : "opacity-0",
+          )}
+        >
+          {removing ? (
+            <LoaderCircle aria-hidden className="animate-spin motion-reduce:animate-none" />
+          ) : (
             <Trash2 aria-hidden />
-          </Button>
-        </TooltipHint>
+          )}
+        </Button>
       </div>
       <CollapsibleContent>
         <ThreadRows threads={props.threads} now={props.now} settled />

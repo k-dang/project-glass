@@ -325,6 +325,35 @@ it("removes every Settled Thread without uncommitted changes at once", async () 
   await user.click(within(dialog).getByRole("button", { name: "Remove Threads" }))
 
   await waitFor(() => expect(removed).toEqual([clean.id]))
+  await screen.findByText("Removed 1 Settled Thread, kept 1")
+})
+
+it("shows Settled Threads being removed until they're gone", async () => {
+  const release = Deferred.makeUnsafe<void>()
+
+  const user = mount(
+    {
+      WatchThreads: () => Stream.make([thread]),
+      WatchSettledThreads: () => Stream.make([thread.id]),
+      GetRemovalWarnings: () => Effect.succeed(new RemovalWarnings({ uncommittedChanges: "none" })),
+      RemoveThread: () => Deferred.await(release),
+    },
+    "/threads",
+  )
+
+  await user.click(await screen.findByRole("button", { name: "Remove Settled Threads" }))
+  await user.click(
+    within(await screen.findByRole("alertdialog")).getByRole("button", { name: "Remove Threads" }),
+  )
+
+  expect(
+    (await screen.findByRole<HTMLButtonElement>("button", { name: "Removing Settled Threads" }))
+      .disabled,
+  ).toBe(true)
+
+  await Effect.runPromise(Deferred.succeed(release, undefined))
+
+  await screen.findByText("Removed 1 Settled Thread")
 })
 
 it("says in the Threads panel how a Turn that finished unseen ended", async () => {

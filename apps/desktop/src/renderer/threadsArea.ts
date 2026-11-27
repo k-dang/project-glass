@@ -478,33 +478,51 @@ export const removeThread = async (registry: AtomRegistry.AtomRegistry, thread: 
       title: `Couldn't remove ${thread.name}`,
       description: problemOf(exit.cause).detail,
     })
+
+  return Exit.isSuccess(exit)
 }
+
+const settledThreads = (count: number) =>
+  count === 1 ? "1 Settled Thread" : `${count} Settled Threads`
 
 export const removeSettledThreads = async (
   registry: AtomRegistry.AtomRegistry,
   settled: ReadonlyArray<Thread>,
   beforeRemoving: (thread: Thread) => void,
 ) => {
-  let kept = 0
+  const checked = await Promise.all(
+    settled.map(async (thread) => {
+      const warnings = await backendRuntimeOf(registry).runPromiseExit(
+        Backend.use((backend) => backend.GetRemovalWarnings({ threadId: thread.id })),
+      )
 
-  for (const thread of settled) {
-    const warnings = await backendRuntimeOf(registry).runPromiseExit(
-      Backend.use((backend) => backend.GetRemovalWarnings({ threadId: thread.id })),
-    )
+      return {
+        thread,
+        clean: Exit.isSuccess(warnings) && warnings.value.uncommittedChanges === "none",
+      }
+    }),
+  )
 
-    if (Exit.isSuccess(warnings) && warnings.value.uncommittedChanges === "none") {
-      beforeRemoving(thread)
-      await removeThread(registry, thread)
-    } else kept++
+  let removed = 0
+
+  for (const { thread, clean } of checked) {
+    if (!clean) continue
+
+    beforeRemoving(thread)
+
+    if (await removeThread(registry, thread)) removed++
   }
+
+  const kept = checked.filter(({ clean }) => !clean).length
 
   if (kept > 0)
     toast.add({
       type: "info",
-      title: kept === 1 ? "Kept 1 Settled Thread" : `Kept ${kept} Settled Threads`,
+      title: `Removed ${settledThreads(removed)}, kept ${kept}`,
       description:
-        "They have uncommitted changes, or Glass couldn't check. Remove each one to see what it discards.",
+        "The kept ones have uncommitted changes, or Glass couldn't check. Remove each one to see what it discards.",
     })
+  else if (removed > 0) toast.add({ type: "success", title: `Removed ${settledThreads(removed)}` })
 }
 
 const groupOrder: ReadonlyArray<PlaceTag> = ["local", "sandbox"]
