@@ -28,6 +28,8 @@ Expect `Result: ok`: every rule holds and every mutant is caught. A run takes ab
 
 ## Coverage
 
+Synced with the code at commit `d9e1af6b`. Before you trust a result, run `git diff d9e1af6b -- <files below>`. If a covered function changed, compare it with its actions first.
+
 | Model | Code |
 | --- | --- |
 | `RecordEvent` | `EventLog.record` in `apps/server/src/EventLog.ts`, fed by `eventsBetween` in `apps/server/src/gitHubEvents.ts` and the ended lookups in `apps/server/src/GitHubSource.ts` |
@@ -49,6 +51,7 @@ Each mutant in `model/mutants.json` is one way to break this code: skipping the 
 1. Find the actions for each covered function you changed, and make them do what the code now does. One SQL transaction in the code is one action in the model.
 2. Run the command. A rule that newly breaks is either a bug in the change or a model that no longer matches the code. Replay the path in the code. If the code can't take a step, fix the model. If it can, report the path in the code's words. Don't weaken a rule to make it pass.
 3. When you find a bug the code ships with, record it in `model/findings.json` and in a Finding section here. When it is fixed, the runner prints `NOW HOLDS`: remove it from both, and add a mutant to `model/mutants.json` that brings the bug back, so the rule is still shown to fail.
+4. When the model matches the code, move the sync commit above to the commit you checked.
 
 ## Scope
 
