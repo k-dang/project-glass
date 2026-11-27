@@ -943,6 +943,7 @@ describe("Watching", () => {
         headBranch: null,
         checks: "passing",
         attention: null,
+        details: null,
         viewerIsAuthor: true,
         viewerHasDrafts: false,
         viewerHasSubmittedReview: false,

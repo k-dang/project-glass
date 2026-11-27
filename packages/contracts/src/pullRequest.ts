@@ -17,6 +17,9 @@ export class PullRequestRef extends Schema.Class<PullRequestRef>("PullRequestRef
 export const referenceKey = ({ owner, repo, number }: PullRequestRef) =>
   `${owner.toLowerCase()}/${repo.toLowerCase()}#${number}`
 
+export const referenceText = ({ owner, repo, number }: PullRequestRef) =>
+  `${owner}/${repo}#${number}`
+
 export const PullRequestState = Schema.Literals(["draft", "open", "closed", "merged"])
 
 export type PullRequestState = typeof PullRequestState.Type

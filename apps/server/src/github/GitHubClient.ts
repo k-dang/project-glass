@@ -97,11 +97,14 @@ import {
   REVIEW_REQUESTS_QUERY,
   type ReviewRequestsPage,
   SEARCH_PULL_REQUESTS_QUERY,
+  SUBSCRIBED_PULL_REQUESTS_QUERY,
+  type SubscribedPullRequest,
   updatedSinceSearch,
   toAttention,
   toCandidatesPage,
   toObservations,
   toReviewRequestsPage,
+  toSubscribedPullRequests,
 } from "./repositoryPullRequests"
 import { HEAD_MOVED, mergeOperation } from "./merging"
 import { toPullRequestStatus } from "./pullRequestStatus"
@@ -141,6 +144,7 @@ import {
   SearchPullRequestsResponse,
   PullRequestAttentionResponse,
   PullRequestObservationsResponse,
+  SubscribedPullRequestsResponse,
   ReviewRequestsResponse,
   AddDraftResponse,
   DraftStateResponse,
@@ -201,6 +205,8 @@ const foundRepository = <A>({ repository }: { readonly repository: A | null }) =
 const OBSERVATIONS_BATCH_SIZE = 100
 
 const ATTENTION_BATCH_SIZE = 50
+
+const SUBSCRIBED_BATCH_SIZE = 10
 
 class CommentGone extends Data.TaggedError("CommentGone") {}
 
@@ -309,6 +315,9 @@ export class GitHubClient extends Context.Service<
     readonly pullRequestAttention: (
       pullRequestIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyMap<string, Attention>, ConnectionError>
+    readonly subscribedPullRequests: (
+      pullRequestIds: ReadonlyArray<string>,
+    ) => Effect.Effect<ReadonlyMap<string, SubscribedPullRequest>, ConnectionError>
     readonly queuedPullRequests: (
       refs: ReadonlyArray<PullRequestRef>,
     ) => Effect.Effect<ReadonlyArray<LookedUpPullRequest | null>, ConnectionError>
@@ -948,6 +957,20 @@ export class GitHubClient extends Context.Service<
           ),
       )
 
+      const subscribedPullRequests = Effect.fn("GitHubClient.subscribedPullRequests")(
+        (pullRequestIds: ReadonlyArray<string>) =>
+          nodesById(
+            {
+              name: "SubscribedPullRequests",
+              query: SUBSCRIBED_PULL_REQUESTS_QUERY,
+              response: SubscribedPullRequestsResponse,
+              batchSize: SUBSCRIBED_BATCH_SIZE,
+              decode: toSubscribedPullRequests,
+            },
+            pullRequestIds,
+          ),
+      )
+
       const aliasedBatches = Effect.fnUntraced(function* <I, S extends Schema.Top, A>(
         lookup: AliasedLookup<I, S, A>,
         items: ReadonlyArray<I>,
@@ -1408,6 +1431,7 @@ export class GitHubClient extends Context.Service<
         pullRequestsUpdatedSince,
         pullRequestObservations,
         pullRequestAttention,
+        subscribedPullRequests,
         queuedPullRequests,
         endedBranchPullRequests,
         reviewRequests,

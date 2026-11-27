@@ -28,6 +28,9 @@ import visualizations from "./migrations/0026_visualizations"
 import dropFeedbackNoteStaged from "./migrations/0027_drop_feedback_note_staged"
 import agentReviewSession from "./migrations/0028_agent_review_session"
 import agentReviewTurns from "./migrations/0030_agent_review_turns"
+import events from "./migrations/0031_events"
+import subscriptions from "./migrations/0032_subscriptions"
+import unpromptedTurns from "./migrations/0033_unprompted_turns"
 
 const migrations = {
   "0001_baseline": baseline,
@@ -59,6 +62,9 @@ const migrations = {
   "0027_drop_feedback_note_staged": dropFeedbackNoteStaged,
   "0028_agent_review_session": agentReviewSession,
   "0030_agent_review_turns": agentReviewTurns,
+  "0031_events": events,
+  "0032_subscriptions": subscriptions,
+  "0033_unprompted_turns": unpromptedTurns,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

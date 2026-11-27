@@ -10,9 +10,11 @@ import {
 import { HttpApiBuilder, HttpApiSecurity } from "effect/http-api"
 import { OutsideAgents } from "../OutsideAgents"
 import { AskProgress } from "./AskProgress"
+import { EventToolHandlers, EventTools } from "./eventTools"
 import { GlassToolHandlers, GlassTools } from "./glassTools"
 import { GlassToolRelay } from "./GlassToolRelay"
 import { BrowserMcpTools } from "./browserTools"
+import { SubscriptionToolHandlers, SubscriptionTools } from "./subscriptionTools"
 import { VisualizationToolHandlers, VisualizationTools } from "./visualizationTools"
 import { McpCaller, McpCredentials, OutsideAgentCaller } from "./McpCredentials"
 import { claimOpenedSession, glassMcpHttp, MCP_PATH, ownsSession, SESSION_HEADER } from "./mcpHttp"
@@ -146,8 +148,12 @@ export const GlassMcpTools = Layer.effectDiscard(
   }),
 ).pipe(
   Layer.provide(BrowserMcpTools),
+  Layer.provide(McpServer.toolkit(SubscriptionTools)),
+  Layer.provide(SubscriptionToolHandlers),
   Layer.provide(McpServer.toolkit(VisualizationTools)),
   Layer.provide(VisualizationToolHandlers),
+  Layer.provide(McpServer.toolkit(EventTools)),
+  Layer.provide(EventToolHandlers),
   Layer.provide(McpServer.toolkit(GlassTools)),
   Layer.provide(GlassToolHandlers),
 )

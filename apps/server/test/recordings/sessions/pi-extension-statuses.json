@@ -24,7 +24,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "3b76c2ae-08ab-4e72-ae98-01e1090936d4",
+            "id": "ab0daa6e-9135-4fdc-9626-1514a38044ab",
             "method": "setStatus",
             "statusKey": "mode",
             "statusText": "\u001b[33mPlan mode\u001b[39m"
@@ -59,7 +59,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-45-550Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-46-028Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -78,7 +78,7 @@
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "ad2583b8-4089-4a3f-b9c9-119904248a3e",
+            "id": "bd3b3f68-6bd6-43f4-b8f5-753cca7b4f3c",
             "method": "setStatus",
             "statusKey": "mode"
           }

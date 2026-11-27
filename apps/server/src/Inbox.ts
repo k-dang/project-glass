@@ -21,6 +21,8 @@ import {
   referenceKey,
   inboxGroupOf,
   inboxGroups,
+  type EventKind,
+  type TriedThread,
   TurnFinished,
   WaitingRequests,
 } from "@glass/contracts"
@@ -47,12 +49,15 @@ import {
   PullRequestMirror,
   summaryOf,
 } from "./PullRequestMirror"
+import { type PullRequestStanding, PullRequestStandings } from "./PullRequestStandings"
+import { heldBackFeedback } from "./gitHubEvents"
 import { Queue } from "./Queue"
 import type { WaitingRequest } from "./Transcripts"
 
 interface WaitingPullRequest {
   readonly pullRequest: PullRequestSummary
   readonly reasons: Arr.NonEmptyReadonlyArray<PullRequestReason>
+  readonly triedBy: ReadonlyArray<TriedThread>
   readonly since: DateTime.Utc
 }
 
@@ -95,6 +100,7 @@ const pullRequestItems = (waiting: ReadonlyArray<WaitingPullRequest>) =>
       InboxPullRequest.make({
         pullRequest: group[0].pullRequest,
         reasons: Arr.flatMap(group, ({ reasons }) => reasons),
+        triedBy: group.flatMap(({ triedBy }) => triedBy),
         since: Arr.min(
           Arr.map(group, ({ since }) => since),
           DateTime.Order,
@@ -116,7 +122,11 @@ const inboxOf = (waiting: Waiting): InboxItems =>
   Arr.sort(
     [
       ...waiting.threads.map(waitingItem),
-      ...waiting.finished.map(finishedItem),
+      ...waiting.finished.flatMap((finished) =>
+        finished.update && Predicate.isTagged(finished.ended.ending, "Done")
+          ? []
+          : [finishedItem(finished)],
+      ),
       ...waiting.questions,
       ...waiting.checkIns,
       ...waiting.outsideAgentRequests,
@@ -149,16 +159,71 @@ const reasonsOf = ({
   return reasons
 }
 
-const yourPullRequests = (mirror: Mirror | undefined): ReadonlyArray<WaitingPullRequest> =>
-  (mirror?.repositories ?? []).flatMap(({ pullRequests }) =>
-    pullRequests.flatMap((pr) => {
-      const reasons = reasonsOf(pr)
+const kindOf: Partial<Record<PullRequestReason["_tag"], EventKind>> = {
+  ChangesRequested: "ChangesRequested",
+  ChecksFailing: "ChecksFailed",
+  AwaitingReply: "ReviewFeedback",
+}
 
-      return pr.viewerIsAuthor && Arr.isReadonlyArrayNonEmpty(reasons)
-        ? [{ pullRequest: summaryOf(pr), reasons, since: pr.updatedAt }]
+const heldBackOf = (
+  reason: PullRequestReason,
+  { details }: MirroredPullRequest,
+): ReadonlyArray<PullRequestReason> => {
+  if (details === null) return []
+
+  const { changesRequested, reviewThreads } = heldBackFeedback(details)
+
+  if (Predicate.isTagged(reason, "ChangesRequested"))
+    return changesRequested.length > 0 ? [reason] : []
+
+  return Predicate.isTagged(reason, "AwaitingReply") && reviewThreads.length > 0
+    ? [AwaitingReply.make({ reviewThreads: reviewThreads.length })]
+    : []
+}
+
+const leftToYou = (pr: MirroredPullRequest, standings: ReadonlyArray<PullRequestStanding>) => {
+  const left = reasonsOf(pr).map((reason) => {
+    const kind = kindOf[reason._tag]
+    const standing = standings.filter(({ kinds }) => kind !== undefined && kinds.includes(kind))
+
+    return standing.some(({ state }) => state === "handling")
+      ? { reasons: heldBackOf(reason, pr), triedBy: [] }
+      : {
+          reasons: [reason],
+          triedBy: standing.map(({ thread }): TriedThread => ({
+            threadId: thread.id,
+            name: thread.name,
+          })),
+        }
+  })
+
+  return {
+    reasons: left.flatMap(({ reasons }) => reasons),
+    triedBy: Arr.dedupeWith(
+      left.flatMap(({ triedBy }) => triedBy),
+      (a, b) => a.threadId === b.threadId,
+    ),
+  }
+}
+
+const yourPullRequests = (
+  mirror: Mirror | undefined,
+  standings: ReadonlyArray<PullRequestStanding>,
+): ReadonlyArray<WaitingPullRequest> => {
+  const standingsOf = Arr.groupBy(standings, ({ pullRequest }) => referenceKey(pullRequest))
+
+  return (mirror?.repositories ?? []).flatMap(({ pullRequests }) =>
+    pullRequests.flatMap((pr) => {
+      if (!pr.viewerIsAuthor) return []
+
+      const { reasons, triedBy } = leftToYou(pr, standingsOf[referenceKey(pr.ref)] ?? [])
+
+      return Arr.isReadonlyArrayNonEmpty(reasons)
+        ? [{ pullRequest: summaryOf(pr), reasons, triedBy, since: pr.updatedAt }]
         : []
     }),
   )
+}
 
 const reviewable = (queued: ReadonlyArray<QueuedPullRequest>) =>
   queued.flatMap((row) => (canRunQueueWork(row) ? [row.pullRequest] : []))
@@ -195,6 +260,7 @@ export class Inbox extends Context.Service<
       const mirror = yield* PullRequestMirror
       const globalChat = yield* GlobalChat
       const oauth = yield* McpOAuth
+      const standings = yield* PullRequestStandings
 
       const finishedReviewOf = (pullRequest: PullRequestSummary) =>
         agentReviews.watch(pullRequest.ref).pipe(
@@ -211,6 +277,7 @@ export class Inbox extends Context.Service<
                       lead: splitLead(review.markdown).lead,
                     }),
                   ],
+                  triedBy: [],
                   since: review.writtenAt,
                 }
           }),
@@ -246,7 +313,9 @@ export class Inbox extends Context.Service<
 
       const waitingPullRequests = Stream.zipLatest(
         finishedAgentReviews,
-        mirror.changes.pipe(Stream.map(yourPullRequests)),
+        Stream.zipLatest(mirror.changes, standings.watch()).pipe(
+          Stream.map(([mirrored, standing]) => yourPullRequests(mirrored, standing)),
+        ),
       ).pipe(Stream.map(([finished, yours]) => [...finished, ...yours]))
 
       return Inbox.of({

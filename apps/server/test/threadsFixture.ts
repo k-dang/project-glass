@@ -76,9 +76,9 @@ export const threadsFixtureWith = ({
 
     const quit = Scope.close(serverScope, Exit.void)
 
-    const launch = startBackend(env, home, agentRunners).pipe(
-      Effect.map((backend) => backend.client),
-    )
+    const launchBackend = startBackend(env, home, agentRunners)
+
+    const launch = launchBackend.pipe(Effect.map((backend) => backend.client))
 
     const watch = (
       threadId: string,
@@ -216,6 +216,7 @@ export const threadsFixtureWith = ({
       quit,
       launch,
       restart: quit.pipe(Effect.andThen(launch)),
+      restartBackend: quit.pipe(Effect.andThen(launchBackend)),
     }
   })
 

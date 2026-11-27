@@ -12,6 +12,7 @@ import {
   OutsideText,
   type InboxPullRequest,
   referenceKey,
+  referenceText,
 } from "@glass/contracts"
 import { Link } from "@tanstack/react-router"
 import { cn } from "cn"
@@ -44,7 +45,6 @@ import {
 import { settledProblem } from "./problems"
 import { ago } from "./PullRequestRow"
 import { CheckList } from "./PullRequestStatus"
-import { referenceText } from "./queue"
 import { RequestCard } from "./RequestCard"
 
 interface DetailProps<Item> {
@@ -398,7 +398,37 @@ function PullRequestDetail(
         </section>
       )}
       <FailingChecks item={props.item} />
+      <TriedBy item={props.item} />
     </DetailShell>
+  )
+}
+
+function TriedBy(props: { item: InboxPullRequest }) {
+  const headingId = useId()
+  const { triedBy } = props.item
+
+  if (triedBy.length === 0) return null
+
+  return (
+    <section aria-labelledby={headingId} className="flex flex-col gap-1 text-sm">
+      <h3 id={headingId} className="text-xs font-medium text-muted-foreground">
+        Tried
+      </h3>
+      <ul className="flex flex-col gap-1">
+        {triedBy.map(({ threadId, name }) => (
+          <li key={threadId} className="text-muted-foreground">
+            <Link
+              to="/threads/$threadId"
+              params={{ threadId }}
+              className="font-medium text-foreground underline underline-offset-4"
+            >
+              {name}
+            </Link>{" "}
+            tried and couldn't clear this.
+          </li>
+        ))}
+      </ul>
+    </section>
   )
 }
 

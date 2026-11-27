@@ -159,6 +159,37 @@ Every Activity the user has done, kept on this device, for the user to look back
 agents to search.
 _Avoid_: History, audit log, event log, telemetry
 
+### Events
+
+**Event**:
+Something that happened which the user didn't do in Glass and which Glass noticed, such as a PR's
+checks failing, a reviewer commenting, or a set time arriving.
+_Avoid_: Activity (what the user did), notification, trigger
+
+**Source**:
+Somewhere Events come from, such as GitHub.
+_Avoid_: Integration, feed, provider (a Sandbox provider makes Sandboxes)
+
+**Subscription**:
+A standing instruction that a Thread be told about the Events on one subject, such as a PR, with a
+note in plain words on what to do about them. A Thread's agent makes one for its own Thread.
+_Avoid_: Watch, trigger, rule, hook
+
+**Update**:
+A Turn Glass starts in a Thread or the Global chat to tell it about Events, or about work it
+started.
+_Avoid_: Notification, wake-up
+
+**PR update**:
+An Update carrying the Events on a PR a Thread has a Subscription to, such as checks failing,
+review feedback, changes requested, a merge conflict, or the PR merging.
+_Avoid_: Babysitting, PR watch
+
+**PR update note**:
+The user's own words on how a Thread handles a PR, set in Settings and given with every PR
+update beside the Subscription's own note.
+_Avoid_: PR prompt, instructions
+
 ### Planning
 
 **To-do**:
@@ -202,8 +233,8 @@ ends the current Session and begins the next; an ended Session stays readable bu
 _Avoid_: Past chat, Past conversation, history, archived chat
 
 **Started work update**:
-A Turn Glass starts in the Global chat or a Thread to tell it that work it started
-finished, failed, or needs the user's input.
+An Update telling the Global chat or a Thread that work it started finished, failed, or needs
+the user's input.
 _Avoid_: Global chat update, notification, event, wake-up
 
 **Agent harness**:

@@ -38,6 +38,7 @@ import {
   type Transcript,
   type TranscriptUpdate,
   type TurnEnd,
+  UnseenTurn,
   type SentMessage,
 } from "@glass/contracts"
 import {
@@ -94,6 +95,8 @@ const changesOf = (files: ReadonlyArray<ChangedFile>) =>
     files,
   })
 
+const sameUnseenTurns = Schema.toEquivalence(Schema.Array(UnseenTurn))
+
 const decodeKeptGoing = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ id: Schema.String, keptGoingAt: Schema.DateTimeUtcFromString })),
 )
@@ -149,6 +152,7 @@ export interface WaitingThread {
 export interface FinishedThread {
   readonly thread: Thread
   readonly ended: TurnEnd
+  readonly update: boolean
 }
 
 export class Threads extends Context.Service<
@@ -157,6 +161,7 @@ export class Threads extends Context.Service<
     readonly watch: () => Stream.Stream<ReadonlyArray<Thread>, ThreadError>
     readonly watchWaiting: () => Stream.Stream<ReadonlyArray<WaitingThread>>
     readonly watchFinished: () => Stream.Stream<ReadonlyArray<FinishedThread>>
+    readonly watchUnseenTurns: () => Stream.Stream<ReadonlyArray<UnseenTurn>>
     readonly watchWorking: () => Stream.Stream<ReadonlyArray<string>>
     readonly keptGoing: Stream.Stream<ReadonlyMap<string, DateTime.Utc>>
     readonly bringBack: (threadId: string) => Effect.Effect<void, ThreadNotFound | ThreadError>
@@ -1031,6 +1036,7 @@ export class Threads extends Context.Service<
             yield* skillPacks.releaseThread(threadId)
             yield* sql`DELETE FROM started_thread WHERE thread_id = ${threadId} OR started_by = ${threadId}`
             yield* sql`DELETE FROM started_agent_review WHERE started_by = ${threadId}`
+            yield* sql`DELETE FROM subscription WHERE thread_id = ${threadId}`
             yield* toDos.unlinkThread(threadId)
             yield* sql`DELETE FROM thread WHERE id = ${threadId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))
@@ -1058,6 +1064,21 @@ export class Threads extends Context.Service<
           })),
         ),
       )
+
+      const watchFinished = () =>
+        Stream.zipLatest(placed, transcripts.unseen).pipe(
+          Stream.map(([current, unseen]) =>
+            current.flatMap(({ thread }): ReadonlyArray<FinishedThread> => {
+              const end = unseen.get(thread.id)
+
+              return end === undefined ||
+                thread.forReview ||
+                Predicate.isTagged(end.ended.ending, "Stopped")
+                ? []
+                : [{ thread, ...end }]
+            }),
+          ),
+        )
 
       return Threads.of({
         keptGoing: SubscriptionRef.changes(keptGoing),
@@ -1135,19 +1156,13 @@ export class Threads extends Context.Service<
               }),
             ),
           ),
-        watchFinished: () =>
-          Stream.zipLatest(placed, transcripts.unseen).pipe(
-            Stream.map(([current, unseen]) =>
-              current.flatMap(({ thread }) => {
-                const ended = unseen.get(thread.id)
-
-                return ended === undefined ||
-                  thread.forReview ||
-                  Predicate.isTagged(ended.ending, "Stopped")
-                  ? []
-                  : [{ thread, ended }]
-              }),
+        watchFinished,
+        watchUnseenTurns: () =>
+          watchFinished().pipe(
+            Stream.map((finished) =>
+              finished.map(({ thread, ended }) => ({ threadId: thread.id, ended })),
             ),
+            Stream.changesWith(sameUnseenTurns),
           ),
         watchWorking: () =>
           Stream.zipLatest(placed, transcripts.running).pipe(

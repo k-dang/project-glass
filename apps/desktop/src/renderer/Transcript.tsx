@@ -1,9 +1,12 @@
 import {
   type WorkOutcome,
   type BackgroundWork,
+  type Event,
   type Turn,
   type TurnEnd,
   type TurnPart,
+  type UpdatedSubscription,
+  referenceText,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Equivalence, Match, Predicate } from "effect"
@@ -17,7 +20,7 @@ import {
   SquareTerminal,
   Unplug,
 } from "lucide-react"
-import { memo, type ReactNode, useCallback, useContext, useMemo, useState } from "react"
+import { memo, type ReactNode, useCallback, useContext, useId, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Message, MessageContent, MessageGroup } from "@/components/ui/message"
 import {
@@ -32,7 +35,7 @@ import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
 import { BackgroundToolCalls, callStatus, toolCallsOf, TurnParts } from "./TurnParts"
 import { sentFrom, UserMessage } from "./UserMessage"
 import { threadColumn } from "./threadColumn"
-import { referenceText } from "./queue"
+import { plural } from "./plural"
 
 export function Transcript(props: {
   turns: ReadonlyArray<Turn>
@@ -142,6 +145,48 @@ function StartedWorkUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
   )
 }
 
+const eventText = (event: Event) =>
+  Match.valueTags(event, {
+    ChecksFailed: ({ checks }) => plural(checks.length, "check failed", "checks failed"),
+    ChecksPassed: () => "checks passed",
+    ReviewFeedback: ({ reviewThreads }) =>
+      plural(
+        reviewThreads.length,
+        "Review thread waits for a reply",
+        "Review threads wait for a reply",
+      ),
+    ChangesRequested: ({ reviewers }) => `${reviewers.join(", ")} requested changes`,
+    MergeConflict: () => "a merge conflict",
+    MergeConflictCleared: () => "merge conflict cleared",
+    PullRequestMerged: () => "merged",
+    PullRequestClosed: () => "closed",
+  })
+
+function UpdateMessage(props: { subscriptions: ReadonlyArray<UpdatedSubscription> }) {
+  const id = useId()
+
+  return (
+    <Message align="end">
+      <MessageContent>
+        <span id={id} className="self-end text-xs text-muted-foreground">
+          PR update from Glass
+        </span>
+        <ul
+          aria-labelledby={id}
+          className="flex flex-col gap-1 self-end text-sm text-muted-foreground"
+        >
+          {props.subscriptions.map(({ subscriptionId, subject, events }) => (
+            <li key={subscriptionId}>
+              {referenceText(subject.pullRequest)}:{" "}
+              {events.map(({ event }) => eventText(event)).join(", ")}
+            </li>
+          ))}
+        </ul>
+      </MessageContent>
+    </Message>
+  )
+}
+
 const backgroundKindText: Record<BackgroundWork["kind"], string> = {
   subagent: "Subagent",
   command: "Command",
@@ -174,6 +219,9 @@ function TurnMessage(props: { turn: Turn }) {
 
   if (Predicate.isTagged(turn.context, "StartedWorkUpdate"))
     return <StartedWorkUpdateMessage work={turn.context.work} />
+
+  if (Predicate.isTagged(turn.context, "Update"))
+    return <UpdateMessage subscriptions={turn.context.subscriptions} />
 
   if (Predicate.isTagged(turn.context, "BackgroundWorkEnded")) return null
 

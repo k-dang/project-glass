@@ -6,6 +6,7 @@ import { type FakeGitHubRequest, startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
 import { isolatedHome, startBackend } from "../../test/harness"
 import { connectMcp, listedTools, toolText } from "../../test/mcpClient"
+import { subscribeArguments } from "../../test/pullRequestUpdates"
 
 const startGlass = Effect.gen(function* () {
   const requests: Array<FakeGitHubRequest> = []
@@ -81,6 +82,7 @@ describe("Glass tools over MCP", () => {
           ["send_thread_message", false],
           ["ask_user", false],
           ["check_in", false],
+          ["list_recent_events", true],
           ["show_visualization", true],
         ],
       )
@@ -226,6 +228,45 @@ describe("Glass tools over MCP", () => {
 
         assert.isTrue(result.isError)
         assert.include(toolText(result), "Only a Thread's agent has a Browser pane")
+      }),
+  )
+
+  it.live(
+    "offers the Subscription tools to a Thread's host alone, and refuses a caller posing as one",
+    () =>
+      Effect.gen(function* () {
+        const { baseUrl, mcpCredentials, outsideAgents, mcp } = yield* startGlass
+        const outsideAgent = yield* connectMcp(baseUrl, yield* outsideAgents.issue("Claude Code"))
+
+        const posing = yield* connectMcp(
+          baseUrl,
+          yield* mcpCredentials.issue(
+            GlobalChatCaller.make({ globalChatId: "global-chat", sessionId: "posing-session" }),
+          ),
+          "glass-sandbox-agent-host",
+        )
+
+        const offered = ({ request }: typeof mcp) =>
+          request("tools/list", {}).response.pipe(
+            Effect.map((response) =>
+              listedTools(response).flatMap(({ name }) => (name.includes("subscri") ? [name] : [])),
+            ),
+          )
+
+        const result = yield* posing.call(
+          "subscribe",
+          subscribeArguments("Keep it green", { owner: "octo-org", repo: "glass", number: 7 }),
+        )
+
+        assert.deepStrictEqual(yield* offered(mcp), [])
+        assert.deepStrictEqual(yield* offered(outsideAgent), [])
+        assert.deepStrictEqual(yield* offered(posing), [
+          "subscribe",
+          "list_subscriptions",
+          "end_subscription",
+        ])
+        assert.isTrue(result.isError)
+        assert.include(toolText(result), "Only a Thread's agent has Subscriptions.")
       }),
   )
 

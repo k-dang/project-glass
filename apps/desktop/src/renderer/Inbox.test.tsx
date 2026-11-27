@@ -129,6 +129,7 @@ const finished = (pullRequest: PullRequestSummary, writtenAt: DateTime.Utc) =>
         lead: "**The retry loses the upload's checksum.** It retries the whole upload on a 503.",
       }),
     ],
+    triedBy: [],
     since: writtenAt,
   })
 
@@ -643,11 +644,13 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
           }),
           AwaitingReply.make({ reviewThreads: 2 }),
         ],
+        triedBy: [],
         since: ago({ hours: 2 }),
       }),
       InboxPullRequest.make({
         pullRequest: summary(readyRef, "Trim the log", false, ago({ hours: 1 })),
         reasons: [ReadyToMerge.make({})],
+        triedBy: [],
         since: ago({ hours: 1 }),
       }),
     ]),
@@ -675,6 +678,32 @@ it("shows why the user's own PRs wait on them, without Agent review actions", as
   expect(pane.getByRole("link", { name: "Open pull request" })).toBeTruthy()
   expect(pane.queryByRole("link", { name: "Read Agent review" })).toBeNull()
   expect(pane.queryByRole("button", { name: "Done" })).toBeNull()
+})
+
+it("says which Thread tried to clear a PR's reasons, and links to it", async () => {
+  const mineRef = new PullRequestRef({ owner: "octo-org", repo: "glass", number: 51 })
+
+  const user = mount(
+    inboxRef([
+      InboxPullRequest.make({
+        pullRequest: summary(mineRef, "Cache the diff", false, ago({ hours: 2 })),
+        reasons: [ChecksFailing.make({ failing: [] })],
+        triedBy: [{ threadId: thread.id, name: thread.name }],
+        since: ago({ hours: 2 }),
+      }),
+    ]),
+  )
+
+  const row = await screen.findByRole("option", { name: /Cache the diff/ })
+  expect(within(row).getByText("A Thread tried")).toBeTruthy()
+
+  await user.click(row)
+  const tried = within(within(articleOf("Cache the diff")).getByRole("region", { name: "Tried" }))
+
+  expect(tried.getByText(/tried and couldn't clear this/)).toBeTruthy()
+  expect(tried.getByRole("link", { name: thread.name }).getAttribute("href")).toContain(
+    `/threads/${thread.id}`,
+  )
 })
 
 it("opens the pull request and offers its finished Agent review", async () => {

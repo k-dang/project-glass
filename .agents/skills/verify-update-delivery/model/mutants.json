@@ -1,0 +1,12 @@
+{
+  "SkipIdleCheck": "NeverCutsIn",
+  "RecordCursorAfterStart": "ToldOnce",
+  "PassOverWhileWaiting": "NoneLost",
+  "PassOverWhileGivenUp": "NoneLost",
+  "IgnoreLimit": "RunsAtMostTheLimit",
+  "CountRunningInMemory": "RunsAtMostTheLimit",
+  "NeverCount": "StopsAtTheLimit",
+  "UnpromptedCounts": "StopsAtTheLimit",
+  "RestartForgetsCount": "StopsAtTheLimit",
+  "IgnoreMessages": "MessageLetsItTryAgain"
+}

@@ -3,6 +3,7 @@ import { Effect, Match, Option, Predicate, Schema } from "effect"
 import { FeedbackNote } from "./feedbackNote"
 import { FollowedRepository } from "./followedRepository"
 import { BinaryFile, ChangedFile, PullRequestRef } from "./pullRequest"
+import { Update } from "./update"
 import { FileTooLarge, TextFile } from "./repository"
 import { Revision } from "./revision"
 
@@ -249,6 +250,7 @@ export const TurnContext = Schema.Union([
   PullRequestContext,
   ThreadContext,
   StartedWorkUpdate,
+  Update,
   BackgroundWorkEnded,
   AgentReviewTurn,
 ])

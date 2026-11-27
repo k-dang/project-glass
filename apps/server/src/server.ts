@@ -7,6 +7,7 @@ import { RpcSerialization, RpcServer } from "effect/rpc"
 import { createServer } from "node:http"
 import { RendererAccess } from "./access"
 import { ActivityLog } from "./ActivityLog"
+import { EventLog } from "./EventLog"
 import { AgentReviews } from "./AgentReviews"
 import { Asks } from "./Asks"
 import { BrowserPages } from "./BrowserPages"
@@ -26,6 +27,7 @@ import { Changes } from "./Changes"
 import { CheckIns } from "./CheckIns"
 import { Git } from "./git"
 import { GitHubAuth } from "./github/GitHubAuth"
+import { GitHubSource } from "./GitHubSource"
 import { GitHubClient } from "./github/GitHubClient"
 import { GlassRpcHandlers } from "./handlers"
 import { GlobalChat } from "./GlobalChat"
@@ -46,6 +48,7 @@ import { OutsideQuestions } from "./OutsideQuestions"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { PullRequestLists } from "./PullRequestLists"
 import { PullRequestMirror } from "./PullRequestMirror"
+import { PullRequestStandings } from "./PullRequestStandings"
 import { PullRequestWorkspaces } from "./PullRequestWorkspaces"
 import { Queue } from "./Queue"
 import { AgentCommands, SettingsStore } from "./SettingsStore"
@@ -61,6 +64,8 @@ import { BranchNames } from "./BranchNames"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
 import { StartedWorkUpdates } from "./StartedWorkUpdates"
+import { Subscriptions } from "./Subscriptions"
+import { Updates } from "./Updates"
 
 const RendererRoutes = Layer.mergeAll(
   RpcServer.layerHttp({ group: GlassRpcs, path: RPC_PATH, protocol: "websocket" }),
@@ -128,9 +133,15 @@ const services = (
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer,
 ) =>
-  Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge)
+  Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge, Updates)
     .pipe(
-      Layer.provide(Inbox.layer),
+      Layer.provide(
+        Inbox.layer.pipe(
+          Layer.provide(PullRequestStandings.layer),
+          Layer.provideMerge(GitHubSource.layer),
+          Layer.provideMerge(Subscriptions.layer),
+        ),
+      ),
       Layer.provide(SettledThreads.layer.pipe(Layer.provideMerge(ThreadPullRequests.layer))),
       Layer.provide(StartedWork.layer),
       Layer.provide(PullRequestLists.layer),
@@ -158,7 +169,7 @@ const services = (
       Layer.provide(agentRunners),
       Layer.provide(BrowserPages.layer),
       Layer.provide(agentCommands),
-      Layer.provide(Layer.merge(ActivityLog.layer, Storage.layer)),
+      Layer.provide(Layer.mergeAll(ActivityLog.layer, EventLog.layer, Storage.layer)),
       Layer.provideMerge(OutsideAgents.layer),
       Layer.provideMerge(McpOAuth.layer),
       Layer.provide(GlassToolRelay.layer),

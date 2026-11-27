@@ -50,7 +50,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-44-723Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-26-874Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -94,7 +94,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232204946,
+              "timestamp": 1795762827084,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -237,7 +237,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232204946,
+              "timestamp": 1795762827084,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -384,7 +384,7 @@
                   "text": "Start the background task"
                 }
               ],
-              "timestamp": 1795232204944
+              "timestamp": 1795762827082
             }
           }
         },
@@ -399,7 +399,7 @@
                   "text": "Start the background task"
                 }
               ],
-              "timestamp": 1795232204944
+              "timestamp": 1795762827082
             }
           }
         },
@@ -427,7 +427,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232204969
+              "timestamp": 1795762827115
             }
           }
         },
@@ -531,10 +531,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795232204969,
+              "timestamp": 1795762827115,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 20,
+              "durationMs": 17,
               "thinkingLevel": "off"
             }
           }
@@ -568,10 +568,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795232204969,
+              "timestamp": 1795762827115,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 20,
+              "durationMs": 17,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -585,7 +585,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795232204946,
+                "timestamp": 1795762827084,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -727,7 +727,7 @@
                     "text": "Start the background task"
                   }
                 ],
-                "timestamp": 1795232204944
+                "timestamp": 1795762827082
               },
               {
                 "role": "assistant",
@@ -755,10 +755,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232204969,
+                "timestamp": 1795762827115,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 20,
+                "durationMs": 17,
                 "thinkingLevel": "off"
               }
             ],
@@ -806,7 +806,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-44-723Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-26-874Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
@@ -832,7 +832,7 @@
               "customType": "report",
               "content": "The background task finished.",
               "display": true,
-              "timestamp": 1795232204992
+              "timestamp": 1795762827135
             }
           }
         },
@@ -844,7 +844,7 @@
               "customType": "report",
               "content": "The background task finished.",
               "display": true,
-              "timestamp": 1795232204992
+              "timestamp": 1795762827135
             }
           }
         },
@@ -872,7 +872,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232204995
+              "timestamp": 1795762827137
             }
           }
         },
@@ -976,10 +976,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795232204995,
+              "timestamp": 1795762827137,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 3,
+              "durationMs": 2,
               "thinkingLevel": "off"
             }
           }
@@ -1013,10 +1013,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795232204995,
+              "timestamp": 1795762827137,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 3,
+              "durationMs": 2,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -1031,7 +1031,7 @@
                 "customType": "report",
                 "content": "The background task finished.",
                 "display": true,
-                "timestamp": 1795232204992
+                "timestamp": 1795762827135
               },
               {
                 "role": "assistant",
@@ -1059,10 +1059,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232204995,
+                "timestamp": 1795762827137,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 3,
+                "durationMs": 2,
                 "thinkingLevel": "off"
               }
             ],
@@ -1110,7 +1110,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-44-723Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-26-874Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

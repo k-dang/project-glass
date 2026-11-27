@@ -25,6 +25,7 @@ import { engineSettingsOf, SettingsStore, withEngineSettings } from "./SettingsS
 import { Sandboxes } from "./Sandboxes"
 import { SavedPlaces } from "./SavedPlaces"
 import { SettledThreads } from "./SettledThreads"
+import { Subscriptions } from "./Subscriptions"
 import { LocalSkills } from "./LocalSkills"
 import { SkillPacks } from "./SkillPacks"
 import { Storage } from "./Storage"
@@ -56,6 +57,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
     const inbox = yield* Inbox
     const threadPullRequests = yield* ThreadPullRequests
     const settledThreads = yield* SettledThreads
+    const subscriptions = yield* Subscriptions
     const outsideQuestions = yield* OutsideQuestions
     const checkIns = yield* CheckIns
     const outsideAgents = yield* OutsideAgents
@@ -89,6 +91,12 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         asks.ask(pullRequest, revision, place, question),
       WatchAgentReview: ({ pullRequest }) => agentReviews.watch(pullRequest),
       GetReviewPrompt: () => settings.read().pipe(Effect.map(({ reviewPrompt }) => reviewPrompt)),
+      GetPullRequestUpdateNote: () =>
+        settings.read().pipe(Effect.map(({ pullRequestUpdateNote }) => pullRequestUpdateNote)),
+      SetPullRequestUpdateNote: ({ note }) =>
+        settings
+          .update((current) => ({ ...current, pullRequestUpdateNote: note }))
+          .pipe(Effect.map(({ pullRequestUpdateNote }) => pullRequestUpdateNote)),
       SetReviewPrompt: ({ prompt }) =>
         settings
           .update((current) => ({ ...current, reviewPrompt: prompt }))
@@ -198,6 +206,7 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       ListSandboxProviders: () => Effect.succeed(sandboxes.providers),
       CreateThread: (input) => threads.create(input),
       WatchWorkingThreads: () => threads.watchWorking(),
+      WatchUnseenTurns: () => threads.watchUnseenTurns(),
       WatchBrowserPageRequests: () => browserPages.requests,
       AnswerBrowserPageRequest: ({ id, answer }) => browserPages.answer(id, answer),
       WatchBrowserControl: () => browserPages.control,
@@ -205,6 +214,9 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
       HandBackBrowser: ({ threadId }) => browserPages.handBack(threadId).pipe(Effect.asVoid),
       WatchThreadPullRequests: () => threadPullRequests.watch(),
       WatchSettledThreads: () => settledThreads.watch(),
+      WatchSubscriptions: ({ threadId }) => subscriptions.watch(threadId),
+      EndSubscription: ({ threadId, subscriptionId }) =>
+        subscriptions.end(threadId, subscriptionId).pipe(Effect.asVoid),
       BringBackThread: ({ threadId }) => threads.bringBack(threadId),
       WatchInbox: () => inbox.watch(),
       MarkTurnSeen: ({ threadId, endedAt }) => threads.markTurnSeen(threadId, endedAt),

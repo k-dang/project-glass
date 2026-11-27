@@ -10,16 +10,18 @@ import {
   ShownPage,
 } from "../BrowserPages"
 import { acting, GlassToolFailure, readOnly } from "./glassTools"
-import { McpCaller } from "./McpCredentials"
+import { callingThreadId } from "./McpCredentials"
 import { forThreadsOnThisDevice } from "./toolAudience"
 
-const callingThread = Effect.serviceOption(McpCaller).pipe(
-  Effect.flatMap((caller) =>
-    Option.isSome(caller) && Predicate.isTagged(caller.value, "Thread")
-      ? Effect.succeed(caller.value.threadId)
-      : Effect.fail(
+const callingThread = callingThreadId.pipe(
+  Effect.flatMap(
+    Option.match({
+      onNone: () =>
+        Effect.fail(
           new BrowserUnavailable({ message: "Only a Thread's agent has a Browser pane to use." }),
         ),
+      onSome: Effect.succeed,
+    }),
   ),
 )
 

@@ -22,6 +22,10 @@ export const TurnSeen = Schema.Struct({
 
 export type TurnSeen = typeof TurnSeen.Type
 
+export const UnseenTurn = Schema.Struct({ threadId: Schema.String, ended: TurnEnd })
+
+export type UnseenTurn = typeof UnseenTurn.Type
+
 const ThreadReason = Schema.Union([WaitingRequests, TurnFinished])
 
 type ThreadReason = typeof ThreadReason.Type
@@ -59,9 +63,14 @@ export const InboxThread = Schema.TaggedStruct("Thread", {
 
 export type InboxThread = typeof InboxThread.Type
 
+export const TriedThread = Schema.Struct({ threadId: Schema.String, name: Schema.String })
+
+export type TriedThread = typeof TriedThread.Type
+
 export const InboxPullRequest = Schema.TaggedStruct("PullRequest", {
   pullRequest: PullRequestSummary,
   reasons: Schema.NonEmptyArray(PullRequestReason),
+  triedBy: Schema.Array(TriedThread),
   since: Schema.DateTimeUtcFromString,
 })
 

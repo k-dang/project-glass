@@ -41,6 +41,7 @@ export interface Details {
   branch: string | undefined
   baseBranch: string | null
   pullRequest: ThreadPullRequest | undefined
+  subscriptions: ReactNode
   skillPacks: ReadonlyArray<ThreadSkillPack>
   localSkills: boolean
   actions: ReactNode
@@ -176,6 +177,7 @@ function ThreadDetails(props: Details) {
           )}
         </>
       )}
+      {props.subscriptions}
       {skillSources.length > 0 && (
         <div className={fact}>
           <Package aria-hidden className="text-muted-foreground" />

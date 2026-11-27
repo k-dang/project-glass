@@ -111,7 +111,10 @@ export class GlassToolRelay extends Context.Service<
             arguments: call.arguments,
           })
           .pipe(
-            Effect.provideService(McpCaller, ThreadCaller.make({ threadId: call.threadId })),
+            Effect.provideService(
+              McpCaller,
+              ThreadCaller.make({ threadId: call.threadId, turnId: call.turnId }),
+            ),
             Effect.provideService(McpSchema.McpServerClient, relayClients[origin._tag]),
             Effect.catchTags({
               InvalidParams: ({ message }) => Effect.succeed(failedToolCall(message)),

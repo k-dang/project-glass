@@ -32,6 +32,8 @@ export * from "./draft"
 
 export * from "./engine"
 
+export * from "./event"
+
 export * from "./feedbackNote"
 
 export * from "./pageMessages"
@@ -47,6 +49,8 @@ export * from "./merge"
 export * from "./pullRequest"
 
 export * from "./pullRequestList"
+
+export * from "./update"
 
 export * from "./pullRequestUrl"
 
@@ -69,6 +73,8 @@ export * from "./settings"
 export * from "./skillPack"
 
 export * from "./storage"
+
+export * from "./subscription"
 
 export * from "./toDo"
 

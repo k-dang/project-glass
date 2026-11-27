@@ -11,6 +11,7 @@ import {
   type RequestPart,
   TurnFinished,
   type TurnSeen,
+  referenceText,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Array as Arr, DateTime, Match, Predicate, Schema } from "effect"
@@ -26,7 +27,6 @@ import { Badge } from "@/components/ui/badge"
 import { fileName } from "./fileName"
 import { ago } from "./PullRequestRow"
 import { turnEndingLooks, warningTone } from "./status"
-import { referenceText } from "./queue"
 
 type Tone = "warning" | "danger" | "review" | "success" | "neutral"
 
@@ -122,7 +122,10 @@ const reasonsOf = (item: InboxItem): ReadonlyArray<Reason> =>
       OutsideQuestion: () => [{ label: "Question", tone: toneClass.warning }],
       CheckIn: () => [{ label: "Check-in", tone: toneClass.warning }],
       OutsideAgentRequest: () => [{ label: "Outside agent", tone: toneClass.warning }],
-      PullRequest: ({ reasons }) => reasons.map(pullRequestReason),
+      PullRequest: ({ reasons, triedBy }) => [
+        ...reasons.map(pullRequestReason),
+        ...(triedBy.length === 0 ? [] : [{ label: "A Thread tried", tone: toneClass.neutral }]),
+      ],
       GlobalChat: ({ requests }) => requests.map(requestReason),
     }),
     (a, b) => a.label === b.label,

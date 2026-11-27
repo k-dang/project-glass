@@ -32,6 +32,7 @@ import {
   type MessageWithContext,
   TurnPart,
   TurnStarted,
+  type Update,
 } from "@glass/contracts"
 import {
   Array as Arr,
@@ -121,7 +122,13 @@ const decodeWaiting = Schema.decodeUnknownEffect(
 )
 
 const decodeEnds = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ threadId: Schema.String, ended: Schema.fromJsonString(TurnEnd) })),
+  Schema.Array(
+    Schema.Struct({
+      threadId: Schema.String,
+      ended: Schema.fromJsonString(TurnEnd),
+      update: Schema.BooleanFromBit,
+    }),
+  ),
 )
 
 export const StoredMessage = Schema.Struct({ ...SentMessage.fields, images: ImagesJson })
@@ -159,6 +166,23 @@ const decodeMessages = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ message: Schema.String })),
 )
 
+const isCapturedContext = Schema.is(CapturedContext)
+
+const capturedContextTags: ReadonlyArray<CapturedContext["_tag"]> = ["PullRequest", "Thread"]
+
+const decodeContexts = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ context: ContextJson })),
+)
+
+const decodeRunningContexts = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ threadId: Schema.String, context: ContextJson })),
+)
+
+export interface RunningUpdate {
+  readonly threadId: string
+  readonly update: Update
+}
+
 const decodePositions = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({ first: Schema.NullOr(Schema.Int), last: Schema.NullOr(Schema.Int) }),
@@ -180,7 +204,12 @@ export interface WaitingRequest {
 
 export type WaitingByThread = ReadonlyMap<string, Arr.NonEmptyReadonlyArray<WaitingRequest>>
 
-type UnseenByThread = ReadonlyMap<string, TurnEnd>
+interface UnseenEnd {
+  readonly ended: TurnEnd
+  readonly update: boolean
+}
+
+type UnseenByThread = ReadonlyMap<string, UnseenEnd>
 
 export type StartedTurn = typeof TurnStarted.Type & { readonly threadId: string }
 
@@ -277,6 +306,12 @@ export class Transcripts extends Context.Service<
       threadIds: ReadonlyArray<string>,
     ) => Effect.Effect<ReadonlyArray<StartedTurn>, ThreadError>
     readonly runningMessage: (threadId: string) => Effect.Effect<string | null, ThreadError>
+    readonly startedByMessage: (
+      threadId: string,
+      turnId: string | null,
+    ) => Effect.Effect<boolean, ThreadError>
+    readonly lastMessageTurn: (threadId: string) => Effect.Effect<string | null, ThreadError>
+    readonly runningUpdates: Effect.Effect<ReadonlyArray<RunningUpdate>, ThreadError>
     readonly startOrQueue: (
       threadId: string,
       input: MessageWithContext,
@@ -395,7 +430,8 @@ export class Transcripts extends Context.Service<
 
       const lastEnds = (conditions: ReadonlyArray<string | Statement.Fragment>) =>
         sql`
-          SELECT a.id AS threadId, t.ended AS ended
+          SELECT a.id AS threadId, t.ended AS ended,
+            json_extract(t.context, '$._tag') IS 'Update' AS "update"
           FROM (
             SELECT id, turn_seen_at FROM thread
             UNION ALL SELECT id, turn_seen_at FROM global_chat_session WHERE ended_at IS NULL
@@ -416,31 +452,31 @@ export class Transcripts extends Context.Service<
             Effect.catch((cause) =>
               Effect.logWarning("Couldn't read the unseen Turns", cause).pipe(Effect.as([])),
             ),
-          )).map(({ threadId, ended }) => [threadId, ended] as const),
+          )).map(({ threadId, ...end }) => [threadId, end] as const),
         ),
       )
 
-      const setUnseen = (threadId: string, ended: TurnEnd | undefined) =>
+      const setUnseen = (threadId: string, end: UnseenEnd | undefined) =>
         SubscriptionRef.updateSome(unseen, (current) => {
           const before = current.get(threadId)
 
           if (
             before === undefined
-              ? ended === undefined
-              : ended !== undefined && sameEnd(before, ended)
+              ? end === undefined
+              : end !== undefined && sameEnd(before.ended, end.ended)
           )
             return Option.none()
 
           const next = new Map(current)
 
-          if (ended === undefined) next.delete(threadId)
-          else next.set(threadId, ended)
+          if (end === undefined) next.delete(threadId)
+          else next.set(threadId, end)
 
           return Option.some(next)
         })
 
       const refreshUnseen = (threadId: string) =>
-        unseenEnds(threadId).pipe(Effect.flatMap(([row]) => setUnseen(threadId, row?.ended)))
+        unseenEnds(threadId).pipe(Effect.flatMap(([end]) => setUnseen(threadId, end)))
 
       const runningThreads = yield* SubscriptionRef.make<ReadonlySet<string>>(
         new Set(
@@ -479,6 +515,7 @@ export class Transcripts extends Context.Service<
         threadId: string,
         { turnId, message, images, context, feedback, sentAt }: typeof TurnStarted.Type,
         retriesDelivery: boolean,
+        unprompted = false,
       ) =>
         sql`INSERT INTO thread_turn ${sql.insert({
           id: turnId,
@@ -489,12 +526,13 @@ export class Transcripts extends Context.Service<
           feedback: encodeFeedback(feedback),
           sent_at: DateTime.formatIso(sentAt),
           retries_delivery: retriesDelivery ? 1 : 0,
+          unprompted: unprompted ? 1 : 0,
         })}`.pipe(Effect.as(true))
 
       const writeApplied = (threadId: string, event: AgentEvent) =>
         Match.value(event).pipe(
           Match.tagsExhaustive({
-            TurnStarted: (started) => insertTurn(threadId, started, false),
+            TurnStarted: (started) => insertTurn(threadId, started, false, true),
             PartSet: ({ turnId, index, part }) =>
               sql`
                 INSERT INTO thread_turn_part (turn_id, position, part)
@@ -1000,6 +1038,57 @@ export class Transcripts extends Context.Service<
               Effect.map(([turn]) => turn?.message ?? null),
             ),
           ),
+        startedByMessage: (threadId, turnId) =>
+          turnId === null
+            ? Effect.succeed(false)
+            : withStorageFailure(
+                "read what started a Turn",
+                sql`
+                  SELECT context FROM thread_turn
+                  WHERE id = ${turnId} AND thread_id = ${threadId} AND unprompted = 0
+                `.pipe(
+                  Effect.flatMap(decodeContexts),
+                  Effect.map(
+                    ([turn]) =>
+                      turn !== undefined &&
+                      (turn.context === null || isCapturedContext(turn.context)),
+                  ),
+                ),
+              ),
+        lastMessageTurn: (threadId) =>
+          withStorageFailure(
+            "read the last Turn a message reached",
+            sql`
+              SELECT t.id FROM thread_turn t
+              WHERE t.thread_id = ${threadId} AND (
+                (
+                  t.unprompted = 0 AND (
+                    t.context IS NULL
+                    OR json_extract(t.context, '$._tag') IN ${sql.in(capturedContextTags)}
+                  )
+                )
+                OR EXISTS (
+                  SELECT 1 FROM thread_turn_part p
+                  WHERE p.turn_id = t.id AND json_extract(p.part, '$._tag') = 'Steer'
+                )
+              )
+              ORDER BY t.rowid DESC LIMIT 1
+            `.pipe(
+              Effect.flatMap(decodeTurnIds),
+              Effect.map(([turn]) => turn?.id ?? null),
+            ),
+          ),
+        runningUpdates: withStorageFailure(
+          "read the running Updates",
+          sql`SELECT thread_id AS threadId, context FROM thread_turn WHERE ended IS NULL`.pipe(
+            Effect.flatMap(decodeRunningContexts),
+            Effect.map((running) =>
+              running.flatMap(({ threadId, context }) =>
+                Predicate.isTagged(context, "Update") ? [{ threadId, update: context }] : [],
+              ),
+            ),
+          ),
+        ),
         settleUndelivered: Effect.fnUntraced(function* (threadId, turnId, reason) {
           const retried = yield* withStorageFailure(
             "read whether a Turn retries delivery",

@@ -17,7 +17,7 @@
       "frames": [
         {
           "out": {
-            "request_id": "27ofgo549cz",
+            "request_id": "y55jilwhob",
             "type": "control_request",
             "request": {
               "subtype": "initialize"
@@ -29,7 +29,7 @@
             "type": "control_response",
             "response": {
               "subtype": "success",
-              "request_id": "27ofgo549cz",
+              "request_id": "y55jilwhob",
               "response": {
                 "commands": [
                   {
@@ -39,7 +39,7 @@
                   },
                   {
                     "name": "announce-pr",
-                    "description": "Watch a PR's CI and draft a paste-ready post (project)",
+                    "description": "Draft a paste-ready Slack post for an open PR (project)",
                     "argumentHint": ""
                   },
                   {
@@ -160,6 +160,11 @@
                   {
                     "name": "implement",
                     "description": "Implement a piece of work based on a spec or set of tickets. (project)",
+                    "argumentHint": ""
+                  },
+                  {
+                    "name": "implement-spec",
+                    "description": "Implement the result of /to-spec and /to-tickets in code. (project)",
                     "argumentHint": ""
                   },
                   {

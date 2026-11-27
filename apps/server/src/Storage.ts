@@ -36,6 +36,7 @@ const groupOfItem = new Map<string, StorageGroup>([
   ["global_chat_session", "threads"],
   ["started_thread", "threads"],
   ["started_agent_review", "threads"],
+  ["subscription", "threads"],
   ["skill_pack", "threads"],
   ["skill_pack_pin", "threads"],
   ["skill_pack_skill", "threads"],

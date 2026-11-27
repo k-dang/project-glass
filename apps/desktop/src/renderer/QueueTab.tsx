@@ -3,6 +3,7 @@ import {
   findPullRequestReferences,
   type PullRequestRef,
   type QueuedPullRequest,
+  referenceText,
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Exit } from "effect"
@@ -26,7 +27,6 @@ import {
   addToQueueAtom,
   describeAddition,
   queueRefreshAtom,
-  referenceText,
   removeFromQueue,
   savedQueueAtom,
   watchedQueueAtom,

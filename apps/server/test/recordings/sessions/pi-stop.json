@@ -31,16 +31,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -59,11 +54,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -79,7 +92,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-51-955Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-32-216Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -123,7 +136,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232212313,
+              "timestamp": 1795762832441,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -266,7 +279,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232212313,
+              "timestamp": 1795762832441,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -413,7 +426,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                 }
               ],
-              "timestamp": 1795232212310
+              "timestamp": 1795762832440
             }
           }
         },
@@ -428,7 +441,7 @@
                   "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                 }
               ],
-              "timestamp": 1795232212310
+              "timestamp": 1795762832440
             }
           }
         },
@@ -438,7 +451,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -456,7 +469,8 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232212342
+              "timestamp": 1795762832477,
+              "providerThinkingLevel": "medium"
             }
           }
         },
@@ -482,8 +496,34 @@
             "assistantMessageEvent": {
               "type": "toolcall_start",
               "contentIndex": 0,
-              "id": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+              "id": "toolu_011sXjXYho2fVbB9hEujjX8U",
               "toolName": "bash"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": ""
             }
           }
         },
@@ -535,7 +575,33 @@
             "assistantMessageEvent": {
               "type": "toolcall_delta",
               "contentIndex": 0,
-              "delta": "\"}"
+              "delta": "\", \"timeout\": null"
+            }
+          }
+        },
+        {
+          "in": {
+            "type": "message_update",
+            "usage": {
+              "input": 0,
+              "output": 0,
+              "cacheRead": 0,
+              "cacheWrite": 0,
+              "totalTokens": 0,
+              "cost": {
+                "input": 0,
+                "output": 0,
+                "cacheRead": 0,
+                "cacheWrite": 0,
+                "total": 0,
+                "totalFromProvider": false
+              },
+              "cacheWrite1h": 0
+            },
+            "assistantMessageEvent": {
+              "type": "toolcall_delta",
+              "contentIndex": 0,
+              "delta": "}"
             }
           }
         },
@@ -563,10 +629,11 @@
               "contentIndex": 0,
               "toolCall": {
                 "type": "toolCall",
-                "id": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+                "id": "toolu_011sXjXYho2fVbB9hEujjX8U",
                 "name": "bash",
                 "arguments": {
-                  "command": "echo hi"
+                  "command": "echo hi",
+                  "timeout": null
                 }
               }
             }
@@ -580,14 +647,15 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+                  "id": "toolu_011sXjXYho2fVbB9hEujjX8U",
                   "name": "bash",
                   "arguments": {
-                    "command": "echo hi"
+                    "command": "echo hi",
+                    "timeout": null
                   }
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -608,10 +676,11 @@
                 "reasoning": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232212342,
-              "responseId": "gen_01M7Y2V9EG3QMTQBNP31QXYGG9",
+              "timestamp": 1795762832477,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT14HtFkkt9YWgtE9HS6",
               "rawStopReason": "tool_use",
-              "durationMs": 752,
+              "durationMs": 1742,
               "thinkingLevel": "medium"
             }
           }
@@ -619,17 +688,18 @@
         {
           "in": {
             "type": "tool_execution_start",
-            "toolCallId": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+            "toolCallId": "toolu_011sXjXYho2fVbB9hEujjX8U",
             "toolName": "bash",
             "args": {
-              "command": "echo hi"
+              "command": "echo hi",
+              "timeout": null
             }
           }
         },
         {
           "in": {
             "type": "extension_ui_request",
-            "id": "47ac9dc6-a3bb-45fc-94af-d8910094f1fa",
+            "id": "159753ad-8b9e-4040-a490-fd962177bea3",
             "method": "confirm",
             "title": "Run it?",
             "message": "bash"
@@ -689,7 +759,7 @@
         {
           "out": {
             "type": "extension_ui_response",
-            "id": "47ac9dc6-a3bb-45fc-94af-d8910094f1fa",
+            "id": "159753ad-8b9e-4040-a490-fd962177bea3",
             "cancelled": true
           }
         },
@@ -702,7 +772,7 @@
         {
           "in": {
             "type": "tool_execution_end",
-            "toolCallId": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+            "toolCallId": "toolu_011sXjXYho2fVbB9hEujjX8U",
             "toolName": "bash",
             "result": {
               "content": [
@@ -721,7 +791,7 @@
             "type": "message_start",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+              "toolCallId": "toolu_011sXjXYho2fVbB9hEujjX8U",
               "toolName": "bash",
               "content": [
                 {
@@ -731,7 +801,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1795232213100
+              "timestamp": 1795762834224
             }
           }
         },
@@ -740,7 +810,7 @@
             "type": "message_end",
             "message": {
               "role": "toolResult",
-              "toolCallId": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+              "toolCallId": "toolu_011sXjXYho2fVbB9hEujjX8U",
               "toolName": "bash",
               "content": [
                 {
@@ -750,7 +820,7 @@
               ],
               "details": {},
               "isError": true,
-              "timestamp": 1795232213100
+              "timestamp": 1795762834224
             }
           }
         },
@@ -762,14 +832,15 @@
               "content": [
                 {
                   "type": "toolCall",
-                  "id": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+                  "id": "toolu_011sXjXYho2fVbB9hEujjX8U",
                   "name": "bash",
                   "arguments": {
-                    "command": "echo hi"
+                    "command": "echo hi",
+                    "timeout": null
                   }
                 }
               ],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -790,16 +861,17 @@
                 "reasoning": 0
               },
               "stopReason": "toolUse",
-              "timestamp": 1795232212342,
-              "responseId": "gen_01M7Y2V9EG3QMTQBNP31QXYGG9",
+              "timestamp": 1795762832477,
+              "providerThinkingLevel": "medium",
+              "responseId": "msg_011ChT14HtFkkt9YWgtE9HS6",
               "rawStopReason": "tool_use",
-              "durationMs": 752,
+              "durationMs": 1742,
               "thinkingLevel": "medium"
             },
             "toolResults": [
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+                "toolCallId": "toolu_011sXjXYho2fVbB9hEujjX8U",
                 "toolName": "bash",
                 "content": [
                   {
@@ -809,7 +881,7 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1795232213100
+                "timestamp": 1795762834224
               }
             ]
           }
@@ -825,7 +897,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -843,9 +915,10 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1795232213103,
+              "timestamp": 1795762834227,
+              "providerThinkingLevel": "medium",
               "errorMessage": "Request aborted",
-              "durationMs": 4,
+              "durationMs": 3,
               "thinkingLevel": "medium"
             }
           }
@@ -856,7 +929,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -874,9 +947,10 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1795232213103,
+              "timestamp": 1795762834227,
+              "providerThinkingLevel": "medium",
               "errorMessage": "Request aborted",
-              "durationMs": 4,
+              "durationMs": 3,
               "thinkingLevel": "medium"
             }
           }
@@ -887,7 +961,7 @@
             "message": {
               "role": "assistant",
               "content": [],
-              "api": "anthropic-messages",
+              "api": "<pi-provider>-messages",
               "provider": "<pi-provider>",
               "model": "<pi-model>",
               "usage": {
@@ -905,9 +979,10 @@
                 }
               },
               "stopReason": "aborted",
-              "timestamp": 1795232213103,
+              "timestamp": 1795762834227,
+              "providerThinkingLevel": "medium",
               "errorMessage": "Request aborted",
-              "durationMs": 4,
+              "durationMs": 3,
               "thinkingLevel": "medium"
             },
             "toolResults": []
@@ -921,7 +996,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795232212313,
+                "timestamp": 1795762832441,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -1063,21 +1138,22 @@
                     "text": "Use the bash tool to run exactly `echo hi` and nothing else, then reply with exactly: DONE"
                   }
                 ],
-                "timestamp": 1795232212310
+                "timestamp": 1795762832440
               },
               {
                 "role": "assistant",
                 "content": [
                   {
                     "type": "toolCall",
-                    "id": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+                    "id": "toolu_011sXjXYho2fVbB9hEujjX8U",
                     "name": "bash",
                     "arguments": {
-                      "command": "echo hi"
+                      "command": "echo hi",
+                      "timeout": null
                     }
                   }
                 ],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1098,15 +1174,16 @@
                   "reasoning": 0
                 },
                 "stopReason": "toolUse",
-                "timestamp": 1795232212342,
-                "responseId": "gen_01M7Y2V9EG3QMTQBNP31QXYGG9",
+                "timestamp": 1795762832477,
+                "providerThinkingLevel": "medium",
+                "responseId": "msg_011ChT14HtFkkt9YWgtE9HS6",
                 "rawStopReason": "tool_use",
-                "durationMs": 752,
+                "durationMs": 1742,
                 "thinkingLevel": "medium"
               },
               {
                 "role": "toolResult",
-                "toolCallId": "toolu_012pGMwVYhPPGB8nW9h7nwx9",
+                "toolCallId": "toolu_011sXjXYho2fVbB9hEujjX8U",
                 "toolName": "bash",
                 "content": [
                   {
@@ -1116,12 +1193,12 @@
                 ],
                 "details": {},
                 "isError": true,
-                "timestamp": 1795232213100
+                "timestamp": 1795762834224
               },
               {
                 "role": "assistant",
                 "content": [],
-                "api": "anthropic-messages",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
                 "model": "<pi-model>",
                 "usage": {
@@ -1139,9 +1216,10 @@
                   }
                 },
                 "stopReason": "aborted",
-                "timestamp": 1795232213103,
+                "timestamp": 1795762834227,
+                "providerThinkingLevel": "medium",
                 "errorMessage": "Request aborted",
-                "durationMs": 4,
+                "durationMs": 3,
                 "thinkingLevel": "medium"
               }
             ],
@@ -1178,16 +1256,11 @@
               "model": {
                 "id": "<pi-model>",
                 "name": "Claude Haiku 5.5",
-                "api": "anthropic-messages",
-                "baseUrl": "<redacted>",
+                "api": "<pi-provider>-messages",
                 "provider": "<pi-provider>",
+                "baseUrl": "<redacted>",
                 "reasoning": true,
                 "input": ["text", "image"],
-                "compat": {
-                  "allowEmptySignature": true,
-                  "forceAdaptiveThinking": true,
-                  "supportsTemperature": false
-                },
                 "cost": {
                   "input": 0.1,
                   "output": 0.5,
@@ -1206,11 +1279,29 @@
                 "contextWindow": 1000000,
                 "maxTokens": 128000,
                 "thinkingLevelMap": {
+                  "minimal": null,
+                  "low": "low",
+                  "medium": "medium",
+                  "high": "high",
                   "xhigh": "xhigh",
                   "max": "max"
                 },
+                "compat": {
+                  "forceAdaptiveThinking": true,
+                  "supportsTemperature": false,
+                  "supportsMidConvoEffort": true,
+                  "supportsMidConvoSystemMessages": true,
+                  "supportsMidConvoToolChanges": true,
+                  "supportsStrictTools": true
+                },
+                "promptCache": {
+                  "short": 300,
+                  "long": 3600
+                },
                 "inputLimits": {
+                  "maxRequestBytes": 33554432,
                   "images": {
+                    "maxPerRequest": 600,
                     "resize": {
                       "maxWidth": 2000,
                       "maxHeight": 2000,
@@ -1226,7 +1317,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-51-955Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-32-216Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 5,

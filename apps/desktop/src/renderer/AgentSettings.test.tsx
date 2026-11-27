@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 import {
+  defaultPullRequestUpdateNote,
   defaultReviewPrompt,
   type EngineFeature,
   type EngineSettings,
@@ -42,12 +43,16 @@ const mount = (handlers: Partial<Handlers> = {}) => {
 
   const setPrompt = vi.fn<Handlers["SetReviewPrompt"]>(({ prompt }) => Effect.succeed(prompt))
 
+  const setNote = vi.fn<Handlers["SetPullRequestUpdateNote"]>(({ note }) => Effect.succeed(note))
+
   const backend = testLayer({
     GetEngineSettings: ({ feature }) =>
       Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, harness: "pi" }),
     SetEngineSettings: setEngine,
     GetReviewPrompt: () => Effect.succeed(defaultReviewPrompt),
     SetReviewPrompt: setPrompt,
+    GetPullRequestUpdateNote: () => Effect.succeed(defaultPullRequestUpdateNote),
+    SetPullRequestUpdateNote: setNote,
     ...handlers,
   })
 
@@ -62,6 +67,7 @@ const mount = (handlers: Partial<Handlers> = {}) => {
   return {
     setEngine,
     setPrompt,
+    setNote,
     user: userEvent.setup(),
     show: (show: boolean) => view.rerender(tree(show)),
   }
@@ -131,10 +137,45 @@ it("refuses an empty prompt, saves edits trimmed on blur, and restores the defau
   await user.click(screen.getByRole("heading", { name: "Agent reviews" }))
   await waitFor(() => expect(box).toHaveProperty("value", "Look only at naming."))
   expect(setPrompt).toHaveBeenCalledWith({ prompt: "Look only at naming." }, expect.anything())
-  await user.click(screen.getByRole("button", { name: "Restore default" }))
+  await user.click(
+    within(screen.getByRole("region", { name: "Agent reviews" })).getByRole("button", {
+      name: "Restore default",
+    }),
+  )
   await waitFor(() =>
     expect(setPrompt).toHaveBeenLastCalledWith({ prompt: defaultReviewPrompt }, expect.anything()),
   )
+})
+
+it("shows the default PR update note, refuses an empty one, saves an edit on blur, and restores the default", async () => {
+  const { setNote, setPrompt, user } = mount()
+  const updates = within(await screen.findByRole("region", { name: "PR updates" }))
+  const box = await updates.findByRole("textbox", { name: "PR update note" })
+  const leaveField = () => user.click(updates.getByRole("heading", { name: "PR updates" }))
+  expect(box).toHaveProperty("value", defaultPullRequestUpdateNote)
+  expect(updates.getByText("Default")).toBeDefined()
+
+  await user.clear(box)
+  await leaveField()
+  expect(setNote).not.toHaveBeenCalled()
+  expect(
+    updates.getByText("Write a PR update note. Threads need it to know how you handle PRs."),
+  ).toBeDefined()
+
+  await user.type(box, "  Squash fixups before pushing.\n")
+  await leaveField()
+  await waitFor(() => expect(box).toHaveProperty("value", "Squash fixups before pushing."))
+  expect(setNote).toHaveBeenCalledWith({ note: "Squash fixups before pushing." }, expect.anything())
+  expect(updates.getByText("Custom")).toBeDefined()
+
+  await user.click(updates.getByRole("button", { name: "Restore default" }))
+  await waitFor(() =>
+    expect(setNote).toHaveBeenLastCalledWith(
+      { note: defaultPullRequestUpdateNote },
+      expect.anything(),
+    ),
+  )
+  expect(setPrompt).not.toHaveBeenCalled()
 })
 
 it("keeps failed edits visible and retries them without repeating another setting's save", async () => {

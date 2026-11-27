@@ -12,6 +12,7 @@ import {
   ToolCallPart,
   TurnDone,
   TurnEnded,
+  TurnStarted,
   type TurnEnding,
   TurnFailed,
   withContextOf,
@@ -57,7 +58,13 @@ const encodeAccess = Schema.encodeSync(AccessJson)
 
 const decodeAccess = Schema.decodeSync(AccessJson)
 
-const scriptedCall = /^call(-ended)?:(\S+)(?: (.+))?$/m
+const scriptedCall = /^call(?<ended>-ended)?:(?<name>\S+)(?: (?<args>.+))?$/m
+
+const scriptedUpdateCall = /^on-update:(?<name>\S+)(?: (?<args>.+))?$/m
+
+const scriptedUnprompted = /^then-unprompted:(?<name>\S+)(?: (?<args>.+))?$/m
+
+const scriptedDuringUpdate = /^during-update:(.+)$/gm
 
 const scriptedHold = /^hold:(\S+)/m
 
@@ -191,30 +198,49 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
             ),
           )
 
-        const run = (turnId: string, { message, prompt }: DeliveredTurn) =>
+        const begin = (turnId: string, work: Effect.Effect<void>) =>
           Effect.gen(function* () {
-            const called = scriptedCall.exec(message)
+            const fiber = yield* work.pipe(Effect.forkIn(scope))
+            turn = { id: turnId, fiber, steers: [], index: 0, waiting: null }
+          })
 
-            if (called !== null && glass !== null) {
-              const [, ended, name, args = "{}"] = called
-              const access = ended === undefined ? glass : yield* earlierStart
-              const { output, done } = yield* callGlass(access, name!, decodeArgs(args))
+        const called = (turnId: string, access: GlassToolsAccess, name: string, args: string) =>
+          Effect.gen(function* () {
+            const { output, done } = yield* callGlass(access, name, decodeArgs(args))
 
-              yield* part(
-                turnId,
-                ToolCallPart.make({
-                  toolCallId: randomUUID(),
-                  name: name!,
-                  inputSummary: "",
-                  input: args,
-                  output,
-                  status: done ? "done" : "failed",
-                  parentToolCallId: null,
-                }),
-              )
+            yield* part(
+              turnId,
+              ToolCallPart.make({
+                toolCallId: randomUUID(),
+                name,
+                inputSummary: "",
+                input: args,
+                output,
+                status: done ? "done" : "failed",
+                parentToolCallId: null,
+              }),
+            )
+          })
+
+        const run = (turnId: string, { message, prompt, context }: DeliveredTurn) =>
+          Effect.gen(function* () {
+            const update =
+              Predicate.isTagged(context, "StartedWorkUpdate") ||
+              Predicate.isTagged(context, "Update")
+
+            const scripted = update ? scriptedUpdateCall.exec(prompt) : scriptedCall.exec(message)
+
+            const script = update
+              ? Array.from(prompt.matchAll(scriptedDuringUpdate), ([, line]) => line).join("\n")
+              : message
+
+            if (scripted !== null && glass !== null) {
+              const { ended, name, args = "{}" } = scripted.groups!
+
+              yield* called(turnId, ended === undefined ? glass : yield* earlierStart, name!, args)
             }
 
-            const hold = scriptedHold.exec(message)?.[1]
+            const hold = scriptedHold.exec(script)?.[1]
 
             if (hold !== undefined) {
               yield* part(turnId, TextPart.make({ text: "Holding." }))
@@ -268,7 +294,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
               yield* part(turnId, TextPart.make({ text: readdirSync(folder).toSorted().join(",") }))
             }
 
-            if (/ask permission/i.test(message)) {
+            if (/ask permission/i.test(script)) {
               yield* waitFor(
                 turnId,
                 PermissionRequestPart.make({
@@ -282,7 +308,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
               )
             }
 
-            if (/ask a question/i.test(message)) {
+            if (/ask a question/i.test(script)) {
               yield* waitFor(
                 turnId,
                 QuestionPart.make({
@@ -303,25 +329,47 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
               )
             }
 
-            if (prompt.includes("<glass_feedback>"))
+            if (prompt.includes("<glass_feedback>") || Predicate.isTagged(context, "Update"))
               yield* part(turnId, TextPart.make({ text: prompt }))
 
             yield* part(turnId, TextPart.make({ text: `Reply to: ${message}` }))
             yield* end(turnId, TurnDone.make({}))
+
+            const unprompted = scriptedUnprompted.exec(message)
+
+            if (unprompted !== null && glass !== null) {
+              const { name, args = "{}" } = unprompted.groups!
+              const id = randomUUID()
+
+              yield* begin(
+                id,
+                Effect.gen(function* () {
+                  yield* report(
+                    TurnStarted.make({
+                      turnId: id,
+                      message: "",
+                      images: [],
+                      context: null,
+                      feedback: [],
+                      sentAt: yield* DateTime.now,
+                    }),
+                  )
+                  yield* called(id, glass, name!, args)
+                  yield* end(id, TurnDone.make({}))
+                }),
+              )
+            }
           })
 
         return {
           configure: () => Effect.void,
           startTurn: (turnId, message) =>
-            Effect.gen(function* () {
-              const fiber = yield* (
-                review !== null && Predicate.isTagged(message.context, "AgentReview")
-                  ? runReview(turnId, message.prompt)
-                  : run(turnId, message)
-              ).pipe(Effect.forkIn(scope))
-
-              turn = { id: turnId, fiber, steers: [], index: 0, waiting: null }
-            }),
+            begin(
+              turnId,
+              review !== null && Predicate.isTagged(message.context, "AgentReview")
+                ? runReview(turnId, message.prompt)
+                : run(turnId, message),
+            ),
           steer: (message) =>
             turn === null ? notRunning : Effect.sync(() => void turn!.steers.push(message)),
           stopBackgroundTask: () => Effect.void,

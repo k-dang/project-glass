@@ -9,3 +9,9 @@ export const forThreadsOnThisDevice = Context.make(
   McpSchema.EnabledWhen,
   ({ clientInfo }) => clientInfo?.name === RELAY_CLIENT_NAME,
 )
+
+export const forThreads = Context.make(
+  McpSchema.EnabledWhen,
+  ({ clientInfo }) =>
+    clientInfo?.name === RELAY_CLIENT_NAME || clientInfo?.name === SANDBOX_RELAY_CLIENT_NAME,
+)

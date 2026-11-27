@@ -50,7 +50,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-43-956Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-27-552Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 0,
@@ -94,7 +94,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232204176,
+              "timestamp": 1795762827759,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -237,7 +237,7 @@
               "role": "system",
               "content": "",
               "sections": "<redacted>",
-              "timestamp": 1795232204176,
+              "timestamp": 1795762827759,
               "toolsAdded": [
                 {
                   "name": "read",
@@ -384,7 +384,7 @@
                   "text": "Say hello"
                 }
               ],
-              "timestamp": 1795232204175
+              "timestamp": 1795762827757
             }
           }
         },
@@ -399,7 +399,7 @@
                   "text": "Say hello"
                 }
               ],
-              "timestamp": 1795232204175
+              "timestamp": 1795762827757
             }
           }
         },
@@ -427,9 +427,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1795232204199,
+              "timestamp": 1795762827790,
               "errorMessage": "500: {\"message\":\"overloaded\"}",
-              "durationMs": 21,
+              "durationMs": 16,
               "thinkingLevel": "off"
             }
           }
@@ -458,9 +458,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1795232204199,
+              "timestamp": 1795762827790,
               "errorMessage": "500: {\"message\":\"overloaded\"}",
-              "durationMs": 21,
+              "durationMs": 16,
               "thinkingLevel": "off"
             }
           }
@@ -489,9 +489,9 @@
                 }
               },
               "stopReason": "error",
-              "timestamp": 1795232204199,
+              "timestamp": 1795762827790,
               "errorMessage": "500: {\"message\":\"overloaded\"}",
-              "durationMs": 21,
+              "durationMs": 16,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -505,7 +505,7 @@
                 "role": "system",
                 "content": "",
                 "sections": "<redacted>",
-                "timestamp": 1795232204176,
+                "timestamp": 1795762827759,
                 "toolsAdded": [
                   {
                     "name": "read",
@@ -647,7 +647,7 @@
                     "text": "Say hello"
                   }
                 ],
-                "timestamp": 1795232204175
+                "timestamp": 1795762827757
               },
               {
                 "role": "assistant",
@@ -670,9 +670,9 @@
                   }
                 },
                 "stopReason": "error",
-                "timestamp": 1795232204199,
+                "timestamp": 1795762827790,
                 "errorMessage": "500: {\"message\":\"overloaded\"}",
-                "durationMs": 21,
+                "durationMs": 16,
                 "thinkingLevel": "off"
               }
             ],
@@ -693,10 +693,10 @@
             "type": "entry_appended",
             "entry": {
               "type": "context_edit",
-              "id": "2c6036cc",
-              "parentId": "eba6206d",
-              "timestamp": "2026-11-21T03:36:44.223Z",
-              "targetId": "eba6206d",
+              "id": "e5d636a4",
+              "parentId": "5478cc6e",
+              "timestamp": "2026-11-27T07:00:27.808Z",
+              "targetId": "5478cc6e",
               "replacement": null
             }
           }
@@ -735,7 +735,7 @@
                 }
               },
               "stopReason": "pending",
-              "timestamp": 1795232204275
+              "timestamp": 1795762827869
             }
           }
         },
@@ -839,10 +839,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795232204275,
+              "timestamp": 1795762827869,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 5,
+              "durationMs": 4,
               "thinkingLevel": "off"
             }
           }
@@ -883,10 +883,10 @@
                 }
               },
               "stopReason": "stop",
-              "timestamp": 1795232204275,
+              "timestamp": 1795762827869,
               "responseId": "test-completion",
               "rawStopReason": "stop",
-              "durationMs": 5,
+              "durationMs": 4,
               "thinkingLevel": "off"
             },
             "toolResults": []
@@ -922,10 +922,10 @@
                   }
                 },
                 "stopReason": "stop",
-                "timestamp": 1795232204275,
+                "timestamp": 1795762827869,
                 "responseId": "test-completion",
                 "rawStopReason": "stop",
-                "durationMs": 5,
+                "durationMs": 4,
                 "thinkingLevel": "off"
               }
             ],
@@ -973,7 +973,7 @@
               "isCompacting": false,
               "steeringMode": "one-at-a-time",
               "followUpMode": "one-at-a-time",
-              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-21T03-36-43-956Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
+              "sessionFile": "<pi-home>/.pi/agent/sessions/--<folder>--/2026-11-27T07-00-27-552Z_1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d.jsonl",
               "sessionId": "1d7e4b2a-9c3f-4a5e-8b6d-2f1e0a9c8b7d",
               "autoCompactionEnabled": true,
               "messageCount": 3,
