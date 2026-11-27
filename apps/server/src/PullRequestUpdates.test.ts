@@ -451,34 +451,26 @@ const recentEvents = (
     ),
   )
 
-const eventsBehind = (turn: Turn | undefined) =>
-  Predicate.isTagged(turn?.context, "Update")
-    ? turn.context.subjects.flatMap(({ events }) => events.map(({ event }) => event._tag))
-    : undefined
+it.live("tells a Thread once that the PR it asked about merged, then ends the Subscription", () =>
+  Effect.gen(function* () {
+    const f = yield* subscribedThread("Clean up once it merges", ["merged-or-closed"])
 
-it.live(
-  "tells a Thread once that the PR it asked about merged, with the Event behind it, then ends the Subscription",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* subscribedThread("Clean up once it merges", ["merged-or-closed"])
+    f.pullRequest.edit({ state: "MERGED" })
+    yield* f.client.ListPullRequests()
+    const [, , update] = yield* f.transcript(f.thread.id, settled(3))
+    yield* subscriptionsLeft(f, f.thread.id, 0)
+    yield* f.client.ListPullRequests()
+    yield* f.send(f.thread.id, "Carry on")
+    const turns = yield* f.transcript(f.thread.id, lastSettled("Carry on"))
 
-      f.pullRequest.edit({ state: "MERGED" })
-      yield* f.client.ListPullRequests()
-      const [, , update] = yield* f.transcript(f.thread.id, settled(3))
-      yield* subscriptionsLeft(f, f.thread.id, 0)
-      yield* f.client.ListPullRequests()
-      yield* f.send(f.thread.id, "Carry on")
-      const turns = yield* f.transcript(f.thread.id, lastSettled("Carry on"))
-
-      assert.deepStrictEqual(turns.map(reasonsTold), [
-        undefined,
-        undefined,
-        [["greeter#7", "Merged"]],
-        undefined,
-      ])
-      assert.include(received(update), "The PR merged.")
-      assert.deepStrictEqual(eventsBehind(update), ["PullRequestMerged"])
-    }),
+    assert.deepStrictEqual(turns.map(reasonsTold), [
+      undefined,
+      undefined,
+      [["greeter#7", "Merged"]],
+      undefined,
+    ])
+    assert.include(received(update), "The PR merged.")
+  }),
 )
 
 it.live(
@@ -610,9 +602,8 @@ it.live("lists, for one Thread, the Events of every PR it has a Subscription to"
     dependency.mergeable = "CONFLICTING"
     unrelated.mergeable = "CONFLICTING"
     yield* f.client.ListPullRequests()
-    const [, , , update] = yield* f.transcript(f.thread.id, settled(4))
+    yield* f.transcript(f.thread.id, settled(4))
 
-    assert.deepStrictEqual(eventsBehind(update), ["MergeConflictAppeared", "MergeConflictAppeared"])
     assert.sameDeepMembers(yield* recentEvents(f, { threadId: f.thread.id }), [
       MergeConflictAppearedEvent.make({ pullRequest: greeter(7) }),
       MergeConflictAppearedEvent.make({ pullRequest: greeter(8) }),

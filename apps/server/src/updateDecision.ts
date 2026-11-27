@@ -16,13 +16,29 @@ export type Told = typeof Told.Type
 
 const untold: ReasonTold = { seen: [], updates: 0 }
 
-export const nothingTold: Told = {}
-
 const withoutUntold = (told: Told): Told =>
   Record.filter(told, ({ seen, updates }) => seen.length > 0 || updates > 0)
 
-export const countedAfresh = (told: Told): Told =>
+const countedAfresh = (told: Told): Told =>
   withoutUntold(Record.map(told, ({ seen }) => ({ seen, updates: 0 })))
+
+export const LastTold = Schema.Struct({
+  subject: Schema.String,
+  told: Told,
+  afterMessage: Schema.NullOr(Schema.String),
+})
+
+export type LastTold = typeof LastTold.Type
+
+export const toldBefore = (
+  last: LastTold | null,
+  subject: string,
+  lastMessageTurn: string | null,
+): Told => {
+  if (last?.subject !== subject) return {}
+
+  return last.afterMessage === lastMessageTurn ? last.told : countedAfresh(last.told)
+}
 
 export const sameTold = Schema.toEquivalence(Told)
 

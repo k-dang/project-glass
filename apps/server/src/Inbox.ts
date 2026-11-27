@@ -136,62 +136,70 @@ const inboxOf = (waiting: Waiting): InboxItems =>
     order,
   )
 
-const reasonsOf = (
-  { attention, checks, details, ref }: MirroredPullRequest,
-  standings: ReadonlyArray<PullRequestStanding>,
-) => {
+const reasonsOf = ({
+  attention,
+  checks,
+}: MirroredPullRequest): ReadonlyArray<PullRequestReason> => {
   const reasons: Array<PullRequestReason> = []
-  const held = details === null ? null : partitionFeedback(details).heldBack
 
-  const standingOn = (reason: OpenReason, holds: boolean) => {
-    const standing = holds
-      ? standings.filter(
-          (candidate) =>
-            candidate.reason === reason &&
-            referenceKey(candidate.pullRequest) === referenceKey(ref),
-        )
-      : []
+  if (attention?.changesRequested) reasons.push(ChangesRequested.make({}))
 
-    const handled = standing.some(({ state }) => state === "handling")
-
-    return {
-      handled,
-      triedBy: handled
-        ? []
-        : standing.map(({ thread }): TriedThread => ({ threadId: thread.id, name: thread.name })),
-    }
+  if (checks === "failing") {
+    reasons.push(ChecksFailing.make({ failing: attention?.failingChecks ?? [] }))
   }
 
-  const changesRequested = attention?.changesRequested === true
-  const checksFailing = checks === "failing"
-  const awaitingReply = attention?.awaitingReply ?? 0
-  const changes = standingOn("changes-requested", changesRequested)
-  const failing = standingOn("failing-checks", checksFailing)
-  const feedback = standingOn("review-feedback", awaitingReply > 0)
+  if (attention && attention.awaitingReply > 0) {
+    reasons.push(AwaitingReply.make({ reviewThreads: attention.awaitingReply }))
+  }
 
-  if (changesRequested && (!changes.handled || (held?.changesRequested.length ?? 0) > 0))
-    reasons.push(ChangesRequested.make({}))
-
-  if (checksFailing && !failing.handled)
-    reasons.push(ChecksFailing.make({ failing: attention?.failingChecks ?? [] }))
-
-  const reviewThreads = feedback.handled ? (held?.reviewThreads.length ?? 0) : awaitingReply
-
-  if (reviewThreads > 0) reasons.push(AwaitingReply.make({ reviewThreads }))
-
-  if (
-    !changesRequested &&
-    !checksFailing &&
-    awaitingReply === 0 &&
-    attention?.approved &&
-    attention.mergeClean
-  )
+  if (reasons.length === 0 && attention?.approved && attention.mergeClean) {
     reasons.push(ReadyToMerge.make({}))
+  }
+
+  return reasons
+}
+
+const openReasonOf: Partial<Record<PullRequestReason["_tag"], OpenReason>> = {
+  ChangesRequested: "changes-requested",
+  ChecksFailing: "failing-checks",
+  AwaitingReply: "review-feedback",
+}
+
+const heldBackOf = (
+  reason: PullRequestReason,
+  { details }: MirroredPullRequest,
+): ReadonlyArray<PullRequestReason> => {
+  if (details === null) return []
+
+  const { changesRequested, reviewThreads } = partitionFeedback(details).heldBack
+
+  if (Predicate.isTagged(reason, "ChangesRequested"))
+    return changesRequested.length > 0 ? [reason] : []
+
+  return Predicate.isTagged(reason, "AwaitingReply") && reviewThreads.length > 0
+    ? [AwaitingReply.make({ reviewThreads: reviewThreads.length })]
+    : []
+}
+
+const leftToYou = (pr: MirroredPullRequest, standings: ReadonlyArray<PullRequestStanding>) => {
+  const left = reasonsOf(pr).map((reason) => {
+    const standing = standings.filter((candidate) => candidate.reason === openReasonOf[reason._tag])
+
+    return standing.some(({ state }) => state === "handling")
+      ? { reasons: heldBackOf(reason, pr), triedBy: [] }
+      : {
+          reasons: [reason],
+          triedBy: standing.map(({ thread }): TriedThread => ({
+            threadId: thread.id,
+            name: thread.name,
+          })),
+        }
+  })
 
   return {
-    reasons,
+    reasons: left.flatMap(({ reasons }) => reasons),
     triedBy: Arr.dedupeWith(
-      [changes, failing, feedback].flatMap(({ triedBy }) => triedBy),
+      left.flatMap(({ triedBy }) => triedBy),
       (a, b) => a.threadId === b.threadId,
     ),
   }
@@ -200,18 +208,21 @@ const reasonsOf = (
 const yourPullRequests = (
   mirror: Mirror | undefined,
   standings: ReadonlyArray<PullRequestStanding>,
-): ReadonlyArray<WaitingPullRequest> =>
-  (mirror?.repositories ?? []).flatMap(({ pullRequests }) =>
+): ReadonlyArray<WaitingPullRequest> => {
+  const standingsOf = Arr.groupBy(standings, ({ pullRequest }) => referenceKey(pullRequest))
+
+  return (mirror?.repositories ?? []).flatMap(({ pullRequests }) =>
     pullRequests.flatMap((pr) => {
       if (!pr.viewerIsAuthor) return []
 
-      const { reasons, triedBy } = reasonsOf(pr, standings)
+      const { reasons, triedBy } = leftToYou(pr, standingsOf[referenceKey(pr.ref)] ?? [])
 
       return Arr.isReadonlyArrayNonEmpty(reasons)
         ? [{ pullRequest: summaryOf(pr), reasons, triedBy, since: pr.updatedAt }]
         : []
     }),
   )
+}
 
 const reviewable = (queued: ReadonlyArray<QueuedPullRequest>) =>
   queued.flatMap((row) => (canRunQueueWork(row) ? [row.pullRequest] : []))

@@ -1,9 +1,16 @@
-import { type Thread, ThreadPullRequest, PullRequestOpen, repositoryKey } from "@glass/contracts"
+import {
+  type Thread,
+  type ThreadError,
+  ThreadPullRequest,
+  PullRequestOpen,
+  repositoryKey,
+} from "@glass/contracts"
 import {
   Context,
   DateTime,
   Effect,
   Layer,
+  Option,
   Predicate,
   Ref,
   Schema,
@@ -101,6 +108,7 @@ export class ThreadPullRequests extends Context.Service<
   {
     readonly watch: () => Stream.Stream<ReadonlyArray<ThreadPullRequest>>
     readonly ofThread: (threadId: string) => Effect.Effect<ThreadPullRequest | undefined>
+    readonly ownIn: (mirror: Mirror) => Effect.Effect<ReadonlyArray<ThreadPullRequest>, ThreadError>
   }
 >()("@glass/server/ThreadPullRequests") {
   static readonly layer = Layer.effect(
@@ -204,6 +212,15 @@ export class ThreadPullRequests extends Context.Service<
           SubscriptionRef.get(listed).pipe(
             Effect.map((current) => current.find((own) => own.threadId === threadId)),
           ),
+        ownIn: (mirrored) =>
+          Effect.gen(function* () {
+            const current = Option.getOrElse(
+              yield* threads.watch().pipe(Stream.runHead),
+              (): ReadonlyArray<Thread> => [],
+            )
+
+            return pullRequestsOf(current, mirrored, yield* Ref.get(ended))
+          }),
       })
     }),
   )

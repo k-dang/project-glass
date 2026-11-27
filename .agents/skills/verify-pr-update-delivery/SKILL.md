@@ -37,7 +37,7 @@ Synced with the code at commit `23352ad88779ba29a0b0436194757c4569e0ee12`. Befor
 | `IsNew`, `DecideNothingHolds`, `Count(t) < GivesUpAfter` | `decide` in `apps/server/src/updateDecision.ts` and `failingChecks` in `apps/server/src/pullRequestNow.ts` (`cleared` returns the count to zero; `unsettled` keeps it, both while checks run again and while a new push has none yet) |
 | `SlotFree` | `runningUpdates` in `Transcripts.ts`, counted in `sendUpdate` in `Updates.ts` against `RUN_AT_ONCE` |
 | `StartUpdate` | `startIfIdle` in `Transcripts.ts`, with `recordTold` in `apps/server/src/Subscriptions.ts` in the same transaction |
-| `afterNewMessage`, `MessageReaches` | `lastMessageTurn` in `Transcripts.ts`, which reads the Turns your message started (`started_by = 'user'`) and your Steers, against `afterMessage` in `last_told`; `toldAbout` in `Subscriptions.ts` and `countedAfresh` in `updateDecision.ts` |
+| `afterNewMessage`, `MessageReaches` | `lastMessageTurn` in `Transcripts.ts`, which reads the Turns your message started (`started_by = 'user'`) and your Steers, against `afterMessage` in `last_told`; `toldBefore` and `countedAfresh` in `updateDecision.ts` |
 | `YouSendMessage`, `YouQueueMessage`, `AgentSendsMessage`, `AgentQueuesMessage`, `QueuedMessageStarts`, `TurnEnds`, `StoppedQueueStarts` | `stepThread` in `apps/server/src/threadState.ts`, which gives the Turn a message starts that message's sender |
 | `AgentMessageReaches` | A Turn another agent's message started (`started_by` is `creator` or `agent`), which `lastMessageTurn` leaves out |
 | `YouSteer` | The Steer part the Agent harness reports, which `lastMessageTurn` reads |

@@ -3,7 +3,7 @@ import { type InboxItems, isGone, type TurnEnd } from "@glass/contracts"
 import { DateTime, Effect, Option, Predicate, Stream } from "effect"
 import { type FakePullRequest, VIEWER } from "../test/fakePullRequest"
 import { withSkippableWaits } from "../test/deadlines"
-import { inboxWhen } from "../test/inboxWhen"
+import { inboxWhen, pullRequestItem } from "../test/inboxWhen"
 import { fail, failed, failThreeTimes, subscribe } from "../test/pullRequestUpdates"
 import { holding, settled, threadsFixture } from "../test/threadsFixture"
 import { greeterPullRequest, pullRequestFor } from "../test/threadWithPullRequest"
@@ -11,20 +11,13 @@ import { QUICK_RETRY_SPACING } from "./reconnecting"
 
 type Fixture = Effect.Success<typeof threadsFixture>
 
-const itemOf = (items: InboxItems, pullRequest: FakePullRequest) =>
-  items.flatMap((item) =>
-    Predicate.isTagged(item, "PullRequest") && item.pullRequest.url === pullRequest.url
-      ? [item]
-      : [],
-  )[0]
-
 const threadItem = (items: InboxItems, threadId: string) =>
   items.flatMap((item) =>
     Predicate.isTagged(item, "Thread") && item.thread.id === threadId ? [item] : [],
   )[0]
 
 const shown = (items: InboxItems, pullRequest: FakePullRequest) => {
-  const item = itemOf(items, pullRequest)
+  const item = pullRequestItem(items, pullRequest)
 
   return item === undefined
     ? undefined
@@ -43,7 +36,7 @@ const shows =
     shown(items, pullRequest)?.reasons.join() === reasons.join()
 
 const failingRuns = (items: InboxItems, pullRequest: FakePullRequest) =>
-  itemOf(items, pullRequest)?.reasons.flatMap((reason) =>
+  pullRequestItem(items, pullRequest)?.reasons.flatMap((reason) =>
     Predicate.isTagged(reason, "ChecksFailing") ? reason.failing.map(({ url }) => url) : [],
   )
 
@@ -92,7 +85,7 @@ it.live(
       )
 
       assert.deepStrictEqual(shown(running, f.pullRequest)?.triedBy, [])
-      assert.deepStrictEqual(itemOf(ended, f.pullRequest)?.triedBy, [
+      assert.deepStrictEqual(pullRequestItem(ended, f.pullRequest)?.triedBy, [
         { threadId: f.thread.id, name: f.thread.name },
       ])
     }),
@@ -273,6 +266,6 @@ it.live("lists a Thread whose PR update stopped at a Permission request", () =>
       (items) => threadItem(items, f.thread.id)?.reasons[0]?._tag === "WaitingRequests",
     )
 
-    assert.isUndefined(itemOf(listed, f.pullRequest))
+    assert.isUndefined(pullRequestItem(listed, f.pullRequest))
   }),
 )

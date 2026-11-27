@@ -561,23 +561,30 @@ export const GlassToolHandlers = GlassTools.toLayer(
         })
     })
 
-    const sender = Effect.gen(function* () {
-      const caller = yield* McpCaller.current
-
-      if (Predicate.isTagged(caller, "OutsideAgent")) return AgentSender.OutsideAgent()
-
-      return Predicate.isTagged(caller, "Thread")
-        ? AgentSender.Thread({
-            id: caller.threadId,
-            turnForUser: isOnTheUsersWord(
-              yield* transcripts.turnStarter(caller.threadId, caller.turnId),
+    const sender = McpCaller.current.pipe(
+      Effect.flatMap(
+        Match.valueTags({
+          OutsideAgent: () => Effect.succeed(AgentSender.OutsideAgent()),
+          Thread: ({ threadId, turnId }) =>
+            transcripts
+              .turnStarter(threadId, turnId)
+              .pipe(
+                Effect.map((starter) =>
+                  AgentSender.Thread({ id: threadId, turnForUser: isOnTheUsersWord(starter) }),
+                ),
+              ),
+          GlobalChat: ({ globalChatId, sessionId }) =>
+            transcripts.runningTurnStarter(sessionId).pipe(
+              Effect.map((starter) =>
+                AgentSender.GlobalChat({
+                  id: globalChatId,
+                  turnForUser: isOnTheUsersWord(starter),
+                }),
+              ),
             ),
-          })
-        : AgentSender.GlobalChat({
-            id: caller.globalChatId,
-            turnForUser: isOnTheUsersWord(yield* transcripts.runningTurnStarter(caller.sessionId)),
-          })
-    })
+        }),
+      ),
+    )
 
     return GlassTools.of({
       list_pull_requests: () =>

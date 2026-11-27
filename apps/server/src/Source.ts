@@ -1,7 +1,7 @@
 import type { EventSource, SubscriptionReason, ThreadError, Update } from "@glass/contracts"
-import { Array as Arr, Context, type DateTime, Effect, Stream } from "effect"
+import { Array as Arr, Context, Effect, Stream } from "effect"
 import type { SubscriptionState } from "./Subscriptions"
-import { decide, type SubjectNow, type Told } from "./updateDecision"
+import { decide, type SubjectNow, type Told, toldBefore } from "./updateDecision"
 
 export interface Subscribed<Detail> {
   readonly state: SubscriptionState
@@ -14,7 +14,7 @@ export const decided = <Detail, Extra>(
   lastMessageTurn: string | null,
 ) =>
   subscribed.map((one) => {
-    const before = one.state.toldAbout(one.subject, lastMessageTurn)
+    const before = toldBefore(one.state.lastTold, one.subject, lastMessageTurn)
 
     return { ...one, before, decision: decide(one.state.subscription.reasons, one.now, before) }
   })
@@ -39,7 +39,6 @@ export interface Source {
     threadId: string,
     states: ReadonlyArray<SubscriptionState>,
     lastMessageTurn: string | null,
-    readSince: DateTime.Utc,
   ) => Effect.Effect<Decided, ThreadError>
 }
 
@@ -49,7 +48,6 @@ export const sourceOf = <Detail, Extra>(source: {
   readonly now: (
     threadId: string,
     states: ReadonlyArray<SubscriptionState>,
-    readSince: DateTime.Utc,
   ) => Effect.Effect<ReadonlyArray<Subscribed<Detail> & Extra>, ThreadError>
   readonly update: (
     due: Arr.NonEmptyReadonlyArray<
@@ -61,8 +59,8 @@ export const sourceOf = <Detail, Extra>(source: {
 }): Source => ({
   name: source.name,
   changes: source.changes,
-  decide: (threadId, states, lastMessageTurn, readSince) =>
-    source.now(threadId, states, readSince).pipe(
+  decide: (threadId, states, lastMessageTurn) =>
+    source.now(threadId, states).pipe(
       Effect.map((subscribed) => {
         const all = decided(subscribed, lastMessageTurn)
 

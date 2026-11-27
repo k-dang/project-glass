@@ -11,18 +11,52 @@ const RUN_AT_ONCE = 3
 
 const tells = ({ due }: SubscriptionDecision) => due.length > 0
 
-const toRecord = (all: ReadonlyArray<SubscriptionDecision>, sends: boolean) =>
-  all.flatMap((decided): ReadonlyArray<ToldSubscription> => {
+const toRecord = (decisions: ReadonlyArray<SubscriptionDecision>) =>
+  decisions.flatMap((decided): ReadonlyArray<ToldSubscription> => {
     const { state, subject, before, told } = decided
-    const hasNews = tells(decided)
-
-    if (hasNews && !sends) return []
-
-    const ends = state.ended !== null && hasNews
+    const ends = state.ended !== null && tells(decided)
 
     return ends || !sameTold(told, before)
       ? [{ subscriptionId: state.subscription.id, subject, told, ends }]
       : []
+  })
+
+const untold = (decisions: ReadonlyArray<SubscriptionDecision>) =>
+  decisions.filter((decided) => !tells(decided))
+
+const asUnitOfWork = <E, R>(
+  threadId: string,
+  source: EventSource,
+  told: ReadonlyArray<SubscriptionDecision>,
+  send: (started: (turnId: string) => Effect.Effect<void>) => Effect.Effect<unknown, E, R>,
+) =>
+  Effect.gen(function* () {
+    const startedAt = yield* DateTime.now
+    const turn = yield* Ref.make<string | undefined>(undefined)
+
+    yield* send((turnId) => Ref.set(turn, turnId)).pipe(
+      Effect.onExit(
+        Effect.fnUntraced(function* (exit) {
+          const turnId = yield* Ref.get(turn)
+
+          if (turnId === undefined && Exit.isSuccess(exit)) return
+
+          yield* recordUnit("Update", {
+            startedAt,
+            endedAt: yield* DateTime.now,
+            exit,
+            fields: {
+              thread_id: threadId,
+              turn_id: turnId,
+              source,
+              subjects: told.map(({ subject }) => subject).join(),
+              subscription_ids: told.map(({ state }) => state.subscription.id).join(),
+              reasons: Arr.dedupe(told.flatMap(({ due }) => due)).join(),
+            },
+          })
+        }),
+      ),
+    )
   })
 
 export const Updates = Layer.effectDiscard(
@@ -31,43 +65,6 @@ export const Updates = Layer.effectDiscard(
     const subscriptions = yield* Subscriptions
     const transcripts = yield* Transcripts
     const sources = yield* Sources
-    const since = yield* DateTime.now
-
-    const asUnitOfWork = <E, R>(
-      threadId: string,
-      source: EventSource,
-      told: ReadonlyArray<SubscriptionDecision>,
-      send: (started: (turnId: string) => Effect.Effect<void>) => Effect.Effect<unknown, E, R>,
-    ) =>
-      Effect.gen(function* () {
-        const startedAt = yield* DateTime.now
-        const turn = yield* Ref.make<string | undefined>(undefined)
-
-        yield* send((turnId) => Ref.set(turn, turnId)).pipe(
-          Effect.onExit(
-            Effect.fnUntraced(function* (exit) {
-              const turnId = yield* Ref.get(turn)
-
-              if (turnId === undefined && Exit.isSuccess(exit)) return
-
-              yield* recordUnit("Update", {
-                startedAt,
-                endedAt: yield* DateTime.now,
-                exit,
-                fields: {
-                  thread_id: threadId,
-                  turn_id: turnId,
-                  source,
-                  subjects: told.map(({ subject }) => subject).join(),
-                  subscription_ids: told.map(({ state }) => state.subscription.id).join(),
-                  reasons: Arr.dedupe(told.flatMap(({ due }) => due)).join(),
-                },
-              })
-              yield* subscriptions.announceChange
-            }),
-          ),
-        )
-      })
 
     const sendUpdate = (threadId: string, waits: Effect.Effect<void>) =>
       threads.whenIdle(threadId, (start) =>
@@ -79,24 +76,23 @@ export const Updates = Layer.effectDiscard(
               threadId,
               yield* subscriptions.states(threadId, source.name),
               lastMessageTurn,
-              since,
             )
 
             if (update === undefined) {
-              yield* subscriptions.recordTold(toRecord(decisions, true), lastMessageTurn)
+              yield* subscriptions.recordTold(toRecord(decisions), lastMessageTurn)
 
               continue
             }
 
             if ((yield* transcripts.runningUpdates).length >= RUN_AT_ONCE) {
-              yield* subscriptions.recordTold(toRecord(decisions, false), lastMessageTurn)
+              yield* subscriptions.recordTold(toRecord(untold(decisions)), lastMessageTurn)
               yield* waits
 
               return
             }
 
             const context = yield* update
-            const record = toRecord(decisions, true)
+            const record = toRecord(decisions)
 
             yield* asUnitOfWork(threadId, source.name, decisions.filter(tells), (started) =>
               start({ message: "", images: [], context, retriesDelivery: false }, (turnId) =>

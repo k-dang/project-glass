@@ -1,10 +1,10 @@
 import { assert, it } from "@effect/vitest"
-import type { InboxItems, Turn } from "@glass/contracts"
-import { Effect, Predicate } from "effect"
+import type { Turn } from "@glass/contracts"
+import { Effect } from "effect"
 import { rmSync } from "node:fs"
 import { join } from "node:path"
-import { type FakePullRequest, VIEWER } from "../test/fakePullRequest"
-import { inboxWhen } from "../test/inboxWhen"
+import { VIEWER } from "../test/fakePullRequest"
+import { inboxWhen, pullRequestItem } from "../test/inboxWhen"
 import {
   fail,
   failed,
@@ -197,13 +197,6 @@ it.live("keeps the count and what the Thread gave up on when Glass opens again",
 
 const updating = (turns: ReadonlyArray<Turn>) => turns.length === 3 && holding(turns.slice(-1))
 
-const itemOf = (items: InboxItems, pullRequest: FakePullRequest) =>
-  items.flatMap((item) =>
-    Predicate.isTagged(item, "PullRequest") && item.pullRequest.url === pullRequest.url
-      ? [item]
-      : [],
-  )[0]
-
 it.live(
   "runs three PR updates at once, starts the rest in the order they became due and decides each again then, with a waiting one's reason left out of the Inbox",
   () =>
@@ -249,7 +242,7 @@ it.live(
 
       const waiting = yield* inboxWhen(
         f.client,
-        (items) => itemOf(items, four!.pullRequest) !== undefined,
+        (items) => pullRequestItem(items, four!.pullRequest) !== undefined,
       )
 
       pass(four!.pullRequest)
@@ -262,7 +255,7 @@ it.live(
       assert.deepStrictEqual(failedRuns(first[2]), ["https://ci.test/lint/1"])
       assert.deepStrictEqual(behind.map(reasonsTold), [undefined, undefined, undefined])
       assert.deepStrictEqual(
-        itemOf(waiting, four!.pullRequest)?.reasons.map(({ _tag }) => _tag),
+        pullRequestItem(waiting, four!.pullRequest)?.reasons.map(({ _tag }) => _tag),
         ["AwaitingReply"],
       )
       assert.deepStrictEqual(failedRuns(again[3]), ["https://ci.test/lint/2"])

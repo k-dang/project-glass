@@ -11,7 +11,7 @@ import { SqlClient, type SqlError, type Statement } from "effect/sql"
 import { randomUUID } from "node:crypto"
 import { isOnTheUsersWord } from "./threadState"
 import { Transcripts } from "./Transcripts"
-import { countedAfresh, nothingTold, Told } from "./updateDecision"
+import { LastTold, type Told } from "./updateDecision"
 
 export interface NewSubscription<E> {
   readonly source: EventSource
@@ -27,12 +27,6 @@ const encodeReasons = Schema.encodeSync(ReasonsJson)
 const SubjectJson = Schema.fromJsonString(SubscriptionSubject)
 
 const encodeSubject = Schema.encodeSync(SubjectJson)
-
-const LastTold = Schema.Struct({
-  subject: Schema.String,
-  told: Told,
-  afterMessage: Schema.NullOr(Schema.String),
-})
 
 const encodeTold = Schema.encodeSync(Schema.fromJsonString(LastTold))
 
@@ -50,6 +44,8 @@ type StoredSubscription = typeof StoredSubscription.Type
 
 const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredSubscription))
 
+const decodeSaved = Schema.decodeUnknownEffect(Schema.Tuple([Schema.Struct({ id: Schema.String })]))
+
 const decodeThreadIds = Schema.decodeUnknownEffect(
   Schema.Array(Schema.Struct({ threadId: Schema.String })),
 )
@@ -59,7 +55,7 @@ const subscriptionOf = ({ id, threadId, source, subject, reasons, note }: Stored
 
 export interface SubscriptionState {
   readonly subscription: Subscription
-  readonly toldAbout: (subject: string, lastMessageTurn: string | null) => Told
+  readonly lastTold: LastTold | null
   readonly ended: SubscriptionEnding | null
 }
 
@@ -72,13 +68,7 @@ export interface ToldSubscription {
 
 const stateOf = (stored: StoredSubscription): SubscriptionState => ({
   subscription: subscriptionOf(stored),
-  toldAbout: (subject, lastMessageTurn) => {
-    const last = stored.lastTold
-
-    if (last?.subject !== subject) return nothingTold
-
-    return last.afterMessage === lastMessageTurn ? last.told : countedAfresh(last.told)
-  },
+  lastTold: stored.lastTold,
   ended: stored.ended,
 })
 
@@ -127,7 +117,6 @@ export class Subscriptions extends Context.Service<
       told: ReadonlyArray<ToldSubscription>,
       lastMessageTurn: string | null,
     ) => Effect.Effect<void, ThreadError>
-    readonly announceChange: Effect.Effect<void>
   }
 >()("@glass/server/Subscriptions") {
   static readonly layer = Layer.effect(
@@ -162,47 +151,32 @@ export class Subscriptions extends Context.Service<
           })
 
         const subject = yield* input.subject
-        const about = encodeSubject(subject)
-        const reasons = encodeReasons(input.reasons)
-        const now = yield* DateTime.now
 
-        const subscription = yield* Effect.gen(function* () {
-          const [existing] = yield* stored(
-            sql`thread_id = ${threadId} AND source = ${input.source} AND subject = ${about} AND ended IS NULL`,
-          )
-
-          const saved = new Subscription({
-            id: existing?.id ?? randomUUID(),
-            threadId,
+        const [{ id }] = yield* sql`
+          INSERT INTO subscription ${sql.insert({
+            id: randomUUID(),
+            thread_id: threadId,
             source: input.source,
-            subject,
-            reasons: input.reasons,
+            subject: encodeSubject(subject),
+            reasons: encodeReasons(input.reasons),
             note: input.note,
-          })
-
-          yield* (
-            existing === undefined
-              ? sql`INSERT INTO subscription ${sql.insert({
-                  id: saved.id,
-                  thread_id: threadId,
-                  source: saved.source,
-                  subject: about,
-                  reasons,
-                  note: input.note,
-                  created_at: DateTime.formatIso(now),
-                })}`
-              : sql`
-                  UPDATE subscription SET ${sql.update({ reasons, note: input.note })}
-                  WHERE id = ${saved.id}
-                `
-          ).pipe(Effect.catch(storageFailure))
-
-          return saved
-        }).pipe(sql.withTransaction, Effect.catchTag("SqlError", storageFailure))
+            created_at: DateTime.formatIso(yield* DateTime.now),
+          })}
+          ON CONFLICT (thread_id, source, subject) WHERE ended IS NULL
+          DO UPDATE SET reasons = excluded.reasons, note = excluded.note
+          RETURNING id
+        `.pipe(Effect.flatMap(decodeSaved), Effect.catch(storageFailure))
 
         yield* wrote
 
-        return subscription
+        return new Subscription({
+          id,
+          threadId,
+          source: input.source,
+          subject,
+          reasons: input.reasons,
+          note: input.note,
+        })
       })
 
       const end = Effect.fn("Subscriptions.end")(function* (
@@ -275,8 +249,10 @@ export class Subscriptions extends Context.Service<
                     WHERE id = ${subscriptionId}
                   `,
             { discard: true },
-          ).pipe(Effect.catch(storageFailure)),
-        announceChange: wrote,
+          ).pipe(
+            Effect.catch(storageFailure),
+            Effect.andThen(told.length > 0 ? wrote : Effect.void),
+          ),
       })
     }),
   )

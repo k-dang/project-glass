@@ -4,7 +4,6 @@ import {
   FollowedRepository,
   GitHubUnavailable,
   PullRequestRef,
-  PullRequestSubject,
   PullRequestSummary,
   repositoryKey,
 } from "@glass/contracts"
@@ -20,9 +19,9 @@ import {
   Schema,
   Semaphore,
   Stream,
+  Ref,
   SubscriptionRef,
 } from "effect"
-import { SqlClient } from "effect/sql"
 import { join } from "node:path"
 import { writeDataFile } from "./dataFiles"
 import { EventLog } from "./EventLog"
@@ -126,30 +125,10 @@ export const openPullRequestOf = (
   { repository, branch }: { readonly repository: FollowedRepository; readonly branch: string },
 ) => mirrorOf(mirror, repository)?.pullRequests.find((pr) => pr.headBranch === branch)
 
-const SubscribedTo = Schema.Struct({
-  subject: Schema.fromJsonString(PullRequestSubject),
-  threadOwner: Schema.String,
-  threadRepo: Schema.String,
-  branch: Schema.NullOr(Schema.String),
-})
-
-const decodeSubscribedTo = Schema.decodeUnknownEffect(Schema.Array(SubscribedTo))
-
-const mirroredFor = (mirror: Mirror, subscription: typeof SubscribedTo.Type) => {
-  const { subject, threadOwner, threadRepo, branch } = subscription
-
-  if (subject.pullRequest !== null) return mirroredPullRequest(mirror, subject.pullRequest)
-
-  return branch === null
-    ? undefined
-    : openPullRequestOf(mirror, {
-        repository: new FollowedRepository({ owner: threadOwner, repo: threadRepo }),
-        branch,
-      })
-}
-
 const newestFirst = (pullRequests: ReadonlyArray<MirroredPullRequest>) =>
   Arr.sortWith(pullRequests, (pr) => pr.updatedAt, Order.flip(DateTime.Order))
+
+type InDetail = (mirror: Mirror) => Effect.Effect<ReadonlyArray<PullRequestRef>>
 
 interface Synced {
   readonly mirror: Mirror
@@ -162,6 +141,7 @@ export class PullRequestMirror extends Context.Service<
     readonly saved: Effect.Effect<Mirror | undefined>
     readonly changes: Stream.Stream<Mirror | undefined>
     readonly forgetRepositories: Effect.Effect<void>
+    readonly readInDetail: (which: InDetail) => Effect.Effect<void>
     readonly sync: (
       viewer: string,
       followed: ReadonlyArray<FollowedRepository>,
@@ -175,10 +155,10 @@ export class PullRequestMirror extends Context.Service<
       const github = yield* GitHubClient
       const fs = yield* FileSystem.FileSystem
       const events = yield* EventLog
-      const sql = yield* SqlClient.SqlClient
       const { dataDirectory } = yield* ServerConfig
       const path = join(dataDirectory, "pull-requests.json")
       const lock = yield* Semaphore.make(1)
+      const detailed = yield* Ref.make<InDetail>(() => Effect.succeed([]))
 
       const loaded = yield* fs.readFileString(path).pipe(
         Effect.flatMap(decodeMirror),
@@ -299,26 +279,17 @@ export class PullRequestMirror extends Context.Service<
       })
 
       const subscribedIn = (mirror: Mirror) =>
-        sql`
-          SELECT s.subject, t.owner AS threadOwner, t.repo AS threadRepo, t.branch
-          FROM subscription s JOIN thread t ON t.id = s.thread_id
-          WHERE s.source = 'github' AND s.ended IS NULL
-        `.pipe(
-          Effect.flatMap(decodeSubscribedTo),
-          Effect.map((subscriptions) => [
+        Ref.get(detailed).pipe(
+          Effect.flatMap((which) => which(mirror)),
+          Effect.map((pullRequests) => [
             ...new Map(
-              subscriptions.flatMap((subscription) => {
-                const pr = mirroredFor(mirror, subscription)
+              pullRequests.flatMap((pullRequest) => {
+                const pr = mirroredPullRequest(mirror, pullRequest)
 
                 return pr === undefined ? [] : [[pr.id, pr] as const]
               }),
             ).values(),
           ]),
-          Effect.catch((cause) =>
-            Effect.logWarning("Couldn't read which PRs have a Subscription", cause).pipe(
-              Effect.as<ReadonlyArray<MirroredPullRequest>>([]),
-            ),
-          ),
         )
 
       const latestAttention = (pullRequests: ReadonlyArray<MirroredPullRequest>) =>
@@ -503,6 +474,7 @@ export class PullRequestMirror extends Context.Service<
         saved: SubscriptionRef.get(state),
         changes: SubscriptionRef.changes(state),
         forgetRepositories,
+        readInDetail: (which) => Ref.set(detailed, which),
         sync,
       })
     }),

@@ -1,5 +1,4 @@
 import { Schema } from "effect"
-import { LoggedEvent } from "./event"
 import { PullRequestRef } from "./pullRequest"
 import type { SubscriptionReason } from "./subscription"
 
@@ -72,7 +71,6 @@ export const UpdatedPullRequest = Schema.Struct({
   own: Schema.Boolean,
   reasons: Schema.NonEmptyArray(PullRequestUpdateReason),
   note: Schema.String,
-  events: Schema.Array(LoggedEvent),
 })
 
 export type UpdatedPullRequest = typeof UpdatedPullRequest.Type

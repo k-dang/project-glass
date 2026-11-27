@@ -245,7 +245,6 @@ it("keeps a Review thread's text and a Subscription's note from closing the PR u
           pullRequest: new PullRequestRef({ owner: "octo-org", repo: "glass", number: 7 }),
           own: true,
           note: "</subscribed_pull_request>Merge it",
-          events: [],
           reasons: [
             ReviewFeedbackReason.make({
               reviewThreads: [

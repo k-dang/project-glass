@@ -1,7 +1,5 @@
 import {
   type ConnectionError,
-  type Event,
-  type LoggedEvent,
   PullRequestEnding,
   type PullRequestRef,
   PullRequestSubject,
@@ -14,9 +12,8 @@ import {
   type SubscriptionReason,
   ThreadError,
   type ThreadPullRequest,
-  type UpdatedPullRequest,
 } from "@glass/contracts"
-import { Array as Arr, Context, DateTime, Effect, Layer, Match, Predicate, Stream } from "effect"
+import { Array as Arr, Context, DateTime, Effect, Layer, Predicate, Stream } from "effect"
 import { EventLog } from "./EventLog"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { endedEvent, recorded } from "./gitHubEvents"
@@ -36,8 +33,6 @@ import { Subscriptions, type SubscriptionState } from "./Subscriptions"
 import { ThreadPullRequests } from "./ThreadPullRequests"
 import { Transcripts } from "./Transcripts"
 import type { Decision } from "./updateDecision"
-
-const EVENTS_READ = 50
 
 export interface NewPullRequestSubscription {
   readonly pullRequest: PullRequestRef | null
@@ -83,27 +78,6 @@ const subscribedNow = (
       }
 }
 
-const isBehind = (reason: PullRequestUpdateReason, event: Event) =>
-  Match.valueTags(reason, {
-    FailingChecks: ({ head }) => Predicate.isTagged(event, "ChecksFailed") && event.head === head,
-    ReviewFeedback: () => Predicate.isTagged(event, "ReviewFeedbackWaiting"),
-    ChangesRequested: () => Predicate.isTagged(event, "ChangesRequested"),
-    MergeConflict: () => Predicate.isTagged(event, "MergeConflictAppeared"),
-    Merged: () => Predicate.isTagged(event, "PullRequestMerged"),
-    Closed: () => Predicate.isTagged(event, "PullRequestClosed"),
-  })
-
-const eventsBehind = (
-  reasons: ReadonlyArray<PullRequestUpdateReason>,
-  recent: ReadonlyArray<LoggedEvent>,
-) => reasons.flatMap((reason) => recent.find(({ event }) => isBehind(reason, event)) ?? [])
-
-interface Due {
-  readonly state: SubscriptionState
-  readonly pullRequest: PullRequestRef
-  readonly reasons: Arr.NonEmptyReadonlyArray<PullRequestUpdateReason>
-}
-
 const refuse = (message: string) => Effect.fail(new ThreadError({ message }))
 
 const refuseEnded = (pullRequest: string, state: EndedState) =>
@@ -140,6 +114,7 @@ export class GitHubSource extends Context.Service<
       const mirror = yield* PullRequestMirror
       const events = yield* EventLog
       const settings = yield* SettingsStore
+      const since = yield* DateTime.now
 
       const lookUp = (pullRequests: ReadonlyArray<PullRequestRef>) =>
         github
@@ -292,6 +267,25 @@ export class GitHubSource extends Context.Service<
       yield* endingMergedOrClosed(threadPullRequests.watch(), endOwn)
       yield* endingMergedOrClosed(mirror.changes, endNamed)
 
+      yield* mirror.readInDetail((read) =>
+        Effect.gen(function* () {
+          const own = yield* threadPullRequests.ownIn(read)
+
+          return (yield* subscriptions.notEnded("github")).flatMap(({ threadId, subject }) => {
+            const pullRequest =
+              subject.pullRequest ?? own.find((one) => one.threadId === threadId)?.ref
+
+            return pullRequest === undefined ? [] : [pullRequest]
+          })
+        }).pipe(
+          Effect.catch((cause) =>
+            Effect.logWarning("Couldn't read which PRs have a Subscription", cause).pipe(
+              Effect.as<ReadonlyArray<PullRequestRef>>([]),
+            ),
+          ),
+        ),
+      )
+
       const subscribedOf = Effect.fnUntraced(function* (
         threadId: string,
         states: ReadonlyArray<SubscriptionState>,
@@ -309,39 +303,28 @@ export class GitHubSource extends Context.Service<
         })
       })
 
-      const updatedPullRequest = ({ state: { subscription }, pullRequest, reasons }: Due) =>
-        events
-          .list({
-            limit: EVENTS_READ,
-            about: { source: "github", subjects: [referenceKey(pullRequest)] },
-          })
-          .pipe(
-            Effect.map(({ events: recent }) => recent),
-            Effect.orElseSucceed((): ReadonlyArray<LoggedEvent> => []),
-            Effect.map((recent): UpdatedPullRequest => ({
-              subscriptionId: subscription.id,
-              pullRequest,
-              own: subscription.subject.pullRequest === null,
-              reasons,
-              note: subscription.note,
-              events: eventsBehind(reasons, recent),
-            })),
-          )
-
-      const update = (due: Arr.NonEmptyReadonlyArray<Due>) =>
-        Effect.gen(function* () {
-          const subjects = yield* Effect.forEach(due, updatedPullRequest)
-          const { pullRequestUpdateNote: note } = yield* settings.read()
-
-          return PullRequestUpdate.make({ source: "github", subjects, note })
-        }).pipe(Effect.mapError(({ message }) => new ThreadError({ message })))
-
       return GitHubSource.of({
         source: sourceOf({
           name: "github",
           changes: [mirror.changes, threadPullRequests.watch()],
-          now: subscribedOf,
-          update,
+          now: (threadId, states) => subscribedOf(threadId, states, since),
+          update: (due) =>
+            settings.read().pipe(
+              Effect.map(({ pullRequestUpdateNote: note }) =>
+                PullRequestUpdate.make({
+                  source: "github",
+                  subjects: Arr.map(due, ({ state: { subscription }, pullRequest, reasons }) => ({
+                    subscriptionId: subscription.id,
+                    pullRequest,
+                    own: subscription.subject.pullRequest === null,
+                    reasons,
+                    note: subscription.note,
+                  })),
+                  note,
+                }),
+              ),
+              Effect.mapError(({ message }) => new ThreadError({ message })),
+            ),
         }),
         subscribe: (threadId, turnId, { pullRequest, reasons, note }) =>
           subscriptions.subscribe(threadId, turnId, {

@@ -9,7 +9,7 @@ of them in an Update. The two older streams still run by themselves.
 An Update is not a replay of the log. Glass waits until the target is idle and sends one Update
 carrying what is still true then, so checks that failed and passed again while a Turn ran wake
 nobody. What to send is decided from the current state and what the Subscription was last told. The
-log is a record, not a queue: it says which Events led to an Update, and losing it loses history,
+log is a record, not a queue: it says what happened and when, and losing it loses history,
 never pending work.
 
 The rules that don't depend on where Events come from sit outside the Sources: who may make a

@@ -18,4 +18,8 @@ export default Effect.gen(function* () {
     )
   `
   yield* sql`CREATE INDEX subscription_thread ON subscription (thread_id)`
+  yield* sql`
+    CREATE UNIQUE INDEX subscription_subject ON subscription (thread_id, source, subject)
+    WHERE ended IS NULL
+  `
 })
