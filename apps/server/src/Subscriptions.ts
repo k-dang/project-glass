@@ -1,6 +1,8 @@
 import {
   EventKind,
   EventSource,
+  type StartedWorkSubject,
+  startedWorkKinds,
   Subscription,
   SubscriptionSubject,
   subjectKey,
@@ -38,6 +40,7 @@ const StoredSubscription = Schema.Struct({
   deliveredThrough: Schema.Int,
   updatesInARow: Schema.Int,
   afterMessage: Schema.NullOr(Schema.String),
+  createdAt: Schema.DateTimeUtcFromString,
 })
 
 export type SubscriptionState = typeof StoredSubscription.Type
@@ -91,6 +94,12 @@ export class Subscriptions extends Context.Service<
       askedIn: AskedIn,
       input: NewSubscription<E>,
     ) => Effect.Effect<Subscription, ThreadError | E>
+    readonly follow: (
+      subscriber: string,
+      subject: StartedWorkSubject,
+      note: string,
+      since: DateTime.Utc,
+    ) => Effect.Effect<void, ThreadError>
     readonly list: (subscriber: string) => Effect.Effect<ReadonlyArray<Subscription>, ThreadError>
     readonly watch: (subscriber: string) => Stream.Stream<ReadonlyArray<Subscription>, ThreadError>
     readonly end: (
@@ -122,7 +131,7 @@ export class Subscriptions extends Context.Service<
         sql`
           SELECT id, subscriber, source, subject, subject_key AS subjectKey, kinds,
             note, delivered_through AS deliveredThrough, updates_in_a_row AS updatesInARow,
-            after_message AS afterMessage
+            after_message AS afterMessage, created_at AS createdAt
           FROM subscription WHERE ${matching} ORDER BY created_at, id
         `.pipe(Effect.flatMap(decodeStored), Effect.catch(storageFailure))
 
@@ -176,6 +185,32 @@ export class Subscriptions extends Context.Service<
         })
       })
 
+      const follow = Effect.fn("Subscriptions.follow")(function* (
+        subscriber: string,
+        subject: StartedWorkSubject,
+        note: string,
+        since: DateTime.Utc,
+      ) {
+        const deliveredThrough = yield* eventLog.latestId.pipe(Effect.catch(storageFailure))
+
+        yield* sql`
+          INSERT INTO subscription ${sql.insert({
+            id: randomUUID(),
+            subscriber,
+            source: subjectSource(subject),
+            subject: encodeSubject(subject),
+            subject_key: subjectKey(subject),
+            kinds: encodeKinds(startedWorkKinds(subject)),
+            note,
+            delivered_through: deliveredThrough,
+            created_at: DateTime.formatIso(since),
+          })}
+          ON CONFLICT (subscriber, source, subject_key) DO NOTHING
+        `.pipe(Effect.catch(storageFailure))
+
+        yield* wrote
+      })
+
       const end = Effect.fn("Subscriptions.end")(function* (
         subscriber: string,
         subscriptionId: string,
@@ -216,6 +251,7 @@ export class Subscriptions extends Context.Service<
 
       return Subscriptions.of({
         subscribe,
+        follow,
         list,
         end,
         deliver,

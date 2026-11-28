@@ -6,7 +6,7 @@ import {
   glassCalls,
   globalTurns,
   lastSettled,
-  threadOutcomesInStartedWorkUpdates,
+  threadEventsTold,
   repository,
   sendGlobal,
   settled,
@@ -64,7 +64,7 @@ it.live(
 
       yield* globalTurns(f.client, (turns) =>
         [created.id, messaged.id].every((id) =>
-          threadOutcomesInStartedWorkUpdates(turns).some(([threadId]) => threadId === id),
+          threadEventsTold(turns).some(([threadId]) => threadId === id),
         ),
       )
 

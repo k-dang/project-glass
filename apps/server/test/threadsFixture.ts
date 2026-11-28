@@ -252,14 +252,18 @@ export const sendGlobal = (
   context: CapturedContext | null = null,
 ) => client.SendGlobalMessage({ message, images: [], context })
 
-export const outcomesInStartedWorkUpdates = (turns: ReadonlyArray<Turn>) =>
+export const startedWorkTold = (turns: ReadonlyArray<Turn>) =>
   turns.flatMap(({ context }) =>
-    Predicate.isTagged(context, "StartedWorkUpdate") ? context.work : [],
+    Predicate.isTagged(context, "Update")
+      ? context.subscriptions.flatMap(({ note, events }) =>
+          events.flatMap(({ source, event }) => (source === "glass" ? [{ note, event }] : [])),
+        )
+      : [],
   )
 
-export const threadOutcomesInStartedWorkUpdates = (turns: ReadonlyArray<Turn>) =>
-  outcomesInStartedWorkUpdates(turns).flatMap((work) =>
-    Predicate.isTagged(work, "Thread") ? [[work.threadId, work.outcome] as const] : [],
+export const threadEventsTold = (turns: ReadonlyArray<Turn>) =>
+  startedWorkTold(turns).flatMap(({ event }) =>
+    "threadId" in event ? [[event.threadId, event._tag] as const] : [],
   )
 
 export const lastSettled = (message: string) => (turns: ReadonlyArray<Turn>) =>

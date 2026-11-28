@@ -12,7 +12,7 @@ import { TestClock } from "effect/testing"
 import { withSkippableWaits } from "../test/deadlines"
 import {
   glassCall,
-  threadOutcomesInStartedWorkUpdates,
+  threadEventsTold,
   threadsFixture,
   glassCalls,
   holding,
@@ -49,7 +49,7 @@ it.live("a Thread in a Sandbox creates a Thread through Glass's tools and hears 
     const turns = yield* f.transcript(parent.id, settled(2))
 
     assert.deepStrictEqual(child?.place, SandboxPlace.make({ providerId: "fake" }))
-    assert.deepStrictEqual(threadOutcomesInStartedWorkUpdates(turns), [[child!.id, "finished"]])
+    assert.deepStrictEqual(threadEventsTold(turns), [[child!.id, "ThreadFinished"]])
   }),
 )
 

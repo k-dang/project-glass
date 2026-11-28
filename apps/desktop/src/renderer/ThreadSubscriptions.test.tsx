@@ -167,7 +167,7 @@ it("shows an Update as a Turn Glass started, listing each PR and its Events", as
   })
 
   await screen.findByText("Fixed lint and renamed it.")
-  const update = within(screen.getByRole("list", { name: "PR update from Glass" }))
+  const update = within(screen.getByRole("list", { name: "Update from Glass" }))
 
   expect(update.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
     "glass-demo/greeter#264: 2 checks failed, checks passed, 1 Review thread waits for a reply, alice requested changes, a merge conflict",

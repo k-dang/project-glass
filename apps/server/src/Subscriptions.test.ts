@@ -8,7 +8,7 @@ import {
   PullRequestSubject,
   Subscription,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, Layer, Option, Schema, Stream } from "effect"
+import { Context, DateTime, Effect, Layer, Option, Predicate, Schema, Stream } from "effect"
 import { SqlClient } from "effect/sql"
 import { fail, failed, subscribe, subscribeArguments } from "../test/pullRequestUpdates"
 import { calledBy, glassCall, repository, settled, threadsFixture } from "../test/threadsFixture"
@@ -30,11 +30,17 @@ const subscriptionsOf = (
     .pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
 
 const covered = (subscriptions: ReadonlyArray<Subscription>) =>
-  subscriptions.map(({ subject: { pullRequest }, kinds, note }) => ({
-    pullRequest: `${pullRequest.repo}#${pullRequest.number}`,
-    kinds,
-    note,
-  }))
+  subscriptions.flatMap(({ subject, kinds, note }) =>
+    Predicate.isTagged(subject, "PullRequest")
+      ? [
+          {
+            pullRequest: `${subject.pullRequest.repo}#${subject.pullRequest.number}`,
+            kinds,
+            note,
+          },
+        ]
+      : [],
+  )
 
 const greeter = (number: number, repo = "greeter") => ({ owner: "glass-demo", repo, number })
 
@@ -208,9 +214,9 @@ it.live("refuses a Subscription asked for in a Turn Glass started", () =>
 
     const [, update] = yield* f.transcript(thread.id, settled(2))
 
-    assert.equal(update?.context?._tag, "StartedWorkUpdate")
+    assert.equal(update?.context?._tag, "Update")
     assert.deepStrictEqual(calledBy(update), refusal)
-    assert.deepStrictEqual(yield* subscriptionsOf(f, thread.id, () => true), [])
+    assert.deepStrictEqual(covered(yield* subscriptionsOf(f, thread.id, () => true)), [])
   }),
 )
 

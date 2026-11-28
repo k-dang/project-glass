@@ -1,41 +1,55 @@
 import { SessionManager } from "@earendil-works/pi-coding-agent"
 import { NodeServices } from "@effect/platform-node"
 import { assert, it } from "@effect/vitest"
-import { ThreadOutcome, TextPart, StartedWorkUpdate } from "@glass/contracts"
-import { Deferred, Effect, Exit, Predicate, Schema, Scope } from "effect"
+import { LoggedEvent, TextPart, ThreadFinishedEvent, ThreadSubject, Update } from "@glass/contracts"
+import { DateTime, Deferred, Effect, Exit, Predicate, Redacted, Schema, Scope } from "effect"
 import { randomUUID } from "node:crypto"
 import { writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { vi } from "vite-plus/test"
+import { glassToolsBackend } from "../../test/adapterSessions"
 import { bundledPi } from "../../test/demoThread"
 import { fakeModelProvider, lastUserText } from "../../test/fakeModelProvider"
 import { isolatedHome, stubHome } from "../../test/harness"
 import { piAdapter } from "./piAdapter"
 import { redelivery, SessionEntries } from "./piRedelivery"
-import { type HostEvent, WorkRole } from "./protocol"
+import { GlobalRole, type HostEvent } from "./protocol"
 
 const sent = {
   message: "",
   images: [],
-  prompt: "Started work update the completed work.",
-  context: StartedWorkUpdate.make({
-    work: [
-      ThreadOutcome.make({
-        threadId: "started",
-        name: "Started",
-        outcome: "finished",
-        reason: null,
-        askedWith: "Build it",
-      }),
+  prompt: "The Thread you started finished.",
+  context: Update.make({
+    subscriptions: [
+      {
+        subscriptionId: "started",
+        subject: ThreadSubject.make({ threadId: "started" }),
+        note: "Build it",
+        events: [
+          new LoggedEvent({
+            id: 1,
+            source: "glass",
+            occurredAt: DateTime.makeUnsafe("2026-11-27T12:00:00Z"),
+            event: ThreadFinishedEvent.make({
+              threadId: "started",
+              name: "Started",
+              endedAt: DateTime.makeUnsafe("2026-11-27T12:00:00Z"),
+            }),
+          }),
+        ],
+      },
     ],
   }),
 }
+
+const unusedTools = { url: "http://127.0.0.1:9/mcp", bearer: Redacted.make("unused") }
 
 const fixture = Effect.gen(function* () {
   const home = yield* isolatedHome
   const model = yield* fakeModelProvider(home, { output: "The work finished. Want to review it?" })
   stubHome(home)
   vi.stubEnv("PI_OFFLINE", "1")
+  const { role } = yield* glassToolsBackend("redelivered")
   const adapter = yield* piAdapter(bundledPi)
 
   const open = (thread: string) =>
@@ -49,8 +63,8 @@ const fixture = Effect.gen(function* () {
         .start({
           folder: home,
           thread,
-          role: WorkRole.make({}),
-          glassTools: undefined,
+          role,
+          glassTools: role.tools,
           skills: [],
           report: (event) =>
             Effect.sync(() => events.push(event)).pipe(
@@ -70,15 +84,15 @@ const fixture = Effect.gen(function* () {
 })
 
 for (const stopReason of ["error", "length"] as const)
-  it(`continues a Started work update whose ${stopReason} attempt pi omitted for recovery`, () => {
+  it(`continues an Update whose ${stopReason} attempt pi omitted for recovery`, () => {
     const saved = SessionManager.inMemory()
 
-    const pending = redelivery("started-work-update-1", sent.prompt, {
+    const pending = redelivery("update-1", sent.prompt, {
       entries: [],
       leafId: null,
     })
 
-    if (pending.state !== "pending") assert.fail("Expected a pending Started work update")
+    if (pending.state !== "pending") assert.fail("Expected a pending Update")
     saved.appendMessage({ role: "user", content: pending.prompt, timestamp: 1 })
 
     const reply = {
@@ -126,7 +140,7 @@ for (const stopReason of ["error", "length"] as const)
       saved.appendCompaction("Earlier context summarized", failed, 100_000)
 
     const delivery = redelivery(
-      "started-work-update-1",
+      "update-1",
       sent.prompt,
       Schema.decodeUnknownSync(SessionEntries)({
         entries: saved.getEntries(),
@@ -153,18 +167,18 @@ for (const stopReason of ["error", "length"] as const)
   })
 
 it.live(
-  "restores pi's saved Started work update response into the same Turn without another model request",
+  "restores pi's saved reply to an Update into the same Turn without another model request",
   () =>
     Effect.gen(function* () {
       const f = yield* fixture
       const thread = randomUUID()
       const first = yield* f.open(thread)
-      yield* first.session.startTurn("started-work-update-1", sent)
+      yield* first.session.startTurn("update-1", sent)
       yield* first.ended
       yield* first.close
 
       const restored = yield* f.open(thread)
-      yield* restored.session.startTurn("started-work-update-1", {
+      yield* restored.session.startTurn("update-1", {
         ...sent,
         prompt: "The instructions changed after an upgrade.",
       })
@@ -175,50 +189,48 @@ it.live(
       assert.deepInclude(output, {
         part: TextPart.make({ text: "The work finished. Want to review it?" }),
       })
-      assert.deepInclude(restored.events.at(-1), { turnId: "started-work-update-1" })
+      assert.deepInclude(restored.events.at(-1), { turnId: "update-1" })
     }).pipe(Effect.provide(NodeServices.layer)),
 )
 
-it.live(
-  "finishes and restores an accepted Started work update without repeating its original input",
-  () =>
-    Effect.gen(function* () {
-      const f = yield* fixture
-      const saved = SessionManager.create(f.home)
+it.live("finishes and restores an accepted Update without repeating its original input", () =>
+  Effect.gen(function* () {
+    const f = yield* fixture
+    const saved = SessionManager.create(f.home)
 
-      const pending = redelivery("started-work-update-1", sent.prompt, {
-        entries: [],
-        leafId: null,
-      })
+    const pending = redelivery("update-1", sent.prompt, {
+      entries: [],
+      leafId: null,
+    })
 
-      if (pending.state !== "pending") assert.fail("Expected a pending Started work update")
-      saved.appendMessage({ role: "user", content: pending.prompt, timestamp: 1 })
+    if (pending.state !== "pending") assert.fail("Expected a pending Update")
+    saved.appendMessage({ role: "user", content: pending.prompt, timestamp: 1 })
 
-      const restored = yield* f.open(saved.getSessionId())
-      yield* restored.session.startTurn("started-work-update-1", sent)
-      yield* restored.ended
+    const restored = yield* f.open(saved.getSessionId())
+    yield* restored.session.startTurn("update-1", sent)
+    yield* restored.ended
 
-      assert.lengthOf(f.model.calls, 1)
-      assert.include(lastUserText(f.model.calls[0]!), "Finish that reply")
-      const branch = SessionManager.open(saved.getSessionFile()!).getBranch()
+    assert.lengthOf(f.model.calls, 1)
+    assert.include(lastUserText(f.model.calls[0]!), "Finish that reply")
+    const branch = SessionManager.open(saved.getSessionFile()!).getBranch()
 
-      const users = branch.flatMap((entry) =>
-        entry.type === "message" && entry.message.role === "user" ? [entry.message] : [],
-      )
+    const users = branch.flatMap((entry) =>
+      entry.type === "message" && entry.message.role === "user" ? [entry.message] : [],
+    )
 
-      assert.lengthOf(users, 2)
-      assert.equal(users[0]?.content, pending.prompt)
+    assert.lengthOf(users, 2)
+    assert.equal(users[0]?.content, pending.prompt)
 
-      yield* restored.close
-      const completed = yield* f.open(saved.getSessionId())
-      yield* completed.session.startTurn("started-work-update-1", sent)
-      yield* completed.ended
-      assert.lengthOf(f.model.calls, 1)
-    }).pipe(Effect.provide(NodeServices.layer)),
+    yield* restored.close
+    const completed = yield* f.open(saved.getSessionId())
+    yield* completed.session.startTurn("update-1", sent)
+    yield* completed.ended
+    assert.lengthOf(f.model.calls, 1)
+  }).pipe(Effect.provide(NodeServices.layer)),
 )
 
 it.live(
-  "keeps a Started work update unfinished when pi's prompt response is invalid and the process exits",
+  "keeps an Update unfinished when pi's prompt response is invalid and the process exits",
   () =>
     Effect.gen(function* () {
       const home = yield* isolatedHome
@@ -245,8 +257,8 @@ it.live(
       const session = yield* adapter.start({
         folder: home,
         thread: randomUUID(),
-        role: WorkRole.make({}),
-        glassTools: undefined,
+        role: GlobalRole.make({ tools: unusedTools }),
+        glassTools: unusedTools,
         skills: [],
         report: (event) =>
           Effect.sync(() => {
@@ -254,7 +266,7 @@ it.live(
           }),
       })
 
-      const error = yield* Effect.flip(session.startTurn("started-work-update-transport", sent))
+      const error = yield* Effect.flip(session.startTurn("update-transport", sent))
 
       assert.equal(
         error.message,

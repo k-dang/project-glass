@@ -215,8 +215,7 @@ const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
   skills.flatMap((plugin) => plugin.skills.flatMap((skill) => ["--skill", skill]))
 
 const retriesDelivery = (role: ThreadRole, { context }: TurnMessage) =>
-  Predicate.isTagged(context, "StartedWorkUpdate") ||
-  (Predicate.isTagged(role, "Global") && Predicate.isTagged(context, "Update"))
+  Predicate.isTagged(role, "Global") && Predicate.isTagged(context, "Update")
 
 const roleFlags = (
   folder: string,

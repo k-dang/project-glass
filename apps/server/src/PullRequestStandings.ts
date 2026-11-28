@@ -1,5 +1,5 @@
 import { type EventKind, isGone, type PullRequestRef, type Thread } from "@glass/contracts"
-import { Array as Arr, Context, Effect, Layer, Option, Stream } from "effect"
+import { Array as Arr, Context, Effect, Layer, Option, Predicate, Stream } from "effect"
 import { EventLog } from "./EventLog"
 import { Subscriptions } from "./Subscriptions"
 import { Threads } from "./Threads"
@@ -38,15 +38,23 @@ export class PullRequestStandings extends Context.Service<
           yield* transcripts.lastMessageTurn(thread.id),
         )
 
-        return pending.map((one): PullRequestStanding => ({
-          pullRequest: one.state.subject.pullRequest,
-          kinds: one.state.kinds,
-          thread,
-          state:
-            beingTold.has(one.state.id) || tells(one) || one.updatesInARow === 0
-              ? "handling"
-              : "tried",
-        }))
+        return pending.flatMap((one): ReadonlyArray<PullRequestStanding> => {
+          const { subject } = one.state
+
+          return Predicate.isTagged(subject, "PullRequest")
+            ? [
+                {
+                  pullRequest: subject.pullRequest,
+                  kinds: one.state.kinds,
+                  thread,
+                  state:
+                    beingTold.has(one.state.id) || tells(one) || one.updatesInARow === 0
+                      ? "handling"
+                      : "tried",
+                },
+              ]
+            : []
+        })
       })
 
       const standings = Effect.gen(function* () {

@@ -32,6 +32,7 @@ import events from "./migrations/0031_events"
 import subscriptions from "./migrations/0032_subscriptions"
 import unpromptedTurns from "./migrations/0033_unprompted_turns"
 import subscriptionSubscriber from "./migrations/0034_subscription_subscriber"
+import startedWorkEvents from "./migrations/0035_started_work_events"
 
 const migrations = {
   "0001_baseline": baseline,
@@ -67,6 +68,7 @@ const migrations = {
   "0032_subscriptions": subscriptions,
   "0033_unprompted_turns": unpromptedTurns,
   "0034_subscription_subscriber": subscriptionSubscriber,
+  "0035_started_work_events": startedWorkEvents,
 }
 
 export const migrationLoader = SqliteMigrator.fromRecord(migrations)

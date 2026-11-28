@@ -1,32 +1,19 @@
 import {
-  Thread,
-  ThreadError,
+  AgentReviewSubject,
   type AgentReviewFailure,
-  ThreadOutcome,
   type AgentReviewState,
-  AgentReviewOutcome,
   finishedReview,
   PullRequestRef,
-  type WorkOutcome,
-  TurnEnd,
+  Thread,
+  ThreadError,
+  ThreadSubject,
+  type TurnEnd,
   type TurnEnding,
-  StartedWorkUpdate,
 } from "@glass/contracts"
-import {
-  Array as Arr,
-  Context,
-  DateTime,
-  Effect,
-  Layer,
-  Match,
-  Option,
-  Predicate,
-  Schema,
-  Stream,
-  SubscriptionRef,
-} from "effect"
-import { SqlClient, type Statement } from "effect/sql"
+import { Context, DateTime, Effect, Layer, Match, Option, Schema, Stream } from "effect"
+import { SqlClient } from "effect/sql"
 import { AgentReviews } from "./AgentReviews"
+import { Subscriptions } from "./Subscriptions"
 import { Threads } from "./Threads"
 import { Transcripts } from "./Transcripts"
 
@@ -57,17 +44,10 @@ const StartedAgentReview = Schema.TaggedStruct("AgentReview", {
 
 export const StartedItem = Schema.Union([StartedThread, StartedAgentReview])
 
-const startedWorkUpdateFields = {
-  started_work_update_outcome_at: Schema.NullOr(Schema.DateTimeUtcFromString),
-  startedWorkUpdate: Schema.NullOr(Schema.fromJsonString(StartedWorkUpdate)),
-  startedWorkUpdateEnded: Schema.NullOr(Schema.fromJsonString(TurnEnd)),
-}
-
 const ThreadRow = Schema.Struct({
   thread_id: Schema.String,
   asked_with: Schema.NullOr(Schema.String),
   started_at: Schema.DateTimeUtcFromString,
-  ...startedWorkUpdateFields,
 })
 
 type ThreadRow = typeof ThreadRow.Type
@@ -78,7 +58,6 @@ const ReviewRow = Schema.Struct({
   number: Schema.Int,
   asked_with: Schema.NullOr(Schema.String),
   started_at: Schema.DateTimeUtcFromString,
-  ...startedWorkUpdateFields,
 })
 
 type ReviewRow = typeof ReviewRow.Type
@@ -87,8 +66,8 @@ const decodeThreadRows = Schema.decodeUnknownEffect(Schema.Array(ThreadRow))
 
 const decodeReviewRows = Schema.decodeUnknownEffect(Schema.Array(ReviewRow))
 
-const decodeStarters = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ started_by: Schema.String })),
+const decodeStartedAt = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ startedAt: Schema.NullOr(Schema.DateTimeUtcFromString) })),
 )
 
 const pullRequestOf = ({ owner, repo, number }: ReviewRow) =>
@@ -98,33 +77,6 @@ export interface Starter {
   readonly startedBy: string
   readonly sessionId: string
 }
-
-interface PendingOutcome {
-  readonly work: WorkOutcome
-  readonly at: DateTime.Utc
-}
-
-const endingReason = (ending: TurnEnding) =>
-  Match.value(ending).pipe(
-    Match.tagsExhaustive({
-      Done: () => null,
-      Stopped: () => null,
-      Failed: ({ reason }) => reason,
-      CutOff: () => "Glass lost the agent while it worked.",
-      Interrupted: () => "Glass quit while it worked.",
-    }),
-  )
-
-const ifNew = (
-  row: ThreadRow | ReviewRow,
-  at: DateTime.Utc,
-  work: WorkOutcome,
-): ReadonlyArray<PendingOutcome> =>
-  DateTime.isGreaterThanOrEqualTo(at, row.started_at) &&
-  (row.started_work_update_outcome_at === null ||
-    DateTime.isGreaterThan(at, row.started_work_update_outcome_at))
-    ? [{ work, at }]
-    : []
 
 const storageFailure = () =>
   new ThreadError({ message: "Couldn't read or save what the Global chat or a Thread started." })
@@ -175,19 +127,9 @@ export class StartedWork extends Context.Service<
     readonly list: (
       startedBy: string,
     ) => Effect.Effect<ReadonlyArray<typeof StartedItem.Type>, ThreadError | AgentReviewFailure>
-    readonly pendingOutcomes: (
-      startedBy: string,
-    ) => Effect.Effect<ReadonlyArray<PendingOutcome>, ThreadError | AgentReviewFailure>
-    readonly recordStartedWorkUpdate: (
-      startedBy: string,
-      turnId: string,
-      outcomes: ReadonlyArray<PendingOutcome>,
-    ) => Effect.Effect<void, ThreadError>
-    readonly reconcileStartedWorkUpdates: (
-      startedBy: string,
-    ) => Effect.Effect<void, ThreadError | AgentReviewFailure>
-    readonly starters: Effect.Effect<ReadonlyArray<string>, ThreadError>
-    readonly changes: Stream.Stream<void>
+    readonly agentReviewStartedAt: (
+      pullRequest: PullRequestRef,
+    ) => Effect.Effect<DateTime.Utc | null, ThreadError>
   }
 >()("@glass/server/StartedWork") {
   static readonly layer = Layer.effect(
@@ -197,91 +139,25 @@ export class StartedWork extends Context.Service<
       const threads = yield* Threads
       const agentReviews = yield* AgentReviews
       const transcripts = yield* Transcripts
-      const recorded = yield* SubscriptionRef.make(0)
+      const subscriptions = yield* Subscriptions
 
-      const rowsMatching = (matching: Statement.Fragment) =>
+      const rowsOf = (startedBy: string) =>
         Effect.all(
           {
             threadRows: sql`
-              SELECT c.thread_id, c.asked_with, c.started_at, c.started_work_update_outcome_at,
-                t.context AS startedWorkUpdate, t.ended AS startedWorkUpdateEnded
-              FROM started_thread c LEFT JOIN thread_turn t ON t.id = c.started_work_update_turn_id
-              WHERE ${matching}
+              SELECT thread_id, asked_with, started_at FROM started_thread
+              WHERE started_by = ${startedBy}
             `.pipe(Effect.flatMap(decodeThreadRows)),
             reviewRows: sql`
-              SELECT c.owner, c.repo, c.number, c.asked_with, c.started_at, c.started_work_update_outcome_at,
-                t.context AS startedWorkUpdate, t.ended AS startedWorkUpdateEnded
-              FROM started_agent_review c LEFT JOIN thread_turn t ON t.id = c.started_work_update_turn_id
-              WHERE ${matching}
+              SELECT owner, repo, number, asked_with, started_at FROM started_agent_review
+              WHERE started_by = ${startedBy}
             `.pipe(Effect.flatMap(decodeReviewRows)),
           },
           { concurrency: "unbounded" },
         ).pipe(Effect.mapError(storageFailure))
 
-      const rowsOf = (startedBy: string) => rowsMatching(sql`c.started_by = ${startedBy}`)
-
-      const allRows = rowsMatching(sql.and([]))
-
-      const threadsOf = (threadRows: ReadonlyArray<ThreadRow>) =>
-        Effect.gen(function* () {
-          const [listed, ends, waiting] = yield* Effect.all(
-            [
-              threads.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
-              transcripts.lastEnds(threadRows.map(({ thread_id }) => thread_id)),
-              transcripts.waitingNow,
-            ],
-            { concurrency: "unbounded" },
-          )
-
-          const byId = new Map(listed.map((thread) => [thread.id, thread]))
-
-          const started = threadRows.flatMap((row) => {
-            const thread = byId.get(row.thread_id)
-
-            return thread === undefined ? [] : [{ row, thread }]
-          })
-
-          return { started, ends, waiting }
-        })
-
       const reviewNow = (row: ReviewRow) =>
         agentReviews.watch(pullRequestOf(row)).pipe(Stream.runHead, Effect.map(Option.getOrThrow))
-
-      const changedRows = SubscriptionRef.update(recorded, (count) => count + 1)
-
-      const changes = SubscriptionRef.changes(recorded).pipe(
-        Stream.switchMap(() =>
-          Stream.unwrap(
-            Effect.gen(function* () {
-              const ended = yield* transcripts.subscribeEnded
-              const { threadRows, reviewRows } = yield* allRows
-
-              const threadIds = threadRows.map(({ thread_id }) => thread_id)
-
-              return Stream.mergeAll(
-                [
-                  ended.pipe(Stream.filter((threadId) => threadIds.includes(threadId))),
-                  transcripts.waiting.pipe(
-                    Stream.map((waiting) => threadIds.map((threadId) => waiting.get(threadId))),
-                    Stream.changesWith(Arr.makeEquivalence((a, b) => a === b)),
-                  ),
-                  ...reviewRows.map((row) =>
-                    agentReviews.watch(pullRequestOf(row)).pipe(Stream.catch(() => Stream.empty)),
-                  ),
-                ].map((changed: Stream.Stream<unknown>) => Stream.as(changed, undefined)),
-                { concurrency: "unbounded" },
-              )
-            }).pipe(
-              Effect.catch((cause) =>
-                Effect.logWarning(
-                  "Couldn't read what the Global chat or a Thread started",
-                  cause,
-                ).pipe(Effect.as(Stream.empty)),
-              ),
-            ),
-          ),
-        ),
-      )
 
       return StartedWork.of({
         linkThread: ({ startedBy, sessionId }, threadId, actedAt) =>
@@ -294,27 +170,62 @@ export class StartedWork extends Context.Service<
               VALUES (${startedBy}, ${threadId}, ${askedWith}, ${startedAt})
               ON CONFLICT DO NOTHING
             `.pipe(saved("a started Thread"))
-            yield* changedRows
+            yield* subscriptions.follow(
+              startedBy,
+              ThreadSubject.make({ threadId }),
+              askedWith ?? "",
+              actedAt,
+            )
           }),
-        startedAgentReview: ({ startedBy, sessionId }, { owner, repo, number }, actedAt) =>
+        startedAgentReview: ({ startedBy, sessionId }, pullRequest, actedAt) =>
           Effect.gen(function* () {
             const askedWith = yield* transcripts.runningMessage(sessionId)
             const startedAt = DateTime.formatIso(actedAt)
+            const { owner, repo, number } = pullRequest
 
             yield* sql`
               INSERT INTO started_agent_review
                 (started_by, owner, repo, number, asked_with, started_at)
               VALUES (${startedBy}, ${owner}, ${repo}, ${number}, ${askedWith}, ${startedAt})
               ON CONFLICT DO UPDATE
-                SET asked_with = excluded.asked_with, started_at = excluded.started_at,
-                  started_work_update_outcome_at = NULL, started_work_update_turn_id = NULL
+                SET asked_with = excluded.asked_with, started_at = excluded.started_at
             `.pipe(saved("a started Agent review"))
-            yield* changedRows
+            yield* subscriptions.follow(
+              startedBy,
+              AgentReviewSubject.make({ pullRequest }),
+              askedWith ?? "",
+              actedAt,
+            )
           }),
         list: (startedBy) =>
           Effect.gen(function* () {
             const { threadRows, reviewRows } = yield* rowsOf(startedBy)
-            const { started, ends, waiting } = yield* threadsOf(threadRows)
+
+            const [listed, ends, waiting] = yield* Effect.all(
+              [
+                threads.watch().pipe(Stream.runHead, Effect.map(Option.getOrThrow)),
+                transcripts.lastEnds(threadRows.map(({ thread_id }) => thread_id)),
+                transcripts.waitingNow,
+              ],
+              { concurrency: "unbounded" },
+            )
+
+            const byId = new Map(listed.map((thread) => [thread.id, thread]))
+
+            const threadItems = threadRows.flatMap((row) => {
+              const thread = byId.get(row.thread_id)
+
+              return thread === undefined
+                ? []
+                : [
+                    StartedThread.make({
+                      thread,
+                      state: threadState(ends.get(thread.id), waiting.has(thread.id)),
+                      askedWith: row.asked_with,
+                      startedAt: row.started_at,
+                    }),
+                  ]
+            })
 
             const reviews = yield* Effect.forEach(
               reviewRows,
@@ -332,173 +243,19 @@ export class StartedWork extends Context.Service<
               { concurrency: "unbounded" },
             )
 
-            const threadItems = started.map(({ row, thread }) =>
-              StartedThread.make({
-                thread,
-                state: threadState(ends.get(thread.id), waiting.has(thread.id)),
-                askedWith: row.asked_with,
-                startedAt: row.started_at,
-              }),
-            )
-
             return [...threadItems, ...reviews].toSorted((a, b) =>
               DateTime.Order(a.startedAt, b.startedAt),
             )
           }),
-        pendingOutcomes: (startedBy) =>
-          Effect.gen(function* () {
-            const { threadRows, reviewRows } = yield* rowsOf(startedBy)
-            const { started, ends, waiting } = yield* threadsOf(threadRows)
-
-            const fromThreads = started.flatMap(
-              ({ row, thread }): ReadonlyArray<PendingOutcome> => {
-                const subject = {
-                  threadId: thread.id,
-                  name: thread.name,
-                  askedWith: row.asked_with,
-                }
-
-                const requests = waiting.get(thread.id)
-
-                if (requests !== undefined) {
-                  const latest = Arr.max(
-                    Arr.map(requests, ({ since }) => since),
-                    DateTime.Order,
-                  )
-
-                  return ifNew(
-                    row,
-                    latest,
-                    ThreadOutcome.make({ ...subject, outcome: "waiting", reason: null }),
-                  )
-                }
-
-                const ended = ends.get(thread.id)
-
-                if (ended === undefined || Predicate.isTagged(ended.ending, "Stopped")) return []
-
-                return ifNew(
-                  row,
-                  ended.at,
-                  ThreadOutcome.make({
-                    ...subject,
-                    outcome: endingState(ended.ending) === "failed" ? "failed" : "finished",
-                    reason: endingReason(ended.ending),
-                  }),
-                )
-              },
-            )
-
-            const fromReviews = yield* Effect.forEach(
-              reviewRows,
-              (row) =>
-                reviewNow(row).pipe(
-                  Effect.map((state): ReadonlyArray<PendingOutcome> => {
-                    const subject = { pullRequest: pullRequestOf(row), askedWith: row.asked_with }
-                    const written = finishedReview(state)
-                    const { job } = state
-
-                    if (written !== null)
-                      return ifNew(
-                        row,
-                        written.writtenAt,
-                        AgentReviewOutcome.make({ ...subject, outcome: "finished", reason: null }),
-                      )
-
-                    return job.status === "failed"
-                      ? ifNew(
-                          row,
-                          row.started_at,
-                          AgentReviewOutcome.make({
-                            ...subject,
-                            outcome: "failed",
-                            reason: job.reason.message,
-                          }),
-                        )
-                      : []
-                  }),
-                ),
-              { concurrency: "unbounded" },
-            )
-
-            return [...fromThreads, ...fromReviews.flat()]
-          }),
-        recordStartedWorkUpdate: (startedBy, turnId, outcomes) =>
-          Effect.forEach(
-            outcomes,
-            ({ work, at }) => {
-              const outcomeAt = DateTime.formatIso(at)
-
-              return Match.value(work).pipe(
-                Match.tagsExhaustive({
-                  Thread: ({ threadId }) =>
-                    sql`
-                      UPDATE started_thread SET started_work_update_outcome_at = ${outcomeAt}, started_work_update_turn_id = ${turnId}
-                      WHERE started_by = ${startedBy} AND thread_id = ${threadId}
-                    `.pipe(saved("a Started work update's covered outcomes")),
-                  AgentReview: ({ pullRequest }) =>
-                    sql`
-                      UPDATE started_agent_review SET started_work_update_outcome_at = ${outcomeAt}, started_work_update_turn_id = ${turnId}
-                      WHERE started_by = ${startedBy} AND owner = ${pullRequest.owner}
-                        AND repo = ${pullRequest.repo} AND number = ${pullRequest.number}
-                    `.pipe(saved("a Started work update's covered outcomes")),
-                }),
-              )
-            },
-            { discard: true },
+        agentReviewStartedAt: ({ owner, repo, number }) =>
+          sql`
+            SELECT MAX(started_at) AS startedAt FROM started_agent_review
+            WHERE owner = ${owner} AND repo = ${repo} AND number = ${number}
+          `.pipe(
+            Effect.flatMap(decodeStartedAt),
+            Effect.map(([found]) => found?.startedAt ?? null),
+            Effect.mapError(storageFailure),
           ),
-        reconcileStartedWorkUpdates: Effect.fn("StartedWork.reconcileStartedWorkUpdates")(
-          function* (startedBy) {
-            const { threadRows, reviewRows } = yield* rowsOf(startedBy)
-
-            for (const row of [...threadRows, ...reviewRows]) {
-              const context = row.startedWorkUpdate
-              const ended = row.startedWorkUpdateEnded
-
-              if (
-                context === null ||
-                row.started_work_update_outcome_at === null ||
-                ended === null ||
-                Predicate.isTagged(ended.ending, "Failed")
-              )
-                continue
-
-              if ("thread_id" in row) {
-                const matched = context.work.find(
-                  (work) => Predicate.isTagged(work, "Thread") && work.threadId === row.thread_id,
-                )
-
-                if (matched !== undefined && matched.outcome !== "waiting")
-                  yield* threads.markTurnSeen(row.thread_id, row.started_work_update_outcome_at)
-              } else {
-                const pr = pullRequestOf(row)
-
-                const matched = context.work.find(
-                  (work) =>
-                    Predicate.isTagged(work, "AgentReview") &&
-                    work.pullRequest.owner === pr.owner &&
-                    work.pullRequest.repo === pr.repo &&
-                    work.pullRequest.number === pr.number,
-                )
-
-                if (matched?.outcome === "finished")
-                  yield* agentReviews.markIncludedInStartedWorkUpdate(
-                    pr,
-                    row.started_work_update_outcome_at,
-                  )
-              }
-            }
-          },
-        ),
-        starters: sql`
-          SELECT started_by FROM started_thread
-          UNION SELECT started_by FROM started_agent_review
-        `.pipe(
-          Effect.flatMap(decodeStarters),
-          Effect.map((found) => found.map(({ started_by }) => started_by)),
-          Effect.mapError(storageFailure),
-        ),
-        changes,
       })
     }),
   )

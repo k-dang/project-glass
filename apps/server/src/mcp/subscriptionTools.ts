@@ -1,10 +1,10 @@
 import {
   defaultSubscriptionKinds,
   Event,
-  EventKind,
   eventKindWords,
+  PullRequestEventKind,
+  PullRequestSubject,
   Subscription,
-  SubscriptionSubject,
 } from "@glass/contracts"
 import { Context, Effect, Match, Schema } from "effect"
 import { Tool, Toolkit } from "effect/ai"
@@ -17,17 +17,19 @@ import { forThreadsAndTheGlobalChat } from "./toolAudience"
 
 const MAX_NOTE_CHARS = 2_000
 
-const kindList = EventKind.literals.map((kind) => `${kind}: ${eventKindWords[kind]}`).join(", ")
+const kindList = PullRequestEventKind.literals
+  .map((kind) => `${kind}: ${eventKindWords[kind]}`)
+  .join(", ")
 
 const Subscribe = Tool.make("subscribe", {
-  description: `Subscribes you to a subject, so Glass tells you about the Events that happen to it after your Turn ends. A PR is the only subject so far: use it when the user asks you to look after a PR, such as keeping it green or handling its review feedback, or to be told when a PR you depend on merges. The PR must be open, in a repository the user follows in Glass. Glass replies with what already stands on the PR as Events in standing, or with null there when it hasn't read the PR in detail yet; then its first read sends what stands in an Update. After that, Glass tells what changes. When you are idle, you get one Update with every new Event since the last one, if at least one is of a kind you asked for. Subscribing again to the same subject replaces its kinds and note, and tells only the Events from then on. A Subscription to a PR ends when the PR merges or closes. Glass allows this only in a Turn a message started, not in one with a glass_update or glass_started_work_update block, nor in one that began by itself.`,
+  description: `Subscribes you to a subject, so Glass tells you about the Events that happen to it after your Turn ends. A PR is the only subject you can subscribe to; Glass subscribes you to the work you start by itself. Use it when the user asks you to look after a PR, such as keeping it green or handling its review feedback, or to be told when a PR you depend on merges. The PR must be open, in a repository the user follows in Glass. Glass replies with what already stands on the PR as Events in standing, or with null there when it hasn't read the PR in detail yet; then its first read sends what stands in an Update. After that, Glass tells what changes. When you are idle, you get one Update with every new Event since the last one, if at least one is of a kind you asked for. Subscribing again to the same subject replaces its kinds and note, and tells only the Events from then on. A Subscription to a PR ends when the PR merges or closes. Glass allows this only in a Turn a message started, not in one with a glass_update block, nor in one that began by itself.`,
   parameters: Schema.Struct({
-    subject: SubscriptionSubject.annotate({
+    subject: PullRequestSubject.annotate({
       description:
         'What to subscribe to, such as {"_tag":"PullRequest","pullRequest":{"owner":"octo-org","repo":"hello-world","number":6}}.',
     }),
     kinds: Schema.optional(
-      Schema.Array(EventKind)
+      Schema.Array(PullRequestEventKind)
         .check(Schema.isMinLength(1), Schema.isUnique())
         .annotate({
           description: `The kinds of Event that start an Update. ${kindList}. Defaults to ${defaultSubscriptionKinds.join(", ")}.`,
@@ -97,25 +99,22 @@ export const SubscriptionToolHandlers = SubscriptionTools.toLayer(
       ),
     )
 
-    const admitted = (subject: SubscriptionSubject) =>
-      Match.valueTags(subject, { PullRequest: ({ pullRequest }) => gitHub.subject(pullRequest) })
-
     return SubscriptionTools.of({
       subscribe: ({ subject, kinds, note }) =>
         calling.pipe(
           Effect.flatMap(({ subscriber, askedIn }) =>
             subscriptions
               .subscribe(subscriber, askedIn, {
-                subject: admitted(subject),
+                subject: gitHub.subject(subject.pullRequest),
                 kinds: kinds ?? defaultSubscriptionKinds,
                 note,
               })
               .pipe(Effect.mapError(explained)),
           ),
           Effect.flatMap((subscription) =>
-            Match.valueTags(subscription.subject, {
-              PullRequest: ({ pullRequest }) => gitHub.standing(pullRequest),
-            }).pipe(Effect.map((standing) => ({ subscription, standing }))),
+            gitHub
+              .standing(subject.pullRequest)
+              .pipe(Effect.map((standing) => ({ subscription, standing }))),
           ),
         ),
       list_subscriptions: () =>

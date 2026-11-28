@@ -5,7 +5,7 @@ export class EventLogError extends Schema.TaggedError<EventLogError>()("EventLog
   message: Schema.String,
 }) {}
 
-export const EventSource = Schema.Literals(["github"])
+export const EventSource = Schema.Literals(["github", "glass"])
 
 export type EventSource = typeof EventSource.Type
 
@@ -71,6 +71,35 @@ export const PullRequestClosedEvent = Schema.TaggedStruct("PullRequestClosed", {
   closedAt: Schema.DateTimeUtcFromString,
 })
 
+const endedTurn = {
+  threadId: Schema.String,
+  name: Schema.String,
+  endedAt: Schema.DateTimeUtcFromString,
+}
+
+export const ThreadFinishedEvent = Schema.TaggedStruct("ThreadFinished", endedTurn)
+
+export const ThreadFailedEvent = Schema.TaggedStruct("ThreadFailed", {
+  ...endedTurn,
+  reason: Schema.String,
+})
+
+export const ThreadWaitingEvent = Schema.TaggedStruct("ThreadWaiting", {
+  threadId: Schema.String,
+  name: Schema.String,
+  requestId: Schema.String,
+})
+
+export const AgentReviewFinishedEvent = Schema.TaggedStruct("AgentReviewFinished", {
+  pullRequest: PullRequestRef,
+  writtenAt: Schema.DateTimeUtcFromString,
+})
+
+export const AgentReviewFailedEvent = Schema.TaggedStruct("AgentReviewFailed", {
+  pullRequest: PullRequestRef,
+  reason: Schema.String,
+})
+
 export const Event = Schema.Union([
   ChecksFailedEvent,
   ChecksPassedEvent,
@@ -80,13 +109,20 @@ export const Event = Schema.Union([
   MergeConflictClearedEvent,
   PullRequestMergedEvent,
   PullRequestClosedEvent,
+  ThreadFinishedEvent,
+  ThreadFailedEvent,
+  ThreadWaitingEvent,
+  AgentReviewFinishedEvent,
+  AgentReviewFailedEvent,
 ])
 
 export type Event = typeof Event.Type
 
 export type EventKind = Event["_tag"]
 
-export const EventKind = Schema.Literals([
+export type PullRequestEvent = Extract<Event, { readonly _tag: typeof PullRequestEventKind.Type }>
+
+export const PullRequestEventKind = Schema.Literals([
   "ChecksFailed",
   "ChecksPassed",
   "ReviewFeedback",
@@ -95,6 +131,23 @@ export const EventKind = Schema.Literals([
   "MergeConflictCleared",
   "PullRequestMerged",
   "PullRequestClosed",
+] satisfies ReadonlyArray<EventKind>)
+
+export const threadEventKinds = [
+  "ThreadFinished",
+  "ThreadFailed",
+  "ThreadWaiting",
+] as const satisfies ReadonlyArray<EventKind>
+
+export const agentReviewEventKinds = [
+  "AgentReviewFinished",
+  "AgentReviewFailed",
+] as const satisfies ReadonlyArray<EventKind>
+
+export const EventKind = Schema.Literals([
+  ...PullRequestEventKind.literals,
+  ...threadEventKinds,
+  ...agentReviewEventKinds,
 ] satisfies ReadonlyArray<EventKind>)
 
 export const eventKindWords: Record<EventKind, string> = {
@@ -106,11 +159,17 @@ export const eventKindWords: Record<EventKind, string> = {
   MergeConflictCleared: "a merge conflict cleared",
   PullRequestMerged: "merged",
   PullRequestClosed: "closed",
+  ThreadFinished: "finished",
+  ThreadFailed: "failed",
+  ThreadWaiting: "waiting on the user",
+  AgentReviewFinished: "written",
+  AgentReviewFailed: "failed",
 }
 
 export const finalEventKinds: ReadonlySet<EventKind> = new Set([
   "PullRequestMerged",
   "PullRequestClosed",
+  ...agentReviewEventKinds,
 ])
 
 export class LoggedEvent extends Schema.Class<LoggedEvent>("LoggedEvent")({

@@ -225,9 +225,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
 
         const run = (turnId: string, { message, prompt, context }: DeliveredTurn) =>
           Effect.gen(function* () {
-            const update =
-              Predicate.isTagged(context, "StartedWorkUpdate") ||
-              Predicate.isTagged(context, "Update")
+            const update = Predicate.isTagged(context, "Update")
 
             const scripted = update ? scriptedUpdateCall.exec(prompt) : scriptedCall.exec(message)
 
