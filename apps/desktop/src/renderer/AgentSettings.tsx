@@ -1,10 +1,8 @@
 import { useAtom, useAtomRefresh, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
-  defaultPullRequestUpdateNote,
   defaultReviewPrompt,
   type EngineFeature,
   type EngineSettings,
-  PullRequestUpdateNote,
   ReviewPrompt,
 } from "@glass/contracts"
 import { Equal, identity, Schema } from "effect"
@@ -35,12 +33,6 @@ const promptAtoms = autosaveSetting(
   (prompt) => prompt.trim(),
 )
 
-const noteAtoms = autosaveSetting(
-  Backend.use((backend) => backend.GetPullRequestUpdateNote()),
-  (note) => Backend.use((backend) => backend.SetPullRequestUpdateNote({ note })),
-  (note) => note.trim(),
-)
-
 interface TextSetting {
   readonly atoms: ReturnType<typeof autosaveSetting<string>>
   readonly copy: TextSettingCopy
@@ -57,19 +49,6 @@ const reviewPrompt: TextSetting = {
     description: "How you review: what to look for and what to skip.",
     footnote: "Glass wraps it in its own instructions, which fix the answer format.",
     defaultValue: defaultReviewPrompt,
-  },
-}
-
-const pullRequestUpdateNote: TextSetting = {
-  atoms: noteAtoms,
-  isValid: Schema.is(PullRequestUpdateNote),
-  invalid: "Write a PR update note. Threads need it to know how you handle PRs.",
-  copy: {
-    title: "PR update note",
-    description: "How a Thread handles a PR: what to fix, what to leave, and what never to do.",
-    footnote:
-      "Glass gives it to the agent with every PR update, beside the note the agent left with its Subscription.",
-    defaultValue: defaultPullRequestUpdateNote,
   },
 }
 
@@ -120,14 +99,6 @@ export function AgentSettings() {
         <EngineSetting feature="agentReviews" />
         <SettingLoader atoms={promptAtoms} label="review prompt">
           {(saved) => <TextSettingEditor setting={reviewPrompt} saved={saved} separated />}
-        </SettingLoader>
-      </SettingsSection>
-      <SettingsSection
-        title="PR updates"
-        description="Choose how Threads handle the PRs they have a Subscription to. Changes apply to the next PR update."
-      >
-        <SettingLoader atoms={noteAtoms} label="PR update note">
-          {(saved) => <TextSettingEditor setting={pullRequestUpdateNote} saved={saved} />}
         </SettingLoader>
       </SettingsSection>
     </>

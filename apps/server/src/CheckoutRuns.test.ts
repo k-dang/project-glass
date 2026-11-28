@@ -1,11 +1,5 @@
 import { assert, it } from "@effect/vitest"
-import {
-  defaultPullRequestUpdateNote,
-  defaultReviewPrompt,
-  PullRequestRef,
-  Revision,
-  runnerIdentity,
-} from "@glass/contracts"
+import { defaultReviewPrompt, PullRequestRef, Revision, runnerIdentity } from "@glass/contracts"
 import { Deferred, Effect, Fiber, Layer, Schema } from "effect"
 import { agentFailure, type AgentFailure } from "./agentFailure"
 import { AgentRunners } from "./agentRunners"
@@ -27,7 +21,6 @@ const settings: Settings = {
   agentReviewEngine: "pi",
   queueAgentReviews: false,
   reviewPrompt: defaultReviewPrompt,
-  pullRequestUpdateNote: defaultPullRequestUpdateNote,
   claudeCommand: "claude",
   piCommand: "pi",
 }

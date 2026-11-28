@@ -107,7 +107,6 @@ it("shows an Update as a Turn Glass started, listing each PR and its Events", as
               message: "",
               images: [],
               context: Update.make({
-                note: "Never merge a PR.",
                 subscriptions: [
                   {
                     subscriptionId: ownSubscription.id,

@@ -2,7 +2,6 @@
 import {
   AgentModels,
   AgentReviewOutcome,
-  defaultPullRequestUpdateNote,
   defaultReviewPrompt,
   PullRequestContext,
   TextPart,
@@ -101,7 +100,6 @@ const mount = (handlers: Parameters<typeof testLayer>[0]) => {
     GetEngineSettings: ({ feature }) =>
       Effect.succeed(feature === "tours" ? tourSettings : { ...tourSettings, harness: "pi" }),
     GetReviewPrompt: () => Effect.succeed(defaultReviewPrompt),
-    GetPullRequestUpdateNote: () => Effect.succeed(defaultPullRequestUpdateNote),
     ...handlers,
   })
 

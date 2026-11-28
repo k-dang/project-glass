@@ -185,11 +185,6 @@ An Update carrying the Events on a PR a Thread has a Subscription to, such as ch
 review feedback, changes requested, a merge conflict, or the PR merging.
 _Avoid_: Babysitting, PR watch
 
-**PR update note**:
-The user's own words on how a Thread handles a PR, set in Settings and given with every PR
-update beside the Subscription's own note.
-_Avoid_: PR prompt, instructions
-
 ### Planning
 
 **To-do**:

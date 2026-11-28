@@ -1,7 +1,6 @@
 import { ThreadError, Update, type UpdatedSubscription } from "@glass/contracts"
 import { Array as Arr, DateTime, Effect, Exit, Layer, Ref, Stream } from "effect"
 import { EventLog } from "./EventLog"
-import { SettingsStore } from "./SettingsStore"
 import { Subscriptions, type SubscriptionState } from "./Subscriptions"
 import { Threads } from "./Threads"
 import { Transcripts } from "./Transcripts"
@@ -87,12 +86,6 @@ export const Updates = Layer.effectDiscard(
     const subscriptions = yield* Subscriptions
     const transcripts = yield* Transcripts
     const eventLog = yield* EventLog
-    const settings = yield* SettingsStore
-
-    const noteOf = settings.read().pipe(
-      Effect.map(({ pullRequestUpdateNote }) => pullRequestUpdateNote),
-      Effect.mapError(({ message }) => new ThreadError({ message })),
-    )
 
     const sendUpdate = (threadId: string, waits: Effect.Effect<void>) =>
       threads.whenIdle(threadId, (start) =>
@@ -121,7 +114,7 @@ export const Updates = Layer.effectDiscard(
             return yield* waits
           }
 
-          const context = Update.make({ subscriptions: updates, note: yield* noteOf })
+          const context = Update.make({ subscriptions: updates })
 
           return yield* asUnitOfWork(threadId, told, (started) =>
             start({ message: "", images: [], context, retriesDelivery: false }, (turnId) =>
