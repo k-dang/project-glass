@@ -5,7 +5,7 @@ import { X } from "lucide-react"
 import { type KeyboardEvent, type PointerEvent, type ReactNode, useRef } from "react"
 import { Button } from "@/components/ui/button"
 
-export const threadPaneWidthAtom = Atom.make(720).pipe(Atom.keepAlive)
+export const threadPaneWidthAtom = Atom.make(560).pipe(Atom.keepAlive)
 
 const minWidth = 320
 
