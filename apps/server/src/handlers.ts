@@ -91,12 +91,6 @@ export const GlassRpcHandlers = GlassRpcs.toLayer(
         asks.ask(pullRequest, revision, place, question),
       WatchAgentReview: ({ pullRequest }) => agentReviews.watch(pullRequest),
       GetReviewPrompt: () => settings.read().pipe(Effect.map(({ reviewPrompt }) => reviewPrompt)),
-      GetPullRequestUpdateNote: () =>
-        settings.read().pipe(Effect.map(({ pullRequestUpdateNote }) => pullRequestUpdateNote)),
-      SetPullRequestUpdateNote: ({ note }) =>
-        settings
-          .update((current) => ({ ...current, pullRequestUpdateNote: note }))
-          .pipe(Effect.map(({ pullRequestUpdateNote }) => pullRequestUpdateNote)),
       SetReviewPrompt: ({ prompt }) =>
         settings
           .update((current) => ({ ...current, reviewPrompt: prompt }))

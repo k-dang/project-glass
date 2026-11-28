@@ -3,7 +3,6 @@ import {
   AllowRequest,
   ChecksFailedEvent,
   ChecksPassedEvent,
-  defaultPullRequestUpdateNote,
   MergeConflictEvent,
   PullRequestRef,
   type Turn,
@@ -111,7 +110,6 @@ it.live("starts an Update when a check fails, and tells each Event once", () =>
     ])
     assert.include(received(update), 'kind="ChecksFailed"')
     assert.include(received(update), "Keep it green")
-    assert.include(received(update), defaultPullRequestUpdateNote)
     assert.deepStrictEqual(turns.map(failedRuns), [
       undefined,
       undefined,
@@ -487,27 +485,6 @@ it.live("logs each Update as one unit of work, with ids and kinds and no comment
     assert.isFalse(
       lines.some((line) => line.includes("Rename this.") || line.includes("Keep it tidy")),
     )
-  }),
-)
-
-it.live("gives every Update the PR update note the user set", () =>
-  Effect.gen(function* () {
-    const f = yield* subscribedThread()
-    const note = "Squash fixups before pushing."
-
-    assert.strictEqual(yield* f.client.GetPullRequestUpdateNote(), defaultPullRequestUpdateNote)
-    assert.strictEqual(yield* f.client.SetPullRequestUpdateNote({ note }), note)
-
-    fail(f.pullRequest, failed("lint"))
-    yield* f.client.ListPullRequests()
-    const [, , update] = yield* f.transcript(f.thread.id, settled(3))
-
-    assert.strictEqual(
-      Predicate.isTagged(update?.context, "Update") ? update.context.note : null,
-      note,
-    )
-    assert.include(received(update), note)
-    assert.notInclude(received(update), defaultPullRequestUpdateNote)
   }),
 )
 

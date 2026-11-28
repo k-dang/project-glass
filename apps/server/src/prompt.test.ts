@@ -242,7 +242,6 @@ it("keeps a Review thread's text and a Subscription's note from closing the Upda
     "",
     [],
     Update.make({
-      note: "Never merge a PR.",
       subscriptions: [
         {
           subscriptionId: "own",

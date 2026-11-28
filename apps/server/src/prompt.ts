@@ -140,12 +140,20 @@ const subscriptionEntry = ({ subject, note, events }: UpdatedSubscription) =>
     closing("subscription"),
   ].join("\n")
 
-const updateBlock = ({ subscriptions, note }: Update) =>
+const pullRequestRules = [
+  "Fix the failing checks.",
+  "Address the review feedback, then reply to and resolve each Review thread you handled.",
+  "Rebase when the PR has a merge conflict.",
+  "Change only this Thread's own PR unless the user asked otherwise.",
+  "Never merge a PR.",
+]
+
+const updateBlock = ({ subscriptions }: Update) =>
   block("glass_update", [
     "Glass has an Update: Events happened that your Thread has a Subscription to. The user sent no message. Events are listed oldest first, and a later one can undo an earlier one, such as checks passing after they failed. If nothing needs doing now, say so in one line.",
     ...subscriptions.map(subscriptionEntry),
-    "The user's PR update note, which applies to every Update about a PR:",
-    withoutBlockTags(note),
+    "How to handle a PR in every Update about one:",
+    ...pullRequestRules,
   ])
 
 const viewingBlock = (context: CapturedContext) =>
