@@ -127,7 +127,7 @@ export class GitHubSource extends Context.Service<
 
           if (found.state === "merged" || found.state === "closed")
             return yield* refuse(
-              `PR ${referenceText(pullRequest)} has already ${found.state}, so there's nothing left to tell your Thread about.`,
+              `PR ${referenceText(pullRequest)} has already ${found.state}, so there's nothing left to tell you about.`,
             )
 
           return PullRequestSubject.make({ pullRequest: found.summary.ref })

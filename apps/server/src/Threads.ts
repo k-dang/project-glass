@@ -1036,7 +1036,7 @@ export class Threads extends Context.Service<
             yield* skillPacks.releaseThread(threadId)
             yield* sql`DELETE FROM started_thread WHERE thread_id = ${threadId} OR started_by = ${threadId}`
             yield* sql`DELETE FROM started_agent_review WHERE started_by = ${threadId}`
-            yield* sql`DELETE FROM subscription WHERE thread_id = ${threadId}`
+            yield* sql`DELETE FROM subscription WHERE subscriber = ${threadId}`
             yield* toDos.unlinkThread(threadId)
             yield* sql`DELETE FROM thread WHERE id = ${threadId}`
           }).pipe(sql.withTransaction, Effect.mapError(storageFailure))

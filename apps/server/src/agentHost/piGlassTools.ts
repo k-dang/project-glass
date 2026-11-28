@@ -8,6 +8,8 @@ const BEARER_VARIABLE = "GLASS_TOOLS_BEARER"
 
 export const PI_GLASS_TOOLS = `${GLASS_MCP_PREFIX}*`
 
+export const PI_CLIENT_NAME = "glass-pi"
+
 export const piGlassToolsEnvironment = (access?: GlassToolsAccess) => ({
   [URL_VARIABLE]: access?.url ?? "",
   [BEARER_VARIABLE]: access === undefined ? "" : Redacted.value(access.bearer),
@@ -73,7 +75,7 @@ export default async function (pi) {
   await request("initialize", {
     protocolVersion: "2025-11-25",
     capabilities: {},
-    clientInfo: { name: "glass-pi", version: "1.0.0" },
+    clientInfo: { name: ${JSON.stringify(PI_CLIENT_NAME)}, version: "1.0.0" },
   })
   await post({ jsonrpc: "2.0", method: "notifications/initialized" })
   const { tools } = await request("tools/list", {})

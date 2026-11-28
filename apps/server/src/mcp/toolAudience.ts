@@ -1,5 +1,6 @@
 import { Context } from "effect"
 import { McpSchema } from "effect/ai"
+import { PI_CLIENT_NAME } from "../agentHost/piGlassTools"
 
 export const RELAY_CLIENT_NAME = "glass-agent-host"
 
@@ -10,8 +11,9 @@ export const forThreadsOnThisDevice = Context.make(
   ({ clientInfo }) => clientInfo?.name === RELAY_CLIENT_NAME,
 )
 
-export const forThreads = Context.make(
+const agentsGlassRuns = new Set([RELAY_CLIENT_NAME, SANDBOX_RELAY_CLIENT_NAME, PI_CLIENT_NAME])
+
+export const forThreadsAndTheGlobalChat = Context.make(
   McpSchema.EnabledWhen,
-  ({ clientInfo }) =>
-    clientInfo?.name === RELAY_CLIENT_NAME || clientInfo?.name === SANDBOX_RELAY_CLIENT_NAME,
+  ({ clientInfo }) => clientInfo !== undefined && agentsGlassRuns.has(clientInfo.name),
 )

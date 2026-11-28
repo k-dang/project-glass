@@ -323,7 +323,9 @@ it.live(
       const savedId = yield* transcripts.runningTurn("agent-1")
       yield* transcripts.startOrQueue("agent-1", sent("After"))
       const firstScope = yield* Scope.make()
-      const reason = "Couldn't recover pi's Started work update. Restart Glass to try again."
+
+      const reason =
+        "Couldn't recover what pi was sent before Glass restarted. Restart Glass to try again."
 
       const first = yield* harness(
         () => Effect.void,

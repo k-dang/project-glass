@@ -61,7 +61,7 @@ export class PullRequestStandings extends Context.Service<
           ),
         )
 
-        return yield* Effect.forEach(yield* subscriptions.subscribedThreads, (threadId) => {
+        return yield* Effect.forEach(yield* subscriptions.subscribers, (threadId) => {
           const thread = listed.find(({ id }) => id === threadId)
 
           return thread === undefined || (thread.sandbox !== null && isGone(thread.sandbox.reach))

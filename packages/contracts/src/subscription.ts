@@ -24,7 +24,7 @@ export const subjectKey = ({ pullRequest }: SubscriptionSubject) => referenceKey
 
 export class Subscription extends Schema.Class<Subscription>("Subscription")({
   id: Schema.String,
-  threadId: Schema.String,
+  subscriber: Schema.String.annotate({ description: "The Thread or the Global chat it tells." }),
   source: EventSource,
   subject: SubscriptionSubject.annotate({ description: "What it is about." }),
   kinds: Schema.Array(EventKind),

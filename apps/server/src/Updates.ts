@@ -1,6 +1,7 @@
 import { ThreadError, Update, type UpdatedSubscription } from "@glass/contracts"
 import { Array as Arr, DateTime, Effect, Exit, Layer, Ref, Stream } from "effect"
 import { EventLog } from "./EventLog"
+import { GlobalChat } from "./GlobalChat"
 import { Subscriptions, type SubscriptionState } from "./Subscriptions"
 import { Threads } from "./Threads"
 import { Transcripts } from "./Transcripts"
@@ -46,6 +47,7 @@ const updated = ({ state, events }: Pending): ReadonlyArray<UpdatedSubscription>
     : []
 
 const asUnitOfWork = <E, R>(
+  subscriber: string,
   threadId: string,
   told: ReadonlyArray<Pending>,
   send: (started: (turnId: string) => Effect.Effect<void>) => Effect.Effect<unknown, E, R>,
@@ -66,6 +68,7 @@ const asUnitOfWork = <E, R>(
             endedAt: yield* DateTime.now,
             exit,
             fields: {
+              subscriber,
               thread_id: threadId,
               turn_id: turnId,
               subjects: told.map(({ state }) => state.subjectKey).join(),
@@ -83,18 +86,22 @@ const asUnitOfWork = <E, R>(
 export const Updates = Layer.effectDiscard(
   Effect.gen(function* () {
     const threads = yield* Threads
+    const global = yield* GlobalChat
     const subscriptions = yield* Subscriptions
     const transcripts = yield* Transcripts
     const eventLog = yield* EventLog
 
-    const sendUpdate = (threadId: string, waits: Effect.Effect<void>) =>
-      threads.whenIdle(threadId, (start) =>
+    const whenIdleFor = (subscriber: string): (typeof GlobalChat.Service)["whenIdle"] =>
+      subscriber === global.id ? global.whenIdle : (effect) => threads.whenIdle(subscriber, effect)
+
+    const sendUpdate = (subscriber: string, waits: Effect.Effect<void>) =>
+      whenIdleFor(subscriber)((start, threadId) =>
         Effect.gen(function* () {
           const lastMessageTurn = yield* transcripts.lastMessageTurn(threadId)
 
           const pending = yield* pendingOf(
             eventLog,
-            yield* subscriptions.states(threadId),
+            yield* subscriptions.states(subscriber),
             lastMessageTurn,
           )
 
@@ -116,9 +123,11 @@ export const Updates = Layer.effectDiscard(
 
           const context = Update.make({ subscriptions: updates })
 
-          return yield* asUnitOfWork(threadId, told, (started) =>
-            start({ message: "", images: [], context, retriesDelivery: false }, (turnId) =>
-              subscriptions.deliver(record(pending)).pipe(Effect.andThen(started(turnId))),
+          return yield* asUnitOfWork(subscriber, threadId, told, (started) =>
+            start(
+              { message: "", images: [], context, retriesDelivery: subscriber === global.id },
+              (turnId) =>
+                subscriptions.deliver(record(pending)).pipe(Effect.andThen(started(turnId))),
             ),
           )
         }),
@@ -127,14 +136,18 @@ export const Updates = Layer.effectDiscard(
     const waiting = yield* Ref.make<ReadonlyArray<string>>([])
 
     const sendUpdates = Effect.gen(function* () {
-      const subscribed = yield* subscriptions.subscribedThreads
-      const inLine = (yield* Ref.get(waiting)).filter((threadId) => subscribed.includes(threadId))
+      const subscribed = yield* subscriptions.subscribers
+
+      const inLine = (yield* Ref.get(waiting)).filter((subscriber) =>
+        subscribed.includes(subscriber),
+      )
+
       const next = yield* Ref.make<ReadonlyArray<string>>([])
 
       yield* Effect.forEach(
-        [...inLine, ...subscribed.filter((threadId) => !inLine.includes(threadId))],
-        (threadId) =>
-          sendUpdate(threadId, Ref.update(next, Arr.append(threadId))).pipe(
+        [...inLine, ...subscribed.filter((subscriber) => !inLine.includes(subscriber))],
+        (subscriber) =>
+          sendUpdate(subscriber, Ref.update(next, Arr.append(subscriber))).pipe(
             Effect.catch((cause) => Effect.logWarning("Couldn't send an Update", cause)),
           ),
         { discard: true },

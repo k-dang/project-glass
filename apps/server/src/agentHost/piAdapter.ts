@@ -13,6 +13,7 @@ import {
   RequestNotWaiting,
   type RequestPart,
   SUGGEST_DRAFT_TOOL,
+  type TurnMessage,
   withContextOf,
 } from "@glass/contracts"
 import {
@@ -46,6 +47,7 @@ import {
   type PiEvent,
 } from "./piRpc"
 import {
+  beginTurn,
   Command,
   dialogMethods,
   dialogQuestion,
@@ -72,7 +74,7 @@ import { piSubagentStatusExtension } from "./piSubagentStatus"
 import { PI_DIFF_LINES } from "./piReviewTools"
 import { SUBMIT_REVIEW_TOOL } from "./submitReviewTool"
 import { runTurns } from "./turnLoop"
-import { startedWorkUpdateDelivery, SessionEntries } from "./piStartedWorkUpdate"
+import { redelivery, SessionEntries } from "./piRedelivery"
 import piDrawDiagramSource from "virtual:pi-draw-diagram"
 import piReviewToolsSource from "virtual:pi-review-tools"
 
@@ -211,6 +213,10 @@ const lockedDownFlags = (
 
 const skillFlags = (skills: ReadonlyArray<WrittenSkills>) =>
   skills.flatMap((plugin) => plugin.skills.flatMap((skill) => ["--skill", skill]))
+
+const retriesDelivery = (role: ThreadRole, { context }: TurnMessage) =>
+  Predicate.isTagged(context, "StartedWorkUpdate") ||
+  (Predicate.isTagged(role, "Global") && Predicate.isTagged(context, "Update"))
 
 const roleFlags = (
   folder: string,
@@ -406,7 +412,10 @@ export const piAdapter = (command: string) =>
 
         const turns = yield* runTurns({
           harness: "pi",
-          machine,
+          machine: {
+            ...machine,
+            begin: (turnId, sent, at) => beginTurn(turnId, sent, at, retriesDelivery(role, sent)),
+          },
           events: Stream.fromQueue(inbox),
           report,
           run: (piCommand, offer) =>
@@ -459,19 +468,17 @@ export const piAdapter = (command: string) =>
           yield* Queue.offer(inbox, answer)
         })
 
-        const startStartedWorkUpdate = Effect.fnUntraced(function* (
-          turnId: string,
-          sent: DeliveredTurn,
-        ) {
+        const startRedelivered = Effect.fnUntraced(function* (turnId: string, sent: DeliveredTurn) {
           const delivery = yield* rpc.request({ type: "get_entries" }, SessionEntries).pipe(
-            Effect.map((session) => startedWorkUpdateDelivery(turnId, sent.prompt, session)),
+            Effect.map((session) => redelivery(turnId, sent.prompt, session)),
             Effect.tapError((error) =>
-              Effect.logWarning("Couldn't recover pi's Started work update", error),
+              Effect.logWarning("Couldn't recover what pi was sent before Glass restarted", error),
             ),
             Effect.mapError(
               () =>
                 new HostThreadError({
-                  message: "Couldn't recover pi's Started work update. Restart Glass to try again.",
+                  message:
+                    "Couldn't recover what pi was sent before Glass restarted. Restart Glass to try again.",
                 }),
             ),
           )
@@ -491,13 +498,12 @@ export const piAdapter = (command: string) =>
             .pipe(
               Effect.tapError(() => Queue.offer(inbox, Input.Refused({ turnId }))),
               Effect.tapError((error) =>
-                Effect.logWarning("Couldn't confirm pi's Started work update delivery", error),
+                Effect.logWarning("Couldn't confirm pi got the Turn again", error),
               ),
               Effect.mapError(
                 () =>
                   new HostThreadError({
-                    message:
-                      "Couldn't confirm pi's Started work update delivery. Restart Glass to try again.",
+                    message: "Couldn't confirm pi got the Turn again. Restart Glass to try again.",
                   }),
               ),
             )
@@ -531,8 +537,8 @@ export const piAdapter = (command: string) =>
             return undefined
           }),
           startTurn: (turnId, sent) =>
-            Predicate.isTagged(sent.context, "StartedWorkUpdate")
-              ? startStartedWorkUpdate(turnId, sent)
+            retriesDelivery(role, sent)
+              ? startRedelivered(turnId, sent)
               : startMessage(turnId, sent),
           answer: Effect.fnUntraced(function* (requestId: string, answer: RequestAnswer) {
             const dialog = dialogs.get(requestId)

@@ -74,9 +74,8 @@ reaches the user.
   `verify-update-delivery`, whose model grows to cover a subscriber whose Update retries delivery
   across the restart, and the seen mark's two rules: telling that a Thread waits marks nothing, and
   finished work reaches the starter, the user, or an unseen mark.
-- The pi adapter's check that a retried Turn reached pi before the restart
-  (`piStartedWorkUpdate.ts`) covers every Turn that retries delivery instead of the Started work
-  update's context. `verify-turn-lifecycle`'s coverage of the Global chat's retried Turn moves to
+- The pi adapter's check that a retried Turn reached pi before the restart (`piRedelivery.ts`)
+  covers every Turn that retries delivery, rather than only a Started work update. `verify-turn-lifecycle`'s coverage of the Global chat's retried Turn moves to
   `Updates.ts`.
 - One Update can carry a started Thread's news beside a PR's. The Update prompt words started work
   as well as PRs, and the PR rules, written for a Thread changing its own PR, need wording the

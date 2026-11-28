@@ -89,7 +89,7 @@ const activeBranch = ({ entries, leafId }: typeof SessionEntries.Type) => {
   return branch.toReversed()
 }
 
-type StartedWorkUpdateDelivery =
+type Redelivery =
   | {
       readonly state: "pending" | "responding"
       readonly prompt: string
@@ -97,13 +97,13 @@ type StartedWorkUpdateDelivery =
     }
   | { readonly state: "completed"; readonly events: ReadonlyArray<PiEvent> }
 
-export const startedWorkUpdateDelivery = (
+export const redelivery = (
   turnId: string,
   prompt: string,
   session: typeof SessionEntries.Type,
-): StartedWorkUpdateDelivery => {
+): Redelivery => {
   const entries = activeBranch(session)
-  const identity = `\n\n<glass_started_work_update_turn>${turnId}</glass_started_work_update_turn>`
+  const identity = `\n\n<glass_redelivered_turn>${turnId}</glass_redelivered_turn>`
 
   const omitted = new Set<string>()
 
@@ -191,7 +191,7 @@ export const startedWorkUpdateDelivery = (
   return {
     state: "responding",
     prompt:
-      "Glass restarted while you were writing the Started work update above. Finish that Started work update using the saved thread. Do not repeat what you already said or take any action on the user's behalf.",
+      "Glass restarted while you were writing the reply above. Finish that reply using the saved thread. Do not repeat what you already said or take any action on the user's behalf.",
     events,
   }
 }

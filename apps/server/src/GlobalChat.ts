@@ -100,7 +100,7 @@ export class GlobalChat extends Context.Service<
     readonly unseen: Stream.Stream<TurnEnd | null>
     readonly markSeen: (endedAt: DateTime.Utc) => Effect.Effect<void, ThreadError>
     readonly whenIdle: <E>(
-      effect: (start: StartIdle) => Effect.Effect<void, E>,
+      effect: (start: StartIdle, sessionId: string) => Effect.Effect<void, E>,
     ) => Effect.Effect<void, E | ThreadError>
   }
 >()("@glass/server/GlobalChat") {

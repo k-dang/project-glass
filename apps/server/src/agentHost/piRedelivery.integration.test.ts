@@ -11,7 +11,7 @@ import { bundledPi } from "../../test/demoThread"
 import { fakeModelProvider, lastUserText } from "../../test/fakeModelProvider"
 import { isolatedHome, stubHome } from "../../test/harness"
 import { piAdapter } from "./piAdapter"
-import { startedWorkUpdateDelivery, SessionEntries } from "./piStartedWorkUpdate"
+import { redelivery, SessionEntries } from "./piRedelivery"
 import { type HostEvent, WorkRole } from "./protocol"
 
 const sent = {
@@ -73,7 +73,7 @@ for (const stopReason of ["error", "length"] as const)
   it(`continues a Started work update whose ${stopReason} attempt pi omitted for recovery`, () => {
     const saved = SessionManager.inMemory()
 
-    const pending = startedWorkUpdateDelivery("started-work-update-1", sent.prompt, {
+    const pending = redelivery("started-work-update-1", sent.prompt, {
       entries: [],
       leafId: null,
     })
@@ -125,7 +125,7 @@ for (const stopReason of ["error", "length"] as const)
     if (stopReason === "length")
       saved.appendCompaction("Earlier context summarized", failed, 100_000)
 
-    const delivery = startedWorkUpdateDelivery(
+    const delivery = redelivery(
       "started-work-update-1",
       sent.prompt,
       Schema.decodeUnknownSync(SessionEntries)({
@@ -186,7 +186,7 @@ it.live(
       const f = yield* fixture
       const saved = SessionManager.create(f.home)
 
-      const pending = startedWorkUpdateDelivery("started-work-update-1", sent.prompt, {
+      const pending = redelivery("started-work-update-1", sent.prompt, {
         entries: [],
         leafId: null,
       })
@@ -199,7 +199,7 @@ it.live(
       yield* restored.ended
 
       assert.lengthOf(f.model.calls, 1)
-      assert.include(lastUserText(f.model.calls[0]!), "Finish that Started work update")
+      assert.include(lastUserText(f.model.calls[0]!), "Finish that reply")
       const branch = SessionManager.open(saved.getSessionFile()!).getBranch()
 
       const users = branch.flatMap((entry) =>
@@ -258,7 +258,7 @@ it.live(
 
       assert.equal(
         error.message,
-        "Couldn't confirm pi's Started work update delivery. Restart Glass to try again.",
+        "Couldn't confirm pi got the Turn again. Restart Glass to try again.",
       )
       yield* session.closed
       assert.isFalse(events.some(Predicate.isTagged("TurnEnded")))
