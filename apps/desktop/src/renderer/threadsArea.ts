@@ -366,25 +366,26 @@ export const answerRequestAtom = Atom.family((request: ThreadRequest) =>
   ),
 )
 
-export const createThreadAtom = backendRuntime.fn((input: NewThread, get) =>
-  Effect.gen(function* () {
-    const created = yield* Backend.use((backend) => backend.CreateThread(input))
+export const createThread = (registry: AtomRegistry.AtomRegistry, input: NewThread) =>
+  backendRuntimeOf(registry).runPromiseExit(
+    Effect.gen(function* () {
+      const created = yield* Backend.use((backend) => backend.CreateThread(input))
 
-    yield* Effect.all(
-      [
-        AtomRegistry.toStreamResult(get.registry, threadsAtom).pipe(
-          Stream.filter((threads) => threads.some(({ id }) => id === created.id)),
-          Stream.runHead,
-          Effect.ignore,
-        ),
-        AtomRegistry.getResult(get.registry, transcriptAtom(created.id)).pipe(Effect.ignore),
-      ],
-      { concurrency: "unbounded", discard: true },
-    )
+      yield* Effect.all(
+        [
+          AtomRegistry.toStreamResult(registry, threadsAtom).pipe(
+            Stream.filter((threads) => threads.some(({ id }) => id === created.id)),
+            Stream.runHead,
+            Effect.ignore,
+          ),
+          AtomRegistry.getResult(registry, transcriptAtom(created.id)).pipe(Effect.ignore),
+        ],
+        { concurrency: "unbounded", discard: true },
+      )
 
-    return created
-  }),
-)
+      return created
+    }),
+  )
 
 export const sendMessageAtom = Atom.family((threadId: string) =>
   backendRuntime.fn((sent: ThreadMessageInput) =>
