@@ -1,8 +1,7 @@
 import { cn } from "cn"
-import { Atom } from "effect/reactivity"
 import type { LucideIcon } from "lucide-react"
 import { Kbd } from "@/components/ui/kbd"
-import { SidePanel } from "./SidePanel"
+import { SidePanel, threadPaneWidthAtom } from "./SidePanel"
 import { actionRow } from "./ThreadFrame"
 import { useShortcuts } from "./useShortcuts"
 
@@ -13,8 +12,6 @@ export interface PaneChoice {
   readonly key?: string
   readonly open: () => void
 }
-
-const paneWidthAtom = Atom.make(400).pipe(Atom.keepAlive)
 
 const focusOnMount = (element: HTMLButtonElement | null) => element?.focus()
 
@@ -27,7 +24,7 @@ export function PanePicker(props: { choices: ReadonlyArray<PaneChoice>; onClose:
     <SidePanel
       name="Pane picker"
       heading="Open a pane"
-      width={paneWidthAtom}
+      width={threadPaneWidthAtom}
       onClose={props.onClose}
     >
       <ul className="flex min-h-0 flex-col gap-0.5 overflow-y-auto p-3">

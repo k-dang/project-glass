@@ -2,7 +2,7 @@ import { RegistryContext, useAtomValue } from "@effect/atom-react"
 import type { PullRequest, PullRequestRef, PullRequestWorkspace } from "@glass/contracts"
 import { useNavigate } from "@tanstack/react-router"
 import { Option } from "effect"
-import { AsyncResult, Atom } from "effect/reactivity"
+import { AsyncResult } from "effect/reactivity"
 import { FileDiff, Maximize2, RotateCw } from "lucide-react"
 import { useCallback, useContext, useMemo, useRef } from "react"
 import { Button } from "@/components/ui/button"
@@ -20,12 +20,10 @@ import { useLiveStatus } from "./liveStatus"
 import { plural } from "./plural"
 import { InlineStatusChips, PullRequestStateIcon } from "./PullRequestStatus"
 import { preloadAtom, reloadPreloaded } from "./reviewsArea"
-import { SidePanel } from "./SidePanel"
+import { SidePanel, threadPaneWidthAtom } from "./SidePanel"
 import { Timeline } from "./Timeline"
 import { useFullFiles } from "./useFullFiles"
 import type { Reactions } from "./workspaceFeedback"
-
-const paneWidthAtom = Atom.make(560).pipe(Atom.keepAlive)
 
 export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: () => void }) {
   const { owner, repo, number } = props.pullRequest
@@ -92,7 +90,7 @@ export function PullRequestPane(props: { pullRequest: PullRequestRef; onClose: (
           </TooltipHint>
         </>
       }
-      width={paneWidthAtom}
+      width={threadPaneWidthAtom}
       onClose={props.onClose}
     >
       {loaded !== null && pullRequest !== null ? (

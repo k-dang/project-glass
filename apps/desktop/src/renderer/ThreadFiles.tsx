@@ -23,7 +23,7 @@ import { problemOf } from "./problems"
 import { createImageViewer, ImageViewer } from "./ImageViewer"
 import { imageSrc } from "./pastedImages"
 import { FileContentsView } from "./RepositoryBrowser"
-import { SidePanel } from "./SidePanel"
+import { SidePanel, threadPaneWidthAtom } from "./SidePanel"
 
 const threadFileAtom = Atom.family((key: FileKey) =>
   backendRuntime.atom(Backend.use((backend) => backend.GetThreadFile(key))),
@@ -284,8 +284,6 @@ export function FileLink(props: { text: string; children: ReactNode }) {
   )
 }
 
-const paneWidthAtom = Atom.make(640).pipe(Atom.keepAlive)
-
 export const FilePane = memo(function FilePane(props: {
   threadId: string
   path: string
@@ -302,7 +300,7 @@ export const FilePane = memo(function FilePane(props: {
     <SidePanel
       name="File"
       heading={fileName(props.path)}
-      width={paneWidthAtom}
+      width={threadPaneWidthAtom}
       onClose={props.onClose}
     >
       {AsyncResult.builder(useAtomValue(atom))

@@ -6,7 +6,7 @@ import {
   SANDBOX_BROWSER_PARTITION,
 } from "@glass/contracts/desktop"
 import { Option, Predicate, Schema } from "effect"
-import { AsyncResult, Atom } from "effect/reactivity"
+import { AsyncResult } from "effect/reactivity"
 import {
   ArrowLeft,
   ArrowRight,
@@ -41,7 +41,7 @@ import {
 } from "./browserPages"
 import { fileName } from "./fileName"
 import { PageNotes } from "./PageNotes"
-import { SidePanel } from "./SidePanel"
+import { SidePanel, threadPaneWidthAtom } from "./SidePanel"
 
 export const BrowserLinks = createContext<{
   readonly policy: BrowserPolicy
@@ -58,8 +58,6 @@ const decodeEvent = Schema.decodeUnknownOption(PageEvent)
 const isReady = (message: { readonly channel: string; readonly args: ReadonlyArray<unknown> }) =>
   message.channel === PAGE_EVENT_CHANNEL &&
   Option.exists(decodeEvent(message.args[0]), ({ type }) => type === "ready")
-
-const paneWidthAtom = Atom.make(720).pipe(Atom.keepAlive)
 
 const handBackBrowserAtom = backendRuntime.fn((threadId: string) =>
   Backend.use((backend) => backend.HandBackBrowser({ threadId })),
@@ -278,7 +276,7 @@ export const BrowserPane = memo(function BrowserPane(props: {
     <SidePanel
       name="Browser"
       heading={title || file || web?.host || "Browser"}
-      width={paneWidthAtom}
+      width={threadPaneWidthAtom}
       onClose={props.onClose}
       actions={
         <>
