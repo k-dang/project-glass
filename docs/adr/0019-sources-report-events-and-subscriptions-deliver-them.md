@@ -3,24 +3,25 @@
 Glass reacted to things the user didn't do through hand-wired streams, one per reaction: a Started
 work update, To-dos completing on merge. A Thread handling its own PR would have added more, each
 with its own delivery bookkeeping, and nothing said why a Thread had woken. Now a Source reports
-what happens as Events into one SQLite log, and a Subscription tells a Thread about the Events on
-its subject in an Update. The two older streams still run by themselves.
+what happens as Events into one SQLite log, and a Subscription tells a Thread or the Global chat
+about the Events on its subject in an Update. Glass itself reports on the work the Global chat and
+Threads start (ADR 0020). To-dos completing on merge still read the Thread's PR, since that starts
+no Turn and doing it twice changes nothing.
 
 The log is what gets delivered. Each Subscription keeps a cursor into it, and Glass moves the cursor
 past the Events an Update carries in the same transaction that starts the Update's Turn, so each
-Event is told once, also across a restart. Glass waits until the Thread is idle and sends one Update
-with every new Event, oldest first, when at least one is of a kind the Subscription asked for.
-Glass doesn't decide whether an Event still holds: checks that failed and passed again while the
-Thread was busy arrive as both Events, and the agent judges what is left to do.
+Event is told once, also across a restart. Glass waits until the subscriber is idle and sends one
+Update with every new Event, oldest first, when at least one is of a kind the Subscription asked
+for. Glass doesn't decide whether an Event still holds: checks that failed and passed again while
+the subscriber was busy arrive as both Events, and the agent judges what is left to do.
 
 A Source only reports Events with a schema and checks what a Subscription may be about. Delivery,
 who may subscribe, giving up after three Updates in a row, and running three at once know nothing
-about where Events come from. GitHub is the only Source, and it reports Events only for PRs a
-Subscription covers, by comparing each read of the PR mirror with the one before; the first read
-for a Subscription reports what already stands. A Thread that subscribes to a PR Glass already
-reads hears what stands in the reply to its subscribing instead, since that read reported it before
-the Subscription began. The mirror is already polled, and a desktop app has no public address for
-webhooks.
+about where Events come from. GitHub reports Events only for PRs a Subscription covers, by comparing
+each read of the PR mirror with the one before; the first read for a Subscription reports what
+already stands. A subscriber to a PR Glass already reads hears what stands in the reply to its
+subscribing instead, since that read reported it before the Subscription began. The mirror is
+already polled, and a desktop app has no public address for webhooks.
 
 ## Considered options
 
@@ -36,8 +37,8 @@ webhooks.
 ## Consequences
 
 - An Update can tell the agent about something already undone, at the cost of a short Turn.
-- A Subscription that gave up keeps its Events, and the next message the Thread gets lets them
-  through.
+- A Subscription that gave up keeps its Events, and the next message its subscriber gets lets
+  them through.
 - Something that happens and is undone between two reads of the mirror is never an Event.
 - Glass reports nothing while it is closed, and the first read after it opens reports what changed.
 - A new Source, such as a schedule or a folder, adds Events and a subject; delivery stays as it is.

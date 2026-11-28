@@ -163,26 +163,28 @@ _Avoid_: History, audit log, event log, telemetry
 
 **Event**:
 Something that happened which the user didn't do in Glass and which Glass noticed, such as a PR's
-checks failing, a reviewer commenting, or a set time arriving.
+checks failing, a reviewer commenting, or a Thread the Global chat started finishing.
 _Avoid_: Activity (what the user did), notification, trigger
 
 **Source**:
-Somewhere Events come from, such as GitHub.
+Somewhere Events come from: GitHub, or Glass itself for the work the Global chat and Threads
+start.
 _Avoid_: Integration, feed, provider (a Sandbox provider makes Sandboxes)
 
 **Subscription**:
-A standing instruction that a Thread be told about the Events on one subject, such as a PR, with a
-note in plain words on what to do about them. A Thread's agent makes one for its own Thread.
+A standing instruction that a Thread or the Global chat be told about the Events on one subject,
+such as a PR or work it started, with a note in plain words on what to do about them. A Thread's
+agent or the Global chat makes one for itself, and Glass makes one for whoever starts work.
 _Avoid_: Watch, trigger, rule, hook
 
 **Update**:
-A Turn Glass starts in a Thread or the Global chat to tell it about Events, or about work it
-started.
+A Turn Glass starts in a Thread or the Global chat to tell it about the Events its Subscriptions
+are about.
 _Avoid_: Notification, wake-up
 
 **PR update**:
-An Update carrying the Events on a PR a Thread has a Subscription to, such as checks failing,
-review feedback, changes requested, a merge conflict, or the PR merging.
+An Update carrying the Events on a PR a Thread or the Global chat has a Subscription to, such as
+checks failing, review feedback, changes requested, a merge conflict, or the PR merging.
 _Avoid_: Babysitting, PR watch
 
 ### Planning
@@ -218,8 +220,8 @@ _Avoid_: Archived, done, finished, closed
 
 **Global chat**:
 The one chat the user has with Glass itself, opened over any Area, which works through
-Glass's tools rather than in a repository. Its model and the work it started stay with it across
-Sessions.
+Glass's tools rather than in a repository. Its model, the work it started, and its Subscriptions
+stay with it across Sessions.
 _Avoid_: Assistant, copilot, Global conversation
 
 **Session**:
@@ -228,8 +230,8 @@ ends the current Session and begins the next; an ended Session stays readable bu
 _Avoid_: Past chat, Past conversation, history, archived chat
 
 **Started work update**:
-An Update telling the Global chat or a Thread that work it started finished, failed, or needs
-the user's input.
+An Update carrying the Events of work the Global chat or a Thread started: it finished, failed,
+or needs the user's input.
 _Avoid_: Global chat update, notification, event, wake-up
 
 **Agent harness**:
