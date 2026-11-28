@@ -370,14 +370,7 @@ export class PullRequestMirror extends Context.Service<
                     ...pr,
                     head: observed?.head ?? pr.head,
                     checks: observed?.checks ?? pr.checks,
-                    attention:
-                      latest === undefined
-                        ? pr.attention
-                        : {
-                            ...latest,
-                            mergeConflict:
-                              latest.mergeConflict ?? pr.attention?.mergeConflict ?? null,
-                          },
+                    attention: latest ?? pr.attention,
                     details: subscribedIds.has(pr.id) ? details : null,
                   },
                 ]
