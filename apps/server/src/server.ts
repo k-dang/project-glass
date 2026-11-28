@@ -28,6 +28,7 @@ import { CheckIns } from "./CheckIns"
 import { Git } from "./git"
 import { GitHubAuth } from "./github/GitHubAuth"
 import { GitHubSource } from "./GitHubSource"
+import { GlassSource } from "./GlassSource"
 import { GitHubClient } from "./github/GitHubClient"
 import { GlassRpcHandlers } from "./handlers"
 import { GlobalChat } from "./GlobalChat"
@@ -63,7 +64,6 @@ import { AgentRunners } from "./agentRunners"
 import { BranchNames } from "./BranchNames"
 import { Tours } from "./Tours"
 import { Transcripts } from "./Transcripts"
-import { StartedWorkUpdates } from "./StartedWorkUpdates"
 import { Subscriptions } from "./Subscriptions"
 import { Updates } from "./Updates"
 
@@ -133,17 +133,16 @@ const services = (
   mcpTools: McpToolsLayer,
   agentCommands: AgentCommandsLayer,
 ) =>
-  Layer.mergeAll(GlassRpcHandlers, mcpTools, StartedWorkUpdates, CompleteToDosOnMerge, Updates)
+  Layer.mergeAll(GlassRpcHandlers, mcpTools, GlassSource, CompleteToDosOnMerge, Updates)
     .pipe(
       Layer.provide(
         Inbox.layer.pipe(
           Layer.provide(PullRequestStandings.layer),
           Layer.provideMerge(GitHubSource.layer),
-          Layer.provideMerge(Subscriptions.layer),
         ),
       ),
       Layer.provide(SettledThreads.layer.pipe(Layer.provideMerge(ThreadPullRequests.layer))),
-      Layer.provide(StartedWork.layer),
+      Layer.provideMerge(StartedWork.layer.pipe(Layer.provideMerge(Subscriptions.layer))),
       Layer.provide(PullRequestLists.layer),
       Layer.provide(PullRequestMirror.layer),
       Layer.provide(ToDos.layer),

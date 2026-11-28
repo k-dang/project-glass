@@ -112,7 +112,7 @@ export class ThreadTurns extends Context.Service<
     ) => Effect.Effect<void, RequestWaiting | ThreadError>
     readonly whenIdle: <E>(
       threadId: string,
-      effect: (start: StartIdle) => Effect.Effect<void, E>,
+      effect: (start: StartIdle, threadId: string) => Effect.Effect<void, E>,
     ) => Effect.Effect<void, E | ThreadError>
     readonly sendQueued: (
       threadId: string,
@@ -466,7 +466,10 @@ export class ThreadTurns extends Context.Service<
             Effect.gen(function* () {
               if (!(yield* transcripts.idle(threadId))) return
 
-              yield* effect((turn, record) => transcripts.startIfIdle(threadId, turn, record))
+              yield* effect(
+                (turn, record) => transcripts.startIfIdle(threadId, turn, record),
+                threadId,
+              )
             }),
           ),
         sendQueued: (threadId, queuedId) =>

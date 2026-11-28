@@ -25,7 +25,7 @@ export const globalChatReply = (input: FakeModelRequest): ReadonlyArray<FakeMode
 
   const words = lastUserText(input)
 
-  if (words.startsWith("<glass_started_work_update>"))
+  if (words.startsWith("<glass_update>"))
     return [{ text: "The Thread you started is done. Want me to look at what it changed?" }]
 
   const call = (name: string, args: Schema.JsonObject): ReadonlyArray<FakeModelDelta> => [

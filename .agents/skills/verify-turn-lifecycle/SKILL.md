@@ -13,7 +13,7 @@ A Turn's ending lives in `thread_turn.ended` (null while it runs). The rules for
 | --- | --- | --- |
 | `OneRunningTurn` | A Thread has at most one running Turn. | `runningTurn` reads only the first row, so a second running Turn is never stopped or ended. |
 | `NoPartsAfterFailure` | A Turn that failed gets no more parts. | A Turn shown as failed keeps growing with output from an agent Glass told to stop. |
-| `RetriedTurnsSurviveLoss` | A Turn that retries delivery is never cut off or interrupted. | A Started work update is lost when the host goes away, and the Global chat never reports it. |
+| `RetriedTurnsSurviveLoss` | A Turn that retries delivery is never cut off or interrupted. | An Update to the Global chat is lost when the host goes away, and the user never hears what it told. |
 | `OrdinaryTurnsEnd` | A running Turn that doesn't retry delivery is always on the host, being delivered, or has its end waiting in the journal. | The Thread shows "running" forever and every message you send only queues. |
 | `StoppedTurnsEnd` | A Turn you stopped is always on the host, being delivered, or has its end waiting in the journal. | The Turn you stopped stays running, or runs again after a restart. |
 | `FinalEndingsStay` | Once a Turn is Done, Failed, Stopped, or Interrupted, its ending never changes. Only Cut off can be replaced. | The transcript and Started work outcomes change after the fact. |
@@ -32,7 +32,7 @@ Synced with the code at commit `b204060a3653274172343636724f824fe6f69899`. Befor
 
 | Model | Code |
 | --- | --- |
-| `YouSend`, `YouSendQueued`, `GlobalChatStartsUpdate`, the queue start in `EndWith` | `stepThread` in `apps/server/src/threadState.ts`; `execute` in `apps/server/src/Transcripts.ts`; `startIfIdle` with `retriesDelivery` in `apps/server/src/StartedWorkUpdates.ts` |
+| `YouSend`, `YouSendQueued`, `GlobalChatStartsUpdate`, the queue start in `EndWith` | `stepThread` in `apps/server/src/threadState.ts`; `execute` in `apps/server/src/Transcripts.ts`; `startIfIdle` with `retriesDelivery` in `apps/server/src/Updates.ts` |
 | `Accepts`, `EndWith`, `GlassSavesJournal` | `writeApplied` (`TurnEnded`, `PartSet`, `PartAppended` and `writableTurn`) and `save` in `apps/server/src/Transcripts.ts` |
 | `HostTakesTurn`, `HostRefusesTurn`, `DeliveryTimesOut` | `deliver`, `dispatch`, `settleUndelivered` in `apps/server/src/ThreadTurns.ts`; `settleUndelivered` in `Transcripts.ts`; `begin` in `apps/server/src/agentHost/turnLoop.ts` |
 | `YouStop` | `stop` and `stopHost` in `ThreadTurns.ts`; `askedToStop` in `Transcripts.ts` (sets `retries_delivery = 0`); `stop` in `turnLoop.ts` |

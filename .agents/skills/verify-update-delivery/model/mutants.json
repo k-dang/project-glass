@@ -8,5 +8,6 @@
   "NeverCount": "StopsAtTheLimit",
   "UnpromptedCounts": "StopsAtTheLimit",
   "RestartForgetsCount": "StopsAtTheLimit",
-  "IgnoreMessages": "MessageLetsItTryAgain"
+  "IgnoreMessages": "MessageLetsItTryAgain",
+  "GlobalChatDoesNotRetry": "GlobalChatUpdatesSurviveRestart"
 }

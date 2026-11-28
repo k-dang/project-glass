@@ -28,7 +28,7 @@ const dependencyRef = new PullRequestRef({ owner: "glass-demo", repo: "greeter",
 
 const ownSubscription = new Subscription({
   id: "own",
-  threadId: thread.id,
+  subscriber: thread.id,
   source: "github",
   subject: PullRequestSubject.make({ pullRequest: own }),
   kinds: ["ChecksFailed", "ReviewFeedback", "ChangesRequested", "MergeConflict"],
@@ -37,7 +37,7 @@ const ownSubscription = new Subscription({
 
 const dependency = new Subscription({
   id: "dependency",
-  threadId: thread.id,
+  subscriber: thread.id,
   source: "github",
   subject: PullRequestSubject.make({ pullRequest: dependencyRef }),
   kinds: ["PullRequestMerged"],
@@ -52,7 +52,7 @@ const mountSubscribed = () => {
       Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null })),
     WatchSubscriptions: ({ threadId }) =>
       SubscriptionRef.changes(subscriptions).pipe(
-        Stream.map((all) => all.filter((subscription) => subscription.threadId === threadId)),
+        Stream.map((all) => all.filter((subscription) => subscription.subscriber === threadId)),
       ),
     EndSubscription: ({ subscriptionId }) =>
       SubscriptionRef.update(subscriptions, (all) => all.filter(({ id }) => id !== subscriptionId)),
@@ -167,7 +167,7 @@ it("shows an Update as a Turn Glass started, listing each PR and its Events", as
   })
 
   await screen.findByText("Fixed lint and renamed it.")
-  const update = within(screen.getByRole("list", { name: "PR update from Glass" }))
+  const update = within(screen.getByRole("list", { name: "Update from Glass" }))
 
   expect(update.getAllByRole("listitem").map((item) => item.textContent)).toEqual([
     "glass-demo/greeter#264: 2 checks failed, checks passed, 1 Review thread waits for a reply, alice requested changes, a merge conflict",

@@ -24,6 +24,7 @@ import {
   repository,
   scriptedHost,
   settled,
+  threadEventsTold,
 } from "../../test/threadsFixture"
 import { type FakeGitHub, startFakeGitHub } from "../../test/fakeGitHub"
 import { VIEWER } from "../../test/fakePullRequest"
@@ -400,14 +401,9 @@ describe("Glass's Thread tools called by a Thread", () => {
       yield* f.send(parent.id, glassCall("list_started_work", {}))
       const [, , listed] = yield* f.transcript(parent.id, settled(3))
 
-      assert.deepStrictEqual<unknown>(
-        Predicate.isTagged(update?.context, "StartedWorkUpdate") &&
-          update.context.work.map((work) => [
-            Predicate.isTagged(work, "Thread") && work.threadId,
-            work.outcome,
-          ]),
-        [[child!.id, "finished"]],
-      )
+      assert.deepStrictEqual(threadEventsTold(update === undefined ? [] : [update]), [
+        [child!.id, "ThreadFinished"],
+      ])
       assert.deepStrictEqual(
         decodeStarted(JSON.parse(calledBy(listed).text)).items.map(
           (item) => Predicate.isTagged(item, "Thread") && item.thread.id,

@@ -195,33 +195,6 @@ export const MessageWithContext = Schema.Struct({
 
 export type MessageWithContext = typeof MessageWithContext.Type
 
-const outcomeFields = {
-  outcome: Schema.Literals(["finished", "failed", "waiting"]),
-  reason: Schema.NullOr(Schema.String),
-  askedWith: Schema.NullOr(Schema.String),
-}
-
-export const ThreadOutcome = Schema.TaggedStruct("Thread", {
-  threadId: Schema.String,
-  name: Schema.String,
-  ...outcomeFields,
-})
-
-export const AgentReviewOutcome = Schema.TaggedStruct("AgentReview", {
-  pullRequest: PullRequestRef,
-  ...outcomeFields,
-})
-
-export const WorkOutcome = Schema.Union([ThreadOutcome, AgentReviewOutcome])
-
-export type WorkOutcome = typeof WorkOutcome.Type
-
-export const StartedWorkUpdate = Schema.TaggedStruct("StartedWorkUpdate", {
-  work: Schema.NonEmptyArray(WorkOutcome),
-})
-
-export type StartedWorkUpdate = typeof StartedWorkUpdate.Type
-
 export const BackgroundWork = Schema.Struct({
   kind: Schema.Literals(["subagent", "command"]),
   description: Schema.String,
@@ -249,7 +222,6 @@ export const AgentReviewTurn = Schema.TaggedStruct("AgentReview", {})
 export const TurnContext = Schema.Union([
   PullRequestContext,
   ThreadContext,
-  StartedWorkUpdate,
   Update,
   BackgroundWorkEnded,
   AgentReviewTurn,

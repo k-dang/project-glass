@@ -23,6 +23,7 @@ import { existsSync, readdirSync, readFileSync, renameSync, writeFileSync } from
 import { basename, dirname, join } from "node:path"
 import type { HarnessAdapter, HarnessSession } from "../src/agentHost/adapter"
 import type { DeliveredTurn } from "../src/agentHost/deliveredMessage"
+import { PI_CLIENT_NAME } from "../src/agentHost/piGlassTools"
 import { GlassToolsAccess, notRunning } from "../src/agentHost/protocol"
 import type { WrittenSkills } from "../src/agentHost/sentSkills"
 import { MCP_PATH } from "../src/mcp/mcpHttp"
@@ -46,7 +47,7 @@ const callGlass = (access: GlassToolsAccess, name: string, args: Schema.JsonObje
 
     if (opened.status !== 200) return { output: `Refused with ${opened.status}`, done: false }
 
-    const mcp = yield* connectMcp(baseUrl, access.bearer)
+    const mcp = yield* connectMcp(baseUrl, access.bearer, PI_CLIENT_NAME)
     const result = yield* mcp.call(name, args)
 
     return { output: JSON.stringify(result.content), done: result.isError !== true }
@@ -224,9 +225,7 @@ export const scriptedAdapter = (gates: string): HarnessAdapter => {
 
         const run = (turnId: string, { message, prompt, context }: DeliveredTurn) =>
           Effect.gen(function* () {
-            const update =
-              Predicate.isTagged(context, "StartedWorkUpdate") ||
-              Predicate.isTagged(context, "Update")
+            const update = Predicate.isTagged(context, "Update")
 
             const scripted = update ? scriptedUpdateCall.exec(prompt) : scriptedCall.exec(message)
 

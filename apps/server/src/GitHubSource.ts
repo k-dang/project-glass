@@ -8,7 +8,7 @@ import {
   type SettingsError,
   ThreadError,
 } from "@glass/contracts"
-import { Array as Arr, Context, Effect, Layer, Ref, Stream } from "effect"
+import { Array as Arr, Context, Effect, Layer, Predicate, Ref, Stream } from "effect"
 import { EventLog } from "./EventLog"
 import { FollowedRepositories } from "./FollowedRepositories"
 import { endedEvent, recorded, standingEvents } from "./gitHubEvents"
@@ -54,7 +54,13 @@ export class GitHubSource extends Context.Service<
 
       const subscribed = subscriptions
         .about("github")
-        .pipe(Effect.map((states) => states.map(({ subject }) => subject.pullRequest)))
+        .pipe(
+          Effect.map((states) =>
+            states.flatMap(({ subject }) =>
+              Predicate.isTagged(subject, "PullRequest") ? [subject.pullRequest] : [],
+            ),
+          ),
+        )
 
       const recordEnded = Effect.fnUntraced(function* (mirrored: Mirror | undefined) {
         if (mirrored === undefined) return
@@ -127,7 +133,7 @@ export class GitHubSource extends Context.Service<
 
           if (found.state === "merged" || found.state === "closed")
             return yield* refuse(
-              `PR ${referenceText(pullRequest)} has already ${found.state}, so there's nothing left to tell your Thread about.`,
+              `PR ${referenceText(pullRequest)} has already ${found.state}, so there's nothing left to tell you about.`,
             )
 
           return PullRequestSubject.make({ pullRequest: found.summary.ref })

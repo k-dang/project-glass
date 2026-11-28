@@ -2,7 +2,9 @@ import { SqliteClient, SqliteMigrator } from "@effect/sql-sqlite-node"
 import { assert, it } from "@effect/vitest"
 import {
   ThreadError,
-  ThreadOutcome,
+  LoggedEvent,
+  ThreadFinishedEvent,
+  ThreadSubject,
   TurnDone,
   TurnCutOff,
   TurnInterrupted,
@@ -11,7 +13,7 @@ import {
   TextPart,
   TurnFailed,
   TurnStopped,
-  StartedWorkUpdate,
+  Update,
 } from "@glass/contracts"
 import {
   DateTime,
@@ -102,22 +104,32 @@ const decodeLine = Schema.decodeUnknownSync(Schema.fromJsonString(UnitLine))
 
 const sent = (message: string) => ({ message, images: [], context: null })
 
-const startedWorkUpdate = StartedWorkUpdate.make({
-  work: [
-    ThreadOutcome.make({
-      threadId: "started",
-      name: "Started",
-      askedWith: "Build it",
-      outcome: "finished",
-      reason: null,
-    }),
+const retriedUpdate = Update.make({
+  subscriptions: [
+    {
+      subscriptionId: "started",
+      subject: ThreadSubject.make({ threadId: "started" }),
+      note: "Build it",
+      events: [
+        new LoggedEvent({
+          id: 1,
+          source: "glass",
+          occurredAt: DateTime.makeUnsafe("2026-11-27T12:00:00Z"),
+          event: ThreadFinishedEvent.make({
+            threadId: "started",
+            name: "Started",
+            endedAt: DateTime.makeUnsafe("2026-11-27T12:00:00Z"),
+          }),
+        }),
+      ],
+    },
   ],
 })
 
-const startedWorkUpdateTurn = {
+const retriedTurn = {
   message: "",
   images: [],
-  context: startedWorkUpdate,
+  context: retriedUpdate,
   retriesDelivery: true,
 }
 
@@ -283,7 +295,7 @@ it.live(
 
       let savedId = ""
 
-      yield* transcripts.startIfIdle("agent-1", startedWorkUpdateTurn, (turnId) =>
+      yield* transcripts.startIfIdle("agent-1", retriedTurn, (turnId) =>
         Effect.sync(() => {
           savedId = turnId
         }),
@@ -319,11 +331,13 @@ it.live(
   () =>
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
-      yield* transcripts.startIfIdle("agent-1", startedWorkUpdateTurn, () => Effect.void)
+      yield* transcripts.startIfIdle("agent-1", retriedTurn, () => Effect.void)
       const savedId = yield* transcripts.runningTurn("agent-1")
       yield* transcripts.startOrQueue("agent-1", sent("After"))
       const firstScope = yield* Scope.make()
-      const reason = "Couldn't recover pi's Started work update. Restart Glass to try again."
+
+      const reason =
+        "Couldn't recover what pi was sent before Glass restarted. Restart Glass to try again."
 
       const first = yield* harness(
         () => Effect.void,
@@ -359,7 +373,7 @@ it.live("fails a Turn started when idle that doesn't retry delivery once the hos
     )
 
     yield* h.turns.whenIdle("agent-1", (start) =>
-      start({ ...startedWorkUpdateTurn, retriesDelivery: false }, () => Effect.void),
+      start({ ...retriedTurn, retriesDelivery: false }, () => Effect.void),
     )
 
     assert.deepStrictEqual(yield* h.delivered(1), ["failed"])
@@ -520,7 +534,7 @@ it.live("starts an idle update only while that Thread has nothing running or Que
     let started = 0
 
     yield* h.turns.whenIdle("agent-1", (start) =>
-      start(startedWorkUpdateTurn, () =>
+      start(retriedTurn, () =>
         Effect.sync(() => {
           started += 1
         }),
@@ -536,7 +550,7 @@ it.live("starts an idle update only while that Thread has nothing running or Que
       }),
     )
     assert.isFalse(again)
-    assert.equal((yield* h.transcript).turns[0]?.context?._tag, "StartedWorkUpdate")
+    assert.equal((yield* h.transcript).turns[0]?.context?._tag, "Update")
   }).pipe(Effect.provide(layer)),
 )
 
@@ -779,9 +793,7 @@ it.effect("leaves a Turn that retries delivery pending when StartTurn never answ
         },
       })
 
-      yield* desk.turns.whenIdle("agent-1", (start) =>
-        start(startedWorkUpdateTurn, () => Effect.void),
-      )
+      yield* desk.turns.whenIdle("agent-1", (start) => start(retriedTurn, () => Effect.void))
       yield* Deferred.await(entered)
       yield* deadlineSet
 
@@ -803,7 +815,7 @@ it.effect("leaves a Turn that retries delivery pending when StartTurn never answ
       const waiting = yield* desk.transcripts.read("agent-1")
       assert.equal(waiting.turns[0]?.ended, null)
       assert.equal(waiting.status, HOST_DIDNT_ANSWER)
-      assert.equal(waiting.turns[0]?.context?._tag, "StartedWorkUpdate")
+      assert.equal(waiting.turns[0]?.context?._tag, "Update")
 
       const retryable = yield* desk.transcripts.retryDeliveries(["agent-1"])
       assert.lengthOf(retryable, 1)
@@ -840,9 +852,7 @@ it.effect(
       const thread = desk.threads.get("agent-1")
       assert.isDefined(thread)
 
-      yield* desk.turns.whenIdle("agent-1", (start) =>
-        start(startedWorkUpdateTurn, () => Effect.void),
-      )
+      yield* desk.turns.whenIdle("agent-1", (start) => start(retriedTurn, () => Effect.void))
       yield* Deferred.await(begun)
       yield* desk.turns.stop(thread)
 
@@ -869,9 +879,7 @@ it.effect(
       const thread = desk.threads.get("agent-1")
       assert.isDefined(thread)
 
-      yield* desk.turns.whenIdle("agent-1", (start) =>
-        start(startedWorkUpdateTurn, () => Effect.void),
-      )
+      yield* desk.turns.whenIdle("agent-1", (start) => start(retriedTurn, () => Effect.void))
       yield* Deferred.await(begun)
       yield* desk.turns.stop(thread)
 
@@ -898,7 +906,7 @@ const glassRun = ThreadTurns.layer.pipe(
   Layer.provideMerge(Layer.mock(ToDos)({})),
 )
 
-const stopStartedWorkUpdate = Effect.gen(function* () {
+const stopRetriedTurn = Effect.gen(function* () {
   const begun = yield* Deferred.make<void>()
 
   const desk = yield* scripted({
@@ -912,7 +920,7 @@ const stopStartedWorkUpdate = Effect.gen(function* () {
   const thread = desk.threads.get("agent-1")
   assert.isDefined(thread)
 
-  yield* desk.turns.whenIdle("agent-1", (start) => start(startedWorkUpdateTurn, () => Effect.void))
+  yield* desk.turns.whenIdle("agent-1", (start) => start(retriedTurn, () => Effect.void))
   yield* Deferred.await(begun)
   yield* desk.turns.stop(thread)
 
@@ -927,7 +935,7 @@ it.effect(
   "ends a Turn that retries delivery when Glass restarts after the user stops it and before the host's Stopped is saved",
   () =>
     Effect.gen(function* () {
-      const turnId = yield* stopStartedWorkUpdate.pipe(Effect.provide(glassRun))
+      const turnId = yield* stopRetriedTurn.pipe(Effect.provide(glassRun))
 
       yield* Effect.gen(function* () {
         const transcripts = yield* Transcripts
@@ -947,7 +955,7 @@ it.effect(
     Effect.gen(function* () {
       const transcripts = yield* Transcripts
 
-      yield* stopStartedWorkUpdate
+      yield* stopRetriedTurn
       yield* transcripts.endRunning(TurnCutOff.make({}), ["agent-1"])
 
       const cutOff = yield* transcripts.read("agent-1")
@@ -975,9 +983,7 @@ it.effect(
         const thread = desk.threads.get("agent-1")
         assert.isDefined(thread)
 
-        yield* desk.turns.whenIdle("agent-1", (start) =>
-          start(startedWorkUpdateTurn, () => Effect.void),
-        )
+        yield* desk.turns.whenIdle("agent-1", (start) => start(retriedTurn, () => Effect.void))
         yield* Deferred.await(entered)
         yield* deadlineSet
         yield* TestClock.adjust(Duration.millis(30_000))

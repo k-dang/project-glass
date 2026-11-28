@@ -26,8 +26,10 @@ import {
 import {
   calledBy,
   glassCall,
+  globalTurns,
   holding,
   lastSettled,
+  sendGlobal,
   settled,
   threadsFixture,
 } from "../test/threadsFixture"
@@ -77,6 +79,32 @@ it.live("marks a failing check's name as data that can't end the Update holding 
     assert.equal(message.match(/<\/failed_check>/g)?.length, 1)
     assert.equal(message.match(/<\/glass_update>/g)?.length, 1)
   }),
+)
+
+it.live(
+  "tells the Global chat about a PR it subscribed to, in the Session after Start fresh too",
+  () =>
+    Effect.gen(function* () {
+      const f = yield* threadWithPullRequest
+      yield* sendGlobal(f.client, subscribe("Tell me when it breaks", f.pullRequest))
+      const [subscribed] = yield* globalTurns(f.client, settled(1))
+
+      fail(f.pullRequest, failed("lint"))
+      yield* f.client.ListPullRequests()
+      const [, update] = yield* globalTurns(f.client, settled(2))
+
+      yield* f.client.StartGlobalChatFresh()
+      rerun(f.pullRequest)
+      yield* f.client.ListPullRequests()
+      fail(f.pullRequest, failed("lint", 2))
+      yield* f.client.ListPullRequests()
+      const [afterStartFresh] = yield* globalTurns(f.client, settled(1))
+
+      assert.strictEqual(calledBy(subscribed).status, "done")
+      assert.deepStrictEqual(failedRuns(update), ["https://ci.test/lint/1"])
+      assert.deepStrictEqual(failedRuns(afterStartFresh), ["https://ci.test/lint/2"])
+      assert.strictEqual(told(update)?.[0]?.note, "Tell me when it breaks")
+    }),
 )
 
 it.live("starts an Update when a check fails, and tells each Event once", () =>

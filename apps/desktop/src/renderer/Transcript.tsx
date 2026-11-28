@@ -1,5 +1,4 @@
 import {
-  type WorkOutcome,
   type BackgroundWork,
   type Event,
   type Turn,
@@ -115,36 +114,6 @@ export function Transcript(props: {
   )
 }
 
-const outcomeText: Record<WorkOutcome["outcome"], string> = {
-  finished: "finished",
-  failed: "failed",
-  waiting: "is waiting on you",
-}
-
-const workOutcomeText = (work: WorkOutcome) => {
-  const subject = Match.valueTags(work, {
-    Thread: ({ name }) => name,
-    AgentReview: ({ pullRequest }) => `Agent review on ${referenceText(pullRequest)}`,
-  })
-
-  return `${subject} ${outcomeText[work.outcome]}`
-}
-
-function StartedWorkUpdateMessage(props: { work: ReadonlyArray<WorkOutcome> }) {
-  return (
-    <Message align="end">
-      <MessageContent>
-        <span className="self-end text-xs text-muted-foreground">Update from Glass</span>
-        <ul className="flex flex-col gap-1 self-end text-sm text-muted-foreground">
-          {props.work.map((work, index) => (
-            <li key={index}>{workOutcomeText(work)}</li>
-          ))}
-        </ul>
-      </MessageContent>
-    </Message>
-  )
-}
-
 const eventText = (event: Event) =>
   Match.valueTags(event, {
     ChecksFailed: ({ checks }) => plural(checks.length, "check failed", "checks failed"),
@@ -160,6 +129,19 @@ const eventText = (event: Event) =>
     MergeConflictCleared: () => "merge conflict cleared",
     PullRequestMerged: () => "merged",
     PullRequestClosed: () => "closed",
+    ThreadFinished: () => "finished",
+    ThreadFailed: () => "failed",
+    ThreadWaiting: () => "is waiting on you",
+    AgentReviewFinished: () => "finished",
+    AgentReviewFailed: () => "failed",
+  })
+
+const subjectText = ({ subject, events }: UpdatedSubscription) =>
+  Match.valueTags(subject, {
+    PullRequest: ({ pullRequest }) => referenceText(pullRequest),
+    AgentReview: ({ pullRequest }) => `Agent review on ${referenceText(pullRequest)}`,
+    Thread: () =>
+      events.flatMap(({ event }) => ("name" in event ? [event.name] : [])).at(-1) ?? "A Thread",
   })
 
 function UpdateMessage(props: { subscriptions: ReadonlyArray<UpdatedSubscription> }) {
@@ -169,16 +151,16 @@ function UpdateMessage(props: { subscriptions: ReadonlyArray<UpdatedSubscription
     <Message align="end">
       <MessageContent>
         <span id={id} className="self-end text-xs text-muted-foreground">
-          PR update from Glass
+          Update from Glass
         </span>
         <ul
           aria-labelledby={id}
           className="flex flex-col gap-1 self-end text-sm text-muted-foreground"
         >
-          {props.subscriptions.map(({ subscriptionId, subject, events }) => (
-            <li key={subscriptionId}>
-              {referenceText(subject.pullRequest)}:{" "}
-              {events.map(({ event }) => eventText(event)).join(", ")}
+          {props.subscriptions.map((updated) => (
+            <li key={updated.subscriptionId}>
+              {subjectText(updated)}:{" "}
+              {updated.events.map(({ event }) => eventText(event)).join(", ")}
             </li>
           ))}
         </ul>
@@ -216,9 +198,6 @@ function BackgroundWorkEndedLines(props: { work: ReadonlyArray<BackgroundWork> }
 
 function TurnMessage(props: { turn: Turn }) {
   const { turn } = props
-
-  if (Predicate.isTagged(turn.context, "StartedWorkUpdate"))
-    return <StartedWorkUpdateMessage work={turn.context.work} />
 
   if (Predicate.isTagged(turn.context, "Update"))
     return <UpdateMessage subscriptions={turn.context.subscriptions} />

@@ -232,17 +232,23 @@ describe("Glass tools over MCP", () => {
   )
 
   it.live(
-    "offers the Subscription tools to a Thread's host alone, and refuses a caller posing as one",
+    "offers the Subscription tools to Threads' hosts and the Global chat's pi alone, and refuses an Outside agent posing as one",
     () =>
       Effect.gen(function* () {
         const { baseUrl, mcpCredentials, outsideAgents, mcp } = yield* startGlass
         const outsideAgent = yield* connectMcp(baseUrl, yield* outsideAgents.issue("Claude Code"))
 
-        const posing = yield* connectMcp(
+        const globalChat = yield* connectMcp(
           baseUrl,
           yield* mcpCredentials.issue(
-            GlobalChatCaller.make({ globalChatId: "global-chat", sessionId: "posing-session" }),
+            GlobalChatCaller.make({ globalChatId: "global-chat", sessionId: "global-session" }),
           ),
+          "glass-pi",
+        )
+
+        const posing = yield* connectMcp(
+          baseUrl,
+          yield* outsideAgents.issue("Posing"),
           "glass-sandbox-agent-host",
         )
 
@@ -258,15 +264,17 @@ describe("Glass tools over MCP", () => {
           subscribeArguments("Keep it green", { owner: "octo-org", repo: "glass", number: 7 }),
         )
 
+        const subscriptionTools = ["subscribe", "list_subscriptions", "end_subscription"]
+
         assert.deepStrictEqual(yield* offered(mcp), [])
         assert.deepStrictEqual(yield* offered(outsideAgent), [])
-        assert.deepStrictEqual(yield* offered(posing), [
-          "subscribe",
-          "list_subscriptions",
-          "end_subscription",
-        ])
+        assert.deepStrictEqual(yield* offered(globalChat), subscriptionTools)
+        assert.deepStrictEqual(yield* offered(posing), subscriptionTools)
         assert.isTrue(result.isError)
-        assert.include(toolText(result), "Only a Thread's agent has Subscriptions.")
+        assert.include(
+          toolText(result),
+          "Only a Thread's agent and the Global chat have Subscriptions.",
+        )
       }),
   )
 

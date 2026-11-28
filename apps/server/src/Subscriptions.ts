@@ -1,6 +1,8 @@
 import {
   EventKind,
   EventSource,
+  type StartedWorkSubject,
+  startedWorkKinds,
   Subscription,
   SubscriptionSubject,
   subjectKey,
@@ -29,7 +31,7 @@ const encodeSubject = Schema.encodeSync(SubjectJson)
 
 const StoredSubscription = Schema.Struct({
   id: Schema.String,
-  threadId: Schema.String,
+  subscriber: Schema.String,
   source: EventSource,
   subject: SubjectJson,
   subjectKey: Schema.String,
@@ -38,6 +40,7 @@ const StoredSubscription = Schema.Struct({
   deliveredThrough: Schema.Int,
   updatesInARow: Schema.Int,
   afterMessage: Schema.NullOr(Schema.String),
+  createdAt: Schema.DateTimeUtcFromString,
 })
 
 export type SubscriptionState = typeof StoredSubscription.Type
@@ -46,12 +49,23 @@ const decodeStored = Schema.decodeUnknownEffect(Schema.Array(StoredSubscription)
 
 const decodeSaved = Schema.decodeUnknownEffect(Schema.Tuple([Schema.Struct({ id: Schema.String })]))
 
-const decodeThreadIds = Schema.decodeUnknownEffect(
-  Schema.Array(Schema.Struct({ threadId: Schema.String })),
+const decodeSubscribers = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ subscriber: Schema.String })),
 )
 
-export const subscriptionOf = ({ id, threadId, source, subject, kinds, note }: SubscriptionState) =>
-  new Subscription({ id, threadId, source, subject, kinds, note })
+export interface AskedIn {
+  readonly threadId: string
+  readonly turnId: string | null
+}
+
+export const subscriptionOf = ({
+  id,
+  subscriber,
+  source,
+  subject,
+  kinds,
+  note,
+}: SubscriptionState) => new Subscription({ id, subscriber, source, subject, kinds, note })
 
 export interface Delivered {
   readonly subscriptionId: string
@@ -76,17 +90,26 @@ export class Subscriptions extends Context.Service<
   Subscriptions,
   {
     readonly subscribe: <E>(
-      threadId: string,
-      turnId: string | null,
+      subscriber: string,
+      askedIn: AskedIn,
       input: NewSubscription<E>,
     ) => Effect.Effect<Subscription, ThreadError | E>
-    readonly list: (threadId: string) => Effect.Effect<ReadonlyArray<Subscription>, ThreadError>
-    readonly watch: (threadId: string) => Stream.Stream<ReadonlyArray<Subscription>, ThreadError>
-    readonly end: (threadId: string, subscriptionId: string) => Effect.Effect<boolean, ThreadError>
+    readonly follow: (
+      subscriber: string,
+      subject: StartedWorkSubject,
+      note: string,
+      since: DateTime.Utc,
+    ) => Effect.Effect<void, ThreadError>
+    readonly list: (subscriber: string) => Effect.Effect<ReadonlyArray<Subscription>, ThreadError>
+    readonly watch: (subscriber: string) => Stream.Stream<ReadonlyArray<Subscription>, ThreadError>
+    readonly end: (
+      subscriber: string,
+      subscriptionId: string,
+    ) => Effect.Effect<boolean, ThreadError>
     readonly changes: Stream.Stream<unknown>
-    readonly subscribedThreads: Effect.Effect<ReadonlyArray<string>, ThreadError>
+    readonly subscribers: Effect.Effect<ReadonlyArray<string>, ThreadError>
     readonly states: (
-      threadId: string,
+      subscriber: string,
     ) => Effect.Effect<ReadonlyArray<SubscriptionState>, ThreadError>
     readonly about: (
       source: EventSource,
@@ -106,24 +129,26 @@ export class Subscriptions extends Context.Service<
 
       const stored = (matching: Statement.Fragment) =>
         sql`
-          SELECT id, thread_id AS threadId, source, subject, subject_key AS subjectKey, kinds,
+          SELECT id, subscriber, source, subject, subject_key AS subjectKey, kinds,
             note, delivered_through AS deliveredThrough, updates_in_a_row AS updatesInARow,
-            after_message AS afterMessage
+            after_message AS afterMessage, created_at AS createdAt
           FROM subscription WHERE ${matching} ORDER BY created_at, id
         `.pipe(Effect.flatMap(decodeStored), Effect.catch(storageFailure))
 
-      const list = (threadId: string) =>
-        stored(sql`thread_id = ${threadId}`).pipe(Effect.map((found) => found.map(subscriptionOf)))
+      const list = (subscriber: string) =>
+        stored(sql`subscriber = ${subscriber}`).pipe(
+          Effect.map((found) => found.map(subscriptionOf)),
+        )
 
       const subscribe = Effect.fn("Subscriptions.subscribe")(function* <E>(
-        threadId: string,
-        turnId: string | null,
+        subscriber: string,
+        { threadId, turnId }: AskedIn,
         input: NewSubscription<E>,
       ) {
         if (!(yield* transcripts.startedByMessage(threadId, turnId)))
           return yield* new ThreadError({
             message:
-              "Only a Turn a message started can subscribe your Thread. Glass started this one, or it began by itself.",
+              "Only a Turn a message started can subscribe. Glass started this one, or it began by itself.",
           })
 
         const subject = yield* input.subject
@@ -133,7 +158,7 @@ export class Subscriptions extends Context.Service<
         const [{ id }] = yield* sql`
           INSERT INTO subscription ${sql.insert({
             id: randomUUID(),
-            thread_id: threadId,
+            subscriber,
             source,
             subject: encodeSubject(subject),
             subject_key: subjectKey(subject),
@@ -142,7 +167,7 @@ export class Subscriptions extends Context.Service<
             delivered_through: deliveredThrough,
             created_at: DateTime.formatIso(yield* DateTime.now),
           })}
-          ON CONFLICT (thread_id, source, subject_key)
+          ON CONFLICT (subscriber, source, subject_key)
           DO UPDATE SET kinds = excluded.kinds, note = excluded.note,
             delivered_through = excluded.delivered_through
           RETURNING id
@@ -152,7 +177,7 @@ export class Subscriptions extends Context.Service<
 
         return new Subscription({
           id,
-          threadId,
+          subscriber,
           source,
           subject,
           kinds: input.kinds,
@@ -160,12 +185,38 @@ export class Subscriptions extends Context.Service<
         })
       })
 
+      const follow = Effect.fn("Subscriptions.follow")(function* (
+        subscriber: string,
+        subject: StartedWorkSubject,
+        note: string,
+        since: DateTime.Utc,
+      ) {
+        const deliveredThrough = yield* eventLog.latestId.pipe(Effect.catch(storageFailure))
+
+        yield* sql`
+          INSERT INTO subscription ${sql.insert({
+            id: randomUUID(),
+            subscriber,
+            source: subjectSource(subject),
+            subject: encodeSubject(subject),
+            subject_key: subjectKey(subject),
+            kinds: encodeKinds(startedWorkKinds(subject)),
+            note,
+            delivered_through: deliveredThrough,
+            created_at: DateTime.formatIso(since),
+          })}
+          ON CONFLICT (subscriber, source, subject_key) DO NOTHING
+        `.pipe(Effect.catch(storageFailure))
+
+        yield* wrote
+      })
+
       const end = Effect.fn("Subscriptions.end")(function* (
-        threadId: string,
+        subscriber: string,
         subscriptionId: string,
       ) {
         const ended = yield* sql`
-          DELETE FROM subscription WHERE id = ${subscriptionId} AND thread_id = ${threadId}
+          DELETE FROM subscription WHERE id = ${subscriptionId} AND subscriber = ${subscriber}
           RETURNING id
         `.pipe(Effect.catch(storageFailure))
 
@@ -200,24 +251,25 @@ export class Subscriptions extends Context.Service<
 
       return Subscriptions.of({
         subscribe,
+        follow,
         list,
         end,
         deliver,
-        watch: (threadId) =>
+        watch: (subscriber) =>
           SubscriptionRef.changes(writes).pipe(
-            Stream.mapEffect(() => list(threadId)),
+            Stream.mapEffect(() => list(subscriber)),
             Stream.changesWith(sameSubscriptions),
           ),
         changes: SubscriptionRef.changes(writes),
-        subscribedThreads: sql`
-          SELECT thread_id AS threadId FROM subscription
-          GROUP BY thread_id ORDER BY MIN(created_at), MIN(rowid)
+        subscribers: sql`
+          SELECT subscriber FROM subscription
+          GROUP BY subscriber ORDER BY MIN(created_at), MIN(rowid)
         `.pipe(
-          Effect.flatMap(decodeThreadIds),
-          Effect.map((found) => found.map(({ threadId }) => threadId)),
+          Effect.flatMap(decodeSubscribers),
+          Effect.map((found) => found.map(({ subscriber }) => subscriber)),
           Effect.catch(storageFailure),
         ),
-        states: (threadId) => stored(sql`thread_id = ${threadId}`),
+        states: (subscriber) => stored(sql`subscriber = ${subscriber}`),
         about: (source) => stored(sql`source = ${source}`),
       })
     }),

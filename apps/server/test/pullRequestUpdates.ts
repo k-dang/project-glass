@@ -105,11 +105,17 @@ export const rerun = (pullRequest: FakePullRequest) => {
 
 export const told = (turn: Turn | undefined) =>
   Predicate.isTagged(turn?.context, "Update")
-    ? turn.context.subscriptions.map(({ subject: { pullRequest }, note, events }) => ({
-        pullRequest: `${pullRequest.repo}#${pullRequest.number}`,
-        note,
-        events: events.map(({ event }) => event),
-      }))
+    ? turn.context.subscriptions.flatMap(({ subject, note, events }) =>
+        Predicate.isTagged(subject, "PullRequest")
+          ? [
+              {
+                pullRequest: `${subject.pullRequest.repo}#${subject.pullRequest.number}`,
+                note,
+                events: events.map(({ event }) => event),
+              },
+            ]
+          : [],
+      )
     : undefined
 
 export const kindsTold = (turn: Turn | undefined) =>

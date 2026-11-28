@@ -1,6 +1,6 @@
 import { useAtomSet, useAtomValue } from "@effect/atom-react"
 import { eventKindWords, referenceText } from "@glass/contracts"
-import { Option } from "effect"
+import { Option, Predicate } from "effect"
 import { AsyncResult } from "effect/reactivity"
 import { BellRing, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
@@ -13,14 +13,20 @@ export function ThreadSubscriptions(props: { threadId: string }) {
 
   const end = useAtomSet(endSubscriptionAtom(props.threadId))
 
-  if (subscriptions === undefined || subscriptions.length === 0) return null
+  const toPullRequests = (subscriptions ?? []).flatMap((subscription) =>
+    Predicate.isTagged(subscription.subject, "PullRequest")
+      ? [{ subscription, pullRequest: subscription.subject.pullRequest }]
+      : [],
+  )
+
+  if (toPullRequests.length === 0) return null
 
   return (
     <>
       <div className="-mx-1 my-1 border-t" />
       <ul aria-label="Subscriptions">
-        {subscriptions.map((subscription) => {
-          const label = referenceText(subscription.subject.pullRequest)
+        {toPullRequests.map(({ subscription, pullRequest }) => {
+          const label = referenceText(pullRequest)
 
           return (
             <li key={subscription.id} className="flex items-start gap-2 px-2 py-1 text-xs">

@@ -53,6 +53,7 @@ export interface TurnState extends Steering {
   readonly providerError: string | null
   readonly generation: number
   readonly promptTakenIn: boolean
+  readonly retriesDelivery: boolean
 }
 
 interface Step {
@@ -91,7 +92,12 @@ export const stoppedReason =
 
 const refusedReason = "pi didn't accept the message. Send it again."
 
-export const beginTurn = (turnId: string, sent: TurnMessage, at: DateTime.Utc): TurnState => ({
+export const beginTurn = (
+  turnId: string,
+  sent: TurnMessage,
+  at: DateTime.Utc,
+  retriesDelivery = false,
+): TurnState => ({
   turn: { id: turnId, ...sent, feedback: [], sentAt: at, ended: null, parts: [] },
   partByBlock: new Map(),
   toolCalls: new Map(),
@@ -100,6 +106,7 @@ export const beginTurn = (turnId: string, sent: TurnMessage, at: DateTime.Utc): 
   steers: [],
   promptTakenIn: false,
   stopping: null,
+  retriesDelivery,
 })
 
 const outputText = (result: ToolResult) =>
@@ -157,8 +164,7 @@ export const step = (current: TurnState | null, input: Input, now: DateTime.Utc)
 
   const finish = (turn: TurnState, ending: TurnEnding) => end(turn, turn.stopping ?? ending)
 
-  const recoversOnNextHost = (turn: TurnState) =>
-    Predicate.isTagged(turn.turn.context, "StartedWorkUpdate") && turn.stopping === null
+  const recoversOnNextHost = (turn: TurnState) => turn.retriesDelivery && turn.stopping === null
 
   const loseDelivery = (turn: TurnState, ending: TurnEnding) => {
     if (recoversOnNextHost(turn)) state = null

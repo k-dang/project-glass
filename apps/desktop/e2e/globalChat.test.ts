@@ -110,7 +110,7 @@ test("reads the PR in view through Glass's tools, keeping that PR after navigati
   await expect(chat).toContainText(/Done in/)
 })
 
-test("starts a Thread through Glass's tools, which appears in Threads and runs its first Turn", async ({
+test("starts a Thread through Glass's tools, which runs its first Turn and tells the Global chat it finished", async ({
   app,
   home,
   window,
@@ -146,5 +146,12 @@ test("starts a Thread through Glass's tools, which appears in Threads and runs i
   await created.click()
   await expect(
     window.getByRole("region", { name: "Transcript" }).getByText("Fake reply to: Say hello"),
+  ).toBeVisible()
+
+  await window.getByRole("button", { name: "Global chat" }).click()
+  await expect(chat.getByText("Update from Glass")).toBeVisible()
+  await expect(chat.getByText(/: finished$/)).toBeVisible()
+  await expect(
+    chat.getByText("The Thread you started is done. Want me to look at what it changed?"),
   ).toBeVisible()
 })

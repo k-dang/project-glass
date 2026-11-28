@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 import {
   AgentModels,
-  AgentReviewOutcome,
+  AgentReviewFinishedEvent,
+  AgentReviewSubject,
+  LoggedEvent,
   defaultReviewPrompt,
   PullRequestContext,
   TextPart,
@@ -9,7 +11,7 @@ import {
   type TranscriptUpdate,
   EarlierTurns,
   TurnDone,
-  StartedWorkUpdate,
+  Update,
   type Activity,
   ActivityPage,
   ActivityPullRequest,
@@ -627,7 +629,7 @@ it("won't start fresh while a Turn runs, and says why", async () => {
   )
 })
 
-it("marks the rail while a Global chat reply is unseen, and shows a Started work update as from Glass", async () => {
+it("marks the rail while a Global chat reply is unseen, and shows an Update about started work as from Glass", async () => {
   vi.spyOn(document, "hasFocus").mockReturnValue(true)
   const at = DateTime.makeUnsafe("2026-11-05T12:00:00Z")
   const ended = { at, ending: TurnDone.make({}) }
@@ -646,14 +648,24 @@ it("marks the rail while a Global chat reply is unseen, and shows a Started work
               id: "report-1",
               message: "",
               images: [],
-              context: StartedWorkUpdate.make({
-                work: [
-                  AgentReviewOutcome.make({
-                    pullRequest: workspace.pullRequest.ref,
-                    outcome: "finished",
-                    reason: null,
-                    askedWith: "Review #42",
-                  }),
+              context: Update.make({
+                subscriptions: [
+                  {
+                    subscriptionId: "review-42",
+                    subject: AgentReviewSubject.make({ pullRequest: workspace.pullRequest.ref }),
+                    note: "Review #42",
+                    events: [
+                      new LoggedEvent({
+                        id: 1,
+                        source: "glass",
+                        occurredAt: at,
+                        event: AgentReviewFinishedEvent.make({
+                          pullRequest: workspace.pullRequest.ref,
+                          writtenAt: at,
+                        }),
+                      }),
+                    ],
+                  },
                 ],
               }),
               feedback: [],
@@ -676,7 +688,7 @@ it("marks the rail while a Global chat reply is unseen, and shows a Started work
   const chat = await screen.findByRole("dialog", { name: "Global chat" })
   await within(chat).findByText("The review on #42 is in.")
   expect(within(chat).getByText("Update from Glass")).toBeTruthy()
-  expect(within(chat).getByText("Agent review on octo-org/glass#42 finished")).toBeTruthy()
+  expect(within(chat).getByText("Agent review on octo-org/glass#42: finished")).toBeTruthy()
   expect(within(rail).queryByText("Unread reply")).toBeNull()
   await waitFor(() => expect(seen).toEqual([DateTime.formatIso(at)]))
 })

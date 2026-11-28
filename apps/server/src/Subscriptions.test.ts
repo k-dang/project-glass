@@ -8,7 +8,7 @@ import {
   PullRequestSubject,
   Subscription,
 } from "@glass/contracts"
-import { Context, DateTime, Effect, Layer, Option, Schema, Stream } from "effect"
+import { Context, DateTime, Effect, Layer, Option, Predicate, Schema, Stream } from "effect"
 import { SqlClient } from "effect/sql"
 import { fail, failed, subscribe, subscribeArguments } from "../test/pullRequestUpdates"
 import { calledBy, glassCall, repository, settled, threadsFixture } from "../test/threadsFixture"
@@ -30,11 +30,17 @@ const subscriptionsOf = (
     .pipe(Stream.filter(until), Stream.runHead, Effect.map(Option.getOrThrow))
 
 const covered = (subscriptions: ReadonlyArray<Subscription>) =>
-  subscriptions.map(({ subject: { pullRequest }, kinds, note }) => ({
-    pullRequest: `${pullRequest.repo}#${pullRequest.number}`,
-    kinds,
-    note,
-  }))
+  subscriptions.flatMap(({ subject, kinds, note }) =>
+    Predicate.isTagged(subject, "PullRequest")
+      ? [
+          {
+            pullRequest: `${subject.pullRequest.repo}#${subject.pullRequest.number}`,
+            kinds,
+            note,
+          },
+        ]
+      : [],
+  )
 
 const greeter = (number: number, repo = "greeter") => ({ owner: "glass-demo", repo, number })
 
@@ -105,7 +111,7 @@ it.live(
         },
         {
           status: "failed",
-          text: "PR glass-demo/greeter#7 has already merged, so there's nothing left to tell your Thread about.",
+          text: "PR glass-demo/greeter#7 has already merged, so there's nothing left to tell you about.",
         },
       ])
       assert.deepStrictEqual(yield* subscriptionsOf(f, thread.id, () => true), [])
@@ -164,7 +170,7 @@ it.live("lists a Thread's Subscriptions to its agent, which ends one by its id",
 
     assert.deepStrictEqual(calledBy(again), {
       status: "failed",
-      text: "Your Thread has no Subscription with that id. list_subscriptions names the ones it has.",
+      text: "You have no Subscription with that id. list_subscriptions names the ones you have.",
     })
   }),
 )
@@ -183,7 +189,7 @@ it.live("ends a Subscription the user ends from the Thread", () =>
 
 const refusal = {
   status: "failed" as const,
-  text: "Only a Turn a message started can subscribe your Thread. Glass started this one, or it began by itself.",
+  text: "Only a Turn a message started can subscribe. Glass started this one, or it began by itself.",
 }
 
 const newThread = (message: string) => ({
@@ -208,9 +214,9 @@ it.live("refuses a Subscription asked for in a Turn Glass started", () =>
 
     const [, update] = yield* f.transcript(thread.id, settled(2))
 
-    assert.equal(update?.context?._tag, "StartedWorkUpdate")
+    assert.equal(update?.context?._tag, "Update")
     assert.deepStrictEqual(calledBy(update), refusal)
-    assert.deepStrictEqual(yield* subscriptionsOf(f, thread.id, () => true), [])
+    assert.deepStrictEqual(covered(yield* subscriptionsOf(f, thread.id, () => true)), [])
   }),
 )
 
@@ -279,6 +285,8 @@ const storeInAUsersTurn = Effect.gen(function* () {
   }
 })
 
+const askedIn = (turnId: string | null) => ({ threadId: "thread", turnId })
+
 const greeterSeven = {
   subject: Effect.succeed(PullRequestSubject.make({ pullRequest: new PullRequestRef(greeter(7)) })),
   kinds: ["ChecksFailed" as const],
@@ -290,14 +298,14 @@ it.effect("refuses a Subscription asked for by a Turn Glass has no record of", (
     const { subscriptions, usersTurn } = yield* storeInAUsersTurn
 
     const unheardOf = yield* subscriptions
-      .subscribe("thread", "a-turn-the-journal-has-not-brought", greeterSeven)
+      .subscribe("thread", askedIn("a-turn-the-journal-has-not-brought"), greeterSeven)
       .pipe(Effect.flip)
 
     const betweenTurns = yield* subscriptions
-      .subscribe("thread", null, greeterSeven)
+      .subscribe("thread", askedIn(null), greeterSeven)
       .pipe(Effect.flip)
 
-    const asked = yield* subscriptions.subscribe("thread", usersTurn, greeterSeven)
+    const asked = yield* subscriptions.subscribe("thread", askedIn(usersTurn), greeterSeven)
 
     assert.strictEqual(unheardOf.message, refusal.text)
     assert.strictEqual(betweenTurns.message, refusal.text)
@@ -308,7 +316,7 @@ it.effect("refuses a Subscription asked for by a Turn Glass has no record of", (
 it.effect("refuses to record an Update for a Subscription the user has ended", () =>
   Effect.gen(function* () {
     const { subscriptions, usersTurn } = yield* storeInAUsersTurn
-    const { id } = yield* subscriptions.subscribe("thread", usersTurn, greeterSeven)
+    const { id } = yield* subscriptions.subscribe("thread", askedIn(usersTurn), greeterSeven)
 
     const delivered = [
       {
@@ -331,7 +339,7 @@ it.effect("refuses to record an Update for a Subscription the user has ended", (
 it.effect("tells a Subscription made again only the Events from then on", () =>
   Effect.gen(function* () {
     const { subscriptions, eventLog, usersTurn } = yield* storeInAUsersTurn
-    yield* subscriptions.subscribe("thread", usersTurn, greeterSeven)
+    yield* subscriptions.subscribe("thread", askedIn(usersTurn), greeterSeven)
 
     yield* eventLog.record("github", [
       {
@@ -342,7 +350,7 @@ it.effect("tells a Subscription made again only the Events from then on", () =>
         }),
       },
     ])
-    yield* subscriptions.subscribe("thread", usersTurn, { ...greeterSeven, note: "Again" })
+    yield* subscriptions.subscribe("thread", askedIn(usersTurn), { ...greeterSeven, note: "Again" })
 
     const [again] = yield* subscriptions.states("thread")
 

@@ -183,6 +183,15 @@ export interface RunningUpdate {
   readonly update: Update
 }
 
+const decodeEndedContexts = Schema.decodeUnknownEffect(
+  Schema.Array(Schema.Struct({ context: ContextJson, ended: Schema.fromJsonString(TurnEnd) })),
+)
+
+export interface EndedUpdate {
+  readonly update: Update
+  readonly ended: TurnEnd
+}
+
 const decodePositions = Schema.decodeUnknownEffect(
   Schema.Array(
     Schema.Struct({ first: Schema.NullOr(Schema.Int), last: Schema.NullOr(Schema.Int) }),
@@ -312,6 +321,7 @@ export class Transcripts extends Context.Service<
     ) => Effect.Effect<boolean, ThreadError>
     readonly lastMessageTurn: (threadId: string) => Effect.Effect<string | null, ThreadError>
     readonly runningUpdates: Effect.Effect<ReadonlyArray<RunningUpdate>, ThreadError>
+    readonly lastEndedUpdate: (threadId: string) => Effect.Effect<EndedUpdate | null, ThreadError>
     readonly startOrQueue: (
       threadId: string,
       input: MessageWithContext,
@@ -1089,6 +1099,22 @@ export class Transcripts extends Context.Service<
             ),
           ),
         ),
+        lastEndedUpdate: (threadId) =>
+          withStorageFailure(
+            "read the last Update that ended",
+            sql`
+              SELECT context, ended FROM thread_turn
+              WHERE thread_id = ${threadId} AND ended IS NOT NULL
+              ORDER BY rowid DESC LIMIT 1
+            `.pipe(
+              Effect.flatMap(decodeEndedContexts),
+              Effect.map(([last]) =>
+                last !== undefined && Predicate.isTagged(last.context, "Update")
+                  ? { update: last.context, ended: last.ended }
+                  : null,
+              ),
+            ),
+          ),
         settleUndelivered: Effect.fnUntraced(function* (threadId, turnId, reason) {
           const retried = yield* withStorageFailure(
             "read whether a Turn retries delivery",

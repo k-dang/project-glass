@@ -1,7 +1,7 @@
 -------------------------------- MODULE Updates --------------------------------
 EXTENDS Naturals, FiniteSets, TLC
 
-CONSTANTS Threads, RunAtOnce, GivesUpAfter, MaxEvents, MaxMessages, MaxRestarts, Broken
+CONSTANTS Subscribers, Retries, RunAtOnce, GivesUpAfter, MaxEvents, MaxMessages, MaxRestarts, Broken
 
 VARIABLES
     logged,
@@ -19,42 +19,42 @@ VARIABLES
     toldTwice,
     lost,
     cutIn,
+    dropped,
     streak,
     sinceMessage
 
 vars == <<logged, wakes, cursor, count, afterNewMessage, turn, queued, unsaved, tracked,
-          messages, restarts, told, toldTwice, lost, cutIn, streak, sinceMessage>>
+          messages, restarts, told, toldTwice, lost, cutIn, dropped, streak, sinceMessage>>
 
 log == <<logged, wakes>>
-ghosts == <<told, toldTwice, lost, cutIn, streak, sinceMessage>>
+ghosts == <<told, toldTwice, lost, cutIn, dropped, streak, sinceMessage>>
 bounds == <<messages, restarts>>
 
 Mutant(name) == name \in Broken
 
-Symmetry == Permutations(Threads)
-
 Init ==
-    /\ logged = [t \in Threads |-> 0]
-    /\ wakes = [t \in Threads |-> {}]
-    /\ cursor = [t \in Threads |-> 0]
-    /\ count = [t \in Threads |-> 0]
-    /\ afterNewMessage = [t \in Threads |-> FALSE]
-    /\ turn = [t \in Threads |-> "idle"]
-    /\ queued = [t \in Threads |-> FALSE]
-    /\ unsaved = [t \in Threads |-> 0]
+    /\ logged = [t \in Subscribers |-> 0]
+    /\ wakes = [t \in Subscribers |-> {}]
+    /\ cursor = [t \in Subscribers |-> 0]
+    /\ count = [t \in Subscribers |-> 0]
+    /\ afterNewMessage = [t \in Subscribers |-> FALSE]
+    /\ turn = [t \in Subscribers |-> "idle"]
+    /\ queued = [t \in Subscribers |-> FALSE]
+    /\ unsaved = [t \in Subscribers |-> 0]
     /\ tracked = {}
     /\ messages = 0
     /\ restarts = 0
-    /\ told = [t \in Threads |-> {}]
+    /\ told = [t \in Subscribers |-> {}]
     /\ toldTwice = FALSE
     /\ lost = FALSE
     /\ cutIn = FALSE
-    /\ streak = [t \in Threads |-> 0]
-    /\ sinceMessage = [t \in Threads |-> 0]
+    /\ dropped = FALSE
+    /\ streak = [t \in Subscribers |-> 0]
+    /\ sinceMessage = [t \in Subscribers |-> 0]
 
 Idle(t) == turn[t] = "idle" /\ ~queued[t]
 
-Running == {t \in Threads : turn[t] = "update"}
+Running == {t \in Subscribers : turn[t] = "update"}
 
 Count(t) == IF afterNewMessage[t] THEN 0 ELSE count[t]
 
@@ -80,7 +80,7 @@ PassOver(t) ==
     /\ cursor' = [cursor EXCEPT ![t] = logged[t]]
     /\ lost' = (lost \/ Wakes(t))
     /\ UNCHANGED <<log, count, afterNewMessage, turn, queued, unsaved, tracked, bounds, told,
-                   toldTwice, cutIn, streak, sinceMessage>>
+                   toldTwice, cutIn, dropped, streak, sinceMessage>>
 
 DecideQuiet(t) ==
     /\ Pending(t) # {}
@@ -118,7 +118,7 @@ StartUpdate(t) ==
     /\ cutIn' = (cutIn \/ ~Idle(t))
     /\ streak' = [streak EXCEPT ![t] = @ + 1]
     /\ sinceMessage' = [sinceMessage EXCEPT ![t] = @ + 1]
-    /\ UNCHANGED <<log, queued, bounds, lost>>
+    /\ UNCHANGED <<log, queued, bounds, lost, dropped>>
 
 Decide(t) ==
     /\ Idle(t) \/ Mutant("SkipIdleCheck")
@@ -139,7 +139,7 @@ MessageReaches(t) ==
            ELSE [afterNewMessage EXCEPT ![t] = TRUE]
     /\ streak' = [streak EXCEPT ![t] = 0]
     /\ sinceMessage' = [sinceMessage EXCEPT ![t] = 0]
-    /\ UNCHANGED <<told, toldTwice, lost, cutIn>>
+    /\ UNCHANGED <<told, toldTwice, lost, cutIn, dropped>>
 
 SendMessage(t) ==
     /\ messages < MaxMessages
@@ -194,18 +194,24 @@ StoppedQueueStarts(t) ==
     /\ turn[t] = "idle"
     /\ QueuedMessageStarts(t)
 
+\* A local Thread's Turn is interrupted and a Sandbox Thread's keeps running. An Update to the
+\* Global chat, one of the Retries, is delivered again in the same Turn.
 GlassRestarts ==
     /\ restarts < MaxRestarts
     /\ restarts' = restarts + 1
-    /\ \E interrupted \in SUBSET {t \in Threads : turn[t] # "idle"} :
-           turn' = [t \in Threads |-> IF t \in interrupted THEN "idle" ELSE turn[t]]
-    /\ unsaved' = [t \in Threads |-> 0]
+    /\ \E interrupted \in SUBSET {t \in Subscribers : turn[t] # "idle"} :
+           /\ \A t \in interrupted :
+                  t \in Retries /\ turn[t] = "update" => Mutant("GlobalChatDoesNotRetry")
+           /\ turn' = [t \in Subscribers |-> IF t \in interrupted THEN "idle" ELSE turn[t]]
+           /\ dropped' = (dropped \/ \E t \in interrupted : t \in Retries /\ turn[t] = "update")
+    /\ unsaved' = [t \in Subscribers |-> 0]
     /\ tracked' = {}
-    /\ count' = IF Mutant("RestartForgetsCount") THEN [t \in Threads |-> 0] ELSE count
-    /\ UNCHANGED <<log, cursor, afterNewMessage, queued, messages, ghosts>>
+    /\ count' = IF Mutant("RestartForgetsCount") THEN [t \in Subscribers |-> 0] ELSE count
+    /\ UNCHANGED <<log, cursor, afterNewMessage, queued, messages, told, toldTwice, lost, cutIn,
+                   streak, sinceMessage>>
 
 Next ==
-    \/ \E t \in Threads :
+    \/ \E t \in Subscribers :
            \/ RecordEvent(t)
            \/ Decide(t)
            \/ RecordCursorLate(t)
@@ -227,7 +233,9 @@ NoneLost == ~lost
 
 RunsAtMostTheLimit == Cardinality(Running) <= RunAtOnce
 
-StopsAtTheLimit == \A t \in Threads : streak[t] <= GivesUpAfter
+StopsAtTheLimit == \A t \in Subscribers : streak[t] <= GivesUpAfter
 
-MessageLetsItTryAgain == \A t \in Threads : Idle(t) => Count(t) <= sinceMessage[t]
+MessageLetsItTryAgain == \A t \in Subscribers : Idle(t) => Count(t) <= sinceMessage[t]
+
+GlobalChatUpdatesSurviveRestart == ~dropped
 ==============================================================================
