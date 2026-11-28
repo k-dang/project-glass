@@ -1,6 +1,34 @@
 # Glass
 
-TBD
+**Review code at the speed agents write it.**
+
+Your agents open pull requests faster than you can read them. Glass points you to the few lines
+that could hurt you, explains the rest, and tells you what's safe to skim. Your PRs and your coding
+agents, in one desktop app.
+
+![An Agent review Hotspot beside the lines it flags](docs/images/agent-review.png)
+
+_An Agent review flags an unchecked API key, right beside the lines that trust it._
+
+- **Know where to look.** An Agent review ranks the few Hotspots that deserve your closest read
+  and marks the files you can skim. It's yours alone: it never posts to GitHub, and it never
+  approves anything for you.
+- **Read a PR in the order it makes sense.** A Tour says why the change exists, draws it as a
+  diagram or a Before / after, then walks you from the part that matters most down to the glue.
+- **Ask, don't guess.** Ask about any line of the diff and get a private answer beside it. Keep
+  the agent's suggested comments you agree with, and post them as your own GitHub review.
+- **One Inbox for everything waiting on you.** Reviews, agent questions, permission requests, and
+  Check-ins from agents running in your terminal ([outside agents](docs/user/outside-agents.md)),
+  grouped by why they wait.
+
+## Run your agents in the same place
+
+![A Claude Code Thread asking permission to run a command](docs/images/threads.png)
+
+Start Claude Code or pi in a Thread, each in its own worktree or Sandbox, and run as many as you
+like. Glass names each branch and links the PR, so an agent's work stays tied to its review. When
+one needs you to answer a question or allow a command, it waits in your Inbox while the rest keep
+working.
 
 ## Layout
 
@@ -23,7 +51,7 @@ Glass signs in to GitHub with `GH_TOKEN`, `GITHUB_TOKEN`, or your GitHub CLI log
 
 Tours, Agent reviews, and Threads use either an authenticated Claude Code CLI or an installed pi CLI.
 If Glass can't find them on your `PATH`, set `claudeCommand` or `piCommand` in `~/.project-glass/settings.json` to the full path and restart Glass.
-pi reuses the credentials and model configuration in `~/.pi/agent` (or `PI_CODING_AGENT_DIR`);
+pi reuses the credentials and model configuration in `~/.pi/agent` (or `PI_CODING_AGENT_DIR`).
 
 ## Commands
 
@@ -57,3 +85,11 @@ pnpm dev   # traces and logs at http://localhost:18888
 ## Storage
 
 The backend keeps the Activity log in `~/.project-glass/glass.db`.
+
+## Docs
+
+- [`GLOSSARY.md`](GLOSSARY.md): the domain words Glass uses in code, UI copy, and specs.
+- [`docs/adr`](docs/adr): architecture decisions.
+- [`docs/architecture/agent-threads.md`](docs/architecture/agent-threads.md): how Threads run.
+
+The screenshots come from `pnpm gallery:capture` on the demo data.

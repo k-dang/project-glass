@@ -220,6 +220,29 @@ export const states: ReadonlyArray<State> = [
   },
   {
     area: "PR workspace",
+    name: "Agent review beside the diff",
+    reach: async (window) => {
+      await pullRequest(window, "Rate-limit the public API")
+      await workspaceTab(window, "Overview")
+      await window
+        .getByRole("list", { name: "Hotspots" })
+        .getByRole("button", { name: /Any caller can mint a fresh bucket/ })
+        .click()
+
+      const point = window
+        .getByRole("complementary", { name: "Agent review" })
+        .getByRole("listitem")
+        .filter({ hasText: "Any caller can mint a fresh bucket" })
+
+      await point.getByRole("button", { name: /middleware\.ts/ }).click()
+      await window.getByRole("tab", { name: "Changes", selected: true }).waitFor()
+      await window.getByRole("button", { name: "Hide file panel" }).click()
+      await point.evaluate((element) => element.scrollIntoView({ block: "start" }))
+      await window.mouse.move(0, 0)
+    },
+  },
+  {
+    area: "PR workspace",
     name: "Changes across several files",
     reach: async (window) => {
       await pullRequest(window, "Rate-limit the public API")
@@ -402,7 +425,11 @@ export const states: ReadonlyArray<State> = [
         const question = window.getByRole("radiogroup")
         await allow.or(question).first().waitFor()
 
-        if (await allow.isVisible()) return
+        if (await allow.isVisible()) {
+          await window.getByRole("button", { name: "Hide details" }).click()
+
+          return
+        }
       }
 
       throw new Error("No Thread is waiting on a Permission request")
