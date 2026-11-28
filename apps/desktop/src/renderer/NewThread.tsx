@@ -1,5 +1,5 @@
 import { cn } from "cn"
-import { useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
+import { RegistryContext, useAtom, useAtomSet, useAtomValue } from "@effect/atom-react"
 import {
   type Thread,
   AgentHarness,
@@ -17,11 +17,11 @@ import {
   type SandboxProviderInfo,
   localPlace,
 } from "@glass/contracts"
-import { useNavigate } from "@tanstack/react-router"
+import { useNavigate, useRouter } from "@tanstack/react-router"
 import { Exit, Option, Predicate } from "effect"
 import { AsyncResult, Atom } from "effect/reactivity"
 import { FolderGit2, FolderPlus, GitBranch, LoaderCircle } from "lucide-react"
-import { useCallback, useMemo, useRef, useState } from "react"
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react"
 import { flushSync } from "react-dom"
 import { MessageGroup } from "@/components/ui/message"
 import { Trace, TraceIcon, TraceLine, TraceTitle } from "@/components/ui/trace"
@@ -29,7 +29,7 @@ import {
   threadsAtom,
   agentModelsAtom,
   newThreadWrittenAtom,
-  createThreadAtom,
+  createThread,
   linkCheckoutAtom,
   localCheckoutsAtom,
   newThreadBranchesAtom,
@@ -55,7 +55,7 @@ import { MessageBox } from "./MessageBox"
 import { ModelPicker } from "./ModelPicker"
 import { PermissionModePicker } from "./PermissionModePicker"
 import { ProblemAlert } from "./ProblemAlert"
-import { problemOf, settledProblem } from "./problems"
+import { type Problem, problemOf, settledProblem } from "./problems"
 import { useSkillChoice } from "./skillChoice"
 import { LocalSkillsToggle, SharedSkillNames, SkillPackPicker } from "./SkillPackPicker"
 
@@ -185,6 +185,21 @@ const useChooseFolder = () => {
   return { choose, waiting: linked.waiting, problem: settledProblem(linked) }
 }
 
+function useRevisits() {
+  const router = useRouter()
+  const [revisits, setRevisits] = useState(0)
+
+  useEffect(
+    () =>
+      router.subscribe("onBeforeNavigate", ({ hrefChanged }) => {
+        if (!hrefChanged) setRevisits((count) => count + 1)
+      }),
+    [router],
+  )
+
+  return revisits
+}
+
 interface DraftChoices {
   readonly providers: ReadonlyArray<SandboxProviderInfo>
   readonly where: PlaceOptions
@@ -209,6 +224,7 @@ function ChoosePlace(props: {
   const [harnesses, setHarnesses] = useState<Readonly<Record<string, AgentHarness>>>({})
   const [harnessChoices, setHarnessChoices] = useState<Readonly<Record<string, HarnessChoice>>>({})
   const [bases, setBases] = useState<Readonly<Record<string, string>>>({})
+  const visit = useRevisits()
   const place = chosenPlace ?? defaultPlace(newest, providers, props.checkouts.length > 0)
 
   const provider = Predicate.isTagged(place, "sandbox")
@@ -267,7 +283,7 @@ function ChoosePlace(props: {
         props.checkouts.map((linked) => (
           <PrefetchBranches key={repositoryKey(linked.repository)} checkout={linked} />
         ))}
-      <Draft {...choices} repositories={repositories} />
+      <Draft key={visit} {...choices} repositories={repositories} />
     </>
   )
 }
@@ -308,8 +324,7 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
   )
 
   const skills = useSkillChoice(where.place, props.choice.harness)
-  const created = useAtomValue(createThreadAtom)
-  const create = useAtomSet(createThreadAtom, { mode: "promiseExit" })
+  const registry = useContext(RegistryContext)
   const defaultBranch = AsyncResult.value(defaults)
   const listed = Option.getOrNull(AsyncResult.value(branches))
 
@@ -379,18 +394,21 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
     (MessageInput & { readonly key: string; readonly baseBranch: string }) | null
   >(null)
 
+  const [failed, setFailed] = useState<Problem | null>(null)
   const heading = useRef<HTMLHeadingElement>(null)
 
   const send = async (message: MessageInput) => {
     if (repository === undefined || key === undefined || baseBranch === null || awaitingModels)
       return false
 
+    setFailed(null)
+
     await document.startViewTransition({
       types: ["start-thread"],
       update: () => flushSync(() => setStarting({ ...message, key, baseBranch })),
     }).updateCallbackDone
 
-    const exit = await create({
+    const exit = await createThread(registry, {
       repository,
       baseBranch,
       place: where.place,
@@ -400,8 +418,10 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
       ...message,
     })
 
-    if (!Exit.isSuccess(exit)) setStarting(null)
-    else if (heading.current !== null)
+    if (Exit.isFailure(exit)) {
+      setStarting(null)
+      setFailed(problemOf(exit.cause))
+    } else if (heading.current !== null)
       void navigate({
         to: "/threads/$threadId",
         params: { threadId: exit.value.id },
@@ -453,13 +473,13 @@ function Draft(props: DraftChoices & { repositories: ReadonlyArray<Choosable> })
         label="Message"
         placeholder="What should the agent do?"
         blocked={
-          created.waiting ||
+          starting !== null ||
           baseBranch === null ||
           awaitingModels ||
           !AsyncResult.isSuccess(skills.listed)
         }
         problem={
-          settledProblem(created) ??
+          failed ??
           settledProblem(skills.listed) ??
           settledProblem(skills.localNamesListed) ??
           settledProblem(defaults) ??

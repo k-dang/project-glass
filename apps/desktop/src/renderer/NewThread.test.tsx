@@ -19,9 +19,8 @@ import {
 } from "@glass/contracts"
 import { cleanup, screen, waitFor, within } from "@testing-library/react"
 import { Deferred, Effect, Exit, Predicate, Stream, SubscriptionRef } from "effect"
-import { AsyncResult, AtomRegistry } from "effect/reactivity"
 import { expect, it } from "vite-plus/test"
-import { createThreadAtom, placeKey } from "./threadsArea"
+import { createThread, placeKey } from "./threadsArea"
 import { thread, threadFields } from "../../test/thread"
 import { choice, listModels, modelOption, mount, pixel } from "../../test/threadApp"
 import { eventually } from "../../test/eventually"
@@ -426,6 +425,55 @@ it("stays on the Thread you went to while the one you started was starting", asy
   expect(await screen.findByRole("link", { name: /agent\/swift-otter/ })).toBeTruthy()
   await eventually(() => expect(watched).toContain(thread.id))
   expect(window.location.hash).toBe(`#/threads/${other.id}`)
+})
+
+it("starts another Thread from New Thread while the first one is still starting", async () => {
+  const started = Deferred.makeUnsafe<void>()
+  const first = new Thread({ ...threadFields, id: "agent-2", name: "agent/quiet-heron" })
+  const threads = Effect.runSync(SubscriptionRef.make<ReadonlyArray<Thread>>([]))
+  const watched: Array<string> = []
+  const created: Array<string> = []
+
+  const user = mount(
+    {
+      WatchThreads: () => SubscriptionRef.changes(threads),
+      CreateThread: (input: NewThread) => {
+        const made = created.length === 0 ? first : thread
+        created.push(input.message)
+
+        return (made === first ? Deferred.await(started) : Effect.void).pipe(
+          Effect.andThen(SubscriptionRef.update(threads, (all) => [...all, made])),
+          Effect.as(made),
+        )
+      },
+      ListLocalCheckouts: () =>
+        Effect.succeed([
+          new LocalCheckout({ repository: thread.repository, path: "/src/greeter" }),
+        ]),
+      ...branchesAt({}),
+      WatchTranscript: ({ threadId }) => {
+        watched.push(threadId)
+
+        return Stream.make(TranscriptSnapshot.make({ turns: [], queued: [], status: null }))
+      },
+    },
+    "/threads/new",
+  )
+
+  await findDraft()
+  await send(user, "Fix the bug")
+  await user.click(screen.getByRole("link", { name: "New Thread" }))
+
+  await waitFor(() => expect(within(newThreadDraft()).queryByText("Fix the bug")).toBeNull())
+  await send(user, "Write the docs")
+  await waitFor(() => expect(window.location.hash).toBe(`#/threads/${thread.id}`))
+
+  Deferred.doneUnsafe(started, Exit.void)
+
+  expect(await screen.findByRole("link", { name: /agent\/quiet-heron/ })).toBeTruthy()
+  await eventually(() => expect(watched).toContain(first.id))
+  expect(created).toEqual(["Fix the bug", "Write the docs"])
+  expect(window.location.hash).toBe(`#/threads/${thread.id}`)
 })
 
 it("keeps local branch, harness, model, effort, and unsent work when exploring a Sandbox", async () => {
@@ -949,25 +997,17 @@ it("watches a created Thread's transcript while waiting for it to be listed", as
     },
   })
 
-  const release = registry.mount(createThreadAtom)
-
   try {
-    registry.set(createThreadAtom, {
-      ...threadFields,
-      message: "Say hello",
-      images: [],
-    })
+    let settled = false
+    const creating = createThread(registry, { ...threadFields, message: "Say hello", images: [] })
+    void creating.then(() => (settled = true))
+
     await eventually(() => expect(watched).toEqual([thread.id]))
-    expect(AsyncResult.isSuccess(registry.get(createThreadAtom))).toBe(false)
+    expect(settled).toBe(false)
 
     Effect.runSync(SubscriptionRef.set(listed, [thread]))
-    expect(
-      await Effect.runPromise(
-        AtomRegistry.getResult(registry, createThreadAtom, { suspendOnWaiting: true }),
-      ),
-    ).toEqual(thread)
+    expect(await creating).toEqual(Exit.succeed(thread))
   } finally {
-    release()
     registry.dispose()
   }
 })
