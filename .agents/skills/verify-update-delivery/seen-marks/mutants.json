@@ -1,0 +1,5 @@
+{
+  "MarkWaiting": "WaitingStaysUnseen",
+  "MarkFailedUpdate": "SeenOnlyOnceHeard",
+  "MarkRunningUpdate": "SeenOnlyOnceHeard"
+}
