@@ -269,7 +269,6 @@ export const Attention = Schema.Struct({
   changesRequested: Schema.Boolean,
   approved: Schema.Boolean,
   mergeClean: Schema.Boolean,
-  mergeConflict: Schema.NullOr(Schema.Boolean),
   awaitingReply: Schema.Int,
   failingChecks: Schema.Array(Check),
 })
@@ -294,7 +293,6 @@ const attentionOf = (node: typeof AttentionNode.Type): Attention => {
     changesRequested: states.includes("CHANGES_REQUESTED"),
     approved: states.includes("APPROVED"),
     mergeClean: cleanMergeStates.has(node.mergeStateStatus),
-    mergeConflict: mergeConflictOf(node),
     awaitingReply: node.reviewThreads.nodes.filter(awaitsReply).length,
     failingChecks: checksOfCommits(node.commits).filter((check) => check.state === "failed"),
   }
