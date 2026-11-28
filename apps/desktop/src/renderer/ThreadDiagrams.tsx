@@ -9,12 +9,11 @@ import {
 } from "@glass/contracts"
 import { cn } from "cn"
 import { Predicate } from "effect"
-import { Atom } from "effect/reactivity"
 import { LoaderCircle, Workflow } from "lucide-react"
 import { useCallback, useMemo, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { MermaidDiagram } from "./MermaidDiagram"
-import { SidePanel } from "./SidePanel"
+import { SidePanel, threadPaneWidthAtom } from "./SidePanel"
 
 const kindLabel: Record<DiagramKind, string> = {
   existing: "Existing behavior",
@@ -80,14 +79,12 @@ function DiagramCard(props: { call: typeof ToolCallPart.Type; onOpen: (title: st
   )
 }
 
-const paneWidthAtom = Atom.make(560).pipe(Atom.keepAlive)
-
 export function DiagramPane(props: { diagram: Diagram; onClose: () => void }) {
   return (
     <SidePanel
       name="Diagram"
       heading={props.diagram.title}
-      width={paneWidthAtom}
+      width={threadPaneWidthAtom}
       onClose={props.onClose}
     >
       <p className="px-5 pt-3 text-xs text-muted-foreground">{kindLabel[props.diagram.kind]}</p>

@@ -1,18 +1,16 @@
 import { useAtomRefresh, useAtomValue } from "@effect/atom-react"
 import { type Thread, ThreadChanges as Changes, type Turn } from "@glass/contracts"
 import { Option } from "effect"
-import { AsyncResult, Atom } from "effect/reactivity"
+import { AsyncResult } from "effect/reactivity"
 import { FileDiff } from "lucide-react"
 import { useMemo, useState } from "react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Button } from "@/components/ui/button"
 import { ChangesWithFeedback, LoadProblem, useNoteOpen } from "./ChangesWithFeedback"
 import { threadChangesAtom, feedbackNotesAtom } from "./threadsArea"
-import { SidePanel } from "./SidePanel"
+import { SidePanel, threadPaneWidthAtom } from "./SidePanel"
 import { useShortcuts } from "./useShortcuts"
 import { lineNotesOf, useFeedbackNotes, useNoteEditorOpen } from "./useFeedbackNotes"
-
-const paneWidthAtom = Atom.make(720).pipe(Atom.keepAlive)
 
 export function ChangesPane(props: {
   thread: Thread
@@ -32,7 +30,7 @@ export function ChangesPane(props: {
     <SidePanel
       name="Changes"
       heading="Changes"
-      width={paneWidthAtom}
+      width={threadPaneWidthAtom}
       wide={wide}
       onClose={props.onClose}
     >
